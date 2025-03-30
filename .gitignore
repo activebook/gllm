@@ -1,0 +1,42 @@
+# Specific
+.qodo
+gllm.yaml
+design.md
+**test/*.*
+
+# Ignore the compiled binary
+gllm
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# IDE settings, configuration, and caches
+.idea/
+.vscode/
+*.swp
+*~
+
+# Dependency directories (should be handled by go modules)
+# vendor/
+
+# Environment variables file
+.env
+
+# Configuration files (can contain secrets, add if needed)
+# .gllm.yaml
+# *.yaml
+# *.json
+# *.toml
+
+# Log files
+*.log
