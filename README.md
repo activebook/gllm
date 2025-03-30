@@ -1,8 +1,9 @@
-# gllm - Your Command-Line LLM Companion
+# gllm - Golang Command-Line LLM Companion
 
 `gllm` is a powerful command-line tool designed to interact seamlessly with various Large Language Models (LLMs). Configure your API keys, set your preferred models, and start chatting or executing commands effortlessly.
 
 ## 🚀 Features
+
 - **Flexible Model Selection**: Easily configure and switch between different LLMs.
 - **Interactive Chat Mode**: Start real-time conversations with AI models.
 - **Prompt Templates & System Prompts**: Manage reusable prompts and instructions.
@@ -19,7 +20,7 @@
 brew install gllm  # macOS (example)
 
 # Or manually build from source
-git clone https://github.com/your-repo/gllm.git
+git clone https://github.com/activebook/gllm.git
 cd gllm
 go build -o gllm
 ```
@@ -29,13 +30,17 @@ go build -o gllm
 ## 🎯 Usage
 
 ### 🔹 Basic Commands
+
 ```sh
 gllm "What is Go?"               # Default model & system prompt
 gllm "Summarize this" -a report.txt  # Use file as input
-gllm "Translate into English" -a image1.jpg
+gllm "Translate into English" -a image1.jpg  # Use image as input and vision model
+gllm "Where is the best place to visit in London?" -m @gpt4o # Switch model
+gllm "How to find a process and terminate it?" -t @shellmate  # Use shellmate prompt to specific shell question
 ```
 
-### 🔹 Interactive Chat
+### 🔹 Interactive Chat (*In Future Edition*)
+
 ```sh
 gllm chat                         # Start chat with defaults
 gllm chat -m gpt4o                # Start chat with a specific model
@@ -44,19 +49,22 @@ gllm chat --load my_session       # Load a saved chat session
 ```
 
 ### 🔹 Prompt Templates
+
 ```sh
 gllm --template @coder              # Use predefined coder prompt
 gllm "Act as shell" --system-prompt "You are a Linux shell..."
-gllm --system-prompt @shell-assistant --template @coder
+gllm --system-prompt @shell-assistant --template @shellmate
 ```
 
 ### 🔹 Configuration Management
+
 ```sh
 gllm config path     # Show config file location
 gllm config show     # Display loaded configurations
 ```
 
 ### 🔹 Model Management
+
 ```sh
 gllm model list                          # List available models
 gllm model add --name gpt4 --key $API_KEY --model gpt-4o --temp 0.7
@@ -64,6 +72,7 @@ gllm model default gpt4                   # Set default model
 ```
 
 ### 🔹 Template & System Prompt Management
+
 ```sh
 gllm template list                        # List available templates
 gllm template add coder "You are an expert Go programmer..."
@@ -72,8 +81,10 @@ gllm system default coder                 # Set default system prompt
 ```
 
 ### 🔹 Version Information
+
 ```sh
 gllm version
+gllm --version
 ```
 
 ---
@@ -82,10 +93,10 @@ gllm version
 
 By default, `gllm` stores configurations in a user-specific directory. Use the `config` commands to manage settings.
 
-### Example Configuration File (`~/.gllm/config.yaml`)
 ```yaml
-default_model: gpt4
-default_system_prompt: coder
+default:
+  model: gpt4
+  system_prompt: coder
 models:
   - name: gpt4
     endpoint: "https://api.openai.com"
@@ -96,22 +107,8 @@ models:
 
 ---
 
-## 🏗 Contributing
-We welcome contributions! Feel free to fork the repo and submit pull requests. Check the [issues](https://github.com/your-repo/gllm/issues) for open discussions.
-
----
-
-## 📄 License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 📬 Contact
-For any questions or support, reach out via [GitHub Issues](https://github.com/your-repo/gllm/issues) or email us at `support@yourdomain.com`.
-
----
-
 ### 💡 Why gllm?
+
 - Simplifies interaction with LLMs via CLI.
 - Supports multiple models and configurations.
 - Powerful customization with templates and prompts.
@@ -119,3 +116,13 @@ For any questions or support, reach out via [GitHub Issues](https://github.com/y
 
 Start using `gllm` today and supercharge your command-line AI experience! 🚀
 
+---
+
+## 🏗 Contributing
+
+@xinasuka {
+  @github: https://github.com/activebook
+  @website: https://activebook.github.io
+}
+
+---
