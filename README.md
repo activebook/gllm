@@ -119,6 +119,15 @@ Start using `gllm` today and supercharge your command-line AI experience! 🚀
 
 ---
 
+| Feature        | Image        |
+|--------------|--------------|
+| **Install**       | ![Install](screenshot/install.png) |
+| **How to Use**    | ![How to Use](screenshot/help.png) |
+| **Configuration** | ![Configuration](screenshot/config.png) |
+| **Usage**        | ![Usage](screenshot/usage.png) |
+
+---
+
 ## 🏗 Contributing
 
 @xinasuka {
