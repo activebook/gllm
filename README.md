@@ -17,7 +17,8 @@
 
 ```sh
 # Install via package manager (if available)
-brew install gllm  # macOS (example)
+brew tap activebook/gllm
+brew install gllm
 
 # Or manually build from source
 git clone https://github.com/activebook/gllm.git
