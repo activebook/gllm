@@ -79,59 +79,68 @@ Configure your API keys and preferred models, then start chatting or executing c
 				prompt = args[0]
 			}
 
-			// If model flag is provided, update the default model
-			if cmd.Flags().Changed("model") {
-				if StartsWith(modelFlag, "@") {
-					modelFlag = RemoveFirst(modelFlag, "@")
-					if err := SetEffectiveModel(modelFlag); err != nil {
-						fmt.Printf("%v\n", err)
+			// Create an indeterminate progress bar
+			spinner := service.NewSpinner("Processing...")
+
+			var images []*service.ImageData
+			// Start a goroutine for your actual LLM work
+			done := make(chan bool)
+			go func() {
+
+				// If model flag is provided, update the default model
+				if cmd.Flags().Changed("model") {
+					if StartsWith(modelFlag, "@") {
+						modelFlag = RemoveFirst(modelFlag, "@")
+						if err := SetEffectiveModel(modelFlag); err != nil {
+							fmt.Printf("%v\n", err)
+							fmt.Println("Using default model instead")
+						}
+					} else {
+						fmt.Printf("model[%s] should start with @\n", modelFlag)
 						fmt.Println("Using default model instead")
 					}
-				} else {
-					fmt.Printf("model[%s] should start with @\n", modelFlag)
-					fmt.Println("Using default model instead")
 				}
-			}
 
-			// If system prompt is provided, update the default system prompt
-			if sysPromptFlag != "" {
-				if StartsWith(sysPromptFlag, "@") {
-					// Using set system prompt
-					sysPromptFlag = RemoveFirst(sysPromptFlag, "@")
-					if err := SetEffectiveSystemPrompt(sysPromptFlag); err != nil {
-						fmt.Printf("%v\n", err)
-						fmt.Println("Using default system prompt instead")
+				// If system prompt is provided, update the default system prompt
+				if sysPromptFlag != "" {
+					if StartsWith(sysPromptFlag, "@") {
+						// Using set system prompt
+						sysPromptFlag = RemoveFirst(sysPromptFlag, "@")
+						if err := SetEffectiveSystemPrompt(sysPromptFlag); err != nil {
+							fmt.Printf("%v\n", err)
+							fmt.Println("Using default system prompt instead")
+						}
+					} else {
+						// Using plain adhoc system prompt
+						SetPlainSystemPrompt(sysPromptFlag)
 					}
-				} else {
-					// Using plain adhoc system prompt
-					SetPlainSystemPrompt(sysPromptFlag)
 				}
-			}
 
-			// If template is provided, update the default template
-			if templateFlag != "" {
-				if StartsWith(templateFlag, "@") {
-					// Using set template
-					templateFlag = RemoveFirst(templateFlag, "@")
-					if err := SetEffectiveTemplate(templateFlag); err != nil {
-						fmt.Printf("%v\n", err)
+				// If template is provided, update the default template
+				if templateFlag != "" {
+					if StartsWith(templateFlag, "@") {
+						// Using set template
+						templateFlag = RemoveFirst(templateFlag, "@")
+						if err := SetEffectiveTemplate(templateFlag); err != nil {
+							fmt.Printf("%v\n", err)
+							fmt.Println("Using default template instead")
+						}
+					} else {
+						fmt.Printf("template[%s] should start with @\n", templateFlag)
 						fmt.Println("Using default template instead")
 					}
-				} else {
-					fmt.Printf("template[%s] should start with @\n", templateFlag)
-					fmt.Println("Using default template instead")
 				}
-			}
 
-			// Here you would interact with the specified model
-			logger.Debugf("Using model: %s\n", modelFlag)
-			logger.Debugf("Using template: %s\n", templateFlag)
-			logger.Debugf("Prompt: %s\n", prompt)
+				// Process all prompt building
+				isThereAttachment := cmd.Flags().Changed("attachment")
+				prompt, images = buildPrompt(prompt, isThereAttachment)
+				done <- true
+			}()
+			// Update the spinner until work is done
+			<-done
+			service.StopSpinner(spinner)
 
 			// Call your LLM service here
-			var images []*service.ImageData
-			isThereAttachment := cmd.Flags().Changed("attachment")
-			prompt, images = buildPrompt(prompt, isThereAttachment)
 			processQuery(prompt, images)
 		},
 	}

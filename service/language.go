@@ -40,6 +40,8 @@ func CallLanguageModel(prompt string, sys_prompt string, images []*ImageData, mo
 	//generateOpenAIStream(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature)
 	//generateGeminiStream(apiKey, modelName, systemPrompt, userPrompt, temperature)
 
+	spinner := NewSpinner("Processing...")
+
 	// Create a channel to receive notifications
 	notifyCh := make(chan StreamNotify, 10) // Buffer to prevent blocking
 	// Start the generation in a goroutine
@@ -59,10 +61,12 @@ func CallLanguageModel(prompt string, sys_prompt string, images []*ImageData, mo
 		switch notify.Status {
 		case StatusStarted:
 			//fmt.Println("Stream started")
+			StopSpinner(spinner)
 		case StatusData:
 			fmt.Print(notify.Data) // Print the streamed text
 		case StatusError:
 			//fmt.Printf("Error: %s\n", notify.Data)
+			StopSpinner(spinner)
 			return
 		case StatusFinished:
 			//fmt.Println("\nStream finished")
