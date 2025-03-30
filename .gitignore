@@ -6,6 +6,7 @@ design.md
 
 # Ignore the compiled binary
 gllm
+gllm.7z
 
 # Binaries for programs and plugins
 *.exe
@@ -40,3 +41,5 @@ gllm
 
 # Log files
 *.log
+# Added by goreleaser init:
+dist/
