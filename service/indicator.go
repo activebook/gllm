@@ -15,5 +15,15 @@ func NewSpinner(text string) *spinner.Spinner {
 }
 
 func StopSpinner(s *spinner.Spinner) {
-	s.Stop()
+	if s.Active() {
+		s.Stop()
+	}
+}
+
+func RestartSpinner(s *spinner.Spinner, text string) {
+	if s.Active() {
+		s.Stop()
+	}
+	s.Prefix = text
+	s.Restart()
 }

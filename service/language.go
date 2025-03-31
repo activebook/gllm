@@ -69,8 +69,12 @@ func CallLanguageModel(prompt string, sys_prompt string, images []*ImageData, mo
 			StopSpinner(spinner)
 			return
 		case StatusFinished:
-			//fmt.Println("\nStream finished")
+			StopSpinner(spinner)
 			return // Exit when stream is done
+		case StatusReasoning:
+			RestartSpinner(spinner, "Reasoning...")
+		case StatusReasoningOver:
+			StopSpinner(spinner)
 		}
 	}
 }

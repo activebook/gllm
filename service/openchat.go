@@ -31,20 +31,21 @@ func generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPro
 		})
 	}
 
-	// Add user message
-	userMessage := openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleUser,
-		Content: "", // Empty string for multimodal
-		MultiContent: []openai.ChatMessagePart{
-			{
-				Type: "text",
-				Text: userPrompt,
-			},
-		},
-	}
-
+	var userMessage openai.ChatCompletionMessage
 	// Add image parts if available
 	if len(images) > 0 {
+		// Add user message
+		userMessage = openai.ChatCompletionMessage{
+			Role:    openai.ChatMessageRoleUser,
+			Content: "", // Empty string for multimodal
+			MultiContent: []openai.ChatMessagePart{
+				{
+					Type: openai.ChatMessagePartTypeText,
+					Text: userPrompt,
+				},
+			},
+		}
+		// Add all images
 		for _, img := range images {
 			// Skip nil images
 			if img == nil {
@@ -64,8 +65,14 @@ func generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPro
 			}
 			userMessage.MultiContent = append(userMessage.MultiContent, imagePart)
 		}
+	} else {
+		// For text only models, add user prompt directly
+		// If use MultiContent(for multimodal), it could be error
+		userMessage = openai.ChatCompletionMessage{
+			Role:    openai.ChatMessageRoleUser,
+			Content: userPrompt, // only for text models
+		}
 	}
-
 	messages = append(messages, userMessage)
 
 	// 3. Create the Chat Completion Request for Streaming
@@ -92,6 +99,7 @@ func generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPro
 	ch <- StreamNotify{Status: StatusStarted}
 
 	// 5. Process the Stream
+	reasoning := false
 	for {
 		response, err := stream.Recv()
 		// Check for the end of the stream
@@ -110,6 +118,19 @@ func generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPro
 		// For streaming, the actual content is in the Delta field
 		if len(response.Choices) > 0 {
 			textPart := (response.Choices[0].Delta.Content)
+			// For reasoning model, textPart could be empty
+			// So we need to check if it's empty
+			if textPart == "" {
+				if !reasoning {
+					ch <- StreamNotify{Status: StatusReasoning, Data: ""}
+				}
+				reasoning = true
+				continue
+			}
+			if reasoning {
+				reasoning = false
+				ch <- StreamNotify{Status: StatusReasoningOver, Data: ""}
+			}
 			ch <- StreamNotify{Status: StatusData, Data: string(textPart)}
 		}
 	}

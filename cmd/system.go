@@ -292,15 +292,17 @@ Example:
 func GetAllSystemPrompts() string {
 	defaultName := viper.GetString("default.system_prompt")
 	sys_prompts := viper.GetStringMapString("system_prompts")
+
 	var pairs []string
 	for name, content := range sys_prompts {
 		if name == defaultName {
-			pairs = append(pairs, fmt.Sprintf("*%s*:\n\t%s", name, content))
+			pairs = append(pairs, fmt.Sprintf("*%s*:\n\t%s\n", name, content))
 			continue
 		} else {
-			pairs = append(pairs, fmt.Sprintf("%s:\n\t%s", name, content))
+			pairs = append(pairs, fmt.Sprintf("%s:\n\t%s\n", name, content))
 		}
 	}
+	sort.Strings(pairs)
 	return strings.Join(pairs, "\n")
 }
 

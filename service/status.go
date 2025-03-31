@@ -8,6 +8,8 @@ const (
 	StatusFinished
 	StatusError
 	StatusData
+	StatusReasoning
+	StatusReasoningOver
 )
 
 type StreamNotify struct {

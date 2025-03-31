@@ -39,10 +39,15 @@ func generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt string
 		}
 	}
 
-	iter := model.GenerateContentStream(ctx, parts...)
-
 	// Signal that streaming has started
 	ch <- StreamNotify{Status: StatusStarted}
+
+	// Because gemini wouldn't show reasoning content, so we need to wait here
+	ch <- StreamNotify{Status: StatusReasoning, Data: ""}
+
+	iter := model.GenerateContentStream(ctx, parts...)
+
+	ch <- StreamNotify{Status: StatusReasoningOver, Data: ""}
 
 	// Stream the responses
 	for {

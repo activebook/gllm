@@ -286,12 +286,13 @@ func GetAllTemplates() string {
 	var pairs []string
 	for name, content := range templates {
 		if name == defaultName {
-			pairs = append(pairs, fmt.Sprintf("*%s*:\n\t%s", name, content))
+			pairs = append(pairs, fmt.Sprintf("*%s*:\n\t%s\n", name, content))
 			continue
 		} else {
-			pairs = append(pairs, fmt.Sprintf("%s:\n\t%s", name, content))
+			pairs = append(pairs, fmt.Sprintf("%s:\n\t%s\n", name, content))
 		}
 	}
+	sort.Strings(pairs)
 	return strings.Join(pairs, "\n")
 }
 

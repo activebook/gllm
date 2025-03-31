@@ -373,13 +373,21 @@ func GetAllModels() (map[string]string, error) {
 		return nil, fmt.Errorf("no models found")
 	}
 
+	// Get keys and sort them
+	keys := make([]string, 0, len(modelsMap))
+	for k := range modelsMap {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
 	models := make(map[string]string)
-	for k, v := range modelsMap {
+	for _, k := range keys {
+		v := modelsMap[k]
 		if configMap, ok := v.(map[string]interface{}); ok {
 			// Convert the inner map to a string representation
 			var pairs []string
 			for k, v := range configMap {
-				pairs = append(pairs, fmt.Sprintf("\t%s: %s", k, v))
+				pairs = append(pairs, fmt.Sprintf("\t%s: %v", k, v))
 			}
 			models[k] = strings.Join(pairs, "\n")
 		} else {
