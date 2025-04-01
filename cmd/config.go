@@ -4,6 +4,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"text/tabwriter"
 
@@ -137,6 +138,22 @@ and all default settings (e.g., default model, default system prompt, default te
 		fmt.Fprintf(w, "%v\n", templates)
 		w.Flush()
 
+		// Search Engines section
+		printSection("Search Engines")
+		searchEngines := GetAllSearchEngines()
+		fmt.Fprintln(w, " Search \t SETTINGS ")
+		fmt.Fprintln(w, "-------\t----------")
+		// Print model data
+		defaultName := GetEffectSearchEnginelName()
+		for name, settings := range searchEngines {
+			if name == defaultName {
+				fmt.Fprintf(w, "*%s*%v\n", name, settings)
+			} else {
+				fmt.Fprintf(w, "%s%v\n", name, settings)
+			}
+		}
+		w.Flush()
+
 		// Default Configuration section
 		printSection("Default Configuration")
 
@@ -161,6 +178,21 @@ and all default settings (e.g., default model, default system prompt, default te
 		fmt.Println("\nDefault Template:")
 		template := GetEffectiveTemplate()
 		fmt.Printf("%v\n", template)
+
+		// Default Search Engine
+		fmt.Println("\nDefault Search Engine:")
+		searchEngine := GetEffectiveSearchEngine()
+		fmt.Fprintln(w, " PROPERTY \t VALUE ")
+		fmt.Fprintln(w, "----------\t-------")
+		pairs := []string{}
+		for property, value := range searchEngine {
+			pairs = append(pairs, fmt.Sprintf("%s\t%v", property, value))
+		}
+		sort.Sort(sort.Reverse(sort.StringSlice(pairs)))
+		for _, pair := range pairs {
+			fmt.Fprintln(w, pair)
+		}
+		w.Flush()
 
 		fmt.Println(strings.Repeat("=", 50))
 	},

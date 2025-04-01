@@ -7,7 +7,5 @@ import (
 )
 
 func main() {
-	//test.TestQwQ()
-	//return
 	cmd.Execute()
 }

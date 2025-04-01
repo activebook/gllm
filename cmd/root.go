@@ -29,8 +29,9 @@ var (
 
 	modelFlag     string   // gllm "What is Go?" -model(-m) gpt4o
 	attachments   []string // gllm "Summarize this" --attachment(-a) report.txt
-	sysPromptFlag string   // gllm "Act as shell" --system-prompt(-s) @shell-assistant
+	sysPromptFlag string   // gllm "Act as shell" --system-prompt(-S) @shell-assistant
 	templateFlag  string   // gllm --template(-t) @coder
+	searchFlag    bool     // gllm --search(-s) "What is the stock price of Tesla right now?"
 
 	// Global cmd instance, to be used by subcommands
 	rootCmd = &cobra.Command{
@@ -212,7 +213,14 @@ func processQuery(prompt string, images []*service.ImageData) {
 	// Call your LLM service here
 	model := GetEffectiveModel()
 	sys_prompt := GetEffectiveSystemPrompt()
-	service.CallLanguageModel(prompt, sys_prompt, images, model)
+	use_search := searchFlag
+	if use_search {
+		searchEngine := GetEffectiveSearchEngine()
+		service.CallLanguageModelRag(prompt, sys_prompt, images, model, searchEngine)
+	} else {
+		service.CallLanguageModel(prompt, sys_prompt, images, model)
+	}
+
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -256,8 +264,9 @@ func init() {
 	// Define the flags
 	rootCmd.Flags().StringVarP(&modelFlag, "model", "m", "", "Specify the language model to use")
 	rootCmd.Flags().StringSliceVarP(&attachments, "attachment", "a", []string{}, "Specify file(s) or image(s) to append to the prompt")
-	rootCmd.Flags().StringVarP(&sysPromptFlag, "system-prompt", "s", "", "Specify a system prompt")
+	rootCmd.Flags().StringVarP(&sysPromptFlag, "system-prompt", "S", "", "Specify a system prompt")
 	rootCmd.Flags().StringVarP(&templateFlag, "template", "t", "", "Specify a template to use")
+	rootCmd.Flags().BoolVarP(&searchFlag, "search", "s", false, "To query an LLM with a search function")
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
 
 	// Add more persistent flags here if needed (e.g., --verbose, --log-file)
