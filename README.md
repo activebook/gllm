@@ -27,6 +27,13 @@ cd gllm
 go build -o gllm
 ```
 
+## 📦 Upgrade
+
+```sh
+brew tap activebook/gllm
+brew upgrade gllm
+```
+
 ---
 
 ## 🎯 Usage
@@ -131,6 +138,7 @@ models:
 - Supports multiple models and configurations.
 - Powerful customization with templates and prompts.
 - Works with text, code, and image-based queries.
+- Supports search with image and query.
 
 Start using `gllm` today and supercharge your command-line AI experience! 🚀
 
@@ -142,6 +150,7 @@ Start using `gllm` today and supercharge your command-line AI experience! 🚀
 | **How to Use**    | ![How to Use](screenshots/help.png) |
 | **Configuration** | ![Configuration](screenshots/config.png) |
 | **Usage**        | ![Usage](screenshots/usage.png) |
+| **Search RAG**   | ![Usage](screenshots/search.png) |
 
 ---
 
