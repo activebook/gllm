@@ -148,7 +148,7 @@ Start using `gllm` today and supercharge your command-line AI experience! 🚀
 |--------------|--------------|
 | **Install**       | ![Install](screenshots/install.png) |
 | **Upgrade**       | ![Install](screenshots/upgrade.png) |
-| **How to Use**    | ![How to Use](screenshots/help.png) |
+| **How to Use**    | ![How to Use](screenshots/howto.png) |
 | **Configuration** | ![Configuration](screenshots/config.png) |
 | **Usage**        | ![Usage](screenshots/usage.png) |
 | **Search RAG**   | ![Usage](screenshots/search.png) |
