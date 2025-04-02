@@ -12,17 +12,12 @@ import (
 	"github.com/google/generative-ai-go/genai"
 )
 
-var (
-	proc chan<- StreamNotify
-)
-
-func generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt string, temperature float32, images []*ImageData, ch chan<- StreamNotify) error {
-	proc = ch
+func generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt string, temperature float32, images []*ImageData) error {
 	// Setup the Gemini client
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
-		ch <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create client: %v", err)}
+		proc <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create client: %v", err)}
 		return err
 	}
 	defer client.Close()
@@ -47,26 +42,26 @@ func generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt string
 	}
 
 	// Signal that streaming has started
-	ch <- StreamNotify{Status: StatusStarted}
+	proc <- StreamNotify{Status: StatusStarted}
 
 	// Because gemini wouldn't show reasoning content, so we need to wait here
-	ch <- StreamNotify{Status: StatusReasoning, Data: ""}
+	proc <- StreamNotify{Status: StatusReasoning, Data: ""}
 
 	iter := model.GenerateContentStream(ctx, parts...)
 
-	ch <- StreamNotify{Status: StatusReasoningOver, Data: ""}
+	proc <- StreamNotify{Status: StatusReasoningOver, Data: ""}
 
 	// Stream the responses
 	for {
 		resp, err := iter.Next()
 		if err == iterator.Done {
 			// Signal that streaming is complete
-			ch <- StreamNotify{Status: StatusFinished}
+			proc <- StreamNotify{Status: StatusFinished}
 			return nil
 		}
 
 		if err != nil {
-			ch <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}
+			proc <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}
 			return err
 		}
 
@@ -74,7 +69,7 @@ func generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt string
 		for _, candidate := range resp.Candidates {
 			for _, part := range candidate.Content.Parts {
 				if textPart, ok := part.(genai.Text); ok {
-					ch <- StreamNotify{Status: StatusData, Data: string(textPart)}
+					proc <- StreamNotify{Status: StatusData, Data: string(textPart)}
 				}
 			}
 		}
@@ -90,20 +85,19 @@ func generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt string
 // Functions that start with uppercase letters (like PrintSection) are exported and can be used by other packages that import your package.
 // generateStreamText connects to the Google AI API and streams the generated text.
 
-func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPrompt string, temperature float32, images []*ImageData, ch chan<- StreamNotify) error {
-	proc = ch
+func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPrompt string, temperature float32, images []*ImageData) error {
 	ctx := context.Background()
 
 	// Initialize Gemini client
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
-		ch <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create client: %v", err)}
+		proc <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create client: %v", err)}
 		return err
 	}
 	defer client.Close()
 
 	// Define the Google Search Tool
-	googleSearchTool := getSearchTool()
+	googleSearchTool := getGeminiSearchTool()
 
 	// Set up model with function calling capability
 	model := client.GenerativeModel(modelName) // Use a model known for tool use
@@ -141,7 +135,7 @@ func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPro
 	for range 3 {
 		resp, err := generateAndProcessStream(ctx, model, history)
 		if err != nil {
-			ch <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}
+			proc <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}
 			return err
 		}
 		// if len(functionResultData) > 0 {
@@ -161,7 +155,7 @@ func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPro
 			fc := resp.functionCall
 			data, err := callSearchFunction(fc)
 			if err != nil {
-				ch <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Error calling function: %v", err)}
+				proc <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Error calling function: %v", err)}
 				return err
 			}
 
@@ -183,11 +177,11 @@ func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPro
 		}
 	}
 	// Signal that streaming is complete
-	ch <- StreamNotify{Status: StatusFinished}
+	proc <- StreamNotify{Status: StatusFinished}
 	return nil
 }
 
-func getSearchTool() *genai.Tool {
+func getGeminiSearchTool() *genai.Tool {
 
 	var searchTool *genai.Tool
 	engine := GetSearchEngine()
@@ -323,7 +317,8 @@ func generateAndProcessStream(ctx context.Context, model *genai.GenerativeModel,
 				}
 			} else if fcPart, ok := part.(genai.FunctionCall); ok {
 				// Store the first function call encountered. Gemini API usually sends one per turn.
-				if result.functionCall == nil {
+				// Must check the function name, some models make up function name
+				if result.functionCall == nil && fcPart.Name == "web_search" {
 					result.functionCall = &fcPart // Store the pointer directly
 					// No need to print details here, we'll do it after the loop
 				}

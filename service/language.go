@@ -5,6 +5,12 @@ import (
 	"strings"
 )
 
+// Create a channel to receive notifications
+// Shared by gemini.go and openchat.go
+var (
+	proc chan<- StreamNotify
+)
+
 func CallLanguageModel(prompt string, sys_prompt string, images []*ImageData, model map[string]any) {
 
 	apiKey := model["key"].(string)
@@ -44,14 +50,15 @@ func CallLanguageModel(prompt string, sys_prompt string, images []*ImageData, mo
 
 	// Create a channel to receive notifications
 	notifyCh := make(chan StreamNotify, 10) // Buffer to prevent blocking
+	proc = notifyCh
 	// Start the generation in a goroutine
 	go func() {
 		if openaiCompatible {
-			if err := generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature, images, notifyCh); err != nil {
+			if err := generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature, images); err != nil {
 				fmt.Printf("Stream error: %v\n", err)
 			}
 		} else {
-			if err := generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt, temperature, images, notifyCh); err != nil {
+			if err := generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt, temperature, images); err != nil {
 				fmt.Printf("Stream error: %v\n", err)
 			}
 		}
@@ -131,14 +138,15 @@ func CallLanguageModelRag(prompt string, sys_prompt string, images []*ImageData,
 
 	// Create a channel to receive notifications
 	notifyCh := make(chan StreamNotify, 10) // Buffer to prevent blocking
+	proc = notifyCh
 	// Start the generation in a goroutine
 	go func() {
 		if openaiCompatible {
-			if err := generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature, images, notifyCh); err != nil {
+			if err := generateOpenAIStreamWithSearchChan(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature, images); err != nil {
 				fmt.Printf("Stream error: %v\n", err)
 			}
 		} else {
-			if err := GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPrompt, temperature, images, notifyCh); err != nil {
+			if err := GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPrompt, temperature, images); err != nil {
 				fmt.Printf("Stream error: %v\n", err)
 			}
 		}
