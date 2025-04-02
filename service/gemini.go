@@ -130,6 +130,8 @@ func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPro
 	// Signal that streaming has started
 	proc <- StreamNotify{Status: StatusStarted}
 
+	// keep track of the references
+	var references map[string]interface{}
 	// only do 3 times of function calling
 	for range 3 {
 		resp, err := generateAndProcessStream(ctx, model, history)
@@ -157,6 +159,8 @@ func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPro
 				proc <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Error calling function: %v", err)}
 				return err
 			}
+			// Link the references
+			references = data
 
 			// --- Prepare Function Response ---
 			functionResponsePart := &genai.FunctionResponse{
@@ -174,6 +178,10 @@ func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPro
 			// No function call and no model content
 			break
 		}
+	}
+	if references != nil {
+		refs := "\n\n" + RetrieveReferences(references)
+		proc <- StreamNotify{Status: StatusData, Data: refs}
 	}
 	// Signal that streaming is complete
 	proc <- StreamNotify{Status: StatusFinished}

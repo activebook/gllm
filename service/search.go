@@ -219,3 +219,35 @@ func BingSearch(query string) (map[string]any, error) {
 
 	return results, nil
 }
+
+func RetrieveReferences(results map[string]any) string {
+	sb := strings.Builder{}
+	sb.WriteString("References:\n")
+	if res, ok := results["results"].([]any); ok {
+		for i, result := range res {
+			if linkMap, ok := result.(map[string]any); ok {
+				if link, ok := linkMap["link"].(string); ok {
+					title, hasTitle := linkMap["title"].(string)
+					displayLink := linkMap["displayLink"].(string)
+					// Choose the best description (title or displayLink)
+					description := displayLink
+					if hasTitle && title != "" {
+						description = title
+					}
+					// Print in a more readable format with truncation
+					sb.WriteString(fmt.Sprintf("[%d] %s\n    %s: %s\n", i+1, truncateString(description, 60),
+						truncateString(displayLink, 30), link))
+				}
+			}
+		}
+	}
+	return sb.String()
+}
+
+// Helper function to truncate long strings
+func truncateString(s string, maxLength int) string {
+	if len(s) <= maxLength {
+		return s
+	}
+	return s[:maxLength-3] + "..."
+}

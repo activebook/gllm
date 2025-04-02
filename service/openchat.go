@@ -201,7 +201,7 @@ func generateOpenAIStreamWithSearchChan(apiKey, endPoint, modelName, systemPromp
 	conversation.messages = append(conversation.messages, userMessage)
 
 	// Process the conversation with recursive tool call handling
-	err := conversation.ProcessConversation(0)
+	err := conversation.ProcessConversation()
 	if err != nil {
 		proc <- StreamNotify{Status: StatusError}
 		Logf("Error processing conversation: %v\n", err)
@@ -218,6 +218,7 @@ type Conversation struct {
 	model         string
 	tools         []openai.Tool
 	maxRecursions int
+	references    map[string]interface{} // keep track of the references
 }
 
 func getOpenaiSearchTool() openai.Tool {
@@ -277,58 +278,58 @@ func NewConversation(apiKey, baseURL, model string) *Conversation {
 }
 
 // ProcessConversation processes the conversation, handling tool calls recursively
-func (c *Conversation) ProcessConversation(recursionDepth int) error {
-	if recursionDepth > c.maxRecursions {
-		// Too much calls, force the end
-		proc <- StreamNotify{Status: StatusFinished}
-		return nil
-	}
-
-	// Create the request
-	req := openai.ChatCompletionRequest{
-		Model:           c.model,
-		Messages:        c.messages,
-		Stream:          true,
-		ReasoningEffort: "high",
-		Tools:           c.tools,
-	}
-
-	// Make the streaming request
-	stream, err := c.client.CreateChatCompletionStream(c.ctx, req)
-	if err != nil {
-		return fmt.Errorf("stream creation error: %v", err)
-	}
-	defer stream.Close()
-
-	proc <- StreamNotify{Status: StatusStarted}
-
-	// Process the stream and collect tool calls
-	assistantMessage, toolCalls, err := c.processStream(stream)
-	if err != nil {
-		return fmt.Errorf("error processing stream: %v", err)
-	}
-
-	// Add the assistant's message to the conversation
-	c.messages = append(c.messages, assistantMessage)
-
-	// If there are tool calls, process them
-	if len(toolCalls) > 0 {
-		// Process each tool call
-		for id, toolCall := range toolCalls {
-			result, err := c.processToolCall(id, toolCall)
-			if err != nil {
-				Logf("Error processing tool call: %v\n", err)
-				continue
-			}
-
-			// Add the tool response to the conversation
-			c.messages = append(c.messages, result)
+func (c *Conversation) ProcessConversation() error {
+	// only allow 3 recursions
+	for range c.maxRecursions {
+		// Create the request
+		req := openai.ChatCompletionRequest{
+			Model:           c.model,
+			Messages:        c.messages,
+			Stream:          true,
+			ReasoningEffort: "high",
+			Tools:           c.tools,
 		}
 
-		// Continue the conversation recursively
-		return c.ProcessConversation(recursionDepth + 1)
-	}
+		// Make the streaming request
+		stream, err := c.client.CreateChatCompletionStream(c.ctx, req)
+		if err != nil {
+			return fmt.Errorf("stream creation error: %v", err)
+		}
+		defer stream.Close()
 
+		proc <- StreamNotify{Status: StatusStarted}
+
+		// Process the stream and collect tool calls
+		assistantMessage, toolCalls, err := c.processStream(stream)
+		if err != nil {
+			return fmt.Errorf("error processing stream: %v", err)
+		}
+
+		// Add the assistant's message to the conversation
+		c.messages = append(c.messages, assistantMessage)
+
+		// If there are tool calls, process them
+		if len(toolCalls) > 0 {
+			// Process each tool call
+			for id, toolCall := range toolCalls {
+				result, err := c.processToolCall(id, toolCall)
+				if err != nil {
+					Logf("Error processing tool call: %v\n", err)
+					continue
+				}
+				// Add the tool response to the conversation
+				c.messages = append(c.messages, result)
+			}
+			// Continue the conversation recursively
+		} else {
+			// No function call and no model content
+			break
+		}
+	}
+	if c.references != nil {
+		refs := "\n\n" + RetrieveReferences(c.references)
+		proc <- StreamNotify{Status: StatusData, Data: refs}
+	}
 	// No more message
 	proc <- StreamNotify{Status: StatusFinished}
 	return nil
@@ -453,6 +454,8 @@ func (c *Conversation) processToolCall(id string, toolCall openai.ToolCall) (ope
 		Logf("Error performing search: %v", err)
 		return openai.ChatCompletionMessage{}, fmt.Errorf("error performing search: %v", err)
 	}
+	// keep the search results for references
+	c.references = data
 
 	// Convert search results to JSON string
 	resultsJSON, err := json.Marshal(data)
