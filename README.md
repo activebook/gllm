@@ -8,6 +8,7 @@
 - **Interactive Chat Mode**: Start real-time conversations with AI models.
 - **Prompt Templates & System Prompts**: Manage reusable prompts and instructions.
 - **Attachment Support**: Process files and images as part of queries.
+- **Search Support**: Using search engines, find relevant and latest information.
 - **Configuration Management**: Customize model behavior and settings.
 - **Version Control**: Easily track and update your setup.
 
@@ -38,6 +39,13 @@ gllm "Summarize this" -a report.txt  # Use file as input
 gllm "Translate into English" -a image1.jpg  # Use image as input and vision model
 gllm "Where is the best place to visit in London?" -m @gpt4o # Switch model
 gllm "How to find a process and terminate it?" -t @shellmate  # Use shellmate prompt to specific shell question
+```
+
+### 🔍 Search & Vision
+
+```sh
+gllm "Who is the President of the United States right now?" --search # Use search to find latest news
+gllm "Who is he/she in this photo? And what is his/her current title?" -s -a "face.png" --model @gemini # Use vision model and search engine to find people in image
 ```
 
 ### 🔹 Interactive Chat (*In Future Edition*)
@@ -79,6 +87,15 @@ gllm template list                        # List available templates
 gllm template add coder "You are an expert Go programmer..."
 gllm system add --name coder --content "You are an expert Go programmer..."
 gllm system default coder                 # Set default system prompt
+```
+
+### 🔹 New update! & Search Engine Management (Only support google and tavily)
+
+```sh
+gllm search list                          # List available search engines   
+gllm search google --key $API_KEY --cx $SEARCH_ENGINE_ID # Use Google Search Engine
+gllm search tavily --key $API_KEY                       # Use Tavily Search Engine
+gllm search default [google,tavily]     # Set default search engine
 ```
 
 ### 🔹 Version Information
