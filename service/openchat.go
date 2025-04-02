@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 
 	openai "github.com/sashabaranov/go-openai"
@@ -205,7 +204,7 @@ func generateOpenAIStreamWithSearchChan(apiKey, endPoint, modelName, systemPromp
 	err := conversation.ProcessConversation(0)
 	if err != nil {
 		proc <- StreamNotify{Status: StatusError}
-		log.Printf("Error processing conversation: %v\n", err)
+		Logf("Error processing conversation: %v\n", err)
 		return fmt.Errorf("error processing conversation: %v", err)
 	}
 	return nil
@@ -318,7 +317,7 @@ func (c *Conversation) ProcessConversation(recursionDepth int) error {
 		for id, toolCall := range toolCalls {
 			result, err := c.processToolCall(id, toolCall)
 			if err != nil {
-				log.Printf("Error processing tool call: %v\n", err)
+				Logf("Error processing tool call: %v\n", err)
 				continue
 			}
 
@@ -429,7 +428,7 @@ func (c *Conversation) processToolCall(id string, toolCall openai.ToolCall) (ope
 		return openai.ChatCompletionMessage{}, fmt.Errorf("query not found in arguments")
 	}
 
-	log.Printf("\nFunction Calling: %s(%+v)\n", toolCall.Function.Name, query)
+	Debugf("\nFunction Calling: %s(%+v)\n", toolCall.Function.Name, query)
 	proc <- StreamNotify{Status: StatusFunctionCalling, Data: ""}
 
 	// Call the search function
@@ -451,7 +450,7 @@ func (c *Conversation) processToolCall(id string, toolCall openai.ToolCall) (ope
 
 	if err != nil {
 		proc <- StreamNotify{Status: StatusFunctionCallingOver, Data: ""}
-		log.Printf("Error performing search: %v", err)
+		Logf("Error performing search: %v", err)
 		return openai.ChatCompletionMessage{}, fmt.Errorf("error performing search: %v", err)
 	}
 

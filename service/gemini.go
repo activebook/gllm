@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -217,7 +216,7 @@ func getGeminiSearchTool() *genai.Tool {
 
 func callSearchFunction(fc *genai.FunctionCall) (map[string]any, error) {
 	// Notify the stream of the function call
-	log.Printf("Function Calling: %s(%+v)\n", fc.Name, fc.Args)
+	Debugf("Function Calling: %s(%+v)\n", fc.Name, fc.Args)
 	proc <- StreamNotify{Status: StatusFunctionCalling, Data: ""}
 
 	// --- Execute Local Function ---
@@ -228,7 +227,7 @@ func callSearchFunction(fc *genai.FunctionCall) (map[string]any, error) {
 	argsJSON, _ := json.Marshal(fc.Args)
 	if err := json.Unmarshal(argsJSON, &args); err != nil {
 		proc <- StreamNotify{Status: StatusFunctionCallingOver, Data: ""}
-		log.Printf("Warning: Could not unmarshal function args: %v. Args: %+v", err, fc.Args)
+		Logf("Warning: Could not unmarshal function args: %v. Args: %+v", err, fc.Args)
 		return nil, fmt.Errorf("could not unmarshal function args: %v", err)
 	}
 
@@ -250,7 +249,7 @@ func callSearchFunction(fc *genai.FunctionCall) (map[string]any, error) {
 	}
 	if err != nil {
 		proc <- StreamNotify{Status: StatusFunctionCallingOver, Data: ""}
-		log.Printf("Error performing search: %v", err)
+		Logf("Error performing search: %v", err)
 		// TODO: Potentially send an error FunctionResponse back to the model
 		return nil, fmt.Errorf("error performing search: %v", err)
 	}
@@ -298,7 +297,7 @@ func generateAndProcessStream(ctx context.Context, model *genai.GenerativeModel,
 			break
 		}
 		if err != nil {
-			log.Printf("Stream error: %v", err.Error())
+			Logf("Stream error: %v", err.Error())
 			return nil, fmt.Errorf("stream error: %v", err)
 		}
 		if resp == nil || len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil {

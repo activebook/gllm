@@ -25,7 +25,7 @@ var (
 	debugMode         bool   // Flag to enable debug logging
 
 	// Global logger instance, configured by setupLogging
-	logger = log.New()
+	logger = service.NewLogger()
 
 	modelFlag     string   // gllm "What is Go?" -model(-m) gpt4o
 	attachments   []string // gllm "Summarize this" --attachment(-a) report.txt
@@ -272,9 +272,7 @@ func init() {
 	// Add more persistent flags here if needed (e.g., --verbose, --log-file)
 	// Set logrus defaults before configuration is loaded
 	// This ensures basic logging works even if config fails
-	logger.SetOutput(os.Stderr)
-	logger.SetLevel(log.InfoLevel)            // Default to Info level initially
-	logger.SetFormatter(&log.TextFormatter{}) // Default to TextFormatter
+	service.InitLogger()
 }
 
 // initConfigPaths calculates the application's configuration directory and file path.
