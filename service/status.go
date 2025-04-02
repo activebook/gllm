@@ -10,6 +10,8 @@ const (
 	StatusData
 	StatusReasoning
 	StatusReasoningOver
+	StatusFunctionCalling
+	StatusFunctionCallingOver
 )
 
 type StreamNotify struct {

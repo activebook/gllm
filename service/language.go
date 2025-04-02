@@ -87,6 +87,22 @@ func CallLanguageModelRag(prompt string, sys_prompt string, images []*ImageData,
 	systemPrompt := sys_prompt
 	userPrompt := prompt
 
+	if name, ok := searchEngine["name"]; ok {
+		SetSearchEngine(name.(string))
+	} else {
+		SetSearchEngine("")
+	}
+	if keyValue, ok := searchEngine["key"]; ok {
+		SetSearchApiKey(keyValue.(string))
+	} else {
+		SetSearchApiKey("")
+	}
+	if cxValue, ok := searchEngine["cx"]; ok {
+		SetSearchCxKey(cxValue.(string))
+	} else {
+		SetSearchCxKey("")
+	}
+
 	var temperature float32
 	switch temp := model["temperature"].(type) {
 	case float64:
@@ -122,7 +138,7 @@ func CallLanguageModelRag(prompt string, sys_prompt string, images []*ImageData,
 				fmt.Printf("Stream error: %v\n", err)
 			}
 		} else {
-			if err := generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt, temperature, images, notifyCh); err != nil {
+			if err := GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPrompt, temperature, images, notifyCh); err != nil {
 				fmt.Printf("Stream error: %v\n", err)
 			}
 		}
@@ -145,6 +161,10 @@ func CallLanguageModelRag(prompt string, sys_prompt string, images []*ImageData,
 		case StatusReasoning:
 			RestartSpinner(spinner, "Reasoning...")
 		case StatusReasoningOver:
+			StopSpinner(spinner)
+		case StatusFunctionCalling:
+			RestartSpinner(spinner, "Searching...")
+		case StatusFunctionCallingOver:
 			StopSpinner(spinner)
 		}
 	}
