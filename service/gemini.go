@@ -11,7 +11,28 @@ import (
 	"github.com/google/generative-ai-go/genai"
 )
 
-func generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt string, temperature float32, images []*ImageData) error {
+func getGeminiFilePart(file *FileData) genai.Part {
+
+	mimeType := file.Format()
+	data := file.Data()
+	// Create appropriate part based on file type
+	switch {
+	case IsImageMIMEType(mimeType):
+		// Handle image files
+		return genai.ImageData(mimeType, data)
+	case IsPDFMIMEType(mimeType):
+		// Handle PDF files.
+		return genai.Blob{MIMEType: mimeType, Data: data}
+	case IsExcelMIMEType(mimeType):
+		// Handle Excel files.
+		return genai.Blob{MIMEType: mimeType, Data: data}
+	default:
+		// Default to plain text for other file types.
+		return genai.Text(string(data))
+	}
+}
+
+func generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt string, temperature float32, files []*FileData) error {
 	// Setup the Gemini client
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
@@ -32,11 +53,11 @@ func generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt string
 	model.SetTemperature(temperature)
 
 	parts := []genai.Part{genai.Text(userPrompt)}
-	for _, imageData := range images {
-		// Check if the image data is empty
-		if imageData != nil {
-			// Convert the image data to a blob
-			parts = append(parts, genai.ImageData(imageData.Format(), imageData.Data()))
+	for _, file := range files {
+		// Check if the file data is empty
+		if file != nil {
+			// Convert the file data to a blob
+			parts = append(parts, getGeminiFilePart(file))
 		}
 	}
 
@@ -84,7 +105,7 @@ func generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt string
 // Functions that start with uppercase letters (like PrintSection) are exported and can be used by other packages that import your package.
 // generateStreamText connects to the Google AI API and streams the generated text.
 
-func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPrompt string, temperature float32, images []*ImageData) error {
+func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPrompt string, temperature float32, files []*FileData) error {
 	ctx := context.Background()
 
 	// Initialize Gemini client
@@ -110,11 +131,11 @@ func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPro
 	model.SetTemperature(temperature)
 
 	parts := []genai.Part{genai.Text(userPrompt)}
-	for _, imageData := range images {
-		// Check if the image data is empty
-		if imageData != nil {
-			// Convert the image data to a blob
-			parts = append(parts, genai.ImageData(imageData.Format(), imageData.Data()))
+	for _, file := range files {
+		// Check if the file data is empty
+		if file != nil {
+			// Convert the file data to a blob
+			parts = append(parts, getGeminiFilePart(file))
 		}
 	}
 

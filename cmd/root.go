@@ -83,7 +83,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 			// Create an indeterminate progress bar
 			spinner := service.NewSpinner("Processing...")
 
-			var images []*service.ImageData
+			var files []*service.FileData
 			// Start a goroutine for your actual LLM work
 			done := make(chan bool)
 			go func() {
@@ -134,7 +134,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 
 				// Process all prompt building
 				isThereAttachment := cmd.Flags().Changed("attachment")
-				prompt, images = buildPrompt(prompt, isThereAttachment)
+				prompt, files = buildPrompt(prompt, isThereAttachment)
 				done <- true
 			}()
 			// Update the spinner until work is done
@@ -142,7 +142,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 			service.StopSpinner(spinner)
 
 			// Call your LLM service here
-			processQuery(prompt, images)
+			processQuery(prompt, files)
 		},
 	}
 )
@@ -159,31 +159,35 @@ func appendText(builder *strings.Builder, text string) {
 }
 
 // Processes a single attachment (file or stdin marker)
-func processAttachment(path string) (string, *service.ImageData) {
+func processAttachment(path string) *service.FileData {
 	// Handle stdin or regular file
-	content, err := readContentFromPath(path)
+	data, err := readContentFromPath(path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading file[%s]: %v\n", path, err)
-		return "", nil
+		return nil
 	}
 
 	// Check if content is an image
-	isImage, format, err := service.CheckIfImageFromBytes(content)
+	isImage, format, err := service.CheckIfImageFromBytes(data)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error checking content type: %v\n", err)
-		return "", nil
+		return nil
 	}
 
-	if isImage {
-		return "", service.NewImageData(format, content)
-	} else {
-		return string(content), nil
+	// If not an image, try to get MIME type from file extension
+	if !isImage {
+		format = service.GetMIMEType(path)
+		if service.IsUnknownMIMEType(format) {
+			// try to guess MIME type by content
+			format = service.GetMIMETypeByContent(data)
+		}
 	}
+	return service.NewFileData(format, data)
 }
 
-func buildPrompt(prompt string, isThereAttachment bool) (string, []*service.ImageData) {
+func buildPrompt(prompt string, isThereAttachment bool) (string, []*service.FileData) {
 	var finalPrompt strings.Builder
-	images := []*service.ImageData{}
+	files := []*service.FileData{}
 
 	// Add user prompt and template
 	appendText(&finalPrompt, prompt)
@@ -192,12 +196,9 @@ func buildPrompt(prompt string, isThereAttachment bool) (string, []*service.Imag
 	if isThereAttachment {
 		// Process attachments
 		for _, attachment := range attachments {
-			textContent, imageData := processAttachment(attachment)
-			if imageData != nil {
-				images = append(images, imageData)
-			}
-			if textContent != "" {
-				appendText(&finalPrompt, textContent)
+			fileData := processAttachment(attachment)
+			if fileData != nil {
+				files = append(files, fileData)
 			}
 		}
 	} else {
@@ -206,19 +207,19 @@ func buildPrompt(prompt string, isThereAttachment bool) (string, []*service.Imag
 		appendText(&finalPrompt, stdinContent)
 	}
 
-	return finalPrompt.String(), images
+	return finalPrompt.String(), files
 }
 
-func processQuery(prompt string, images []*service.ImageData) {
+func processQuery(prompt string, files []*service.FileData) {
 	// Call your LLM service here
 	model := GetEffectiveModel()
 	sys_prompt := GetEffectiveSystemPrompt()
 	use_search := searchFlag
 	if use_search {
 		searchEngine := GetEffectiveSearchEngine()
-		service.CallLanguageModelRag(prompt, sys_prompt, images, model, searchEngine)
+		service.CallLanguageModelRag(prompt, sys_prompt, files, model, searchEngine)
 	} else {
-		service.CallLanguageModel(prompt, sys_prompt, images, model)
+		service.CallLanguageModel(prompt, sys_prompt, files, model)
 	}
 
 }

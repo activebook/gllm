@@ -12,7 +12,50 @@ import (
 	openai "github.com/sashabaranov/go-openai"
 )
 
-func generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPrompt string, temperature float32, images []*ImageData) error {
+// For direct inclusion in messages, OpenAI's Chat Completions API only supports:
+// Text - Regular text content in the message
+// Images - Can be included directly in messages as either:
+// Data URLs (base64-encoded)
+// URLs pointing to publicly accessible images
+// For other file types like PDFs, Excel files, Word documents, etc., you can't include them directly in a message. Instead, you need to follow a two-step process:
+// Upload the file to OpenAI's servers first using the Files API
+// Reference the file in one of two ways:
+// Using the Assistants API (which has built-in file handling capabilities)
+// Using the file retrieval tool if using function calling with GPT-4 Turbo
+// This is different from some other APIs like Google's Gemini, which allows you to send various file types directly as part of the request payload using multipart format with appropriate MIME types.
+func getOpenAIFilePart(file *FileData) *openai.ChatMessagePart {
+
+	var part *openai.ChatMessagePart
+	format := file.Format()
+	// Handle based on file type
+	if IsImageMIMEType(format) {
+		// Create base64 image URL
+		base64Data := base64.StdEncoding.EncodeToString(file.Data())
+		//imageURL := fmt.Sprintf("data:image/%s;base64,%s", file.Format(), base64Data)
+		// data:format;base64,base64Data
+		imageURL := fmt.Sprintf("data:%s;base64,%s", file.Format(), base64Data)
+		// Create and append image part
+		part = &openai.ChatMessagePart{
+			Type: "image_url",
+			ImageURL: &openai.ChatMessageImageURL{
+				URL: imageURL,
+			},
+		}
+	} else if IsTextMIMEType(format) {
+		// Create and append text part
+		part = &openai.ChatMessagePart{
+			Type: openai.ChatMessagePartTypeText,
+			Text: string(file.Data()),
+		}
+	} else {
+		// Unknown file type, skip
+		// Don't deal with pdf, xls
+		// It needs upload to OpenAI's servers first, so we can't include them directly in a message.
+	}
+	return part
+}
+
+func generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPrompt string, temperature float32, files []*FileData) error {
 
 	// 1. Initialize the Client
 	ctx := context.Background()
@@ -35,7 +78,7 @@ func generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPro
 
 	var userMessage openai.ChatCompletionMessage
 	// Add image parts if available
-	if len(images) > 0 {
+	if len(files) > 0 {
 		// Add user message
 		userMessage = openai.ChatCompletionMessage{
 			Role:    openai.ChatMessageRoleUser,
@@ -47,25 +90,14 @@ func generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPro
 				},
 			},
 		}
-		// Add all images
-		for _, img := range images {
-			// Skip nil images
-			if img == nil {
-				continue
+		// Add all files
+		for _, file := range files {
+			if file != nil {
+				part := getOpenAIFilePart(file)
+				if part != nil {
+					userMessage.MultiContent = append(userMessage.MultiContent, *part)
+				}
 			}
-
-			// Create base64 image URL
-			base64Data := base64.StdEncoding.EncodeToString(img.Data())
-			imageURL := fmt.Sprintf("data:image/%s;base64,%s", img.Format(), base64Data)
-
-			// Create and append image part
-			imagePart := openai.ChatMessagePart{
-				Type: "image_url",
-				ImageURL: &openai.ChatMessageImageURL{
-					URL: imageURL,
-				},
-			}
-			userMessage.MultiContent = append(userMessage.MultiContent, imagePart)
 		}
 	} else {
 		// For text only models, add user prompt directly
@@ -101,7 +133,7 @@ func generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPro
 	proc <- StreamNotify{Status: StatusStarted}
 
 	// 5. Process the Stream
-	reasoning := false
+	//reasoning := false
 	for {
 		response, err := stream.Recv()
 		// Check for the end of the stream
@@ -121,24 +153,31 @@ func generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPro
 		if len(response.Choices) > 0 {
 			textPart := (response.Choices[0].Delta.Content)
 			// For reasoning model, textPart could be empty
-			// So we need to check if it's empty
-			if textPart == "" {
-				if !reasoning {
-					proc <- StreamNotify{Status: StatusReasoning, Data: ""}
+			// The empty textPart (when response.Choices[0].Delta.Content is an empty string) is actually a normal and important part of the streaming protocol. There are several reasons why you might receive chunks with empty content:
+			// Message role indicators: Sometimes the API sends a chunk that only indicates the role (e.g., "assistant") without any content. This happens at the beginning of a response.
+			// Thinking/processing time: For models with reasoning capabilities, there might be pauses or empty chunks while the model is "thinking" before generating the next part of the response.
+			// Special tokens: The model might send chunks that represent special tokens or control signals rather than visible text.
+			// Metadata updates: Some chunks might be sent just to update metadata fields like finish_reason or other status indicators.
+			// Stream heartbeats: Empty chunks can sometimes function as heartbeats to keep the connection alive during processing.
+			/*
+				if textPart == "" {
+					if !reasoning {
+						proc <- StreamNotify{Status: StatusReasoning, Data: ""}
+					}
+					reasoning = true
+					continue
 				}
-				reasoning = true
-				continue
-			}
-			if reasoning {
-				reasoning = false
-				proc <- StreamNotify{Status: StatusReasoningOver, Data: ""}
-			}
+				if reasoning {
+					reasoning = false
+					proc <- StreamNotify{Status: StatusReasoningOver, Data: ""}
+				}
+			*/
 			proc <- StreamNotify{Status: StatusData, Data: string(textPart)}
 		}
 	}
 }
 
-func generateOpenAIStreamWithSearchChan(apiKey, endPoint, modelName, systemPrompt, userPrompt string, temperature float32, images []*ImageData) error {
+func generateOpenAIStreamWithSearchChan(apiKey, endPoint, modelName, systemPrompt, userPrompt string, temperature float32, files []*FileData) error {
 
 	// 1. Initialize the Client
 	conversation := NewConversation(
@@ -158,7 +197,7 @@ func generateOpenAIStreamWithSearchChan(apiKey, endPoint, modelName, systemPromp
 
 	var userMessage openai.ChatCompletionMessage
 	// Add image parts if available
-	if len(images) > 0 {
+	if len(files) > 0 {
 		// Add user message
 		userMessage = openai.ChatCompletionMessage{
 			Role:    openai.ChatMessageRoleUser,
@@ -170,25 +209,14 @@ func generateOpenAIStreamWithSearchChan(apiKey, endPoint, modelName, systemPromp
 				},
 			},
 		}
-		// Add all images
-		for _, img := range images {
-			// Skip nil images
-			if img == nil {
-				continue
+		// Add all files
+		for _, file := range files {
+			if file != nil {
+				part := getOpenAIFilePart(file)
+				if part != nil {
+					userMessage.MultiContent = append(userMessage.MultiContent, *part)
+				}
 			}
-
-			// Create base64 image URL
-			base64Data := base64.StdEncoding.EncodeToString(img.Data())
-			imageURL := fmt.Sprintf("data:image/%s;base64,%s", img.Format(), base64Data)
-
-			// Create and append image part
-			imagePart := openai.ChatMessagePart{
-				Type: "image_url",
-				ImageURL: &openai.ChatMessageImageURL{
-					URL: imageURL,
-				},
-			}
-			userMessage.MultiContent = append(userMessage.MultiContent, imagePart)
 		}
 	} else {
 		// For text only models, add user prompt directly

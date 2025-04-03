@@ -2,7 +2,6 @@
 package cmd
 
 import (
-	"github.com/activebook/gllm/test"
 	"github.com/spf13/cobra"
 )
 
@@ -19,8 +18,8 @@ var testCmd = &cobra.Command{
 		// For now, we'll just print a message
 		cmd.Println("Test command executed. For future interactive REPL mode, use 'gllm chat'")
 
-		test.TestSearch2()
+		//test.TestSearch2()
 		//test.TestQwQ()
-		//return
+		return
 	},
 }

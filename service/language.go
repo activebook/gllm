@@ -11,7 +11,7 @@ var (
 	proc chan<- StreamNotify
 )
 
-func CallLanguageModel(prompt string, sys_prompt string, images []*ImageData, model map[string]any) {
+func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, model map[string]any) {
 
 	apiKey := model["key"].(string)
 	endPoint := model["endpoint"].(string)
@@ -54,11 +54,11 @@ func CallLanguageModel(prompt string, sys_prompt string, images []*ImageData, mo
 	// Start the generation in a goroutine
 	go func() {
 		if openaiCompatible {
-			if err := generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature, images); err != nil {
+			if err := generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
 				fmt.Printf("Stream error: %v\n", err)
 			}
 		} else {
-			if err := generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt, temperature, images); err != nil {
+			if err := generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
 				fmt.Printf("Stream error: %v\n", err)
 			}
 		}
@@ -86,7 +86,7 @@ func CallLanguageModel(prompt string, sys_prompt string, images []*ImageData, mo
 	}
 }
 
-func CallLanguageModelRag(prompt string, sys_prompt string, images []*ImageData, model map[string]any, searchEngine map[string]any) {
+func CallLanguageModelRag(prompt string, sys_prompt string, files []*FileData, model map[string]any, searchEngine map[string]any) {
 
 	apiKey := model["key"].(string)
 	endPoint := model["endpoint"].(string)
@@ -142,11 +142,11 @@ func CallLanguageModelRag(prompt string, sys_prompt string, images []*ImageData,
 	// Start the generation in a goroutine
 	go func() {
 		if openaiCompatible {
-			if err := generateOpenAIStreamWithSearchChan(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature, images); err != nil {
+			if err := generateOpenAIStreamWithSearchChan(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
 				fmt.Printf("Stream error: %v\n", err)
 			}
 		} else {
-			if err := GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPrompt, temperature, images); err != nil {
+			if err := GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
 				fmt.Printf("Stream error: %v\n", err)
 			}
 		}
