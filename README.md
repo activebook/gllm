@@ -9,6 +9,7 @@
 - **Prompt Templates & System Prompts**: Manage reusable prompts and instructions.
 - **Attachment Support**: Process files and images as part of queries.
 - **Search Support**: Using search engines, find relevant and latest information.
+- **Reading PDF Support**: Google models support PDF processing.(OpenAI compatibles only for text/image)
 - **Configuration Management**: Customize model behavior and settings.
 - **Version Control**: Easily track and update your setup.
 
@@ -152,6 +153,7 @@ Start using `gllm` today and supercharge your command-line AI experience! 🚀
 | **Configuration** | ![Configuration](screenshots/config.png) |
 | **Usage**        | ![Usage](screenshots/usage.png) |
 | **Search RAG**   | ![Usage](screenshots/search.png) |
+| **Reading PDF**   | ![Usage](screenshots/pdf.png) |
 
 ---
 
