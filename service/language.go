@@ -11,6 +11,12 @@ var (
 	proc chan<- StreamNotify
 )
 
+const (
+	// Terminal colors
+	inProgressColor = "\033[90m" // Bright Black
+	completeColor   = "\033[32m" // Green
+)
+
 func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, model map[string]any) {
 
 	apiKey := model["key"].(string)
@@ -43,9 +49,6 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 		}
 	}
 
-	//generateOpenAIStream(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature)
-	//generateGeminiStream(apiKey, modelName, systemPrompt, userPrompt, temperature)
-
 	spinner := NewSpinner("Processing...")
 
 	// Create a channel to receive notifications
@@ -54,34 +57,41 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 	// Start the generation in a goroutine
 	go func() {
 		if openaiCompatible {
-			if err := generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
-				fmt.Printf("Stream error: %v\n", err)
+			//if err := generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
+			if err := generateVolcStreamChan(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
+				Errorf("Stream error: %v\n", err)
 			}
 		} else {
 			if err := generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
-				fmt.Printf("Stream error: %v\n", err)
+				Errorf("Stream error: %v\n", err)
 			}
 		}
 	}()
+
 	// Process notifications in the main thread
 	for notify := range notifyCh {
 		switch notify.Status {
+		case StatusProcessing:
+			StartSpinner(spinner, "Processing...")
 		case StatusStarted:
-			//fmt.Println("Stream started")
 			StopSpinner(spinner)
 		case StatusData:
 			fmt.Print(notify.Data) // Print the streamed text
 		case StatusError:
-			//fmt.Printf("Error: %s\n", notify.Data)
 			StopSpinner(spinner)
 			return
 		case StatusFinished:
 			StopSpinner(spinner)
 			return // Exit when stream is done
 		case StatusReasoning:
-			RestartSpinner(spinner, "Reasoning...")
-		case StatusReasoningOver:
 			StopSpinner(spinner)
+			// Start with in-progress color
+			fmt.Println(completeColor + "Thinking ↓" + inProgressColor)
+		case StatusReasoningOver:
+			// Switch to complete color at the end
+			fmt.Print(resetColor)
+			fmt.Print(completeColor + "✓" + resetColor)
+			fmt.Println()
 		}
 	}
 }
@@ -142,36 +152,42 @@ func CallLanguageModelRag(prompt string, sys_prompt string, files []*FileData, m
 	// Start the generation in a goroutine
 	go func() {
 		if openaiCompatible {
-			if err := generateOpenAIStreamWithSearchChan(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
-				fmt.Printf("Stream error: %v\n", err)
+			//if err := generateOpenAIStreamWithSearchChan(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
+			if err := generateVolcStreamWithSearchChan(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
+				Errorf("Stream error: %v\n", err)
 			}
 		} else {
 			if err := GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
-				fmt.Printf("Stream error: %v\n", err)
+				Errorf("Stream error: %v\n", err)
 			}
 		}
 	}()
 	// Process notifications in the main thread
 	for notify := range notifyCh {
 		switch notify.Status {
+		case StatusProcessing:
+			StartSpinner(spinner, "Processing...")
 		case StatusStarted:
-			//fmt.Println("Stream started")
 			StopSpinner(spinner)
 		case StatusData:
 			fmt.Print(notify.Data) // Print the streamed text
 		case StatusError:
-			//fmt.Printf("Error: %s\n", notify.Data)
 			StopSpinner(spinner)
 			return
 		case StatusFinished:
 			StopSpinner(spinner)
 			return // Exit when stream is done
 		case StatusReasoning:
-			RestartSpinner(spinner, "Reasoning...")
-		case StatusReasoningOver:
 			StopSpinner(spinner)
+			// Start with in-progress color
+			fmt.Println(completeColor + "Thinking ↓" + inProgressColor)
+		case StatusReasoningOver:
+			// Switch to complete color at the end
+			fmt.Print(resetColor)
+			fmt.Print(completeColor + "✓" + resetColor)
+			fmt.Println()
 		case StatusFunctionCalling:
-			RestartSpinner(spinner, "Searching...")
+			StartSpinner(spinner, "Searching...")
 		case StatusFunctionCallingOver:
 			StopSpinner(spinner)
 		}

@@ -58,8 +58,6 @@ var modelCmd = &cobra.Command{
 		if len(args) == 0 {
 			return cmd.Help()
 		}
-		// Handle cases where a non-existent subcommand is provided (Cobra usually handles this)
-		fmt.Printf("Unknown model subcommand: %s\n", args[0])
 		return cmd.Help()
 	},
 }

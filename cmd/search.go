@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/activebook/gllm/service"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -36,7 +37,7 @@ The cx parameter is the key for the custom search engine.`,
 		viper.Set("search_engines.google.key", key)
 		viper.Set("search_engines.google.cx", cx)
 		if err := viper.WriteConfig(); err != nil {
-			fmt.Printf("Error saving configuration: %s\n", err)
+			service.Errorf("Error saving configuration: %s\n", err)
 			return
 		}
 
@@ -60,7 +61,7 @@ var tavilyCmd = &cobra.Command{
 		// Save configuration
 		viper.Set("search_engines.tavily.key", key)
 		if err := viper.WriteConfig(); err != nil {
-			fmt.Printf("Error saving configuration: %s\n", err)
+			service.Errorf("Error saving configuration: %s\n", err)
 			return
 		}
 
@@ -84,7 +85,7 @@ var bingCmd = &cobra.Command{
 		// Save configuration
 		viper.Set("search_engines.bing.key", key)
 		if err := viper.WriteConfig(); err != nil {
-			fmt.Printf("Error saving configuration: %s\n", err)
+			service.Errorf("Error saving configuration: %s\n", err)
 			return
 		}
 
@@ -166,20 +167,20 @@ var defaultCmd = &cobra.Command{
 		// Set new default
 		engine := strings.ToLower(args[0])
 		if engine != "google" && engine != "tavily" && engine != "bing" {
-			fmt.Printf("Error: '%s' is not a valid search engine. Options: google, tavily, bing\n", engine)
+			service.Errorf("Error: '%s' is not a valid search engine. Options: google, tavily, bing\n", engine)
 			return
 		}
 
 		// Check if the selected engine is configured
 		key := viper.GetString(fmt.Sprintf("search_engines.%s.key", engine))
 		if key == "" {
-			fmt.Printf("Warning: %s is not yet configured. Please set API key first.\n", engine)
+			service.Warnf("Warning: %s is not yet configured. Please set API key first.\n", engine)
 			return
 		}
 
 		viper.Set("default.search", engine)
 		if err := viper.WriteConfig(); err != nil {
-			fmt.Printf("Error saving configuration: %s\n", err)
+			service.Errorf("Error saving configuration: %s\n", err)
 			return
 		}
 

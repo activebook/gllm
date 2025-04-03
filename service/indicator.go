@@ -20,10 +20,13 @@ func StopSpinner(s *spinner.Spinner) {
 	}
 }
 
-func RestartSpinner(s *spinner.Spinner, text string) {
+func StartSpinner(s *spinner.Spinner, text string) {
 	if s.Active() {
 		s.Stop()
+		s.Prefix = text
+		s.Start()
+	} else {
+		s.Prefix = text
+		s.Start()
 	}
-	s.Prefix = text
-	s.Restart()
 }

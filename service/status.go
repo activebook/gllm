@@ -4,6 +4,7 @@ type StreamStatus int
 
 const (
 	StatusUnknown StreamStatus = iota
+	StatusProcessing
 	StatusStarted
 	StatusFinished
 	StatusError

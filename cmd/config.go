@@ -8,6 +8,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/activebook/gllm/service"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -30,8 +31,6 @@ or use 'config path' to see where the configuration file is located.`,
 		if len(args) == 0 {
 			return cmd.Help()
 		}
-		// Handle cases where a non-existent subcommand is provided (Cobra usually handles this)
-		fmt.Printf("Unknown config subcommand: %s\n", args[0])
 		return cmd.Help()
 	},
 }
@@ -96,7 +95,7 @@ and all default settings (e.g., default model, default system prompt, default te
 		printSection("Models")
 		models, err := GetAllModels()
 		if err != nil {
-			fmt.Printf("Error retrieving models: %s\n", err)
+			service.Errorf("Error retrieving models: %s\n", err)
 		} else {
 			// Print headers for the table
 			fmt.Fprintln(w, " MODEL \t SETTINGS ")

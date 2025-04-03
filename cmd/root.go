@@ -16,7 +16,7 @@ import (
 
 var (
 	// Hardcode the version string here
-	version     = "v1.2.2" // <<< Set your desired version
+	version     = "v1.4.0" // <<< Set your desired version
 	versionFlag bool       // To hold the version flag value
 
 	cfgFile           string // To hold the path to the config file if specified via flag
@@ -25,7 +25,7 @@ var (
 	debugMode         bool   // Flag to enable debug logging
 
 	// Global logger instance, configured by setupLogging
-	logger = service.NewLogger()
+	logger = service.GetLogger()
 
 	modelFlag     string   // gllm "What is Go?" -model(-m) gpt4o
 	attachments   []string // gllm "Summarize this" --attachment(-a) report.txt
@@ -54,7 +54,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 		Run: func(cmd *cobra.Command, args []string) {
 			// Your main command logic goes here
 			// For example, you can print a message or perform some action
-			logger.Debugln("Start processing...")
+			service.Debugf("Start processing...\n")
 			// If no arguments and no relevant flags are set, show help instead
 			// Args: cobra.ArbitraryArgs: This tells Cobra that receiving any number of positional arguments (including zero arguments) is perfectly valid.
 			// It won't trigger an error or the help message based on the argument count alone.
@@ -93,11 +93,11 @@ Configure your API keys and preferred models, then start chatting or executing c
 					if StartsWith(modelFlag, "@") {
 						modelFlag = RemoveFirst(modelFlag, "@")
 						if err := SetEffectiveModel(modelFlag); err != nil {
-							fmt.Printf("%v\n", err)
+							service.Warnf("%v\n", err)
 							fmt.Println("Using default model instead")
 						}
 					} else {
-						fmt.Printf("model[%s] should start with @\n", modelFlag)
+						service.Warnf("model[%s] should start with @\n", modelFlag)
 						fmt.Println("Using default model instead")
 					}
 				}
@@ -108,7 +108,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 						// Using set system prompt
 						sysPromptFlag = RemoveFirst(sysPromptFlag, "@")
 						if err := SetEffectiveSystemPrompt(sysPromptFlag); err != nil {
-							fmt.Printf("%v\n", err)
+							service.Warnf("%v\n", err)
 							fmt.Println("Using default system prompt instead")
 						}
 					} else {
@@ -123,11 +123,11 @@ Configure your API keys and preferred models, then start chatting or executing c
 						// Using set template
 						templateFlag = RemoveFirst(templateFlag, "@")
 						if err := SetEffectiveTemplate(templateFlag); err != nil {
-							fmt.Printf("%v\n", err)
+							service.Warnf("%v\n", err)
 							fmt.Println("Using default template instead")
 						}
 					} else {
-						fmt.Printf("template[%s] should start with @\n", templateFlag)
+						service.Warnf("template[%s] should start with @\n", templateFlag)
 						fmt.Println("Using default template instead")
 					}
 				}
@@ -234,13 +234,13 @@ func Execute() {
 	// Alternatively, put this inside initConfig before viper.ReadInConfig().
 	if appConfigDir != "" { // Make sure appConfigDir has been calculated by init()
 		if err := os.MkdirAll(appConfigDir, 0750); err != nil { // 0750 permissions: user rwx, group rx, others none
-			logger.Errorf("Error creating config directory '%s': %v\n", appConfigDir, err)
+			service.Errorf("Error creating config directory '%s': %v\n", appConfigDir, err)
 			// Decide if this is a fatal error. Maybe just warn? For now, let's warn.
 		}
 	}
 
 	if err := rootCmd.Execute(); err != nil {
-		logger.Errorf("Whoops. There was an error while executing your CLI '%s'\n", err)
+		service.Errorf("'%s'\n", err)
 		os.Exit(1)
 	}
 }
@@ -283,7 +283,7 @@ func initConfigPaths() {
 	userConfigDir, err := os.UserConfigDir()
 	if err != nil {
 		// Fallback to home directory if UserConfigDir fails
-		logger.Warnln("Warning: Could not find user config dir, falling back to home directory.", err)
+		service.Warnf("Warning: Could not find user config dir, falling back to home directory.%v\n", err)
 		userConfigDir, err = homedir.Dir()
 		cobra.CheckErr(err) // If home dir also fails, panic
 	}
@@ -315,16 +315,16 @@ func initConfig() {
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		logger.Debugln("Using config file:", viper.ConfigFileUsed())
+		//service.Debugf("Using config file:", viper.ConfigFileUsed())
 	} else {
 		// Handle errors using the logger
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			logger.Debugf("Config file not found in %s or via --config flag. Using defaults/env vars.", appConfigDir)
+			service.Debugf("Config file not found in %s or via --config flag. Using defaults/env vars.", appConfigDir)
 		} else if os.IsNotExist(err) {
-			logger.Debugf("Config file path %s does not exist. Using defaults/env vars.", viper.ConfigFileUsed())
+			service.Debugf("Config file path %s does not exist. Using defaults/env vars.", viper.ConfigFileUsed())
 		} else {
 			// Use Warn or Error level for actual reading errors
-			logger.Warnf("Error reading config file (%s): %v", viper.ConfigFileUsed(), err)
+			service.Errorf("Error reading config file (%s): %v", viper.ConfigFileUsed(), err)
 		}
 	}
 
@@ -348,7 +348,7 @@ func setupLogging() {
 		var err error
 		level, err = log.ParseLevel(logLevelStr)
 		if err != nil {
-			logger.Warnf("Invalid log level '%s' in config, using 'info': %v", logLevelStr, err)
+			service.Warnf("Invalid log level '%s' in config, using 'info': %v", logLevelStr, err)
 			level = log.InfoLevel
 			logLevelStr = "info (due to invalid config value)"
 		} else {
@@ -357,7 +357,7 @@ func setupLogging() {
 	logger.SetLevel(level)
 
 	// Log the final configuration being used (at Debug level)
-	logger.Debugf("Logger initialized: level=%s ", logLevelStr)
+	service.Debugf("Logger initialized: level=%s ", logLevelStr)
 }
 
 // Helper function to get the calculated default config file path
