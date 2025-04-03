@@ -2,16 +2,17 @@
 
 `gllm` is a powerful command-line tool designed to interact seamlessly with various Large Language Models (LLMs). Configure your API keys, set your preferred models, and start chatting or executing commands effortlessly.
 
-## 🚀 Features
+## 🚀 Features  
 
-- **Flexible Model Selection**: Easily configure and switch between different LLMs.
-- **Interactive Chat Mode**: Start real-time conversations with AI models.
-- **Prompt Templates & System Prompts**: Manage reusable prompts and instructions.
-- **Attachment Support**: Process files and images as part of queries.
-- **Search Support**: Using search engines, find relevant and latest information.
-- **Reading PDF Support**: Google models support PDF processing.(OpenAI compatibles only for text/image)
-- **Configuration Management**: Customize model behavior and settings.
-- **Version Control**: Easily track and update your setup.
+- **Flexible Model Selection**: Easily configure and switch between different LLMs.  
+- **Interactive Chat Mode**: Start real-time conversations with AI models.  
+- **Prompt Templates & System Prompts**: Manage reusable prompts and instructions.  
+- **Attachment Support**: Process files and images as part of queries.  
+- **Search Support**: Using search engines, find relevant and latest information.  
+- **Reading PDF Support**: Google models support PDF processing (OpenAI compatibles only for text/image).  
+- **Reasoning Support**: Generate detailed explanations, logical breakdowns, and step-by-step analysis.  
+- **Configuration Management**: Customize model behavior and settings.  
+- **Version Control**: Easily track and update your setup.  
 
 ---
 
@@ -140,19 +141,21 @@ models:
 - Powerful customization with templates and prompts.
 - Works with text, code, and image-based queries.
 - Supports search with image and query.
+- Check reasoning details.
 
 Start using `gllm` today and supercharge your command-line AI experience! 🚀
 
 ---
 
-| Feature        | Image        |
-|--------------|--------------|
+| Feature           | Image        |
+|-------------------|--------------|
 | **Install**       | ![Install](screenshots/install.png) |
 | **Upgrade**       | ![Install](screenshots/upgrade.png) |
 | **How to Use**    | ![How to Use](screenshots/howto.png) |
 | **Configuration** | ![Configuration](screenshots/config.png) |
-| **Usage**        | ![Usage](screenshots/usage.png) |
-| **Search RAG**   | ![Usage](screenshots/search.png) |
+| **Usage**         | ![Usage](screenshots/usage.png) |
+| **Reasoning**     | ![Usage](screenshots/reasoning.png) |
+| **Search RAG**    | ![Usage](screenshots/search.png) |
 | **Reading PDF**   | ![Usage](screenshots/pdf.png) |
 
 ---
