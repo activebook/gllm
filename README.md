@@ -172,18 +172,24 @@ This project includes various features to enhance usability and efficiency. Belo
 
 | Feature           | Description |
 |------------------|-------------|
-| **Multi-Search** | Perform multiple searches simultaneously. ![Multi](screenshots/multisearch.png) |
-| **Reading PDFs** | Extract and analyze content from PDFs. ![PDF](screenshots/pdf.png) |
+| **Multi-Search** | Perform multiple searches simultaneously. 
 
-For more details, refer to the official documentation.
+---
+![Multi](screenshots/multisearch.png) |
+| **Reading PDFs** | Extract and analyze content from PDFs.  
+
+---
+ ![PDF](screenshots/pdf.png) |
+
+For more details, using `gllm --help` to check.
 
 ---
 
 ## 🏗 Contributing
 
 @xinasuka {
-  @github: https://github.com/activebook
-  @website: https://activebook.github.io
+  @github: <https://github.com/activebook>
+  @website: <https://activebook.github.io>
 }
 
 ---
