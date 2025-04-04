@@ -48,6 +48,7 @@ gllm "Summarize this" -a report.txt  # Use file as input
 gllm "Translate into English" -a image1.jpg  # Use image as input and vision model
 gllm "Where is the best place to visit in London?" -m @gpt4o # Switch model
 gllm "How to find a process and terminate it?" -t @shellmate  # Use shellmate prompt to specific shell question
+gllm -s "Who's the POTUS right now? and check what's his latest tariff policy" -m @gemini-pro -r 10 # Use Gemini model to search and set max references to 10
 ```
 
 ### 🔍 Search & Vision
