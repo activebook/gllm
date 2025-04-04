@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -41,9 +40,10 @@ type TavilyError struct {
 }
 
 var (
-	searchApiKey string
-	searchCxKey  string
-	searchEngine string
+	searchApiKey  string
+	searchCxKey   string
+	searchEngine  string
+	maxReferences int
 )
 
 const TavilyUrl = "https://api.tavily.com/search"
@@ -67,6 +67,10 @@ func GetSearchEngine() string {
 	return searchEngine
 }
 
+func SetMaxReferences(max int) {
+	maxReferences = max
+}
+
 func TavilySearch(query string) (map[string]any, error) {
 
 	// Format the JSON payload, inserting the query variable
@@ -75,7 +79,7 @@ func TavilySearch(query string) (map[string]any, error) {
   "topic": "general",
   "search_depth": "basic",
   "chunks_per_source": 3,
-  "max_results": 5,
+  "max_results": 10,
   "time_range": null,
   "days": 3,
   "include_answer": "basic",
@@ -89,7 +93,7 @@ func TavilySearch(query string) (map[string]any, error) {
 	// Create a new POST request with the payload
 	req, err := http.NewRequest("POST", TavilyUrl, strings.NewReader(payload))
 	if err != nil {
-		log.Fatalf("[Tavily]Error creating request: %v", err)
+		Errorf("[Tavily]Error creating request: %v", err)
 		return nil, fmt.Errorf("[Tavily]Error creating request: %v", err)
 	}
 
@@ -100,7 +104,7 @@ func TavilySearch(query string) (map[string]any, error) {
 	// Execute the request
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Fatalf("[Tavily]Error sending request: %v", err)
+		Errorf("[Tavily]Error sending request: %v", err)
 		return nil, fmt.Errorf("[Tavily]Error sending request: %v", err)
 	}
 	defer res.Body.Close()
@@ -108,28 +112,27 @@ func TavilySearch(query string) (map[string]any, error) {
 	// Read the response body
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		log.Fatalf("[Tavily]Error reading response: %v", err)
+		Errorf("[Tavily]Error reading response: %v", err)
 		return nil, fmt.Errorf("[Tavily]Error reading response: %v", err)
 	}
 
-	fmt.Println("Response Status:", res.Status)
 	if res.StatusCode != 200 {
 		var tavilyError TavilyError
 		if err := json.Unmarshal([]byte(body), &tavilyError); err != nil {
-			log.Fatalf("[Tavily]Error parsing JSON: %v", err)
+			Errorf("[Tavily]Error parsing JSON: %v", err)
 		}
 		return nil, fmt.Errorf("[Tavily]Error: %s", tavilyError.Detail.Error)
 	}
 
 	var tavilyResp TavilyResponse
 	if err := json.Unmarshal([]byte(body), &tavilyResp); err != nil {
-		log.Fatalf("[Tavily]Error parsing JSON: %v", err)
+		Errorf("[Tavily]Error parsing JSON: %v", err)
 		return nil, fmt.Errorf("[Tavily]Error parsing JSON: %v", err)
 	}
 
 	formatted, err := tavilyFormatResponse(&tavilyResp)
 	if err != nil {
-		log.Fatalf("[Tavily]Error formatting response: %v", err)
+		Errorf("[Tavily]Error formatting response: %v", err)
 		return nil, fmt.Errorf("[Tavily]Error formatting response: %v", err)
 	}
 	return formatted, nil
@@ -173,13 +176,13 @@ func GoogleSearch(query string) (map[string]any, error) {
 	ctx := context.Background() // Required for NewService
 	svc, err := customsearch.NewService(ctx, option.WithAPIKey(searchApiKey))
 	if err != nil {
-		log.Fatalf("[Google]Error creating service: %v", err)
+		Errorf("[Google]Error creating service: %v", err)
 		return nil, fmt.Errorf("[Google]Error creating service: %v", err)
 	}
 
-	resp, err := svc.Cse.List().Safe("off").Num(5).Cx(searchCxKey).Q(query).Do()
+	resp, err := svc.Cse.List().Safe("off").Num(10).Cx(searchCxKey).Q(query).Do()
 	if err != nil {
-		log.Fatalf("[Google]Error making API call: %v", err)
+		Errorf("[Google]Error making API call: %v", err)
 		return nil, fmt.Errorf("[Google]Error making API call: %v", err)
 	}
 
@@ -220,26 +223,43 @@ func BingSearch(query string) (map[string]any, error) {
 	return results, nil
 }
 
-func RetrieveReferences(results map[string]any) string {
+func RetrieveReferences(references []*map[string]any) string {
+	if len(references) == 0 {
+		return ""
+	}
 	sb := strings.Builder{}
 	sb.WriteString("References:\n")
-	if res, ok := results["results"].([]any); ok {
-		for i, result := range res {
-			if linkMap, ok := result.(map[string]any); ok {
-				if link, ok := linkMap["link"].(string); ok {
-					title, hasTitle := linkMap["title"].(string)
-					displayLink := linkMap["displayLink"].(string)
-					// Choose the best description (title or displayLink)
-					description := displayLink
-					if hasTitle && title != "" {
-						description = title
+	index, total := 0, 0
+	for _, ref := range references {
+		if ref == nil {
+			continue
+		}
+
+		if results, ok := (*ref)["results"].([]any); ok {
+			for _, result := range results {
+				if linkMap, ok := result.(map[string]any); ok {
+					if link, ok := linkMap["link"].(string); ok {
+						title, hasTitle := linkMap["title"].(string)
+						displayLink := linkMap["displayLink"].(string)
+						// Choose the best description (title or displayLink)
+						description := displayLink
+						if hasTitle && title != "" {
+							description = title
+						}
+						// Print in a more readable format with truncation
+						total++
+						if index < maxReferences {
+							index++
+							sb.WriteString(fmt.Sprintf("[%d] %s\n    %s: %s\n", index, truncateString(description, 60),
+								truncateString(displayLink, 30), link))
+						}
 					}
-					// Print in a more readable format with truncation
-					sb.WriteString(fmt.Sprintf("[%d] %s\n    %s: %s\n", i+1, truncateString(description, 60),
-						truncateString(displayLink, 30), link))
 				}
 			}
 		}
+	}
+	if total > maxReferences {
+		sb.WriteString(fmt.Sprintf("...and %d more references. Use the '-r' flag to view more.\n", total-maxReferences))
 	}
 	return sb.String()
 }

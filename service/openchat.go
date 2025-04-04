@@ -248,7 +248,7 @@ type Conversation struct {
 	temperature   float32
 	tools         []openai.Tool
 	maxRecursions int
-	references    map[string]interface{} // keep track of the references
+	references    []*map[string]interface{} // keep track of the references
 }
 
 func getOpenaiSearchTool() openai.Tool {
@@ -304,6 +304,7 @@ func NewConversation(apiKey, baseURL, model string, temperature float32) *Conver
 		model:         model,
 		temperature:   temperature,
 		tools:         []openai.Tool{tool},
+		references:    make([]*map[string]any, 0, 1),
 		maxRecursions: 3, // Limit recursion depth to prevent infinite loops
 	}
 }
@@ -358,7 +359,7 @@ func (c *Conversation) ProcessConversation() error {
 			break
 		}
 	}
-	if c.references != nil {
+	if len(c.references) > 0 {
 		refs := "\n\n" + RetrieveReferences(c.references)
 		proc <- StreamNotify{Status: StatusData, Data: refs}
 	}
@@ -487,7 +488,7 @@ func (c *Conversation) processToolCall(id string, toolCall openai.ToolCall) (ope
 		return openai.ChatCompletionMessage{}, fmt.Errorf("error performing search: %v", err)
 	}
 	// keep the search results for references
-	c.references = data
+	c.references = append(c.references, &data)
 
 	// Convert search results to JSON string
 	resultsJSON, err := json.Marshal(data)

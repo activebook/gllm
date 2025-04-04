@@ -248,7 +248,7 @@ type VolcChat struct {
 	temperature   float32
 	tools         []*model.Tool
 	maxRecursions int
-	references    map[string]interface{} // keep track of the references
+	references    []*map[string]interface{} // keep track of the references
 }
 
 func getVolcSearchTool() *model.Tool {
@@ -307,14 +307,19 @@ func NewVolcChat(apiKey, baseURL, modelName string, temperature float32) *VolcCh
 		model:         modelName,
 		temperature:   temperature,
 		tools:         []*model.Tool{tool},
-		maxRecursions: 3, // Limit recursion depth to prevent infinite loops
+		references:    make([]*map[string]interface{}, 0, 1),
+		maxRecursions: 5, // Limit recursion depth to prevent infinite loops
 	}
 }
 
 func (c *VolcChat) ProcessVolcChat() error {
 	// only allow 3 recursions
+	i := 0
 	for range c.maxRecursions {
 		proc <- StreamNotify{Status: StatusProcessing}
+
+		i++
+		Debugf("Processing conversation at times: %d\n", i)
 
 		// Create the request
 		req := model.CreateChatCompletionRequest{
@@ -360,7 +365,7 @@ func (c *VolcChat) ProcessVolcChat() error {
 			break
 		}
 	}
-	if c.references != nil {
+	if len(c.references) > 0 {
 		refs := "\n\n" + RetrieveReferences(c.references)
 		proc <- StreamNotify{Status: StatusData, Data: refs}
 	}
@@ -411,7 +416,7 @@ func (c *VolcChat) processVolcStream(stream *utils.ChatCompletionStreamReader) (
 				text := *delta.ReasoningContent
 				contentBuffer.WriteString(text)
 				proc <- StreamNotify{Status: StatusData, Data: text}
-			} else {
+			} else if delta.Content != "" {
 				text := delta.Content
 				contentBuffer.WriteString(text)
 				proc <- StreamNotify{Status: StatusData, Data: text}
@@ -514,7 +519,7 @@ func (c *VolcChat) processVolcToolCall(id string, toolCall model.ToolCall) (*mod
 		return nil, fmt.Errorf("error performing search: %v", err)
 	}
 	// keep the search results for references
-	c.references = data
+	c.references = append(c.references, &data)
 
 	// Convert search results to JSON string
 	resultsJSON, err := json.Marshal(data)

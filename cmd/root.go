@@ -16,7 +16,7 @@ import (
 
 var (
 	// Hardcode the version string here
-	version     = "v1.4.0" // <<< Set your desired version
+	version     = "v1.4.2" // <<< Set your desired version
 	versionFlag bool       // To hold the version flag value
 
 	cfgFile           string // To hold the path to the config file if specified via flag
@@ -32,6 +32,7 @@ var (
 	sysPromptFlag string   // gllm "Act as shell" --system-prompt(-S) @shell-assistant
 	templateFlag  string   // gllm --template(-t) @coder
 	searchFlag    bool     // gllm --search(-s) "What is the stock price of Tesla right now?"
+	referenceFlag int      // gllm --reference(-r) 3 "What is the stock price of Tesla right now?"
 
 	// Global cmd instance, to be used by subcommands
 	rootCmd = &cobra.Command{
@@ -217,6 +218,7 @@ func processQuery(prompt string, files []*service.FileData) {
 	use_search := searchFlag
 	if use_search {
 		searchEngine := GetEffectiveSearchEngine()
+		service.SetMaxReferences(referenceFlag)
 		service.CallLanguageModelRag(prompt, sys_prompt, files, model, searchEngine)
 	} else {
 		service.CallLanguageModel(prompt, sys_prompt, files, model)
@@ -268,6 +270,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&sysPromptFlag, "system-prompt", "S", "", "Specify a system prompt")
 	rootCmd.Flags().StringVarP(&templateFlag, "template", "t", "", "Specify a template to use")
 	rootCmd.Flags().BoolVarP(&searchFlag, "search", "s", false, "To query an LLM with a search function")
+	rootCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
 
 	// Add more persistent flags here if needed (e.g., --verbose, --log-file)
