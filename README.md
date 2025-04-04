@@ -148,16 +148,18 @@ Start using `gllm` today and supercharge your command-line AI experience! 🚀
 
 ---
 
-| Feature           | Image        |
-|-------------------|--------------|
-| **Install**       | ![Install](screenshots/install.png) |
-| **Upgrade**       | ![Install](screenshots/upgrade.png) |
-| **How to Use**    | ![How to Use](screenshots/howto.png) |
-| **Configuration** | ![Configuration](screenshots/config.png) |
-| **Usage**         | ![Usage](screenshots/usage.png) |
-| **Reasoning**     | ![Usage](screenshots/reasoning.png) |
-| **Search RAG**    | ![Usage](screenshots/search.png) |
-| **Reading PDF**   | ![Usage](screenshots/pdf.png) |
+| Feature            | Feature            |
+|--------------------|--------------------|
+| **Install**        | **Upgrade**        |
+| ![Install](screenshots/install.png) | ![Upgrade](screenshots/upgrade.png) |
+| **How to Use**     | **Configuration**  |
+| ![How to Use](screenshots/howto.png) | ![Config](screenshots/config.png) |
+| **Usage**          | **Reasoning**      |
+| ![Usage](screenshots/usage.png)     | ![Reasoning](screenshots/reasoning.png) |
+| **Search RAG**     | **Multi Searches** |
+| ![Search](screenshots/search.png)   | ![Multi](screenshots/multisearch.png) |
+| **Reading PDF**    |                    |
+| ![PDF](screenshots/pdf.png)         |                    |
 
 ---
 
