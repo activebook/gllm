@@ -156,15 +156,15 @@ This project includes various features to enhance usability and efficiency. Belo
 
 | Feature             | Description |
 |---------------------|-------------|
-| **Installation & Upgrade** | Easily install or upgrade the application. <br> --- <br> ![Install](screenshots/install.png) ![Upgrade](screenshots/upgrade.png) |
-| **How to Use** | Step-by-step guide on using the application. <br> --- <br> ![How to Use](screenshots/howto.png) |
+| **Installation & Upgrade** | Easily install or upgrade using brew. <br> --- <br> ![Install](screenshots/install.png) ![Upgrade](screenshots/upgrade.png) |
+| **How to Use** | Just try --help. <br> --- <br> ![How to Use](screenshots/howto.png) |
 
 ## Core Functionalities
 
 | Feature            | Description |
 |--------------------|-------------|
-| **General Usage** | Demonstrates how to interact with the system. <br> --- <br> ![Usage](screenshots/usage.png) |
-| **Search with RAG** | Implements Retrieval-Augmented Generation for smarter search capabilities. <br> --- <br> ![Search](screenshots/search.png) |
+| **General Usage** | Good to know. <br> --- <br> ![Usage](screenshots/usage.png) |
+| **Search with RAG** | Smarter search. <br> --- <br> ![Search](screenshots/search.png) |
 | **Configuration** | Customize settings for specific use cases. <br> --- <br> ![Config](screenshots/config.png) |
 | **Reasoning** | Enables advanced reasoning capabilities. <br> --- <br> ![Reasoning](screenshots/reasoning.png) |
 
