@@ -156,30 +156,24 @@ This project includes various features to enhance usability and efficiency. Belo
 
 | Feature             | Description |
 |---------------------|-------------|
-| **Installation & Upgrade** | Easily install or upgrade the application. ![Install](screenshots/install.png) ![Upgrade](screenshots/upgrade.png) |
-| **How to Use** | Step-by-step guide on using the application. ![How to Use](screenshots/howto.png) |
+| **Installation & Upgrade** | Easily install or upgrade the application. <br> --- <br> ![Install](screenshots/install.png) ![Upgrade](screenshots/upgrade.png) |
+| **How to Use** | Step-by-step guide on using the application. <br> --- <br> ![How to Use](screenshots/howto.png) |
 
 ## Core Functionalities
 
 | Feature            | Description |
 |--------------------|-------------|
-| **General Usage** | Demonstrates how to interact with the system. ![Usage](screenshots/usage.png) |
-| **Search with RAG** | Implements Retrieval-Augmented Generation for smarter search capabilities. ![Search](screenshots/search.png) |
-| **Configuration** | Customize settings for optimal performance. ![Config](screenshots/config.png) |
-| **Reasoning** | Enables advanced reasoning capabilities. ![Reasoning](screenshots/reasoning.png) |
+| **General Usage** | Demonstrates how to interact with the system. <br> --- <br> ![Usage](screenshots/usage.png) |
+| **Search with RAG** | Implements Retrieval-Augmented Generation for smarter search capabilities. <br> --- <br> ![Search](screenshots/search.png) |
+| **Configuration** | Customize settings for specific use cases. <br> --- <br> ![Config](screenshots/config.png) |
+| **Reasoning** | Enables advanced reasoning capabilities. <br> --- <br> ![Reasoning](screenshots/reasoning.png) |
 
 ## Additional Features
 
 | Feature           | Description |
 |------------------|-------------|
-| **Multi-Search** | Perform multiple searches simultaneously. 
-
----
-![Multi](screenshots/multisearch.png) |
-| **Reading PDFs** | Extract and analyze content from PDFs.  
-
----
- ![PDF](screenshots/pdf.png) |
+| **Multi-Search** | Conduct multiple searches in one go. <br> --- <br> ![Multi](screenshots/multisearch.png) |
+| **Reading PDFs** | Extract and analyze content from PDFs. (Gemini Only)  <br> --- <br> ![PDF](screenshots/pdf.png) |
 
 For more details, using `gllm --help` to check.
 
