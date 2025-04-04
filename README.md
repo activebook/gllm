@@ -148,18 +148,34 @@ Start using `gllm` today and supercharge your command-line AI experience! 🚀
 
 ---
 
-| Feature            | Feature            |
-|--------------------|--------------------|
-| **Install**        | **Upgrade**        |
-| ![Install](screenshots/install.png) | ![Upgrade](screenshots/upgrade.png) |
-| **How to Use**     | **Configuration**  |
-| ![How to Use](screenshots/howto.png) | ![Config](screenshots/config.png) |
-| **Usage**          | **Reasoning**      |
-| ![Usage](screenshots/usage.png)     | ![Reasoning](screenshots/reasoning.png) |
-| **Search RAG**     | **Multi Searches** |
-| ![Search](screenshots/search.png)   | ![Multi](screenshots/multisearch.png) |
-| **Reading PDF**    |                    |
-| ![PDF](screenshots/pdf.png)         |                    |
+# Project Features
+
+This project includes various features to enhance usability and efficiency. Below is an overview of the key functionalities.
+
+## Installation & Usage
+
+| Feature             | Description |
+|---------------------|-------------|
+| **Installation & Upgrade** | Easily install or upgrade the application. ![Install](screenshots/install.png) ![Upgrade](screenshots/upgrade.png) |
+| **How to Use** | Step-by-step guide on using the application. ![How to Use](screenshots/howto.png) |
+
+## Core Functionalities
+
+| Feature            | Description |
+|--------------------|-------------|
+| **General Usage** | Demonstrates how to interact with the system. ![Usage](screenshots/usage.png) |
+| **Search with RAG** | Implements Retrieval-Augmented Generation for smarter search capabilities. ![Search](screenshots/search.png) |
+| **Configuration** | Customize settings for optimal performance. ![Config](screenshots/config.png) |
+| **Reasoning** | Enables advanced reasoning capabilities. ![Reasoning](screenshots/reasoning.png) |
+
+## Additional Features
+
+| Feature           | Description |
+|------------------|-------------|
+| **Multi-Search** | Perform multiple searches simultaneously. ![Multi](screenshots/multisearch.png) |
+| **Reading PDFs** | Extract and analyze content from PDFs. ![PDF](screenshots/pdf.png) |
+
+For more details, refer to the official documentation.
 
 ---
 
