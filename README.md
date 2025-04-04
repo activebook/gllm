@@ -108,6 +108,17 @@ gllm search tavily --key $API_KEY                       # Use Tavily Search Engi
 gllm search default [google,tavily]     # Set default search engine
 ```
 
+### 🔹 Std input Support
+
+```sh
+cat script.py | gllm "Help me fix bugs in this python coding snippet:" -a - # Use std input as file attachment
+cat image.png | gllm "What is this image about?" -a - # Use std input as image attachment
+cat jap.txt | gllm "Translate all this into English" # Use std input as text input
+cat report.txt | gllm "Summarize this"
+echo "What is the capital of France?" | gllm # Use std input as text input
+echo "Who's the POTUS right now?" | gllm -s # Use std input as search query
+```
+
 ### 🔹 Version Information
 
 ```sh

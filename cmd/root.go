@@ -56,6 +56,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 			// Your main command logic goes here
 			// For example, you can print a message or perform some action
 			service.Debugf("Start processing...\n")
+
 			// If no arguments and no relevant flags are set, show help instead
 			// Args: cobra.ArbitraryArgs: This tells Cobra that receiving any number of positional arguments (including zero arguments) is perfectly valid.
 			// It won't trigger an error or the help message based on the argument count alone.
@@ -64,7 +65,8 @@ Configure your API keys and preferred models, then start chatting or executing c
 				!cmd.Flags().Changed("system-prompt") &&
 				!cmd.Flags().Changed("template") &&
 				!cmd.Flags().Changed("attachment") &&
-				!cmd.Flags().Changed("version") {
+				!cmd.Flags().Changed("version") &&
+				!hasStdinData() {
 				cmd.Help()
 				return
 			}
@@ -79,6 +81,9 @@ Configure your API keys and preferred models, then start chatting or executing c
 			// If prompt is provided, append it to the full prompt
 			if len(args) > 0 {
 				prompt = args[0]
+			} else {
+				// Read from stdin if no prompt is provided
+				prompt = readStdin()
 			}
 
 			// Create an indeterminate progress bar

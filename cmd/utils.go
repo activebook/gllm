@@ -73,6 +73,15 @@ func readStdin() string {
 	return ""
 }
 
+func hasStdinData() bool {
+	// Check if stdin has data (is being piped)
+	stat, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return (stat.Mode() & os.ModeCharDevice) == 0
+}
+
 // readContentFromPath reads content from a specified source path.
 // If the source is "-", it reads from standard input (os.Stdin).
 // Otherwise, it reads from the file at the given path.
