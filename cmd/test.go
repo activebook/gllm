@@ -72,6 +72,8 @@ var testCmd = &cobra.Command{
 		//test.TestSearch2()
 		//test.TestQwQ()
 		//test.TestVV()
+
+		//service.ProcessGeminiChatStream("AIzaSyBwlIzbZ7bnRtYU7iicNdMnLYKkd8XVPDU", "gemini-2.0-flash", "You're a helper assistant", "how to cook?", 0.7, nil)
 		return
 	},
 }

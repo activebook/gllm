@@ -33,6 +33,7 @@ var (
 	templateFlag  string   // gllm --template(-t) @coder
 	searchFlag    bool     // gllm --search(-s) "What is the stock price of Tesla right now?"
 	referenceFlag int      // gllm --reference(-r) 3 "What is the stock price of Tesla right now?"
+	convoName     string   // gllm --conversation(-c) "My Conversation" "What is the stock price of Tesla right now?"
 
 	// Global cmd instance, to be used by subcommands
 	rootCmd = &cobra.Command{
@@ -66,6 +67,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 				!cmd.Flags().Changed("template") &&
 				!cmd.Flags().Changed("attachment") &&
 				!cmd.Flags().Changed("version") &&
+				!cmd.Flags().Changed("conversation") &&
 				!hasStdinData() {
 				cmd.Help()
 				return
@@ -136,6 +138,13 @@ Configure your API keys and preferred models, then start chatting or executing c
 						service.Warnf("template[%s] should start with @\n", templateFlag)
 						fmt.Println("Using default template instead")
 					}
+				}
+
+				// Check if -c/--conversation was used without a value
+				if cmd.Flags().Changed("conversation") {
+					// Flag was used without a value, use a default name
+					// set convo history path, if the path is not empty, it would load the history
+					service.NewConversation(convoName, true)
 				}
 
 				// Process all prompt building
@@ -276,6 +285,11 @@ func init() {
 	rootCmd.Flags().StringVarP(&templateFlag, "template", "t", "", "Specify a template to use")
 	rootCmd.Flags().BoolVarP(&searchFlag, "search", "s", false, "To query an LLM with a search function")
 	rootCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
+
+	// The key fix is using NoOptDefVal property which specifically handles the case when a flag is provided without a value.
+	rootCmd.Flags().StringVarP(&convoName, "conversation", "c", "", "Specify a conversation name (optional)")
+	rootCmd.Flags().Lookup("conversation").NoOptDefVal = service.GetDefaultConvoName() // This sets a default when flag is used without value
+
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
 
 	// Add more persistent flags here if needed (e.g., --verbose, --log-file)

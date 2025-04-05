@@ -180,7 +180,7 @@ func generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPro
 func generateOpenAIStreamWithSearchChan(apiKey, endPoint, modelName, systemPrompt, userPrompt string, temperature float32, files []*FileData) error {
 
 	// 1. Initialize the Client
-	conversation := NewConversation(
+	conversation := NewOpenChat(
 		apiKey,
 		endPoint,
 		modelName,
@@ -230,17 +230,17 @@ func generateOpenAIStreamWithSearchChan(apiKey, endPoint, modelName, systemPromp
 	conversation.messages = append(conversation.messages, userMessage)
 
 	// Process the conversation with recursive tool call handling
-	err := conversation.ProcessConversation()
+	err := conversation.ProcessOpenChat()
 	if err != nil {
 		proc <- StreamNotify{Status: StatusError}
-		Logf("Error processing conversation: %v\n", err)
+		Infof("Error processing conversation: %v\n", err)
 		return fmt.Errorf("error processing conversation: %v", err)
 	}
 	return nil
 }
 
-// Conversation manages the state of an ongoing conversation with an AI assistant
-type Conversation struct {
+// OpenChat manages the state of an ongoing conversation with an AI assistant
+type OpenChat struct {
 	client        *openai.Client
 	ctx           context.Context
 	messages      []openai.ChatCompletionMessage
@@ -286,8 +286,8 @@ func getOpenaiSearchTool() openai.Tool {
 	return searchTool
 }
 
-// NewConversation creates a new conversation manager
-func NewConversation(apiKey, baseURL, model string, temperature float32) *Conversation {
+// NewOpenChat creates a new conversation manager
+func NewOpenChat(apiKey, baseURL, model string, temperature float32) *OpenChat {
 	config := openai.DefaultConfig(apiKey)
 	if baseURL != "" {
 		config.BaseURL = baseURL
@@ -297,7 +297,7 @@ func NewConversation(apiKey, baseURL, model string, temperature float32) *Conver
 	// Create a tool with the function
 	tool := getOpenaiSearchTool()
 
-	return &Conversation{
+	return &OpenChat{
 		client:        client,
 		ctx:           context.Background(),
 		messages:      []openai.ChatCompletionMessage{},
@@ -309,8 +309,8 @@ func NewConversation(apiKey, baseURL, model string, temperature float32) *Conver
 	}
 }
 
-// ProcessConversation processes the conversation, handling tool calls recursively
-func (c *Conversation) ProcessConversation() error {
+// ProcessOpenChat processes the conversation, handling tool calls recursively
+func (c *OpenChat) ProcessOpenChat() error {
 	// only allow 3 recursions
 	for range c.maxRecursions {
 		// Create the request
@@ -333,7 +333,7 @@ func (c *Conversation) ProcessConversation() error {
 		proc <- StreamNotify{Status: StatusStarted}
 
 		// Process the stream and collect tool calls
-		assistantMessage, toolCalls, err := c.processStream(stream)
+		assistantMessage, toolCalls, err := c.processOpenChatStream(stream)
 		if err != nil {
 			return fmt.Errorf("error processing stream: %v", err)
 		}
@@ -345,9 +345,9 @@ func (c *Conversation) ProcessConversation() error {
 		if len(toolCalls) > 0 {
 			// Process each tool call
 			for id, toolCall := range toolCalls {
-				result, err := c.processToolCall(id, toolCall)
+				result, err := c.processOpenChatToolCall(id, toolCall)
 				if err != nil {
-					Logf("Error processing tool call: %v\n", err)
+					Infof("Error processing tool call: %v\n", err)
 					continue
 				}
 				// Add the tool response to the conversation
@@ -368,8 +368,8 @@ func (c *Conversation) ProcessConversation() error {
 	return nil
 }
 
-// processStream processes the stream and collects tool calls
-func (c *Conversation) processStream(stream *openai.ChatCompletionStream) (openai.ChatCompletionMessage, map[string]openai.ToolCall, error) {
+// processOpenChatStream processes the stream and collects tool calls
+func (c *OpenChat) processOpenChatStream(stream *openai.ChatCompletionStream) (openai.ChatCompletionMessage, map[string]openai.ToolCall, error) {
 	assistantMessage := openai.ChatCompletionMessage{
 		Role: openai.ChatMessageRoleAssistant,
 	}
@@ -449,8 +449,8 @@ func (c *Conversation) processStream(stream *openai.ChatCompletionStream) (opena
 	return assistantMessage, toolCalls, nil
 }
 
-// processToolCall processes a single tool call and returns a tool response message
-func (c *Conversation) processToolCall(id string, toolCall openai.ToolCall) (openai.ChatCompletionMessage, error) {
+// processOpenChatToolCall processes a single tool call and returns a tool response message
+func (c *OpenChat) processOpenChatToolCall(id string, toolCall openai.ToolCall) (openai.ChatCompletionMessage, error) {
 	// Parse the query from the arguments
 	var argsMap map[string]interface{}
 	if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &argsMap); err != nil {
@@ -484,7 +484,7 @@ func (c *Conversation) processToolCall(id string, toolCall openai.ToolCall) (ope
 
 	if err != nil {
 		proc <- StreamNotify{Status: StatusFunctionCallingOver, Data: ""}
-		Logf("Error performing search: %v", err)
+		Infof("Error performing search: %v", err)
 		return openai.ChatCompletionMessage{}, fmt.Errorf("error performing search: %v", err)
 	}
 	// keep the search results for references

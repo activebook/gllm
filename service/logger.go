@@ -36,7 +36,7 @@ func InitLogger() {
 	logger.SetFormatter(&log.TextFormatter{}) // Default to TextFormatter
 }
 
-func Logf(format string, args ...interface{}) {
+func Infof(format string, args ...interface{}) {
 	if logger != nil {
 		logger.Printf(format, args...)
 	}

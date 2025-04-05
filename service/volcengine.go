@@ -108,10 +108,15 @@ func generateVolcStreamChan(apiKey, endPoint, modelName, systemPrompt, userPromp
 
 	proc <- StreamNotify{Status: StatusProcessing}
 
+	// Load previous messages if any
+	convo := GetConversion()
+	convo.Load()
+	convo.PushMessages(messages) // Add new messages to the conversation
+
 	// 3. Create the Chat Completion Request for Streaming
 	request := model.CreateChatCompletionRequest{
 		Model:       modelName,
-		Messages:    messages,
+		Messages:    convo.Messages,
 		Temperature: &temperature, // Directly use the float32 value here
 		// MaxTokens:   150,         // Optional: limit output length
 		// TopP:        1.0,         // Optional: nucleus sampling
@@ -132,13 +137,14 @@ func generateVolcStreamChan(apiKey, endPoint, modelName, systemPrompt, userPromp
 
 	// 5. Process the Stream
 	state := stateNormal
+	assistContent := strings.Builder{}
+	reasoningContent := strings.Builder{}
 	for {
 		response, err := stream.Recv()
 		// Check for the end of the stream
 		if errors.Is(err, io.EOF) {
 			// Indicate stream end
-			proc <- StreamNotify{Status: StatusFinished}
-			return nil // Exit the loop when the stream is done
+			break // Exit the loop when the stream is done
 		}
 		// Handle potential errors during streaming
 		if err != nil {
@@ -168,19 +174,39 @@ func generateVolcStreamChan(apiKey, endPoint, modelName, systemPrompt, userPromp
 			if delta.ReasoningContent != nil {
 				// For reasoning model
 				text := *delta.ReasoningContent
+				reasoningContent.WriteString(text)
 				proc <- StreamNotify{Status: StatusData, Data: text}
 			} else {
 				text := delta.Content
+				assistContent.WriteString(text)
 				proc <- StreamNotify{Status: StatusData, Data: text}
 			}
 		}
 	}
+
+	// keep response content
+	reasoning_content := reasoningContent.String()
+	msg := model.ChatCompletionMessage{
+		Role:             model.ChatMessageRoleAssistant,
+		ReasoningContent: &reasoning_content,
+		Content: &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(assistContent.String()),
+		},
+	}
+	// Add the assistant's message to the conversation
+	convo.PushMessage(&msg)
+	err = convo.Save()
+	if err != nil {
+		return fmt.Errorf("failed to save conversation: %v", err)
+	}
+	proc <- StreamNotify{Status: StatusFinished}
+	return err
 }
 
 func generateVolcStreamWithSearchChan(apiKey, endPoint, modelName, systemPrompt, userPrompt string, temperature float32, files []*FileData) error {
 
 	// 1. Initialize the Client
-	conversation := NewVolcChat(
+	chat := NewVolcChat(
 		apiKey,
 		endPoint,
 		modelName,
@@ -227,14 +253,18 @@ func generateVolcStreamWithSearchChan(apiKey, endPoint, modelName, systemPrompt,
 		}
 		messages = append(messages, userMessage)
 	}
-	conversation.messages = messages
 
-	// Process the conversation with recursive tool call handling
-	err := conversation.ProcessVolcChat()
+	// Load previous messages if any
+	convo := GetConversion()
+	convo.Load()
+	convo.PushMessages(messages) // Add new messages to the conversation
+
+	// Process the chat with recursive tool call handling
+	err := chat.ProcessVolcChat()
 	if err != nil {
 		proc <- StreamNotify{Status: StatusError}
-		Logf("Error processing conversation: %v\n", err)
-		return fmt.Errorf("error processing conversation: %v", err)
+		Infof("Error processing chat: %v\n", err)
+		return fmt.Errorf("error processing chat: %v", err)
 	}
 	return nil
 }
@@ -243,7 +273,6 @@ func generateVolcStreamWithSearchChan(apiKey, endPoint, modelName, systemPrompt,
 type VolcChat struct {
 	client        *arkruntime.Client
 	ctx           *context.Context
-	messages      []*model.ChatCompletionMessage
 	model         string
 	temperature   float32
 	tools         []*model.Tool
@@ -303,7 +332,6 @@ func NewVolcChat(apiKey, baseURL, modelName string, temperature float32) *VolcCh
 	return &VolcChat{
 		client:        client,
 		ctx:           &ctx,
-		messages:      []*model.ChatCompletionMessage{},
 		model:         modelName,
 		temperature:   temperature,
 		tools:         []*model.Tool{tool},
@@ -313,6 +341,8 @@ func NewVolcChat(apiKey, baseURL, modelName string, temperature float32) *VolcCh
 }
 
 func (c *VolcChat) ProcessVolcChat() error {
+	convo := GetConversion()
+
 	// only allow 3 recursions
 	i := 0
 	for range c.maxRecursions {
@@ -325,7 +355,7 @@ func (c *VolcChat) ProcessVolcChat() error {
 		req := model.CreateChatCompletionRequest{
 			Model:       c.model,
 			Temperature: &c.temperature,
-			Messages:    c.messages,
+			Messages:    convo.Messages,
 			Tools:       c.tools,
 		}
 
@@ -345,19 +375,19 @@ func (c *VolcChat) ProcessVolcChat() error {
 		}
 
 		// Add the assistant's message to the conversation
-		c.messages = append(c.messages, assistantMessage)
+		convo.PushMessage(assistantMessage)
 
 		// If there are tool calls, process them
 		if len(*toolCalls) > 0 {
 			// Process each tool call
 			for id, toolCall := range *toolCalls {
-				result, err := c.processVolcToolCall(id, toolCall)
+				toolMessage, err := c.processVolcToolCall(id, toolCall)
 				if err != nil {
-					Logf("Error processing tool call: %v\n", err)
+					Infof("Error processing tool call: %v\n", err)
 					continue
 				}
 				// Add the tool response to the conversation
-				c.messages = append(c.messages, result)
+				convo.PushMessage(toolMessage)
 			}
 			// Continue the conversation recursively
 		} else {
@@ -370,6 +400,11 @@ func (c *VolcChat) ProcessVolcChat() error {
 		proc <- StreamNotify{Status: StatusData, Data: refs}
 	}
 	// No more message
+	// Save the conversation
+	err := convo.Save()
+	if err != nil {
+		return fmt.Errorf("failed to save conversation: %v", err)
+	}
 	proc <- StreamNotify{Status: StatusFinished}
 	return nil
 }
@@ -381,6 +416,7 @@ func (c *VolcChat) processVolcStream(stream *utils.ChatCompletionStreamReader) (
 	}
 	toolCalls := make(map[string]model.ToolCall)
 	contentBuffer := strings.Builder{}
+	reasoningBuffer := strings.Builder{}
 	lastCallId := ""
 
 	state := stateNormal
@@ -414,7 +450,7 @@ func (c *VolcChat) processVolcStream(stream *utils.ChatCompletionStreamReader) (
 			if delta.ReasoningContent != nil {
 				// For reasoning model
 				text := *delta.ReasoningContent
-				contentBuffer.WriteString(text)
+				reasoningBuffer.WriteString(text)
 				proc <- StreamNotify{Status: StatusData, Data: text}
 			} else if delta.Content != "" {
 				text := delta.Content
@@ -463,7 +499,10 @@ func (c *VolcChat) processVolcStream(stream *utils.ChatCompletionStreamReader) (
 		}
 	}
 
-	// Update the assistant message
+	// Update the assistant reasoning message
+	reasoning_content := reasoningBuffer.String()
+	assistantMessage.ReasoningContent = &reasoning_content
+	// Set the content of the assistant message
 	assistantMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(contentBuffer.String()),
 	}
@@ -515,7 +554,7 @@ func (c *VolcChat) processVolcToolCall(id string, toolCall model.ToolCall) (*mod
 
 	if err != nil {
 		proc <- StreamNotify{Status: StatusFunctionCallingOver, Data: ""}
-		Logf("Error performing search: %v", err)
+		Infof("Error performing search: %v", err)
 		return nil, fmt.Errorf("error performing search: %v", err)
 	}
 	// keep the search results for references

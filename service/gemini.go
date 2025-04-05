@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -48,6 +49,7 @@ func generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt string
 	// Configure Model Parameters
 	// System Instruction (System Prompt)
 	if systemPrompt != "" {
+		// For gemini, the system prompt is set as a user content
 		model.SystemInstruction = genai.NewUserContent(genai.Text(systemPrompt))
 	}
 	model.SetTemperature(temperature)
@@ -67,7 +69,12 @@ func generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt string
 	// Because gemini wouldn't show reasoning content, so we need to wait here
 	proc <- StreamNotify{Status: StatusReasoning, Data: ""}
 
-	iter := model.GenerateContentStream(ctx, parts...)
+	// Start a chat session
+	cs := model.StartChat()
+	cs.History, _ = SimpleLoadGeminiChatHistory("chat_history.json")
+	iter := cs.SendMessageStream(ctx, parts...)
+
+	//iter := model.GenerateContentStream(ctx, parts...)
 
 	proc <- StreamNotify{Status: StatusReasoningOver, Data: ""}
 
@@ -76,8 +83,7 @@ func generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt string
 		resp, err := iter.Next()
 		if err == iterator.Done {
 			// Signal that streaming is complete
-			proc <- StreamNotify{Status: StatusFinished}
-			return nil
+			break
 		}
 
 		if err != nil {
@@ -94,6 +100,12 @@ func generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt string
 			}
 		}
 	}
+
+	//history := ConvertGeminiHistory(cs.History, modelName, systemPrompt)
+	//SaveChatHistory(history)
+	err = SimpleSaveGeminiChatHistory(cs.History, "chat_history.json")
+	proc <- StreamNotify{Status: StatusFinished}
+	return err
 }
 
 /*
@@ -149,6 +161,7 @@ func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPro
 	})
 
 	// Signal that streaming has started
+	cs := model.StartChat()
 	proc <- StreamNotify{Status: StatusStarted}
 
 	// keep track of the references
@@ -159,7 +172,7 @@ func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPro
 		i++
 		Debugf("Processing conversation at times: %d\n", i)
 
-		resp, err := generateAndProcessStream(ctx, model, history)
+		resp, err := generateAndProcessStream(ctx, cs, history)
 		if err != nil {
 			proc <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}
 			return err
@@ -209,8 +222,9 @@ func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPro
 		proc <- StreamNotify{Status: StatusData, Data: refs}
 	}
 	// Signal that streaming is complete
+	err = SimpleSaveGeminiChatHistory(cs.History, "chat_history.json")
 	proc <- StreamNotify{Status: StatusFinished}
-	return nil
+	return err
 }
 
 func getGeminiSearchTool() *genai.Tool {
@@ -260,7 +274,7 @@ func callSearchFunction(fc *genai.FunctionCall) (map[string]any, error) {
 	argsJSON, _ := json.Marshal(fc.Args)
 	if err := json.Unmarshal(argsJSON, &args); err != nil {
 		proc <- StreamNotify{Status: StatusFunctionCallingOver, Data: ""}
-		Logf("Warning: Could not unmarshal function args: %v. Args: %+v", err, fc.Args)
+		Infof("Warning: Could not unmarshal function args: %v. Args: %+v", err, fc.Args)
 		return nil, fmt.Errorf("could not unmarshal function args: %v", err)
 	}
 
@@ -282,7 +296,7 @@ func callSearchFunction(fc *genai.FunctionCall) (map[string]any, error) {
 	}
 	if err != nil {
 		proc <- StreamNotify{Status: StatusFunctionCallingOver, Data: ""}
-		Logf("Error performing search: %v", err)
+		Infof("Error performing search: %v", err)
 		// TODO: Potentially send an error FunctionResponse back to the model
 		return nil, fmt.Errorf("error performing search: %v", err)
 	}
@@ -310,12 +324,13 @@ type streamProcessingResult struct {
 }
 
 // Refactored function to handle one stream generation and processing call
-func generateAndProcessStream(ctx context.Context, model *genai.GenerativeModel, history []*genai.Content) (*streamProcessingResult, error) {
+func generateAndProcessStream(ctx context.Context, cs *genai.ChatSession, history []*genai.Content) (*streamProcessingResult, error) {
 	allParts := extractAllParts(history)
 
 	// Because gemini wouldn't show reasoning content, so we need to wait here
 	proc <- StreamNotify{Status: StatusReasoning, Data: ""}
-	iter := model.GenerateContentStream(ctx, allParts...)
+	//iter := model.GenerateContentStream(ctx, allParts...)
+	iter := cs.SendMessageStream(ctx, allParts...)
 	proc <- StreamNotify{Status: StatusReasoningOver, Data: ""}
 
 	result := &streamProcessingResult{
@@ -330,7 +345,7 @@ func generateAndProcessStream(ctx context.Context, model *genai.GenerativeModel,
 			break
 		}
 		if err != nil {
-			Logf("Stream error: %v", err.Error())
+			Infof("Stream error: %v", err.Error())
 			return nil, fmt.Errorf("stream error: %v", err)
 		}
 		if resp == nil || len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil {
@@ -370,4 +385,58 @@ func generateAndProcessStream(ctx context.Context, model *genai.GenerativeModel,
 		result.fullText = accumulatedText
 	}
 	return result, nil // Signal to continue processing
+}
+
+func ProcessGeminiChatStream(apiKey, modelName, systemPrompt, userPrompt string, temperature float32, files []*FileData) error {
+	// Setup the Gemini client
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	if err != nil {
+		proc <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create client: %v", err)}
+		return err
+	}
+	defer client.Close()
+
+	// Create the model and generate content
+	model := client.GenerativeModel(modelName)
+	cs := model.StartChat()
+	model.SystemInstruction = genai.NewUserContent(genai.Text(systemPrompt))
+
+	// Must be either 'user' or 'model'.
+	cs.History = []*genai.Content{
+		{
+			Parts: []genai.Part{
+				genai.Text("Hello, I have 2 dogs in my house."),
+			},
+			Role: "user",
+		},
+		{
+			Parts: []genai.Part{
+				genai.Text("Great to meet you. What would you like to know?"),
+			},
+			Role: "model",
+		},
+	}
+
+	iter := cs.SendMessageStream(ctx, genai.Text("How many paws are in my house?"))
+	for {
+		resp, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+		// Process and send content
+		for _, candidate := range resp.Candidates {
+			for _, part := range candidate.Content.Parts {
+				if textPart, ok := part.(genai.Text); ok {
+					fmt.Printf("%s", string(textPart))
+				}
+			}
+		}
+	}
+	history := ConvertGeminiHistory(cs.History, modelName, systemPrompt)
+	SaveChatHistory(history)
+	return nil
 }
