@@ -205,6 +205,7 @@ This project includes various features to enhance usability and efficiency. Belo
 | Feature           | Description |
 |------------------|-------------|
 | **Multi-Search** | Conduct multiple searches in one go. <br> --- <br> ![Multi](screenshots/multisearch.png) |
+| **Multi-turn**   | Continue prevous conversation. <br> --- <br> ![Multi](screenshots/conversation.png) |
 | **Reading PDFs** | Extract and analyze content from PDFs. (Gemini Only)  <br> --- <br> ![PDF](screenshots/pdf.png) |
 
 For more details, using `gllm --help` to check.
