@@ -58,6 +58,18 @@ gllm "Who is the President of the United States right now?" --search # Use searc
 gllm "Who is he/she in this photo? And what is his/her current title?" -s -a "face.png" --model @gemini # Use vision model and search engine to find people in image
 ```
 
+### 💬 Keep Conversations (Multi-turn chat)
+
+```sh
+gllm -s "Who's the POTUS right now?" -c      # Start a conversation(default without name) and retain the full context (last 10 messages)
+gllm "Tell me again, who's the POTUS right now?" -c   # Continue the default conversation
+gllm "Let's talk about why we exist." -c newtalk      # Start a new named conversation called 'newtalk'
+gllm -s "Look up what famous people have said about this." -c newtalk  # Continue the 'newtalk' conversation
+```
+
+⚠️ Warning: If you're using **Gemini mode** and an **OpenAI-compatible model**, keep in mind that they **cannot be used within the same conversation**.  
+These models handle chat messages differently, and mixing them will lead to unexpected behavior.
+
 ### 🔹 Interactive Chat (*In Future Edition*)
 
 ```sh
@@ -106,6 +118,15 @@ gllm search list                          # List available search engines
 gllm search google --key $API_KEY --cx $SEARCH_ENGINE_ID # Use Google Search Engine
 gllm search tavily --key $API_KEY                       # Use Tavily Search Engine
 gllm search default [google,tavily]     # Set default search engine
+```
+
+### 🔹 New update! & Conversation Management
+
+```sh
+gllm convo list           # list all conversations
+gllm convo remove newtalk # remove a conversation
+gllm convo info newtalk   # show a conversation in details
+gllm convo clear          # clear all conversations
 ```
 
 ### 🔹 Std input Support

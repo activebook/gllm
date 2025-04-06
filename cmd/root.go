@@ -141,10 +141,12 @@ Configure your API keys and preferred models, then start chatting or executing c
 				}
 
 				// Check if -c/--conversation was used without a value
+				cmd.Flags().Lookup("conversation").NoOptDefVal = service.GetDefaultConvoName() // This sets a default when flag is used without value
 				if cmd.Flags().Changed("conversation") {
 					// Flag was used without a value, use a default name
 					// set convo history path, if the path is not empty, it would load the history
 					service.NewConversation(convoName, true)
+					service.NewGHistory(convoName, true)
 				}
 
 				// Process all prompt building
@@ -287,8 +289,7 @@ func init() {
 	rootCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
 
 	// The key fix is using NoOptDefVal property which specifically handles the case when a flag is provided without a value.
-	rootCmd.Flags().StringVarP(&convoName, "conversation", "c", "", "Specify a conversation name (optional)")
-	rootCmd.Flags().Lookup("conversation").NoOptDefVal = service.GetDefaultConvoName() // This sets a default when flag is used without value
+	rootCmd.Flags().StringVarP(&convoName, "conversation", "c", "", "Specify a conversation name to track chat session (optional)")
 
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
 

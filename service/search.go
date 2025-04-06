@@ -250,8 +250,8 @@ func RetrieveReferences(references []*map[string]any) string {
 						total++
 						if index < maxReferences {
 							index++
-							sb.WriteString(fmt.Sprintf("[%d] %s\n    %s: %s\n", index, truncateString(description, 60),
-								truncateString(displayLink, 30), link))
+							sb.WriteString(fmt.Sprintf("[%d] %s\n    %s: %s\n", index, TruncateString(description, 60),
+								TruncateString(displayLink, 30), link))
 						}
 					}
 				}
@@ -262,12 +262,4 @@ func RetrieveReferences(references []*map[string]any) string {
 		sb.WriteString(fmt.Sprintf("...and %d more references. Use the '-r' flag to view more.\n", total-maxReferences))
 	}
 	return sb.String()
-}
-
-// Helper function to truncate long strings
-func truncateString(s string, maxLength int) string {
-	if len(s) <= maxLength {
-		return s
-	}
-	return s[:maxLength-3] + "..."
 }

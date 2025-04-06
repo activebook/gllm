@@ -17,8 +17,8 @@ var searchCmd = &cobra.Command{
 	Long:  `Configure API keys and settings for various search engines used with gllm.`,
 }
 
-// googleCmd represents the google search command
-var googleCmd = &cobra.Command{
+// searchGoogleCmd represents the google search command
+var searchGoogleCmd = &cobra.Command{
 	Use:   "google",
 	Short: "Configure Google search engine",
 	Long: `Configure Google Custom Search JSON API.
@@ -45,8 +45,8 @@ The cx parameter is the key for the custom search engine.`,
 	},
 }
 
-// tavilyCmd represents the tavily search command
-var tavilyCmd = &cobra.Command{
+// searchTavilyCmd represents the tavily search command
+var searchTavilyCmd = &cobra.Command{
 	Use:   "tavily",
 	Short: "Configure Tavily search engine",
 	Long:  `Configure Tavily API. Tavily provides 1000 search queries per month for free.`,
@@ -69,8 +69,8 @@ var tavilyCmd = &cobra.Command{
 	},
 }
 
-// bingCmd represents the bing search command
-var bingCmd = &cobra.Command{
+// searchBingCmd represents the bing search command
+var searchBingCmd = &cobra.Command{
 	Use:   "bing",
 	Short: "Configure Bing search engine",
 	Long:  `Configure Bing API. Bing isn't supported by gllm at the moment.`,
@@ -94,7 +94,7 @@ var bingCmd = &cobra.Command{
 }
 
 // listCmd represents the command to list all search engines
-var listCmd = &cobra.Command{
+var searchListCmd = &cobra.Command{
 	Use:     "list",
 	Short:   "List all configured search engines",
 	Aliases: []string{"ls"},
@@ -146,8 +146,8 @@ var listCmd = &cobra.Command{
 	},
 }
 
-// defaultCmd represents the command to set default search engine
-var defaultCmd = &cobra.Command{
+// searchDefaultCmd represents the command to set default search engine
+var searchDefaultCmd = &cobra.Command{
 	Use:     "default",
 	Aliases: []string{"def"},
 	Short:   "Set the default search engine",
@@ -256,19 +256,19 @@ func init() {
 	rootCmd.AddCommand(searchCmd)
 
 	// Add subcommands to search command
-	searchCmd.AddCommand(googleCmd)
-	searchCmd.AddCommand(tavilyCmd)
-	searchCmd.AddCommand(bingCmd)
-	searchCmd.AddCommand(listCmd)
-	searchCmd.AddCommand(defaultCmd)
+	searchCmd.AddCommand(searchGoogleCmd)
+	searchCmd.AddCommand(searchTavilyCmd)
+	searchCmd.AddCommand(searchBingCmd)
+	searchCmd.AddCommand(searchListCmd)
+	searchCmd.AddCommand(searchDefaultCmd)
 
 	// Google flags
-	googleCmd.Flags().StringP("key", "k", "", "Google Custom Search API key")
-	googleCmd.Flags().StringP("cx", "c", "", "Google Custom Search Engine ID")
+	searchGoogleCmd.Flags().StringP("key", "k", "", "Google Custom Search API key")
+	searchGoogleCmd.Flags().StringP("cx", "c", "", "Google Custom Search Engine ID")
 
 	// Tavily flags
-	tavilyCmd.Flags().StringP("key", "k", "", "Tavily API key")
+	searchTavilyCmd.Flags().StringP("key", "k", "", "Tavily API key")
 
 	// Bing flags
-	bingCmd.Flags().StringP("key", "k", "", "Bing API key")
+	searchBingCmd.Flags().StringP("key", "k", "", "Bing API key")
 }

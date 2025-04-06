@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -71,9 +70,13 @@ func generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt string
 
 	// Start a chat session
 	cs := model.StartChat()
-	cs.History, _ = SimpleLoadGeminiChatHistory("chat_history.json")
-	iter := cs.SendMessageStream(ctx, parts...)
 
+	// Load previous messages if any
+	convo := GetGHistory()
+	convo.Load()
+	cs.History = convo.History
+
+	iter := cs.SendMessageStream(ctx, parts...)
 	//iter := model.GenerateContentStream(ctx, parts...)
 
 	proc <- StreamNotify{Status: StatusReasoningOver, Data: ""}
@@ -101,9 +104,12 @@ func generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt string
 		}
 	}
 
-	//history := ConvertGeminiHistory(cs.History, modelName, systemPrompt)
-	//SaveChatHistory(history)
-	err = SimpleSaveGeminiChatHistory(cs.History, "chat_history.json")
+	// Save the conversation history
+	convo.History = cs.History
+	err = convo.Save()
+	if err != nil {
+		return fmt.Errorf("failed to save conversation: %v", err)
+	}
 	proc <- StreamNotify{Status: StatusFinished}
 	return err
 }
@@ -117,7 +123,10 @@ func generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt string
 // Functions that start with uppercase letters (like PrintSection) are exported and can be used by other packages that import your package.
 // generateStreamText connects to the Google AI API and streams the generated text.
 
-func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPrompt string, temperature float32, files []*FileData) error {
+// This method is old, because it's used to keep history by itself and don't use ChatSession.
+// When using ChatSession, you don't need to keep history by youself.
+// If you do, it would double keeping and go wrong.
+func old_GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPrompt string, temperature float32, files []*FileData) error {
 	ctx := context.Background()
 
 	// Initialize Gemini client
@@ -162,6 +171,12 @@ func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPro
 
 	// Signal that streaming has started
 	cs := model.StartChat()
+
+	// Load previous messages if any
+	convo := GetGHistory()
+	convo.Load()
+	cs.History = convo.History
+
 	proc <- StreamNotify{Status: StatusStarted}
 
 	// keep track of the references
@@ -177,17 +192,17 @@ func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPro
 			proc <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}
 			return err
 		}
-		// if len(functionResultData) > 0 {
-		// 	printAllLinks(functionResultData)
-		// 	functionResultData = nil
-		// }
+
 		if resp == nil {
 			break
 		}
 		// First add just the text response (if any)
-		if len(resp.modelContent.Parts) > 0 {
-			history = append(history, resp.modelContent)
-		}
+		// ChatSession History would do itself, don't need keep this
+		/*
+			if len(resp.modelContent.Parts) > 0 {
+				history = append(history, resp.modelContent)
+			}
+		*/
 		// Check if a function call was requested in the first response
 		if resp.functionCall != nil {
 			// Add the complete model response from the first stream to history
@@ -207,10 +222,19 @@ func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPro
 			}
 
 			// Add function response to history
-			history = append(history, &genai.Content{
-				Parts: []genai.Part{functionResponsePart},
-				Role:  "function", // Role "function" is conventional for tool results
-			})
+			/*
+				history = append(history, &genai.Content{
+					Parts: []genai.Part{functionResponsePart},
+					Role:  "function", // Role "function" is conventional for tool results
+				})
+			*/
+			// don't need to append, just one function response is enough
+			history = []*genai.Content{
+				{
+					Parts: []genai.Part{functionResponsePart},
+					Role:  "function", // Role "function" is conventional for tool results
+				},
+			}
 
 		} else {
 			// No function call and no model content
@@ -221,8 +245,14 @@ func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPro
 		refs := "\n\n" + RetrieveReferences(references)
 		proc <- StreamNotify{Status: StatusData, Data: refs}
 	}
+
+	// Save the conversation history
+	convo.History = cs.History
+	err = convo.Save()
+	if err != nil {
+		return fmt.Errorf("failed to save conversation: %v", err)
+	}
 	// Signal that streaming is complete
-	err = SimpleSaveGeminiChatHistory(cs.History, "chat_history.json")
 	proc <- StreamNotify{Status: StatusFinished}
 	return err
 }
@@ -387,9 +417,11 @@ func generateAndProcessStream(ctx context.Context, cs *genai.ChatSession, histor
 	return result, nil // Signal to continue processing
 }
 
-func ProcessGeminiChatStream(apiKey, modelName, systemPrompt, userPrompt string, temperature float32, files []*FileData) error {
-	// Setup the Gemini client
+// A more concise version: Use only the ChatSession's history
+func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPrompt string, temperature float32, files []*FileData) error {
 	ctx := context.Background()
+
+	// Initialize client
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
 		proc <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create client: %v", err)}
@@ -397,46 +429,143 @@ func ProcessGeminiChatStream(apiKey, modelName, systemPrompt, userPrompt string,
 	}
 	defer client.Close()
 
-	// Create the model and generate content
+	// Setup model & tools
+	googleSearchTool := getGeminiSearchTool()
 	model := client.GenerativeModel(modelName)
-	cs := model.StartChat()
-	model.SystemInstruction = genai.NewUserContent(genai.Text(systemPrompt))
+	model.Tools = []*genai.Tool{googleSearchTool}
 
-	// Must be either 'user' or 'model'.
-	cs.History = []*genai.Content{
-		{
-			Parts: []genai.Part{
-				genai.Text("Hello, I have 2 dogs in my house."),
-			},
-			Role: "user",
-		},
-		{
-			Parts: []genai.Part{
-				genai.Text("Great to meet you. What would you like to know?"),
-			},
-			Role: "model",
-		},
+	if systemPrompt != "" {
+		model.SystemInstruction = genai.NewUserContent(genai.Text(systemPrompt))
+	}
+	model.SetTemperature(temperature)
+
+	// Prepare user message parts
+	parts := []genai.Part{genai.Text(userPrompt)}
+	for _, file := range files {
+		if file != nil {
+			parts = append(parts, getGeminiFilePart(file))
+		}
 	}
 
-	iter := cs.SendMessageStream(ctx, genai.Text("How many paws are in my house?"))
+	// Start chat session and load previous history
+	cs := model.StartChat()
+	convo := GetGHistory()
+	convo.Load()
+	cs.History = convo.History
+
+	proc <- StreamNotify{Status: StatusStarted}
+
+	// Send the initial message
+	references := make([]*map[string]interface{}, 0, 1)
+
+	// Prepare user content
+	userContent := &genai.Content{
+		Parts: parts,
+		Role:  "user",
+	}
+
+	contentParts := userContent.Parts
+	// Process function calling loop - max 5 iterations
+	for i := 0; i < 5; i++ {
+		Debugf("Processing conversation at times: %d\n", i+1)
+
+		// Add to chat session (don't need to track separately)
+		proc <- StreamNotify{Status: StatusReasoning, Data: ""}
+		resp := cs.SendMessageStream(ctx, contentParts...)
+		proc <- StreamNotify{Status: StatusReasoningOver, Data: ""}
+
+		// Process the stream
+		result, err := processStream(resp)
+		if err != nil {
+			proc <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}
+			return err
+		}
+
+		// Stread Done and No function call - we're done
+		if result.functionCall == nil {
+			break
+		}
+
+		// Handle function call
+		fc := result.functionCall
+		data, err := callSearchFunction(fc)
+		if err != nil {
+			proc <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Error calling function: %v", err)}
+			return err
+		}
+
+		// Track references
+		references = append(references, &data)
+
+		// Prepare function response
+		functionResponsePart := &genai.FunctionResponse{
+			Name:     fc.Name,
+			Response: data,
+		}
+
+		// Send function response back through the chat session
+		functionContent := &genai.Content{
+			Parts: []genai.Part{functionResponsePart},
+			Role:  "function",
+		}
+		contentParts = functionContent.Parts
+	}
+
+	// Add references to the output if any
+	if len(references) > 0 {
+		refs := "\n\n" + RetrieveReferences(references)
+		proc <- StreamNotify{Status: StatusData, Data: refs}
+	}
+
+	// Save conversation history
+	convo.History = cs.History
+	if err := convo.Save(); err != nil {
+		return fmt.Errorf("failed to save conversation: %v", err)
+	}
+
+	proc <- StreamNotify{Status: StatusFinished}
+	return nil
+}
+
+// Helper function to process stream
+func processStream(iter *genai.GenerateContentResponseIterator) (*streamProcessingResult, error) {
+	result := &streamProcessingResult{
+		modelContent: &genai.Content{Role: "model", Parts: []genai.Part{}},
+	}
+	var accumulatedText string
+
 	for {
 		resp, err := iter.Next()
 		if err == iterator.Done {
 			break
 		}
 		if err != nil {
-			log.Fatal(err)
+			Infof("Stream error: %v", err.Error())
+			return nil, fmt.Errorf("stream error: %v", err)
 		}
-		// Process and send content
-		for _, candidate := range resp.Candidates {
-			for _, part := range candidate.Content.Parts {
-				if textPart, ok := part.(genai.Text); ok {
-					fmt.Printf("%s", string(textPart))
+		if resp == nil || len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil {
+			continue
+		}
+
+		candidateContent := resp.Candidates[0].Content
+		for _, part := range candidateContent.Parts {
+			if textPart, ok := part.(genai.Text); ok {
+				if textPart != "" {
+					txt := string(textPart)
+					proc <- StreamNotify{Status: StatusData, Data: txt}
+					accumulatedText += txt
+				}
+			} else if fcPart, ok := part.(genai.FunctionCall); ok {
+				if result.functionCall == nil && fcPart.Name == "web_search" {
+					result.functionCall = &fcPart
 				}
 			}
 		}
 	}
-	history := ConvertGeminiHistory(cs.History, modelName, systemPrompt)
-	SaveChatHistory(history)
-	return nil
+
+	if accumulatedText != "" {
+		result.modelContent.Parts = append(result.modelContent.Parts, genai.Text(accumulatedText))
+		result.fullText = accumulatedText
+	}
+	return result, nil
 }

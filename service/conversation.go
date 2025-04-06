@@ -2,14 +2,14 @@ package service
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 )
 
 var (
-	instance *Conversation
+	cinstance *Conversation
 )
 
 type Conversation struct {
@@ -19,17 +19,11 @@ type Conversation struct {
 	ShouldLoad bool
 }
 
-func GetDefaultConvoName() string {
-	// Get the default conversation name from the config
-	// This is a placeholder function. Replace with actual logic to get the default name.
-	return "default"
-}
-
 func NewConversation(title string, shouldLoad bool) *Conversation {
-	if instance != nil {
-		return instance
+	if cinstance != nil {
+		return cinstance
 	}
-	instance = &Conversation{
+	cinstance = &Conversation{
 		Messages:   []*model.ChatCompletionMessage{},
 		Name:       GetDefaultConvoName(),
 		ShouldLoad: shouldLoad,
@@ -39,33 +33,23 @@ func NewConversation(title string, shouldLoad bool) *Conversation {
 		if title == "" {
 			title = GetDefaultConvoName()
 		}
-		instance.Name = title
-		sanitzed := GetSanitizeTitle(instance.Name)
-		instance.SetPath(sanitzed)
+		cinstance.Name = title
+		sanitzed := GetSanitizeTitle(cinstance.Name)
+		cinstance.SetPath(sanitzed)
 	}
-	return instance
+	return cinstance
 }
 
 func GetConversion() *Conversation {
-	if instance == nil {
-		instance = NewConversation("", false)
+	if cinstance == nil {
+		cinstance = NewConversation("", false)
 	}
-	return instance
+	return cinstance
 }
 
 func (c *Conversation) SetPath(title string) {
-	// Prefer os.UserConfigDir()
-	userConfigDir, err := os.UserConfigDir()
-	if err != nil {
-		Warnf("Warning: Could not find user dir, falling back to home directory.%v\n", err)
-		userConfigDir, _ = os.UserHomeDir()
-	}
-	convoDir := filepath.Join(userConfigDir, "gllm", "convo")
-	if err := os.MkdirAll(convoDir, 0750); err != nil { // 0750 permissions: user rwx, group rx, others none
-		Errorf("Error creating conversation directory '%s': %v\n", convoDir, err)
-		convoDir = ""
-	}
-	c.Path = filepath.Join(convoDir, title+".json")
+	dir := MakeUserSubDir("gllm", "convo")
+	c.Path = GetFilePath(dir, title+".json")
 }
 
 func (c *Conversation) PushMessage(message *model.ChatCompletionMessage) {
@@ -115,11 +99,15 @@ func (c *Conversation) Load() error {
 
 	data, err := os.ReadFile(c.Path)
 	if err != nil {
-		return err
+		// Handle file not found specifically if needed (e.g., return empty history)
+		if os.IsNotExist(err) {
+			return nil // Return empty slice if file doesn't exist
+		}
+		return fmt.Errorf("failed to read conversation file '%s': %w", c.Path, err)
 	}
 	err = json.Unmarshal(data, &c.Messages)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to deserialize conversation: %w", err)
 	}
 	return nil
 }
