@@ -11,6 +11,7 @@
 - **Search Support**: Using search engines, find relevant and latest information.  
 - **Reading PDF Support**: Google models support PDF processing (OpenAI compatibles only for text/image).  
 - **Reasoning Support**: Generate detailed explanations, logical breakdowns, and step-by-step analysis.  
+- **Multi-turn Chat**: Engage in multiple rounds of conversation.  
 - **Configuration Management**: Customize model behavior and settings.  
 - **Version Control**: Easily track and update your setup.  
 
