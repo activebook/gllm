@@ -15,6 +15,7 @@ const (
 	errorColor = "\033[31m"       // Red
 	warnColor  = "\033[38;5;208m" // Dark Orange
 	debugColor = "\033[34m"       // Blue
+	cyanColor  = "\033[92m"       // Bright Green
 	resetColor = "\033[0m"
 )
 
@@ -32,13 +33,15 @@ func GetLogger() *log.Logger {
 
 func InitLogger() {
 	logger.SetOutput(os.Stderr)
-	logger.SetLevel(log.InfoLevel)            // Default to Info level initially
-	logger.SetFormatter(&log.TextFormatter{}) // Default to TextFormatter
+	logger.SetLevel(log.InfoLevel) // Default to Info level initially
+	logger.SetFormatter(&log.TextFormatter{
+		DisableTimestamp: true, // Remove timestamp numbers like [0000]
+	})
 }
 
 func Infof(format string, args ...interface{}) {
 	if logger != nil {
-		logger.Printf(format, args...)
+		logger.Infof(cyanColor+format+resetColor, args...)
 	}
 }
 

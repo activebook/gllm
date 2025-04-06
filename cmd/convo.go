@@ -212,6 +212,54 @@ var convoInfoCmd = &cobra.Command{
 	},
 }
 
+// convoRenameCmd represents the convo rename command
+var convoRenameCmd = &cobra.Command{
+	Use:   "rename [oldname] [newname]",
+	Short: "Rename a conversation",
+	Long:  `Rename an existing conversation to a new name.`,
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		oldName := args[0]
+		newName := args[1]
+		newName = service.GetSanitizeTitle(newName)
+		convoDir := getConvoDir()
+		oldPath := service.GetFilePath(convoDir, oldName+".json")
+		newPath := service.GetFilePath(convoDir, newName+".json")
+
+		// Check if source exists
+		if _, err := os.Stat(oldPath); os.IsNotExist(err) {
+			return fmt.Errorf("conversation '%s' not found", oldName)
+		}
+
+		// Check if target exists
+		if _, err := os.Stat(newPath); err == nil {
+			return fmt.Errorf("conversation '%s' already exists", newName)
+		}
+
+		// Ask for confirmation
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			fmt.Printf("Rename conversation '%s' to '%s'? (y/N): ", oldName, newName)
+			var response string
+			fmt.Scanln(&response)
+
+			response = strings.ToLower(strings.TrimSpace(response))
+			if response != "y" && response != "yes" {
+				fmt.Println("Operation cancelled.")
+				return nil
+			}
+		}
+
+		// Perform the rename
+		if err := os.Rename(oldPath, newPath); err != nil {
+			return fmt.Errorf("failed to rename conversation: %v", err)
+		}
+
+		fmt.Printf("Conversation renamed from '%s' to '%s' successfully.\n", oldName, newName)
+		return nil
+	},
+}
+
 func init() {
 	// Add convo command to root command
 	rootCmd.AddCommand(convoCmd)
@@ -221,8 +269,10 @@ func init() {
 	convoCmd.AddCommand(convoRemoveCmd)
 	convoCmd.AddCommand(convoInfoCmd)
 	convoCmd.AddCommand(convoClearCmd)
+	convoCmd.AddCommand(convoRenameCmd)
 
 	// Add flags for other prompt commands if needed in the future
 	convoRemoveCmd.Flags().BoolP("force", "f", false, "Skip confirm")
 	convoClearCmd.Flags().BoolP("force", "f", false, "Force clear all without confirmation")
+	convoRenameCmd.Flags().BoolP("force", "f", false, "Skip confirm")
 }
