@@ -205,6 +205,24 @@ func GetEffectSearchEnginelName() string {
 	return defaultName
 }
 
+func SetEffectSearchEnginelName(name string) {
+	switch name {
+	case service.GoogleSearchEngine:
+		viper.Set("default.search", "google")
+	case service.TavilySearchEngine:
+		viper.Set("default.search", "tavily")
+	case service.BingSearchEngine:
+		viper.Set("default.search", "bing")
+	default:
+		service.Warnf("Error: '%s' is not a valid search engine. Options: google, tavily, bing\n", name)
+		return
+	}
+	if err := viper.WriteConfig(); err != nil {
+		service.Errorf("Error saving configuration: %s\n", err)
+		return
+	}
+}
+
 func GetAllSearchEngines() map[string]string {
 	searchEngines := viper.GetStringMap("search_engines")
 

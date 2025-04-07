@@ -51,6 +51,12 @@ const GoogleSearchEngine = "google"
 const BingSearchEngine = "bing"
 const TavilySearchEngine = "tavily"
 
+func GetDefaultSearchEngineName() string {
+	// Get the default conversation name from the config
+	// This is a placeholder function. Replace with actual logic to get the default name.
+	return GoogleSearchEngine
+}
+
 func SetSearchApiKey(key string) {
 	searchApiKey = key
 }

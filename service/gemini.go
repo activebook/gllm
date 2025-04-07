@@ -64,17 +64,22 @@ func generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt string
 
 	// Signal that streaming has started
 	proc <- StreamNotify{Status: StatusStarted}
-
-	// Because gemini wouldn't show reasoning content, so we need to wait here
-	proc <- StreamNotify{Status: StatusReasoning, Data: ""}
+	<-proceed // Wait for the main goroutine to tell sub-goroutine to proceed
 
 	// Start a chat session
 	cs := model.StartChat()
 
 	// Load previous messages if any
 	convo := GetGHistory()
-	convo.Load()
+	err = convo.Load()
+	if err != nil {
+		proc <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}
+		return err
+	}
 	cs.History = convo.History
+
+	// Because gemini wouldn't show reasoning content, so we need to wait here
+	proc <- StreamNotify{Status: StatusReasoning, Data: ""}
 
 	iter := cs.SendMessageStream(ctx, parts...)
 	//iter := model.GenerateContentStream(ctx, parts...)
@@ -177,7 +182,9 @@ func old_GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, use
 	convo.Load()
 	cs.History = convo.History
 
+	// Signal that streaming has started
 	proc <- StreamNotify{Status: StatusStarted}
+	<-proceed // Wait for the main goroutine to tell sub-goroutine to proceed
 
 	// keep track of the references
 	references := make([]*map[string]interface{}, 0, 1)
@@ -418,7 +425,7 @@ func generateAndProcessStream(ctx context.Context, cs *genai.ChatSession, histor
 }
 
 // A more concise version: Use only the ChatSession's history
-func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPrompt string, temperature float32, files []*FileData) error {
+func generateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPrompt string, temperature float32, files []*FileData) error {
 	ctx := context.Background()
 
 	// Initialize client
@@ -447,13 +454,19 @@ func GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPro
 		}
 	}
 
+	// Signal that streaming has started
+	proc <- StreamNotify{Status: StatusStarted}
+	<-proceed // Wait for the main goroutine to tell sub-goroutine to proceed
+
 	// Start chat session and load previous history
 	cs := model.StartChat()
 	convo := GetGHistory()
-	convo.Load()
+	err = convo.Load()
+	if err != nil {
+		proc <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}
+		return err
+	}
 	cs.History = convo.History
-
-	proc <- StreamNotify{Status: StatusStarted}
 
 	// Send the initial message
 	references := make([]*map[string]interface{}, 0, 1)

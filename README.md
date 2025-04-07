@@ -57,6 +57,7 @@ gllm -s "Who's the POTUS right now? and check what's his latest tariff policy" -
 ```sh
 gllm "Who is the President of the United States right now?" --search # Use search to find latest news
 gllm "Who is he/she in this photo? And what is his/her current title?" -s -a "face.png" --model @gemini # Use vision model and search engine to find people in image
+gllm "When was gpt4.5 released?" --search=google # Use specific search engine to find latest news
 ```
 
 ### 💬 Keep Conversations (Multi-turn chat)
@@ -64,8 +65,8 @@ gllm "Who is he/she in this photo? And what is his/her current title?" -s -a "fa
 ```sh
 gllm -s "Who's the POTUS right now?" -c      # Start a conversation(default without name) and retain the full context (last 10 messages)
 gllm "Tell me again, who's the POTUS right now?" -c   # Continue the default conversation
-gllm "Let's talk about why we exist." -c newtalk      # Start a new named conversation called 'newtalk'
-gllm -s "Look up what famous people have said about this." -c newtalk  # Continue the 'newtalk' conversation
+gllm "Let's talk about why we exist." -c=newtalk      # Start a new named conversation called 'newtalk'
+gllm -s "Look up what famous people have said about this." -c=newtalk  # Continue the 'newtalk' conversation
 ```
 
 ⚠️ Warning: If you're using **Gemini mode** and an **OpenAI-compatible model**, keep in mind that they **cannot be used within the same conversation**.  

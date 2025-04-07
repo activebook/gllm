@@ -31,7 +31,7 @@ var (
 	attachments   []string // gllm "Summarize this" --attachment(-a) report.txt
 	sysPromptFlag string   // gllm "Act as shell" --system-prompt(-S) @shell-assistant
 	templateFlag  string   // gllm --template(-t) @coder
-	searchFlag    bool     // gllm --search(-s) "What is the stock price of Tesla right now?"
+	searchFlag    string   // gllm --search(-s) "What is the stock price of Tesla right now?"
 	referenceFlag int      // gllm --reference(-r) 3 "What is the stock price of Tesla right now?"
 	convoName     string   // gllm --conversation(-c) "My Conversation" "What is the stock price of Tesla right now?"
 
@@ -57,6 +57,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 			// Your main command logic goes here
 			// For example, you can print a message or perform some action
 			service.Debugf("Start processing...\n")
+			//service.Debugf("Arguments received: %#v\n", args)
 
 			// If no arguments and no relevant flags are set, show help instead
 			// Args: cobra.ArbitraryArgs: This tells Cobra that receiving any number of positional arguments (including zero arguments) is perfectly valid.
@@ -140,10 +141,21 @@ Configure your API keys and preferred models, then start chatting or executing c
 					}
 				}
 
+				if cmd.Flags().Changed("search") {
+					// Search mode
+					service.Debugf("Search flag was changed, value is: '%s'", searchFlag)
+					SetEffectSearchEnginelName(searchFlag)
+				} else {
+					// Normal mode
+					searchFlag = ""
+				}
+
 				// Check if -c/--conversation was used without a value
-				cmd.Flags().Lookup("conversation").NoOptDefVal = service.GetDefaultConvoName() // This sets a default when flag is used without value
 				if cmd.Flags().Changed("conversation") {
 					// Flag was used without a value, use a default name
+					// Debug what's happening
+					service.Debugf("Conversation flag was changed, value is: '%s'", convoName)
+
 					// set convo history path, if the path is not empty, it would load the history
 					service.NewConversation(convoName, true)
 					service.NewGHistory(convoName, true)
@@ -231,8 +243,7 @@ func processQuery(prompt string, files []*service.FileData) {
 	// Call your LLM service here
 	model := GetEffectiveModel()
 	sys_prompt := GetEffectiveSystemPrompt()
-	use_search := searchFlag
-	if use_search {
+	if searchFlag != "" {
 		searchEngine := GetEffectiveSearchEngine()
 		service.SetMaxReferences(referenceFlag)
 		service.CallLanguageModelRag(prompt, sys_prompt, files, model, searchEngine)
@@ -285,11 +296,13 @@ func init() {
 	rootCmd.Flags().StringSliceVarP(&attachments, "attachment", "a", []string{}, "Specify file(s) or image(s) to append to the prompt")
 	rootCmd.Flags().StringVarP(&sysPromptFlag, "system-prompt", "S", "", "Specify a system prompt")
 	rootCmd.Flags().StringVarP(&templateFlag, "template", "t", "", "Specify a template to use")
-	rootCmd.Flags().BoolVarP(&searchFlag, "search", "s", false, "To query an LLM with a search function")
 	rootCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
 
 	// The key fix is using NoOptDefVal property which specifically handles the case when a flag is provided without a value.
+	rootCmd.Flags().StringVarP(&searchFlag, "search", "s", "google", "To query an LLM with a search function")
+	rootCmd.Flags().Lookup("search").NoOptDefVal = service.GetDefaultSearchEngineName() // This sets a default when flag is used without value
 	rootCmd.Flags().StringVarP(&convoName, "conversation", "c", "", "Specify a conversation name to track chat session (optional)")
+	rootCmd.Flags().Lookup("conversation").NoOptDefVal = service.GetDefaultConvoName() // This sets a default when flag is used without value
 
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
 

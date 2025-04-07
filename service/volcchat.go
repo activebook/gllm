@@ -106,12 +106,20 @@ func generateVolcStreamChan(apiKey, endPoint, modelName, systemPrompt, userPromp
 		messages = append(messages, userMessage)
 	}
 
-	proc <- StreamNotify{Status: StatusProcessing}
+	// Signal that streaming has started
+	proc <- StreamNotify{Status: StatusStarted}
+	<-proceed // Wait for the main goroutine to tell sub-goroutine to proceed
 
 	// Load previous messages if any
 	convo := GetConversion()
-	convo.Load()
+	err := convo.Load()
+	if err != nil {
+		proc <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}
+		return err
+	}
 	convo.PushMessages(messages) // Add new messages to the conversation
+
+	proc <- StreamNotify{Status: StatusProcessing}
 
 	// 3. Create the Chat Completion Request for Streaming
 	request := model.CreateChatCompletionRequest{
@@ -134,6 +142,7 @@ func generateVolcStreamChan(apiKey, endPoint, modelName, systemPrompt, userPromp
 
 	// Signal that streaming has started
 	proc <- StreamNotify{Status: StatusStarted}
+	<-proceed // Wait for the main goroutine to tell sub-goroutine to proceed
 
 	// 5. Process the Stream
 	state := stateNormal
@@ -254,13 +263,21 @@ func generateVolcStreamWithSearchChan(apiKey, endPoint, modelName, systemPrompt,
 		messages = append(messages, userMessage)
 	}
 
+	// Signal that streaming has started
+	proc <- StreamNotify{Status: StatusStarted}
+	<-proceed // Wait for the main goroutine to tell sub-goroutine to proceed
+
 	// Load previous messages if any
 	convo := GetConversion()
-	convo.Load()
+	err := convo.Load()
+	if err != nil {
+		proc <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}
+		return err
+	}
 	convo.PushMessages(messages) // Add new messages to the conversation
 
 	// Process the chat with recursive tool call handling
-	err := chat.ProcessVolcChat()
+	err = chat.ProcessVolcChat()
 	if err != nil {
 		proc <- StreamNotify{Status: StatusError}
 		Infof("Error processing chat: %v\n", err)
@@ -346,10 +363,10 @@ func (c *VolcChat) ProcessVolcChat() error {
 	// only allow 3 recursions
 	i := 0
 	for range c.maxRecursions {
-		proc <- StreamNotify{Status: StatusProcessing}
-
 		i++
 		Debugf("Processing conversation at times: %d\n", i)
+
+		proc <- StreamNotify{Status: StatusProcessing}
 
 		// Create the request
 		req := model.CreateChatCompletionRequest{
@@ -367,6 +384,7 @@ func (c *VolcChat) ProcessVolcChat() error {
 		defer stream.Close()
 
 		proc <- StreamNotify{Status: StatusStarted}
+		<-proceed // Wait for the main goroutine to tell sub-goroutine to proceed
 
 		// Process the stream and collect tool calls
 		assistantMessage, toolCalls, err := c.processVolcStream(stream)

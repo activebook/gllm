@@ -37,7 +37,7 @@ func writeConfig() error {
 
 	// Write the config file
 	// Use WriteConfigAs to ensure it writes even if the file doesn't exist yet
-	logger.Debugln("Saving configuration to:", configFile) // Debug message
+	//logger.Debugln("Saving configuration to:", configFile) // Debug message
 	if err := viper.WriteConfigAs(configFile); err != nil {
 		return fmt.Errorf("failed to write configuration file '%s': %w", configFile, err)
 	}
