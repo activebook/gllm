@@ -82,7 +82,7 @@ func (g *GHistory) Save() error {
 	if len(g.History) == 0 {
 		return nil
 	}
-	data, err := serializeHistory(g.History)
+	data, err := g.serializeHistory(g.History)
 	if err != nil {
 		return fmt.Errorf("failed to serialize conversation: %w", err)
 	}
@@ -108,9 +108,14 @@ func (g *GHistory) Load() error {
 	if len(data) == 0 {
 		return nil
 	}
+	// First try to validate the JSON format before unmarshaling
+	if !json.Valid(data) {
+		return fmt.Errorf("invalid JSON format in conversation file '%s'", g.Path)
+	}
+
 	// Deserialize the JSON data
 	// DeserializeHistory is a function that converts the JSON data back into the original structure
-	history, err := deserializeHistory(data)
+	history, err := g.deserializeHistory(data)
 	if err != nil {
 		return fmt.Errorf("failed to deserialize conversation: %w", err)
 	}
@@ -119,7 +124,7 @@ func (g *GHistory) Load() error {
 }
 
 // When marshaling:
-func serializeHistory(history []*genai.Content) ([]byte, error) {
+func (g *GHistory) serializeHistory(history []*genai.Content) ([]byte, error) {
 	var serializableHistory []SerializableContent
 	for _, content := range history {
 		sc := SerializableContent{
@@ -192,10 +197,15 @@ func serializeHistory(history []*genai.Content) ([]byte, error) {
 }
 
 // When unmarshaling:
-func deserializeHistory(data []byte) ([]*genai.Content, error) {
+func (g *GHistory) deserializeHistory(data []byte) ([]*genai.Content, error) {
 	var serializableHistory []SerializableContent
 	if err := json.Unmarshal(data, &serializableHistory); err != nil {
 		return nil, err
+	}
+	if len(serializableHistory) > 0 {
+		if serializableHistory[0].Parts == nil {
+			return nil, fmt.Errorf("invalid conversation format: isn't a compatible format. '%s'", g.Path)
+		}
 	}
 
 	var history []*genai.Content

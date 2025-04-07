@@ -67,6 +67,16 @@ type OpenAIImageURL struct {
 	Url string `json:"url"` // Can be data URL or HTTP URL
 }
 
+func DetectModelProvider(endPoint string) string {
+	domains := []string{"googleapis.com", "google.com"}
+	for _, domain := range domains {
+		if strings.Contains(endPoint, domain) {
+			return ModelGemini
+		}
+	}
+	return ModelOpenAICompatible
+}
+
 // Detects the conversation provider based on message format
 func DetectMessageProvider(data []byte) string {
 	// Try to unmarshal as array of messages

@@ -2,13 +2,13 @@ package service
 
 import (
 	"fmt"
-	"strings"
 )
 
 // Create a channel to receive notifications
 // Shared by gemini.go and openchat.go
 var (
-	proc chan<- StreamNotify
+	proc    chan<- StreamNotify // Sub Channel to send notifications
+	proceed <-chan bool         // Sub Channel to receive proceed signal
 )
 
 const (
@@ -40,28 +40,25 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 		temperature = 0.7 // or whatever default makes sense
 	}
 
-	var openaiCompatible bool = true
-	domains := []string{"googleapis.com", "google.com"}
-	for _, domain := range domains {
-		if strings.Contains(endPoint, domain) {
-			openaiCompatible = false
-			break
-		}
-	}
+	// Check if the endpoint is compatible with OpenAI
+	provider := DetectModelProvider(endPoint)
 
 	spinner := NewSpinner("Processing...")
 
 	// Create a channel to receive notifications
 	notifyCh := make(chan StreamNotify, 10) // Buffer to prevent blocking
 	proc = notifyCh
+	proceedCh := make(chan bool) // For main -> sub communication
+	proceed = proceedCh
 	// Start the generation in a goroutine
 	go func() {
-		if openaiCompatible {
+		switch provider {
+		case ModelOpenAICompatible:
 			//if err := generateOpenAIStreamChan(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
 			if err := generateVolcStreamChan(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
 				Errorf("Stream error: %v\n", err)
 			}
-		} else {
+		case ModelGemini:
 			if err := generateGeminiStreamChan(apiKey, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
 				Errorf("Stream error: %v\n", err)
 			}
@@ -75,6 +72,7 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 			StartSpinner(spinner, "Processing...")
 		case StatusStarted:
 			StopSpinner(spinner)
+			proceedCh <- true
 		case StatusData:
 			fmt.Print(notify.Data) // Print the streamed text
 		case StatusError:
@@ -135,29 +133,26 @@ func CallLanguageModelRag(prompt string, sys_prompt string, files []*FileData, m
 		temperature = 0.7 // or whatever default makes sense
 	}
 
-	var openaiCompatible bool = true
-	domains := []string{"googleapis.com", "google.com"}
-	for _, domain := range domains {
-		if strings.Contains(endPoint, domain) {
-			openaiCompatible = false
-			break
-		}
-	}
+	// Check if the endpoint is compatible with OpenAI
+	provider := DetectModelProvider(endPoint)
 
 	spinner := NewSpinner("Processing...")
 
 	// Create a channel to receive notifications
 	notifyCh := make(chan StreamNotify, 10) // Buffer to prevent blocking
 	proc = notifyCh
+	proceedCh := make(chan bool) // For main -> sub communication
+	proceed = proceedCh
 	// Start the generation in a goroutine
 	go func() {
-		if openaiCompatible {
+		switch provider {
+		case ModelOpenAICompatible:
 			//if err := generateOpenAIStreamWithSearchChan(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
 			if err := generateVolcStreamWithSearchChan(apiKey, endPoint, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
 				Errorf("Stream error: %v\n", err)
 			}
-		} else {
-			if err := GenerateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
+		case ModelGemini:
+			if err := generateGeminiStreamWithSearchChan(apiKey, modelName, systemPrompt, userPrompt, temperature, files); err != nil {
 				Errorf("Stream error: %v\n", err)
 			}
 		}
@@ -169,6 +164,7 @@ func CallLanguageModelRag(prompt string, sys_prompt string, files []*FileData, m
 			StartSpinner(spinner, "Processing...")
 		case StatusStarted:
 			StopSpinner(spinner)
+			proceedCh <- true
 		case StatusData:
 			fmt.Print(notify.Data) // Print the streamed text
 		case StatusError:

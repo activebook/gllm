@@ -63,19 +63,6 @@ func (c *Conversation) PushMessages(messages []*model.ChatCompletionMessage) {
 
 func (c *Conversation) Save() error {
 	// Save conversation to file
-	// ...
-	/*
-		data := []byte("")
-		// Implement saving logic here
-		for _, msg := range messages {
-			// Serialize each message and save to the file
-			json, err := msg.Content.MarshalJSON()
-			if err != nil {
-				return err
-			}
-			data = append(data, json...)
-		}
-	*/
 	if !c.ShouldLoad {
 		// don't save anything
 		return nil
@@ -105,9 +92,21 @@ func (c *Conversation) Load() error {
 		}
 		return fmt.Errorf("failed to read conversation file '%s': %w", c.Path, err)
 	}
+
+	// First try to validate the JSON format before unmarshaling
+	if !json.Valid(data) {
+		return fmt.Errorf("invalid JSON format in conversation file '%s'", c.Path)
+	}
+
 	err = json.Unmarshal(data, &c.Messages)
 	if err != nil {
 		return fmt.Errorf("failed to deserialize conversation: %w", err)
+	}
+	if len(c.Messages) > 0 {
+		msg := c.Messages[0]
+		if msg.Content == nil {
+			return fmt.Errorf("invalid conversation format: isn't a compatible format. '%s'", c.Path)
+		}
 	}
 	return nil
 }
