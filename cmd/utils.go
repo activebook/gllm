@@ -15,8 +15,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// ... existing code ...
-
 // writeConfig saves the current viper configuration to the determined config file path.
 // It handles creation of the directory if needed.
 func writeConfig() error {

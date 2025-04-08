@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 
+	serp "github.com/serpapi/google-search-results-golang"
 	"google.golang.org/api/customsearch/v1"
 	"google.golang.org/api/option"
 )
@@ -53,9 +54,12 @@ const TavilySearchEngine = "tavily"
 const NoneSearchEngine = "none"
 
 func GetDefaultSearchEngineName() string {
-	// Get the default conversation name from the config
-	// This is a placeholder function. Replace with actual logic to get the default name.
 	return GoogleSearchEngine
+}
+
+func GetNoneSearchEngineName() string {
+	// Using for placeholder
+	return NoneSearchEngine
 }
 
 func SetSearchApiKey(key string) {
@@ -213,22 +217,77 @@ func GoogleSearch(query string) (map[string]any, error) {
 
 // --- Simulation of Bing Search ---
 func BingSearch(query string) (map[string]any, error) {
-	// This is where your search implementation would go
-	// For now, we'll return a dummy result
-	results := map[string]any{
-		"query": query,
-		"results": []map[string]string{
-			{
-				"title":   "Dummy Title",
-				"snippet": "Dummy Snippet",
-				"url":     "https://www.dummy.com",
-			},
-		},
-		"search_engine_latency_ms": 10,
+	// Call SerpAPI Search API
+	return SerpAPISearch(query, "bing")
+}
+
+func SerpAPISearch(query string, engine string) (map[string]any, error) {
+	parameter := map[string]string{
+		"engine":     engine,
+		"q":          query,
+		"count":      "10",
+		"first":      "1",
+		"safeSearch": "off",
 	}
 
-	return results, nil
+	search := serp.NewGoogleSearch(parameter, searchApiKey)
+	results, err := search.GetJSON()
+	if err != nil {
+		//Errorf("[SerpAPI]Error getting JSON: %v", err)
+		return nil, fmt.Errorf("[SerpAPI]Error getting JSON: %v", err)
+	}
+	organic_results := results["organic_results"]
+	search_meta := results["search_metadata"]
+	var total_time_taken float32
+	if metaMap, ok := search_meta.(map[string]interface{}); ok {
+		if totalTime, ok := metaMap["total_time_taken"].(float64); ok {
+			total_time_taken = float32(totalTime)
+		}
+	}
+
+	formatted_results, err := formatSerpAPIResponse(organic_results)
+	if err != nil {
+		Errorf("[SerpAPI]Error formatting response: %v", err)
+		return nil, fmt.Errorf("[SerpAPI]Error formatting response: %v", err)
+	}
+	response := map[string]any{
+		"results":                  formatted_results,
+		"search_engine_latency_ms": total_time_taken,
+	}
+
+	return response, nil
 }
+
+// formatSerpAPIResponse formats the SerpAPI response into a standardized structure
+func formatSerpAPIResponse(organic_results interface{}) (map[string]any, error) {
+	result := make(map[string]any)
+
+	// Extract organic search results
+	results := make([]any, 0)
+	if organicResults, ok := organic_results.([]interface{}); ok {
+		for _, r := range organicResults {
+			if result, ok := r.(map[string]interface{}); ok {
+				formattedResult := map[string]interface{}{
+					"title":       GetStringValue(result, "title"),
+					"link":        GetStringValue(result, "link"),
+					"displayLink": GetStringValue(result, "displayed_link"),
+					"snippet":     GetStringValue(result, "snippet"),
+				}
+				// Add source domain
+				if link, ok := result["link"].(string); ok {
+					if parsedURL, err := url.Parse(link); err == nil {
+						formattedResult["source"] = parsedURL.Hostname()
+					}
+				}
+				results = append(results, formattedResult)
+			}
+		}
+	}
+
+	result["results"] = results
+	return result, nil
+}
+
 func NoneSearch(query string) (map[string]any, error) {
 	return map[string]any{
 		"query":                    query,

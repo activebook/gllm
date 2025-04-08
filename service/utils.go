@@ -62,3 +62,11 @@ func TruncateString(s string, maxLen int) string {
 	}
 	return s[:maxLen-3] + "..."
 }
+
+// Helper function to safely extract string values
+func GetStringValue(data map[string]interface{}, key string) string {
+	if value, ok := data[key].(string); ok {
+		return value
+	}
+	return ""
+}
