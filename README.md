@@ -144,11 +144,12 @@ gllm search default [google,tavily]     # Set default search engine
 ### 🔹 New update! & Conversation Management
 
 ```sh
-gllm convo list           # list all conversations
-gllm convo remove newtalk # remove a conversation
-gllm convo info newtalk   # show a conversation in details
+gllm convo list            # list all conversations
+gllm convo remove newtalk  # remove a conversation
+gllm convo remove "chat_*" # wildcard remove multiple conversations
+gllm convo info newtalk    # show a conversation in details
 gllm convo info newtalk -n 100 -c 300 # view history context (the lastest 100 messages, 300 characters each)
-gllm convo clear          # clear all conversations
+gllm convo clear           # clear all conversations
 ```
 
 ### 🔹 Std input Support
@@ -244,7 +245,8 @@ This project includes various features to enhance usability and efficiency. Belo
 |------------------|-------------|
 | **Chat Mode** | Interactive chat session mode. <br> --- <br> ![ChatMode](screenshots/chatmode.png) |
 | **Follow up**   | Continue follow-up chat. <br> --- <br> ![FollowUP](screenshots/chatmode2.png) |
-| **Chat History**   | Check out chat context. <br> --- <br> ![Context](screenshots/chathistory.png) |
+| **Chat History with tool calls**   | Check out chat context. <br> --- <br> ![Context](screenshots/chathistory.png) |
+| **Chat History with Reasoning**   | Check out chat context. <br> --- <br> ![Context](screenshots/chathistory1.png) |
 
 For more details, using `gllm --help` to check.
 
