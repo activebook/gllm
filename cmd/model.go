@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/activebook/gllm/service"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -425,9 +426,9 @@ func GetEffectiveModel() map[string]any {
 			if configMap, ok := modelConfig.(map[string]interface{}); ok {
 				return configMap
 			}
-			logger.Warnf("Warning: Default model '%s' has invalid configuration format", defaultName)
+			service.Warnf("Warning: Default model '%s' has invalid configuration format", defaultName)
 		} else {
-			logger.Warnf("Warning: Default model '%s' not found in configuration. Falling back...", defaultName)
+			service.Warnf("Warning: Default model '%s' not found in configuration. Falling back...", defaultName)
 		}
 	}
 

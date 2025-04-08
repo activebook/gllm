@@ -72,14 +72,31 @@ gllm -s "Look up what famous people have said about this." -c=newtalk  # Continu
 ⚠️ Warning: If you're using **Gemini mode** and an **OpenAI-compatible model**, keep in mind that they **cannot be used within the same conversation**.  
 These models handle chat messages differently, and mixing them will lead to unexpected behavior.
 
-### 🔹 Interactive Chat (*In Future Edition*)
+### 🖥️ >> Interactive Chat (**Available!**)
 
 ```sh
-gllm chat                         # Start chat with defaults
-gllm chat -m gpt4o                # Start chat with a specific model
-gllm chat --use-prompt coder      # Use a named system prompt
-gllm chat --load my_session       # Load a saved chat session
+gllm chat                       # Start chat with defaults
+gllm chat -m @gpt4o             # Start chat with a specific model
+gllm chat --sys-prompt coder    # Use a named system prompt
+gllm chat -c my_chat            # Start a new chat session
+gllm chat -s                    # Start a new conversation with search
 ```
+
+#### 🛠️ You can change setting in the chat session
+
+```sh
+gllm> /exit, /quit    # Exit the chat session
+gllm> /clear, /reset  # Clear context
+gllm> /help           # Show available commands
+gllm> /system, /S <@name|prompt>  # change system prompt
+gllm> /template, /t <@name|tmpl>  # change template
+gllm> /search, /s <search_engine> # select a search engine to use
+gllm> /reference. /r <num>        # change link reference count
+gllm> /attach, /a <filename>      # Attach a file to the chat session
+gllm> /detach, /d <filename|all>  # Detach a file to the chat session
+```
+
+⚠️ Warning: You can't switch models within the same conversation. Once you choose a model, you'll need to stick with it throughout. Just like when using different models online, you can continue or change topics, you can do search and attach files, but **the model type remains the same**.
 
 ### 🔹 Prompt Templates
 
