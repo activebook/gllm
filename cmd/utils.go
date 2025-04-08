@@ -107,7 +107,7 @@ func GenerateChatFilename() string {
 	currentTime := time.Now()
 
 	// Format the time as a string in the format "chat_YYYY-MM-DD_HH-MM-SS.json"
-	filename := fmt.Sprintf("chat_%s.json", currentTime.Format("2006-01-02_15-04-05"))
+	filename := fmt.Sprintf("chat_%s", currentTime.Format("2006-01-02_15-04-05"))
 
 	return filename
 }

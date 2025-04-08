@@ -4,6 +4,7 @@ go 1.24.1
 
 require (
 	github.com/briandowns/spinner v1.23.2
+	github.com/chzyer/readline v1.5.1
 	github.com/google/generative-ai-go v0.19.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/sashabaranov/go-openai v1.38.1
@@ -21,7 +22,6 @@ require (
 	cloud.google.com/go/auth/oauth2adapt v0.2.6 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
 	cloud.google.com/go/longrunning v0.5.7 // indirect
-	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
