@@ -6,9 +6,18 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/activebook/gllm/service"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+var (
+	plainTemplate string
+)
+
+func SetPlainTemplate(prompt string) {
+	plainTemplate = prompt
+}
 
 // templateCmd represents the base command when called without any subcommands
 var templateCmd = &cobra.Command{
@@ -310,6 +319,10 @@ func SetEffectiveTemplate(name string) error {
 
 // New helper function to get the effective template prompt based on config
 func GetEffectiveTemplate() string {
+	if plainTemplate != "" {
+		return plainTemplate
+	}
+
 	defaultName := viper.GetString("default.template")
 	if defaultName == "" {
 		// No default set, return empty string
@@ -323,7 +336,7 @@ func GetEffectiveTemplate() string {
 			return content
 		}
 		// If default_prompt references a non-existent prompt, fall through
-		logger.Warnf("Warning: Default template prompt '%s' not found in configuration. Falling back...\n", defaultName)
+		service.Warnf("Warning: Default template prompt '%s' not found in configuration. Falling back...", defaultName)
 	}
 
 	// 2. If no valid default, check if any prompts exist

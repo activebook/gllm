@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/activebook/gllm/service"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -337,7 +338,7 @@ func GetEffectiveSystemPrompt() string {
 			return content
 		}
 		// If default_prompt references a non-existent prompt, fall through
-		logger.Warnf("Warning: Default system prompt '%s' not found in configuration. Falling back...\n", defaultName)
+		service.Warnf("Warning: Default system prompt '%s' not found in configuration. Falling back...", defaultName)
 	}
 
 	// 2. If no valid default, check if any prompts exist

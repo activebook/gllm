@@ -10,6 +10,7 @@ import (
 	"os"            // Make sure this is imported
 	"path/filepath" // Make sure this is imported
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -99,6 +100,16 @@ func StartsWith(s string, prefix string) bool {
 
 func RemoveFirst(s string, prefix string) string {
 	return strings.TrimPrefix(s, prefix)
+}
+
+func GenerateChatFilename() string {
+	// Get the current time
+	currentTime := time.Now()
+
+	// Format the time as a string in the format "chat_YYYY-MM-DD_HH-MM-SS.json"
+	filename := fmt.Sprintf("chat_%s.json", currentTime.Format("2006-01-02_15-04-05"))
+
+	return filename
 }
 
 // Define the hardcoded default system prompt

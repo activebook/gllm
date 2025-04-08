@@ -157,7 +157,7 @@ var searchDefaultCmd = &cobra.Command{
 		if len(args) == 0 {
 			current := viper.GetString("default.search")
 			if current == "" {
-				fmt.Println("No default search engine set. Available options: google, tavily, bing")
+				fmt.Println("No default search engine set. Available options: google, tavily, bing, none")
 			} else {
 				fmt.Printf("Current default search engine: %s\n", current)
 			}
@@ -166,15 +166,15 @@ var searchDefaultCmd = &cobra.Command{
 
 		// Set new default
 		engine := strings.ToLower(args[0])
-		if engine != "google" && engine != "tavily" && engine != "bing" {
-			service.Errorf("Error: '%s' is not a valid search engine. Options: google, tavily, bing\n", engine)
+		if engine != "google" && engine != "tavily" && engine != "bing" && engine != "none" {
+			service.Errorf("Error: '%s' is not a valid search engine. Options: google, tavily, bing, none\n", engine)
 			return
 		}
 
 		// Check if the selected engine is configured
 		key := viper.GetString(fmt.Sprintf("search_engines.%s.key", engine))
 		if key == "" {
-			service.Warnf("Warning: %s is not yet configured. Please set API key first.\n", engine)
+			service.Warnf("Warning: %s is not yet configured. Please set API key first.", engine)
 			return
 		}
 
@@ -205,7 +205,7 @@ func GetEffectSearchEnginelName() string {
 	return defaultName
 }
 
-func SetEffectSearchEnginelName(name string) {
+func SetEffectSearchEnginelName(name string) bool {
 	switch name {
 	case service.GoogleSearchEngine:
 		viper.Set("default.search", "google")
@@ -213,14 +213,17 @@ func SetEffectSearchEnginelName(name string) {
 		viper.Set("default.search", "tavily")
 	case service.BingSearchEngine:
 		viper.Set("default.search", "bing")
+	case service.NoneSearchEngine:
+		viper.Set("default.search", "none")
 	default:
-		service.Warnf("Error: '%s' is not a valid search engine. Options: google, tavily, bing\n", name)
-		return
+		service.Warnf("Error: '%s' is not a valid search engine. Options: google, tavily, bing, none", name)
+		return false
 	}
 	if err := viper.WriteConfig(); err != nil {
 		service.Errorf("Error saving configuration: %s\n", err)
-		return
+		return false
 	}
+	return true
 }
 
 func GetAllSearchEngines() map[string]string {
@@ -258,9 +261,9 @@ func GetEffectiveSearchEngine() map[string]any {
 				configMap["name"] = defaultName
 				return configMap
 			}
-			logger.Warnf("Warning: Default Search Engine '%s' has invalid configuration format", defaultName)
+			service.Warnf("Warning: Default Search Engine '%s' has invalid configuration format", defaultName)
 		} else {
-			logger.Warnf("Warning: Default Search Engine '%s' not found in configuration. Falling back...", defaultName)
+			service.Warnf("Warning: Default Search Engine '%s' not found in configuration. Falling back...", defaultName)
 		}
 	}
 

@@ -102,11 +102,11 @@ Configure your API keys and preferred models, then start chatting or executing c
 					if StartsWith(modelFlag, "@") {
 						modelFlag = RemoveFirst(modelFlag, "@")
 						if err := SetEffectiveModel(modelFlag); err != nil {
-							service.Warnf("%v\n", err)
+							service.Warnf("%v", err)
 							fmt.Println("Using default model instead")
 						}
 					} else {
-						service.Warnf("model[%s] should start with @\n", modelFlag)
+						service.Warnf("model[%s] should start with @", modelFlag)
 						fmt.Println("Using default model instead")
 					}
 				}
@@ -117,7 +117,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 						// Using set system prompt
 						sysPromptFlag = RemoveFirst(sysPromptFlag, "@")
 						if err := SetEffectiveSystemPrompt(sysPromptFlag); err != nil {
-							service.Warnf("%v\n", err)
+							service.Warnf("%v", err)
 							fmt.Println("Using default system prompt instead")
 						}
 					} else {
@@ -132,18 +132,18 @@ Configure your API keys and preferred models, then start chatting or executing c
 						// Using set template
 						templateFlag = RemoveFirst(templateFlag, "@")
 						if err := SetEffectiveTemplate(templateFlag); err != nil {
-							service.Warnf("%v\n", err)
+							service.Warnf("%v", err)
 							fmt.Println("Using default template instead")
 						}
 					} else {
-						service.Warnf("template[%s] should start with @\n", templateFlag)
-						fmt.Println("Using default template instead")
+						// Using plain adhoc template
+						SetPlainTemplate(templateFlag)
 					}
 				}
 
 				if cmd.Flags().Changed("search") {
 					// Search mode
-					service.Debugf("Search flag was changed, value is: '%s'", searchFlag)
+					//service.Debugf("Search flag was changed, value is: '%s'", searchFlag)
 					SetEffectSearchEnginelName(searchFlag)
 				} else {
 					// Normal mode
@@ -154,11 +154,11 @@ Configure your API keys and preferred models, then start chatting or executing c
 				if cmd.Flags().Changed("conversation") {
 					// Flag was used without a value, use a default name
 					// Debug what's happening
-					service.Debugf("Conversation flag was changed, value is: '%s'", convoName)
+					//service.Debugf("Conversation flag was changed, value is: '%s'", convoName)
 
 					// set convo history path, if the path is not empty, it would load the history
-					service.NewConversation(convoName, true)
-					service.NewGHistory(convoName, true)
+					service.NewOpenChatConversation(convoName, true)
+					service.NewGeminiConversation(convoName, true)
 				}
 
 				// Process all prompt building
@@ -211,7 +211,7 @@ func processAttachment(path string) *service.FileData {
 			format = service.GetMIMETypeByContent(data)
 		}
 	}
-	return service.NewFileData(format, data)
+	return service.NewFileData(format, data, path)
 }
 
 func buildPrompt(prompt string, isThereAttachment bool) (string, []*service.FileData) {
@@ -241,16 +241,14 @@ func buildPrompt(prompt string, isThereAttachment bool) (string, []*service.File
 
 func processQuery(prompt string, files []*service.FileData) {
 	// Call your LLM service here
-	model := GetEffectiveModel()
+	modelInfo := GetEffectiveModel()
 	sys_prompt := GetEffectiveSystemPrompt()
+	var searchEngine map[string]any
 	if searchFlag != "" {
-		searchEngine := GetEffectiveSearchEngine()
+		searchEngine = GetEffectiveSearchEngine()
 		service.SetMaxReferences(referenceFlag)
-		service.CallLanguageModelRag(prompt, sys_prompt, files, model, searchEngine)
-	} else {
-		service.CallLanguageModel(prompt, sys_prompt, files, model)
 	}
-
+	service.CallLanguageModel(prompt, sys_prompt, files, modelInfo, searchEngine)
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -319,7 +317,7 @@ func initConfigPaths() {
 	userConfigDir, err := os.UserConfigDir()
 	if err != nil {
 		// Fallback to home directory if UserConfigDir fails
-		service.Warnf("Warning: Could not find user config dir, falling back to home directory.%v\n", err)
+		service.Warnf("Warning: Could not find user config dir, falling back to home directory.%v", err)
 		userConfigDir, err = homedir.Dir()
 		cobra.CheckErr(err) // If home dir also fails, panic
 	}

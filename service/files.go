@@ -15,12 +15,14 @@ import (
 type FileData struct {
 	format string
 	data   []byte
+	path   string
 }
 
-func NewFileData(format string, data []byte) *FileData {
+func NewFileData(format string, data []byte, path string) *FileData {
 	return &FileData{
 		format: format,
 		data:   data,
+		path:   path,
 	}
 }
 
@@ -29,6 +31,10 @@ func (i *FileData) Format() string {
 }
 func (i *FileData) Data() []byte {
 	return i.data
+}
+
+func (i *FileData) Path() string {
+	return i.path
 }
 
 /*

@@ -50,6 +50,7 @@ const TavilyUrl = "https://api.tavily.com/search"
 const GoogleSearchEngine = "google"
 const BingSearchEngine = "bing"
 const TavilySearchEngine = "tavily"
+const NoneSearchEngine = "none"
 
 func GetDefaultSearchEngineName() string {
 	// Get the default conversation name from the config
@@ -210,7 +211,7 @@ func GoogleSearch(query string) (map[string]any, error) {
 	return response, nil
 }
 
-// --- Simulation of Google Search ---
+// --- Simulation of Bing Search ---
 func BingSearch(query string) (map[string]any, error) {
 	// This is where your search implementation would go
 	// For now, we'll return a dummy result
@@ -227,6 +228,13 @@ func BingSearch(query string) (map[string]any, error) {
 	}
 
 	return results, nil
+}
+func NoneSearch(query string) (map[string]any, error) {
+	return map[string]any{
+		"query":                    query,
+		"results":                  []map[string]string{},
+		"search_engine_latency_ms": 0,
+	}, nil
 }
 
 func RetrieveReferences(references []*map[string]any) string {
