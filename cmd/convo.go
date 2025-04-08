@@ -11,6 +11,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	convoMessageCount  int
+	convoMessageLength int
+)
+
 func getConvoDir() string {
 	dir := service.MakeUserSubDir("gllm", "convo")
 	return dir
@@ -177,8 +182,11 @@ var convoInfoCmd = &cobra.Command{
 	Use:     "info [conversation]",
 	Aliases: []string{"in"},
 	Short:   "Show conversation details",
-	Long:    `Display detailed information about a specific conversation.`,
-	Args:    cobra.ExactArgs(1),
+	Long: `Display detailed information about a specific conversation.
+
+Using the --message-num (-n) flag, set the number of recent messages to display..
+Using the --message-chars (-c) flag, set the maximum length of each message's content.`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		convoName := args[0]
 		convoDir := getConvoDir()
@@ -202,9 +210,9 @@ var convoInfoCmd = &cobra.Command{
 		// Process and display messages based on provider
 		switch provider {
 		case service.ModelGemini:
-			service.DisplayGeminiConversationLog(data)
+			service.DisplayGeminiConversationLog(data, convoMessageCount, convoMessageLength)
 		case service.ModelOpenAI, service.ModelOpenAICompatible:
-			service.DisplayOpenAIConversationLog(data)
+			service.DisplayOpenAIConversationLog(data, convoMessageCount, convoMessageLength)
 		default:
 			fmt.Println("Unknown conversation format.")
 		}
@@ -272,6 +280,8 @@ func init() {
 	convoCmd.AddCommand(convoRenameCmd)
 
 	// Add flags for other prompt commands if needed in the future
+	convoInfoCmd.Flags().IntVarP(&convoMessageCount, "message-num", "n", 20, "Number of messages to display")
+	convoInfoCmd.Flags().IntVarP(&convoMessageLength, "message-chars", "c", 200, "Length of messages to display")
 	convoRemoveCmd.Flags().BoolP("force", "f", false, "Skip confirm")
 	convoClearCmd.Flags().BoolP("force", "f", false, "Force clear all without confirmation")
 	convoRenameCmd.Flags().BoolP("force", "f", false, "Skip confirm")

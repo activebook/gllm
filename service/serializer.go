@@ -13,9 +13,33 @@ const (
 	ModelOpenAI           = "openai"
 	ModelOpenAICompatible = "openai-compatible"
 	ModelUnknown          = "unknown"
+)
 
-	// Content preview length
-	MaxPreviewLength = 100
+var (
+	// RoleColors for message roles
+	RoleColors = map[string]string{
+		"message":   "\033[93m", // Bright Yellow
+		"system":    "\033[33m", // Yellow
+		"user":      "\033[32m", // Green
+		"assistant": "\033[34m", // Blue
+		"model":     "\033[34m", // Blue (Gemini equivalent to assistant)
+		"function":  "\033[36m", // Cyan
+		"tool":      "\033[36m", // Cyan (OpenAI tool responses)
+	}
+
+	// ContentTypeColors for special content
+	ContentTypeColors = map[string]string{
+		"function_call":     "\033[35m", // Magenta
+		"function_response": "\033[35m", // Magenta
+		"image":             "\033[31m", // Red
+		"file_data":         "\033[31m", // Red
+	}
+
+	// Reset code to end coloring
+	ResetColor = "\033[0m"
+
+	// Gray for additional info like "... and X more messages"
+	GrayColor = "\033[90m"
 )
 
 // Gemini message format
@@ -109,16 +133,17 @@ func DetectMessageProvider(data []byte) string {
 }
 
 // Display summary of Gemini conversation
-func DisplayGeminiConversationLog(data []byte) {
+func DisplayGeminiConversationLog(data []byte, msgCount int, msgLength int) {
 	var messages []GeminiMessage
 	if err := json.Unmarshal(data, &messages); err != nil {
 		fmt.Fprintf(os.Stderr, "Error parsing Gemini messages: %v\n", err)
 		return
 	}
 
-	fmt.Printf("Messages: %d\n", len(messages))
+	// Summary section (keeping it simple for now)
+	fmt.Println("Summary:")
+	fmt.Printf("  %sMessages: %d%s\n", ResetColor, len(messages), resetColor)
 
-	// Count message types
 	var userCount, modelCount, functionCallCount, functionResponseCount, imageCount, fileCount int
 	for _, msg := range messages {
 		switch msg.Role {
@@ -127,8 +152,6 @@ func DisplayGeminiConversationLog(data []byte) {
 		case "model":
 			modelCount++
 		}
-
-		// Check for special content types
 		for _, part := range msg.Parts {
 			switch part.Type {
 			case "function_call":
@@ -140,8 +163,6 @@ func DisplayGeminiConversationLog(data []byte) {
 			case "file_data":
 				fileCount++
 			}
-
-			// Also check for inline data which might be images
 			if part.InlineData != nil {
 				if mimeType, ok := part.InlineData["mime_type"].(string); ok {
 					if strings.HasPrefix(mimeType, "image/") {
@@ -152,63 +173,71 @@ func DisplayGeminiConversationLog(data []byte) {
 		}
 	}
 
-	fmt.Printf("User messages: %d\n", userCount)
-	fmt.Printf("Model responses: %d\n", modelCount)
+	fmt.Printf("  %sUser messages: %d%s\n", RoleColors["user"], userCount, ResetColor)
+	fmt.Printf("  %sModel responses: %d%s\n", RoleColors["model"], modelCount, ResetColor)
 	if functionCallCount > 0 {
-		fmt.Printf("Function calls: %d\n", functionCallCount)
+		fmt.Printf("  %sFunction calls: %d%s\n", ContentTypeColors["function_call"], functionCallCount, ResetColor)
 	}
 	if functionResponseCount > 0 {
-		fmt.Printf("Function responses: %d\n", functionResponseCount)
+		fmt.Printf("  %sFunction responses: %d%s\n", ContentTypeColors["function_response"], functionResponseCount, ResetColor)
 	}
 	if imageCount > 0 {
-		fmt.Printf("Images: %d\n", imageCount)
+		fmt.Printf("  %sImages: %d%s\n", ContentTypeColors["image"], imageCount, ResetColor)
 	}
 	if fileCount > 0 {
-		fmt.Printf("Files: %d\n", fileCount)
+		fmt.Printf("  %sFiles: %d%s\n", ContentTypeColors["file_data"], fileCount, ResetColor)
 	}
 
-	// Show conversation preview
+	// Conversation preview with colors
 	if len(messages) > 0 {
 		fmt.Println("\nConversation Preview:")
-		messageLimit := min(10, len(messages))
-
-		for i := 0; i < messageLimit; i++ {
+		messageLimit := min(msgCount, len(messages))
+		// Adjust start index to show recent messages
+		start := len(messages) - messageLimit
+		if start > 0 {
+			fmt.Printf("  %s... (%d) old messages ...%s\n", GrayColor, start, resetColor)
+			fmt.Println()
+		}
+		for i := start; i < len(messages); i++ {
 			msg := messages[i]
-			fmt.Printf("  %s: ", msg.Role)
+			// Apply color to role, default to no color if role not found
+			roleColor := RoleColors[msg.Role]
+			if roleColor == "" {
+				roleColor = ""
+			}
+			fmt.Printf("  %s%s%s: ", roleColor, msg.Role, ResetColor)
 
-			// Show preview of content
 			if len(msg.Parts) > 0 {
 				for j, part := range msg.Parts {
 					if j > 0 {
 						fmt.Print(" + ")
 					}
-
 					switch part.Type {
 					case "text":
-						preview := TruncateString(part.Text, MaxPreviewLength)
+						preview := TruncateString(part.Text, msgLength)
 						fmt.Printf("%s", preview)
 					case "function_call":
-						fmt.Printf("[Function call: %s]", part.Name)
-						// Print a few args as preview
+						fmt.Printf("%s[Function call: %s]%s", ContentTypeColors["function_call"], part.Name, ResetColor)
 						if len(part.Args) > 0 {
 							argStr, _ := json.Marshal(part.Args)
-							fmt.Printf(" args: %s", TruncateString(string(argStr), 30))
+							fmt.Printf(" args: %s", TruncateString(string(argStr), msgLength))
 						}
 					case "function_response":
-						fmt.Printf("[Function response]")
+						fmt.Printf("%s[Function response]%s", ContentTypeColors["function_response"], ResetColor)
 						respPreview, _ := json.Marshal(part.Args)
-						fmt.Printf(" data: %s", TruncateString(string(respPreview), 30))
+						fmt.Printf(" data: %s", TruncateString(string(respPreview), msgLength))
 					case "image":
-						fmt.Printf("[Image content]")
+						fmt.Printf("%s[Image content]%s", ContentTypeColors["image"], ResetColor)
 					case "file_data":
 						if filename, ok := getFileName(part.FileData); ok {
-							fmt.Printf("[File: %s]", filename)
+							fmt.Printf("%s[File: %s]%s", ContentTypeColors["file_data"], filename, ResetColor)
 						} else {
-							fmt.Printf("[File]")
+							fmt.Printf("%s[File]%s", ContentTypeColors["file_data"], ResetColor)
 						}
 					default:
 						fmt.Printf("[%s content]", part.Type)
 					}
+					fmt.Println()
 				}
 				fmt.Println()
 			} else {
@@ -217,25 +246,25 @@ func DisplayGeminiConversationLog(data []byte) {
 		}
 
 		if len(messages) > messageLimit {
-			fmt.Printf("  ... and %d more messages\n", len(messages)-messageLimit)
+			fmt.Printf("  %s... and %d old messages before%s\n", GrayColor, len(messages)-messageLimit, ResetColor)
 		}
 	}
 }
 
-// Display summary of OpenAI conversation with enhanced details
-func DisplayOpenAIConversationLog(data []byte) {
+// Display summary of OpenAI conversation
+func DisplayOpenAIConversationLog(data []byte, msgCount int, msgLength int) {
 	var messages []OpenAIMessage
 	if err := json.Unmarshal(data, &messages); err != nil {
 		fmt.Fprintf(os.Stderr, "Error parsing OpenAI messages: %v\n", err)
 		return
 	}
 
-	fmt.Printf("Messages: %d\n", len(messages))
+	// Summary section
+	fmt.Println("Summary:")
+	fmt.Printf("  %sMessages: %d%s\n", ResetColor, len(messages), ResetColor)
 
-	// Count message types
 	var systemCount, userCount, assistantCount int
 	var functionCallCount, functionResponseCount, imageCount int
-
 	for _, msg := range messages {
 		switch msg.Role {
 		case "system":
@@ -247,18 +276,12 @@ func DisplayOpenAIConversationLog(data []byte) {
 		case "function", "tool":
 			functionResponseCount++
 		}
-
-		// Check for function calls
 		if msg.FunctionCall != nil {
 			functionCallCount++
 		}
-
-		// Check for tool calls (newer API)
 		if len(msg.ToolCalls) > 0 {
 			functionCallCount += len(msg.ToolCalls)
 		}
-
-		// Check for images in content
 		if contentItems, ok := msg.Content.([]interface{}); ok {
 			for _, item := range contentItems {
 				if contentMap, ok := item.(map[string]interface{}); ok {
@@ -270,61 +293,69 @@ func DisplayOpenAIConversationLog(data []byte) {
 		}
 	}
 
-	fmt.Printf("System messages: %d\n", systemCount)
-	fmt.Printf("User messages: %d\n", userCount)
-	fmt.Printf("Assistant responses: %d\n", assistantCount)
+	fmt.Printf("  %sSystem messages: %d%s\n", RoleColors["system"], systemCount, ResetColor)
+	fmt.Printf("  %sUser messages: %d%s\n", RoleColors["user"], userCount, ResetColor)
+	fmt.Printf("  %sAssistant responses: %d%s\n", RoleColors["assistant"], assistantCount, ResetColor)
 	if functionCallCount > 0 {
-		fmt.Printf("Function/tool calls: %d\n", functionCallCount)
+		fmt.Printf("  %sFunction/tool calls: %d%s\n", ContentTypeColors["function_call"], functionCallCount, ResetColor)
 	}
 	if functionResponseCount > 0 {
-		fmt.Printf("Function/tool responses: %d\n", functionResponseCount)
+		fmt.Printf("  %sFunction/tool responses: %d%s\n", ContentTypeColors["function_response"], functionResponseCount, ResetColor)
 	}
 	if imageCount > 0 {
-		fmt.Printf("Images: %d\n", imageCount)
+		fmt.Printf("  %sImages: %d%s\n", ContentTypeColors["image"], imageCount, ResetColor)
 	}
 
-	// Show conversation preview
+	// Conversation preview with colors
 	if len(messages) > 0 {
-		fmt.Println("\nConversation Preview:")
-		messageLimit := min(10, len(messages))
-
-		for i := 0; i < messageLimit; i++ {
+		fmt.Println("\nConversation Preview: Recent")
+		messageLimit := min(msgCount, len(messages))
+		// Adjust start index to show recent messages
+		start := len(messages) - messageLimit
+		if start > 0 {
+			fmt.Printf("  %s... (%d) old messages ...%s\n", GrayColor, start, resetColor)
+			fmt.Println()
+		}
+		for i := start; i < len(messages); i++ {
 			msg := messages[i]
-			fmt.Printf("  %s", msg.Role)
+			// Apply color to role
+			roleColor := RoleColors[msg.Role]
+			if roleColor == "" {
+				roleColor = ""
+			}
+			fmt.Printf("  %s%s%s", roleColor, msg.Role, ResetColor)
 
-			// Show name for function calls if present
 			if msg.Name != "" {
 				fmt.Printf(" (%s)", msg.Name)
 			}
 			fmt.Print(": ")
 
-			// Handle different content types
 			switch content := msg.Content.(type) {
 			case string:
-				preview := TruncateString(content, MaxPreviewLength)
+				preview := TruncateString(content, msgLength)
 				fmt.Printf("%s", preview)
 			case []interface{}:
-				// Handle multimodal content
 				fmt.Print("[Multimodal content: ")
 				for j, item := range content {
 					if j > 0 {
 						fmt.Print(", ")
 					}
-
 					if contentMap, ok := item.(map[string]interface{}); ok {
 						if contentType, ok := contentMap["type"].(string); ok {
-							fmt.Print(contentType)
 							if contentType == "text" {
 								if text, ok := contentMap["text"].(string); ok {
-									fmt.Printf(" (%s)", TruncateString(text, 20))
+									fmt.Printf("text (%s)", TruncateString(text, msgLength))
 								}
+							} else if contentType == "image_url" {
+								fmt.Printf("%simage%s", ContentTypeColors["image"], ResetColor)
+							} else {
+								fmt.Print(contentType)
 							}
 						}
 					}
 				}
 				fmt.Print("]")
 			case nil:
-				// Content might be nil for function calls
 				if msg.Role == "assistant" {
 					fmt.Print("[No text content]")
 				}
@@ -332,37 +363,37 @@ func DisplayOpenAIConversationLog(data []byte) {
 				fmt.Print("[Unknown content format]")
 			}
 
-			// Show function call details
+			// Function call details
 			if msg.FunctionCall != nil {
-				fmt.Printf(" [Function call: %s", msg.FunctionCall.Name)
+				fmt.Printf(" %s[Function call: %s]%s", ContentTypeColors["function_call"], msg.FunctionCall.Name, ResetColor)
 				if msg.FunctionCall.Arguments != "" {
-					fmt.Printf(", args: %s", TruncateString(msg.FunctionCall.Arguments, 30))
+					fmt.Printf(" args: %s", TruncateString(msg.FunctionCall.Arguments, msgLength))
 				}
-				fmt.Print("]")
 			}
 
-			// Show tool call details
+			// Tool call details
 			if len(msg.ToolCalls) > 0 {
-				fmt.Printf(" [Tool calls: ")
+				fmt.Printf(" %s[Tool calls: ", ContentTypeColors["function_call"])
 				for j, tool := range msg.ToolCalls {
 					if j > 0 {
 						fmt.Print(", ")
 					}
 					fmt.Printf("%s (id: %s)", tool.Function.Name, tool.Id)
 				}
-				fmt.Print("]")
+				fmt.Printf("]%s", ResetColor)
 			}
 
-			// Show tool response details
+			// Tool response details
 			if msg.ToolCallId != "" {
-				fmt.Printf(" [Response to tool call: %s]", msg.ToolCallId)
+				fmt.Printf(" %s[Response to tool call: %s]%s", ContentTypeColors["function_response"], msg.ToolCallId, ResetColor)
 			}
 
+			fmt.Println()
 			fmt.Println()
 		}
 
 		if len(messages) > messageLimit {
-			fmt.Printf("  ... and %d more messages\n", len(messages)-messageLimit)
+			fmt.Printf("  %s... and %d old messages before%s\n", GrayColor, len(messages)-messageLimit, ResetColor)
 		}
 	}
 }

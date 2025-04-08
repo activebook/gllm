@@ -25,6 +25,7 @@ Special commands:
 /exit, /quit - Exit the chat session
 /clear, /reset - Clear context
 /help - Show available commands
+/history [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)
 /system, /S <@name|prompt> - change system prompt
 /template, /t <@name|tmpl> - change template
 /search, /s <search_engine> - select a search engine to use
@@ -215,6 +216,7 @@ func (ci *ChatInfo) startREPL() {
 
 type ChatInfo struct {
 	Model      string
+	Provider   string
 	Files      []*service.FileData
 	Conversion service.ConversationManager
 	QuitFlag   bool
@@ -234,6 +236,7 @@ func buildChatInfo(files []*service.FileData) *ChatInfo {
 
 	ci := ChatInfo{
 		Model:      modelInfo["model"].(string),
+		Provider:   provider,
 		Files:      files,
 		Conversion: cm,
 		QuitFlag:   false,
@@ -462,6 +465,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /clear, /reset - Clear conversation history")
 	fmt.Println("  /help - Show this help message")
 	fmt.Println("  /info - Show current settings and conversation stats")
+	fmt.Println("  /history /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)")
 	fmt.Println("  /attach, /a <filename> - Attach a file to the conversation")
 	fmt.Println("  /detach, /d <filename|all> - Detach a file from the conversation")
 	fmt.Println("  /template, /t \"<tmpl|name>\" - Change the template")
@@ -470,9 +474,36 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /reference, /r \"<num>\" - Change the search link reference count")
 }
 
+func (ci *ChatInfo) showHistory(num int, chars int) {
+
+	convoPath := ci.Conversion.GetPath()
+
+	// Check if conversation exists
+	if _, err := os.Stat(convoPath); os.IsNotExist(err) {
+		service.Errorf("Conversation '%s' not found.\n", convoPath)
+		return
+	}
+
+	// Read and parse the conversation file
+	data, err := os.ReadFile(convoPath)
+	if err != nil {
+		service.Errorf("error reading conversation file: %v", err)
+		return
+	}
+
+	switch ci.Provider {
+	case service.ModelGemini:
+		service.DisplayGeminiConversationLog(data, num, chars)
+	case service.ModelOpenAICompatible:
+		service.DisplayOpenAIConversationLog(data, num, chars)
+	default:
+		fmt.Println("Unknown provider")
+	}
+}
+
 func (ci *ChatInfo) handleCommand(cmd string) {
 	// Split the command into parts
-	parts := strings.SplitN(cmd, " ", 2)
+	parts := strings.SplitN(cmd, " ", 3)
 	command := parts[0]
 	switch command {
 	case "/exit", "/quit":
@@ -482,6 +513,22 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 
 	case "/help":
 		ci.showHelp()
+
+	case "/history", "/h":
+		num := 20
+		chars := 200
+		// Parse arguments
+		if len(parts) > 1 {
+			if n, err := strconv.Atoi(parts[1]); err == nil && n > 0 {
+				num = n
+			}
+		}
+		if len(parts) > 2 {
+			if c, err := strconv.Atoi(parts[2]); err == nil && c > 0 {
+				chars = c
+			}
+		}
+		ci.showHistory(num, chars)
 
 	case "/clear", "/reset":
 		ci.clearContext()
