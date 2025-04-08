@@ -227,6 +227,13 @@ This project includes various features to enhance usability and efficiency. Belo
 | **Multi-turn**   | Continue prevous conversation. <br> --- <br> ![Multi](screenshots/conversation.png) |
 | **Reading PDFs** | Extract and analyze content from PDFs. (Gemini Only)  <br> --- <br> ![PDF](screenshots/pdf.png) |
 
+## Interactive Chat Features
+
+| Feature           | Description |
+|------------------|-------------|
+| **Chat Mode** | Interactive chat session mode. <br> --- <br> ![ChatMode](screenshots/chatmode.png) |
+| **Follow up**   | Continue follow-up chat. <br> --- <br> ![FollowUP](screenshots/chatmode1.png) |
+
 For more details, using `gllm --help` to check.
 
 ---
