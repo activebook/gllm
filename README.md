@@ -232,7 +232,7 @@ This project includes various features to enhance usability and efficiency. Belo
 | Feature           | Description |
 |------------------|-------------|
 | **Chat Mode** | Interactive chat session mode. <br> --- <br> ![ChatMode](screenshots/chatmode.png) |
-| **Follow up**   | Continue follow-up chat. <br> --- <br> ![FollowUP](screenshots/chatmode1.png) |
+| **Follow up**   | Continue follow-up chat. <br> --- <br> ![FollowUP](screenshots/chatmode2.png) |
 
 For more details, using `gllm --help` to check.
 
