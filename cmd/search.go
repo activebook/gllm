@@ -29,7 +29,17 @@ The cx parameter is the key for the custom search engine.`,
 		cx, _ := cmd.Flags().GetString("cx")
 
 		if key == "" || cx == "" {
-			fmt.Println("Error: Both API key and cx values are required")
+			googleKey := viper.GetString("search_engines.google.key")
+			googleCx := viper.GetString("search_engines.google.cx")
+			if googleKey == "" || googleCx == "" {
+				service.Warnf("Warning: Google Search is not yet configured. Please set API key first.")
+			}
+			fmt.Println("Google Custom Search:")
+			fmt.Printf("  API Key: %s\n", maskAPIKey(googleKey))
+			fmt.Printf("  CX: %s\n", maskAPIKey(googleCx))
+			fmt.Println("  Quota: 100 searches per day (free tier)")
+			fmt.Println("You can use --key and --cx to update the API key.")
+			fmt.Println("Both API key and cx values are required.")
 			return
 		}
 
@@ -54,7 +64,14 @@ var searchTavilyCmd = &cobra.Command{
 		key, _ := cmd.Flags().GetString("key")
 
 		if key == "" {
-			fmt.Println("Error: API key is required")
+			tavilyKey := viper.GetString("search_engines.tavily.key")
+			if tavilyKey == "" {
+				service.Warnf("Warning: Tavily Search is not yet configured. Please set API key first.")
+			}
+			fmt.Println("Tavily Search:")
+			fmt.Printf("  API Key: %s\n", maskAPIKey(tavilyKey))
+			fmt.Println("  Quota: 1000 searches per month (free tier)")
+			fmt.Println("You can use --key to update the API key.")
 			return
 		}
 
@@ -78,7 +95,14 @@ var searchBingCmd = &cobra.Command{
 		key, _ := cmd.Flags().GetString("key")
 
 		if key == "" {
-			fmt.Println("Error: API key is required")
+			bingKey := viper.GetString("search_engines.bing.key")
+			if bingKey == "" {
+				service.Warnf("Warning: Bing Search is not yet configured. Please set API key first.")
+			}
+			fmt.Println("Bing Search:")
+			fmt.Printf("  API Key: %s\n", maskAPIKey(bingKey))
+			fmt.Println("  Quota: 100 searches per month (free tier) - SerpAPI")
+			fmt.Println("You can use --key to update the API key.")
 			return
 		}
 
@@ -124,8 +148,9 @@ var searchListCmd = &cobra.Command{
 		// Bing
 		bingKey := viper.GetString("search_engines.bing.key")
 		if bingKey != "" {
-			fmt.Println("Bing currently not supported:")
+			fmt.Println("Bing Search:")
 			fmt.Printf("  API Key: %s\n", maskAPIKey(bingKey))
+			fmt.Println("  Quota: 100 searches per month (free tier) - SerpAPI")
 		}
 
 		if googleKey == "" && tavilyKey == "" && bingKey == "" {

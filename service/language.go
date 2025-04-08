@@ -125,6 +125,7 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 			StartSpinner(spinner, "Searching...")
 		case StatusFunctionCallingOver:
 			StopSpinner(spinner)
+			proceedCh <- true
 		}
 	}
 }

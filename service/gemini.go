@@ -185,7 +185,8 @@ func (ll *LangLogic) callSearchFunction(fc *genai.FunctionCall) (map[string]any,
 	argsJSON, _ := json.Marshal(fc.Args)
 	if err := json.Unmarshal(argsJSON, &args); err != nil {
 		ll.ProcChan <- StreamNotify{Status: StatusFunctionCallingOver, Data: ""}
-		Infof("Warning: Could not unmarshal function args: %v. Args: %+v", err, fc.Args)
+		<-ll.ProceedChan
+		Warnf("Could not unmarshal function args: %v. Args: %+v", err, fc.Args)
 		return nil, fmt.Errorf("could not unmarshal function args: %v", err)
 	}
 
@@ -210,11 +211,13 @@ func (ll *LangLogic) callSearchFunction(fc *genai.FunctionCall) (map[string]any,
 	}
 	if err != nil {
 		ll.ProcChan <- StreamNotify{Status: StatusFunctionCallingOver, Data: ""}
-		Infof("Error performing search: %v", err)
+		<-ll.ProceedChan
+		Warnf("Performing search: %v", err)
 		// TODO: Potentially send an error FunctionResponse back to the model
 		return nil, fmt.Errorf("error performing search: %v", err)
 	}
 	ll.ProcChan <- StreamNotify{Status: StatusFunctionCallingOver, Data: ""}
+	<-ll.ProceedChan
 	return data, nil
 }
 
@@ -304,8 +307,9 @@ func (ll *LangLogic) geminiStreamWithSearch() error {
 		fc := result.functionCall
 		data, err := ll.callSearchFunction(fc)
 		if err != nil {
-			ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Error calling function: %v", err)}
-			return err
+			// continue
+			//ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Error calling function: %v", err)}
+			//return err
 		}
 
 		// Track references

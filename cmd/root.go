@@ -142,7 +142,19 @@ Configure your API keys and preferred models, then start chatting or executing c
 				if cmd.Flags().Changed("search") {
 					// Search mode
 					//service.Debugf("Search flag was changed, value is: '%s'", searchFlag)
-					SetEffectSearchEnginelName(searchFlag)
+					es := GetEffectSearchEnginelName()
+					if es == "" && searchFlag == service.GetNoneSearchEngineName() {
+						// Search mode(just -s flag), but no search engine name provided
+						// Use default (google) search engine
+						searchFlag = service.GetDefaultSearchEngineName()
+						SetEffectSearchEnginelName(searchFlag)
+					} else if searchFlag != service.GetNoneSearchEngineName() {
+						// Set the search engine name
+						SetEffectSearchEnginelName(searchFlag)
+					} else {
+						// There is already a search engine name set
+						// and it's not the none one, so we do nothing
+					}
 				} else {
 					// Normal mode
 					searchFlag = ""
@@ -295,8 +307,8 @@ func init() {
 	rootCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
 
 	// The key fix is using NoOptDefVal property which specifically handles the case when a flag is provided without a value.
-	rootCmd.Flags().StringVarP(&searchFlag, "search", "s", "google", "To query an LLM with a search function")
-	rootCmd.Flags().Lookup("search").NoOptDefVal = service.GetDefaultSearchEngineName() // This sets a default when flag is used without value
+	rootCmd.Flags().StringVarP(&searchFlag, "search", "s", "", "To query an LLM with a search function")
+	rootCmd.Flags().Lookup("search").NoOptDefVal = service.GetNoneSearchEngineName() // This sets a default when flag is used without value
 	rootCmd.Flags().StringVarP(&convoName, "conversation", "c", "", "Specify a conversation name to track chat session (optional)")
 	rootCmd.Flags().Lookup("conversation").NoOptDefVal = service.GetDefaultConvoName() // This sets a default when flag is used without value
 

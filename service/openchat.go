@@ -305,7 +305,7 @@ func (ll *LangLogic) openchatStreamWithSearch() error {
 	err = chat.process()
 	if err != nil {
 		ll.ProcChan <- StreamNotify{Status: StatusError}
-		Infof("Error processing chat: %v\n", err)
+		Warnf("Error processing chat: %v\n", err)
 		return fmt.Errorf("error processing chat: %v", err)
 	}
 	return nil
@@ -405,7 +405,7 @@ func (c *OpenChat) process() error {
 			for id, toolCall := range *toolCalls {
 				toolMessage, err := c.processToolCall(id, toolCall)
 				if err != nil {
-					Infof("Error processing tool call: %v\n", err)
+					Warnf("Processing tool call: %v\n", err)
 					continue
 				}
 				// Add the tool response to the conversation
@@ -580,7 +580,8 @@ func (c *OpenChat) processToolCall(id string, toolCall model.ToolCall) (*model.C
 
 	if err != nil {
 		c.proc <- StreamNotify{Status: StatusFunctionCallingOver, Data: ""}
-		Infof("Error performing search: %v", err)
+		<-c.proceed
+		Warnf("Performing search: %v", err)
 		return nil, fmt.Errorf("error performing search: %v", err)
 	}
 	// keep the search results for references
@@ -591,10 +592,12 @@ func (c *OpenChat) processToolCall(id string, toolCall model.ToolCall) (*model.C
 	if err != nil {
 		// TODO: Potentially send an error FunctionResponse back to the model
 		c.proc <- StreamNotify{Status: StatusFunctionCallingOver, Data: ""}
+		<-c.proceed
 		return nil, fmt.Errorf("error marshaling results: %v", err)
 	}
 
 	c.proc <- StreamNotify{Status: StatusFunctionCallingOver, Data: ""}
+	<-c.proceed
 	// Create and return the tool response message
 	return &model.ChatCompletionMessage{
 		Role: model.ChatMessageRoleTool,
