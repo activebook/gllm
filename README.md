@@ -1,6 +1,6 @@
 # gllm - Golang Command-Line LLM Companion
 
-`gllm` is a powerful command-line tool designed to interact seamlessly with various Large Language Models (LLMs). Configure your API keys, set your preferred models, and start chatting or executing commands effortlessly.
+`gllm` is a powerful command-line tool designed to interact seamlessly with various Large Language Models (LLMs). Supports features like interactive chat, multi-turn conversations, file attachments, search integration, and extensive customization.
 
 ## 🚀 Features  
 
@@ -12,6 +12,7 @@
 - **Reading PDF Support**: Google models support PDF processing (OpenAI compatibles only for text/image).  
 - **Reasoning Support**: Generate detailed explanations, logical breakdowns, and step-by-step analysis.  
 - **Multi-turn Chat**: Engage in multiple rounds of conversation.  
+- **Check out history and context**: In chat mode or multi-turn chat, easily view the full context.
 - **Configuration Management**: Customize model behavior and settings.  
 - **Version Control**: Easily track and update your setup.  
 
@@ -88,12 +89,13 @@ gllm chat -s                    # Start a new conversation with search
 gllm> /exit, /quit    # Exit the chat session
 gllm> /clear, /reset  # Clear context
 gllm> /help           # Show available commands
-gllm> /system, /S <@name|prompt>  # change system prompt
-gllm> /template, /t <@name|tmpl>  # change template
-gllm> /search, /s <search_engine> # select a search engine to use
-gllm> /reference. /r <num>        # change link reference count
-gllm> /attach, /a <filename>      # Attach a file to the chat session
-gllm> /detach, /d <filename|all>  # Detach a file to the chat session
+gllm> /history /h [num] [chars]   # Show recent conversation history (default: 20 messages, 200 chars)
+gllm> /system, /S [@name|prompt]  # change system prompt
+gllm> /template, /t [@name|tmpl]  # change template
+gllm> /search, /s [search_engine] # select a search engine to use
+gllm> /reference. /r [num]        # change link reference count
+gllm> /attach, /a [filename]      # Attach a file to the chat session
+gllm> /detach, /d [filename|all]  # Detach a file to the chat session
 ```
 
 ⚠️ Warning: You can't switch models within the same conversation. Once you choose a model, you'll need to stick with it throughout. Just like when using different models online, you can continue or change topics, you can do search and attach files, but **the model type remains the same**.
@@ -145,6 +147,7 @@ gllm search default [google,tavily]     # Set default search engine
 gllm convo list           # list all conversations
 gllm convo remove newtalk # remove a conversation
 gllm convo info newtalk   # show a conversation in details
+gllm convo info newtalk -n 100 -c 300 # view history context (the lastest 100 messages, 300 characters each)
 gllm convo clear          # clear all conversations
 ```
 
@@ -176,12 +179,18 @@ By default, `gllm` stores configurations in a user-specific directory. Use the `
 default:
   model: gpt4
   system_prompt: coder
+  template: default
+  search: google
 models:
   - name: gpt4
     endpoint: "https://api.openai.com"
     key: "$OPENAI_KEY"
     model: "gpt-4o"
     temperature: 0.7
+search_engines:
+  - google:
+    key: "$GOOGLE_API_KEY"
+  - tavily:
 ```
 
 ---
@@ -194,12 +203,14 @@ models:
 - Works with text, code, and image-based queries.
 - Supports search with image and query.
 - Check reasoning details.
+- Supports multiple conversations.
+- Check out context details.
 
 Start using `gllm` today and supercharge your command-line AI experience! 🚀
 
 ---
 
-# Project Features
+## Project Features
 
 This project includes various features to enhance usability and efficiency. Below is an overview of the key functionalities.
 
@@ -233,6 +244,7 @@ This project includes various features to enhance usability and efficiency. Belo
 |------------------|-------------|
 | **Chat Mode** | Interactive chat session mode. <br> --- <br> ![ChatMode](screenshots/chatmode.png) |
 | **Follow up**   | Continue follow-up chat. <br> --- <br> ![FollowUP](screenshots/chatmode2.png) |
+| **Chat History**   | Check out chat context. <br> --- <br> ![Context](screenshots/chathistory.png) |
 
 For more details, using `gllm --help` to check.
 
