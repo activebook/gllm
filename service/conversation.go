@@ -14,6 +14,7 @@ import (
 // ConversationManager is an interface for handling conversation history
 type ConversationManager interface {
 	SetPath(title string)
+	GetPath() string
 	Load() error
 	Save() error
 	Clear() error
@@ -30,6 +31,10 @@ type BaseConversation struct {
 func (c *BaseConversation) SetPath(title string) {
 	dir := MakeUserSubDir("gllm", "convo")
 	c.Path = GetFilePath(dir, title+".json")
+}
+
+func (c *BaseConversation) GetPath() string {
+	return c.Path
 }
 
 // Common validation and file operations
