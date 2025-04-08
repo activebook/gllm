@@ -15,9 +15,7 @@ import (
 )
 
 var (
-	// Hardcode the version string here
-	version     = "v1.5.1" // <<< Set your desired version
-	versionFlag bool       // To hold the version flag value
+	versionFlag bool // To hold the version flag value
 
 	cfgFile           string // To hold the path to the config file if specified via flag
 	appConfigDir      string // Store the calculated config directory path
