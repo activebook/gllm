@@ -84,31 +84,40 @@ var convoListCmd = &cobra.Command{
 
 // convoRemoveCmd represents the convo remove command
 var convoRemoveCmd = &cobra.Command{
-	Use:     "remove [conversation]",
+	Use:     "remove [conversation|pattern]",
 	Aliases: []string{"rm"},
-	Short:   "Remove a conversation",
-	Long: `Remove a specific conversation with confirmation.
+	Short:   "Remove a conversation or multiple conversations using a pattern",
+	Long: `Remove a specific conversation or multiple conversations using a pattern with wildcards.
 This action cannot be undone.
 
-Example:
-gllm convo remove [conversation]
-gllm convo remove [conversation] --force`,
+Examples:
+gllm convo remove chat_123
+gllm convo remove "chat_*" --force`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		convoName := args[0]
+		pattern := args[0]
 		convoDir := getConvoDir()
-		convoPath := service.GetFilePath(convoDir, convoName+".json")
+		convoPathPattern := filepath.Join(convoDir, pattern+".json")
 
-		// Check if conversation exists
-		if _, err := os.Stat(convoPath); os.IsNotExist(err) {
-			fmt.Printf("Conversation '%s' not found.\n", convoName)
+		// Find matching files using the pattern
+		matches, err := filepath.Glob(convoPathPattern)
+		if err != nil {
+			return fmt.Errorf("failed to parse pattern: %v", err)
+		}
+
+		if len(matches) == 0 {
+			fmt.Printf("No conversations found matching '%s'.\n", pattern)
 			return nil
 		}
 
-		// Ask for confirmation
+		// Ask for confirmation if not forced
 		force, _ := cmd.Flags().GetBool("force")
 		if !force {
-			fmt.Printf("Are you sure you want to remove conversation '%s'? (y/N): ", convoName)
+			fmt.Printf("The following conversations will be removed:\n")
+			for _, match := range matches {
+				fmt.Printf("  - %s\n", filepath.Base(match))
+			}
+			fmt.Print("Are you sure? (y/N): ")
 			var response string
 			fmt.Scanln(&response)
 
@@ -118,10 +127,16 @@ gllm convo remove [conversation] --force`,
 				return nil
 			}
 		}
-		if err := os.Remove(convoPath); err != nil {
-			return fmt.Errorf("failed to remove conversation: %v", err)
+
+		// Remove the matching files
+		for _, match := range matches {
+			if err := os.Remove(match); err != nil {
+				fmt.Printf("Failed to remove '%s': %v\n", filepath.Base(match), err)
+			} else {
+				fmt.Printf("Conversation '%s' removed successfully.\n", filepath.Base(match))
+			}
 		}
-		fmt.Printf("Conversation '%s' removed successfully.\n", convoName)
+
 		return nil
 	},
 }
