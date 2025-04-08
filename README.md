@@ -246,7 +246,7 @@ This project includes various features to enhance usability and efficiency. Belo
 | **Chat Mode** | Interactive chat session mode. <br> --- <br> ![ChatMode](screenshots/chatmode.png) |
 | **Follow up**   | Continue follow-up chat. <br> --- <br> ![FollowUP](screenshots/chatmode2.png) |
 | **Chat History with tool calls**   | Check out chat context. <br> --- <br> ![Context](screenshots/chathistory.png) |
-| **Chat History with Reasoning**   | Check out chat context. <br> --- <br> ![Context](screenshots/chathistory1.png) |
+| **Chat History with Reasoning**   | Check out chat context. <br> --- <br> ![Context](screenshots/chathistory2.png) |
 
 For more details, using `gllm --help` to check.
 
