@@ -104,9 +104,11 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 			StopSpinner(spinner)
 			proceedCh <- true
 		case StatusData:
-			//fmt.Print(notify.Data) // Print the streamed text
 			// Render the streamed text and save to markdown buffer
 			markdownRenderer.RenderString("%s", notify.Data)
+		case StatusReasoningData:
+			// Reasoning data don't need to be saved to markdown buffer
+			fmt.Print(notify.Data) // Print the streamed text
 		case StatusError:
 			StopSpinner(spinner)
 			return
