@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -492,6 +493,10 @@ func (ci *ChatInfo) showHistory(num int, chars int) {
 		service.Errorf("error reading conversation file: %v", err)
 		return
 	}
+
+	convoName := strings.TrimSuffix(filepath.Base(convoPath), filepath.Ext(convoPath))
+	// Display conversation details
+	fmt.Printf("Name: %s\n", convoName)
 
 	switch ci.Provider {
 	case service.ModelGemini:
