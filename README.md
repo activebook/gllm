@@ -194,6 +194,7 @@ default:
   system_prompt: coder
   template: default
   search: google
+  markdown: on
 models:
   - name: gpt4
     endpoint: "https://api.openai.com"
