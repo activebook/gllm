@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/google/generative-ai-go/genai"
@@ -109,6 +112,27 @@ func NewOpenChatConversation(title string, shouldLoad bool) *OpenChatConversatio
 		if shouldLoad {
 			if title == "" {
 				title = GetDefaultConvoName()
+			} else {
+				// check if it's an index
+				index, err := strconv.Atoi(title)
+				if err == nil {
+					// It's an index, resolve to conversation name using your sorted list logic
+					convos, err := ListSortedConvos(GetConvoDir())
+					if err != nil {
+						// handle error
+						Warnf("Failed to resolve conversation index: %v", err)
+						Warnf("Using default conversation")
+						title = GetDefaultConvoName()
+					}
+					if index < 1 || index > len(convos) {
+						// handle out of range
+						Warnf("Conversation index out of range: %d", index)
+						Warnf("Using default conversation")
+						title = GetDefaultConvoName()
+					} else {
+						title = convos[index-1].Name
+					}
+				}
 			}
 			openchatInstance.Name = title
 			sanitized := GetSanitizeTitle(openchatInstance.Name)
@@ -197,6 +221,27 @@ func NewGeminiConversation(title string, shouldLoad bool) *GeminiConversation {
 		if shouldLoad {
 			if title == "" {
 				title = GetDefaultConvoName()
+			} else {
+				// check if it's an index
+				index, err := strconv.Atoi(title)
+				if err == nil {
+					// It's an index, resolve to conversation name using your sorted list logic
+					convos, err := ListSortedConvos(GetConvoDir())
+					if err != nil {
+						// handle error
+						Warnf("Failed to resolve conversation index: %v", err)
+						Warnf("Using default conversation")
+						title = GetDefaultConvoName()
+					}
+					if index < 1 || index > len(convos) {
+						// handle out of range
+						Warnf("Conversation index out of range: %d", index)
+						Warnf("Using default conversation")
+						title = GetDefaultConvoName()
+					} else {
+						title = convos[index-1].Name
+					}
+				}
 			}
 			geminiInstance.Name = title
 			sanitized := GetSanitizeTitle(geminiInstance.Name)
@@ -408,4 +453,54 @@ func (g *GeminiConversation) Load() error {
 
 	g.History = history
 	return nil
+}
+
+/*
+ * Get the sorted list of conversations in the given directory
+ * sorted by modTime descending
+ */
+
+type ConvoMeta struct {
+	Name     string
+	Provider string
+	ModTime  int64
+}
+
+func GetConvoDir() string {
+	dir := MakeUserSubDir("gllm", "convo")
+	return dir
+}
+
+// listSortedConvos returns a slice of convoMeta sorted by modTime descending
+func ListSortedConvos(convoDir string) ([]ConvoMeta, error) {
+	files, err := os.ReadDir(convoDir)
+	if err != nil {
+		return nil, fmt.Errorf("fail to read conversation directory: %v", err)
+	}
+	var convos []ConvoMeta
+	for _, file := range files {
+		if !file.IsDir() && strings.HasSuffix(file.Name(), ".json") {
+			title := strings.TrimSuffix(file.Name(), ".json")
+			fullPath := GetFilePath(convoDir, file.Name())
+			var provider string
+			data, err := os.ReadFile(fullPath)
+			if err == nil {
+				provider = DetectMessageProvider(data)
+			}
+			info, err := os.Stat(fullPath)
+			var modTime int64
+			if err == nil {
+				modTime = info.ModTime().Unix()
+			}
+			convos = append(convos, ConvoMeta{
+				Name:     title,
+				Provider: provider,
+				ModTime:  modTime,
+			})
+		}
+	}
+	sort.Slice(convos, func(i, j int) bool {
+		return convos[i].ModTime > convos[j].ModTime
+	})
+	return convos, nil
 }

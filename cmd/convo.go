@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/activebook/gllm/service"
@@ -15,11 +15,6 @@ var (
 	convoMessageCount  int
 	convoMessageLength int
 )
-
-func getConvoDir() string {
-	dir := service.MakeUserSubDir("gllm", "convo")
-	return dir
-}
 
 // convoCmd represents the convo command
 var convoCmd = &cobra.Command{
@@ -35,7 +30,7 @@ var convoListCmd = &cobra.Command{
 	Short:   "List all conversations",
 	Long:    `List all available conversations in sorted order.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		convoDir := getConvoDir()
+		convoDir := service.GetConvoDir()
 
 		// Check if directory exists
 		if _, err := os.Stat(convoDir); os.IsNotExist(err) {
@@ -43,40 +38,24 @@ var convoListCmd = &cobra.Command{
 			return nil
 		}
 
-		files, err := os.ReadDir(convoDir)
+		convos, err := service.ListSortedConvos(convoDir)
 		if err != nil {
-			return fmt.Errorf("fail to read conversation directory: %v", err)
+			fmt.Println(err)
+			return nil
 		}
-
-		var convos []string
-		for _, file := range files {
-			if !file.IsDir() && strings.HasSuffix(file.Name(), ".json") {
-				title := strings.TrimSuffix(file.Name(), ".json")
-				fullPath := service.GetFilePath(convoDir, file.Name())
-				var convo string
-				data, err := os.ReadFile(fullPath)
-				if err != nil {
-					convo = fmt.Sprintf("  - %s", title)
-				} else {
-					provider := service.DetectMessageProvider(data)
-					convo = fmt.Sprintf("  - %s [%s]", title, provider)
-				}
-				convos = append(convos, convo)
-			}
-		}
-
 		if len(convos) == 0 {
 			fmt.Println("No conversations found.")
 			return nil
 		}
 
-		// Sort conversations alphabetically
-		sort.Strings(convos)
-
 		fmt.Println("Available conversations:")
-		for _, convo := range convos {
+		for index, convo := range convos {
 			// Display with title if available
-			fmt.Println(convo)
+			if convo.Provider != "" {
+				fmt.Printf("  - [%d] %s [%s]\n", index+1, convo.Name, convo.Provider)
+			} else {
+				fmt.Printf("  - [%d] %s\n", index+1, convo.Name)
+			}
 		}
 		return nil
 	},
@@ -84,23 +63,46 @@ var convoListCmd = &cobra.Command{
 
 // convoRemoveCmd represents the convo remove command
 var convoRemoveCmd = &cobra.Command{
-	Use:     "remove [conversation|pattern]",
+	Use:     "remove [conversation|pattern|index]",
 	Aliases: []string{"rm"},
-	Short:   "Remove a conversation or multiple conversations using a pattern",
-	Long: `Remove a specific conversation or multiple conversations using a pattern with wildcards.
+	Short:   "Remove a conversation by name or index, or multiple conversations using a pattern",
+	Long: `Remove a specific conversation by name or index, or multiple conversations using a pattern with wildcards.
 This action cannot be undone.
 
 Examples:
 gllm convo remove chat_123
-gllm convo remove "chat_*" --force`,
+gllm convo remove "chat_*" --force
+gllm convo remove 1 --force`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		pattern := args[0]
-		convoDir := getConvoDir()
+		convoDir := service.GetConvoDir()
+		var matches []string
+
+		// Try to parse as index
+		index, err := strconv.Atoi(pattern)
+		if err == nil {
+			convos, err := service.ListSortedConvos(convoDir)
+			if err != nil {
+				fmt.Println(err)
+				return nil
+			}
+			if len(convos) == 0 {
+				fmt.Println("No conversations found.")
+				return nil
+			}
+			if index < 1 || index > len(convos) {
+				return fmt.Errorf("index %d out of range (1-%d)", index, len(convos))
+			}
+			// Use the resolved file name as the pattern
+			pattern = convos[index-1].Name
+		}
+
+		// Now pattern is either a name or a wildcard
 		convoPathPattern := filepath.Join(convoDir, pattern+".json")
 
 		// Find matching files using the pattern
-		matches, err := filepath.Glob(convoPathPattern)
+		matches, err = filepath.Glob(convoPathPattern)
 		if err != nil {
 			return fmt.Errorf("failed to parse pattern: %v", err)
 		}
@@ -115,7 +117,7 @@ gllm convo remove "chat_*" --force`,
 		if !force {
 			fmt.Printf("The following conversations will be removed:\n")
 			for _, match := range matches {
-				fmt.Printf("  - %s\n", filepath.Base(match))
+				fmt.Printf("  - %s\n", strings.TrimSuffix(filepath.Base(match), filepath.Ext(match)))
 			}
 			fmt.Print("Are you sure? (y/N): ")
 			var response string
@@ -131,9 +133,9 @@ gllm convo remove "chat_*" --force`,
 		// Remove the matching files
 		for _, match := range matches {
 			if err := os.Remove(match); err != nil {
-				fmt.Printf("Failed to remove '%s': %v\n", filepath.Base(match), err)
+				fmt.Printf("Failed to remove '%s': %v\n", strings.TrimSuffix(filepath.Base(match), filepath.Ext(match)), err)
 			} else {
-				fmt.Printf("Conversation '%s' removed successfully.\n", filepath.Base(match))
+				fmt.Printf("Conversation '%s' removed successfully.\n", strings.TrimSuffix(filepath.Base(match), filepath.Ext(match)))
 			}
 		}
 
@@ -151,7 +153,7 @@ Example:
 gllm convo clear
 gllm convo clear --force`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		convoDir := getConvoDir()
+		convoDir := service.GetConvoDir()
 		// Check if directory exists
 		if _, err := os.Stat(convoDir); os.IsNotExist(err) {
 			fmt.Println("No conversations found.")
@@ -194,7 +196,7 @@ gllm convo clear --force`,
 
 // convoInfoCmd represents the convo info command
 var convoInfoCmd = &cobra.Command{
-	Use:     "info [conversation]",
+	Use:     "info [conversation|index]",
 	Aliases: []string{"in"},
 	Short:   "Show conversation details",
 	Long: `Display detailed information about a specific conversation.
@@ -204,7 +206,26 @@ Using the --message-chars (-c) flag, set the maximum length of each message's co
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		convoName := args[0]
-		convoDir := getConvoDir()
+		convoDir := service.GetConvoDir()
+
+		// If convoName is a number, treat it as an index
+		index, err := strconv.Atoi(convoName)
+		if err == nil {
+			convos, err := service.ListSortedConvos(convoDir)
+			if err != nil {
+				fmt.Println(err)
+				return nil
+			}
+			if len(convos) == 0 {
+				fmt.Println("No conversations found.")
+				return nil
+			}
+			if index < 1 || index > len(convos) {
+				return fmt.Errorf("index %d out of range (1-%d)", index, len(convos))
+			}
+			convoName = convos[index-1].Name
+		}
+
 		convoPath := filepath.Join(convoDir, convoName+".json")
 
 		// Check if conversation exists
@@ -218,6 +239,9 @@ Using the --message-chars (-c) flag, set the maximum length of each message's co
 		if err != nil {
 			return fmt.Errorf("error reading conversation file: %v", err)
 		}
+
+		// Display conversation details
+		fmt.Printf("Name: %s\n", convoName)
 
 		// Detect provider based on message format
 		provider := service.DetectMessageProvider(data)
@@ -237,7 +261,7 @@ Using the --message-chars (-c) flag, set the maximum length of each message's co
 
 // convoRenameCmd represents the convo rename command
 var convoRenameCmd = &cobra.Command{
-	Use:   "rename [oldname] [newname]",
+	Use:   "rename [oldname|index] [newname]",
 	Short: "Rename a conversation",
 	Long:  `Rename an existing conversation to a new name.`,
 	Args:  cobra.ExactArgs(2),
@@ -245,7 +269,26 @@ var convoRenameCmd = &cobra.Command{
 		oldName := args[0]
 		newName := args[1]
 		newName = service.GetSanitizeTitle(newName)
-		convoDir := getConvoDir()
+		convoDir := service.GetConvoDir()
+
+		// If oldName is a number, treat it as an index
+		index, err := strconv.Atoi(oldName)
+		if err == nil {
+			convos, err := service.ListSortedConvos(convoDir)
+			if err != nil {
+				fmt.Println(err)
+				return nil
+			}
+			if len(convos) == 0 {
+				fmt.Println("No conversations found.")
+				return nil
+			}
+			if index < 1 || index > len(convos) {
+				return fmt.Errorf("index %d out of range (1-%d)", index, len(convos))
+			}
+			oldName = convos[index-1].Name
+		}
+
 		oldPath := service.GetFilePath(convoDir, oldName+".json")
 		newPath := service.GetFilePath(convoDir, newName+".json")
 

@@ -1,8 +1,6 @@
 package service
 
-import (
-	"fmt"
-)
+import "fmt"
 
 const (
 	// Terminal colors
@@ -64,6 +62,7 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 	notifyCh := make(chan StreamNotify, 10) // Buffer to prevent blocking
 	proceedCh := make(chan bool)            // For main -> sub communication
 
+	markdownRenderer := NewMarkdownRenderer()
 	ll := LangLogic{
 		ApiKey:        modelInfo["key"].(string),
 		EndPoint:      modelInfo["endpoint"].(string),
@@ -105,12 +104,16 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 			StopSpinner(spinner)
 			proceedCh <- true
 		case StatusData:
-			fmt.Print(notify.Data) // Print the streamed text
+			//fmt.Print(notify.Data) // Print the streamed text
+			// Render the streamed text and save to markdown buffer
+			markdownRenderer.RenderString("%s", notify.Data)
 		case StatusError:
 			StopSpinner(spinner)
 			return
 		case StatusFinished:
 			StopSpinner(spinner)
+			// Render the markdown
+			markdownRenderer.RenderMarkdown()
 			return // Exit when stream is done
 		case StatusReasoning:
 			StopSpinner(spinner)

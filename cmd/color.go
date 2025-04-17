@@ -1,4 +1,3 @@
-// File: cmd/version.go
 package cmd
 
 import (
@@ -8,17 +7,14 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(testCmd)
+	rootCmd.AddCommand(colorCmd)
 }
 
-var testCmd = &cobra.Command{
-	Use:   "test",
-	Short: "Test some inner mechanism of gllm",
-	Long:  `Just for testing purposes.`,
+var colorCmd = &cobra.Command{
+	Use:   "color",
+	Short: "Show some different colors of gllm output",
 	Run: func(cmd *cobra.Command, args []string) {
 		// This is where you would implement the logic for your test command
-		// For now, we'll just print a message
-		cmd.Println("Test command executed. For future interactive REPL mode, use 'gllm chat'")
 
 		colors := map[string]string{
 			"Black":   "\033[30m",
@@ -74,6 +70,5 @@ var testCmd = &cobra.Command{
 		//test.TestVV()
 
 		//service.ProcessGeminiChatStream("AIzaSyBwlIzbZ7bnRtYU7iicNdMnLYKkd8XVPDU", "gemini-2.0-flash", "You're a helper assistant", "how to cook?", 0.7, nil)
-		return
 	},
 }
