@@ -25,7 +25,8 @@ Special commands:
 /exit, /quit - Exit the chat session
 /clear, /reset - Clear context
 /help - Show available commands
-/history [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)
+/history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)
+/markdown, /mark [on|off] - Switch whether to render markdown or not
 /system, /S <@name|prompt> - change system prompt
 /template, /t <@name|tmpl> - change template
 /search, /s <search_engine> - select a search engine to use
@@ -466,6 +467,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /help - Show this help message")
 	fmt.Println("  /info - Show current settings and conversation stats")
 	fmt.Println("  /history /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)")
+	fmt.Println("  /markdown, /mark [on|off] - Switch whether to render markdown or not")
 	fmt.Println("  /attach, /a <filename> - Attach a file to the conversation")
 	fmt.Println("  /detach, /d <filename|all> - Detach a file from the conversation")
 	fmt.Println("  /template, /t \"<tmpl|name>\" - Change the template")
@@ -501,6 +503,20 @@ func (ci *ChatInfo) showHistory(num int, chars int) {
 	}
 }
 
+func (ci *ChatInfo) setMarkdown(mark string) {
+	if len(mark) != 0 {
+		SwitchMarkdown(mark)
+	}
+	marked := GetMarkdownSwitch()
+	if marked == "on" {
+		fmt.Println("Makedown output switched " + switchOnColor + "on" + resetColor)
+	} else if marked == "only" {
+		fmt.Println("Makedown output switched " + switchOnlyColor + "only" + resetColor)
+	} else {
+		fmt.Println("Makedown output switched " + switchOffColor + "off" + resetColor)
+	}
+}
+
 func (ci *ChatInfo) handleCommand(cmd string) {
 	// Split the command into parts
 	parts := strings.SplitN(cmd, " ", 3)
@@ -529,6 +545,14 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 			}
 		}
 		ci.showHistory(num, chars)
+
+	case "/markdown", "/mark":
+		if len(parts) < 2 {
+			ci.setMarkdown("")
+			return
+		}
+		mark := strings.TrimSpace(parts[1])
+		ci.setMarkdown(mark)
 
 	case "/clear", "/reset":
 		ci.clearContext()
