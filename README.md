@@ -162,6 +162,7 @@ gllm convo clear           # clear all conversations
 gllm markdown on            # enable markdown output which append the end of the streaming contents
 gllm markdown off           # disable markdown output
 gllm markdown only          # only render markdown output
+```
 
 ### 🔹 Std input Support
 
