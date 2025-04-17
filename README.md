@@ -11,6 +11,7 @@
 - **Search Support**: Using search engines, find relevant and latest information.  
 - **Reading PDF Support**: Google models support PDF processing (OpenAI compatibles only for text/image).  
 - **Reasoning Support**: Generate detailed explanations, logical breakdowns, and step-by-step analysis.  
+- **Markdown Support**: Format Markdown contents and make it easier to read.
 - **Multi-turn Chat**: Engage in multiple rounds of conversation.  
 - **Check out history and context**: In chat mode or multi-turn chat, easily view the full context.
 - **Configuration Management**: Customize model behavior and settings.  
@@ -80,6 +81,7 @@ gllm chat                       # Start chat with defaults
 gllm chat -m @gpt4o             # Start chat with a specific model
 gllm chat --sys-prompt coder    # Use a named system prompt
 gllm chat -c my_chat            # Start a new chat session
+gllm chat -c=1                  # Follow a previous chat session with a convo index
 gllm chat -s                    # Start a new conversation with search
 ```
 
@@ -90,6 +92,7 @@ gllm> /exit, /quit    # Exit the chat session
 gllm> /clear, /reset  # Clear context
 gllm> /help           # Show available commands
 gllm> /history /h [num] [chars]   # Show recent conversation history (default: 20 messages, 200 chars)
+gllm> /markdown, /mark [on|off|only]  # Switch whether to render markdown or not
 gllm> /system, /S [@name|prompt]  # change system prompt
 gllm> /template, /t [@name|tmpl]  # change template
 gllm> /search, /s [search_engine] # select a search engine to use
@@ -148,9 +151,17 @@ gllm convo list            # list all conversations
 gllm convo remove newtalk  # remove a conversation
 gllm convo remove "chat_*" # wildcard remove multiple conversations
 gllm convo info newtalk    # show a conversation in details
+gllm convo info 1          # use index to view a conversation in details
 gllm convo info newtalk -n 100 -c 300 # view history context (the lastest 100 messages, 300 characters each)
 gllm convo clear           # clear all conversations
 ```
+
+### 🔹 New update! & Markdown output Management
+
+```sh
+gllm markdown on            # enable markdown output which append the end of the streaming contents
+gllm markdown off           # disable markdown output
+gllm markdown only          # only render markdown output
 
 ### 🔹 Std input Support
 
@@ -204,6 +215,7 @@ search_engines:
 - Works with text, code, and image-based queries.
 - Supports search with image and query.
 - Check reasoning details.
+- Easy to read markdown formatted output.
 - Supports multiple conversations.
 - Check out context details.
 
@@ -238,6 +250,7 @@ This project includes various features to enhance usability and efficiency. Belo
 | **Multi-Search** | Conduct multiple searches in one go. <br> --- <br> ![Multi](screenshots/multisearch.png) |
 | **Multi-turn**   | Continue prevous conversation. <br> --- <br> ![Multi](screenshots/conversation.png) |
 | **Reading PDFs** | Extract and analyze content from PDFs. (Gemini Only)  <br> --- <br> ![PDF](screenshots/pdf.png) |
+| **Markdown Format**   | Readable markdown format. <br> --- <br> ![Markdown](screenshots/markdown.png) |
 
 ## Interactive Chat Features
 

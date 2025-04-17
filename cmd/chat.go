@@ -26,7 +26,7 @@ Special commands:
 /clear, /reset - Clear context
 /help - Show available commands
 /history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)
-/markdown, /mark [on|off] - Switch whether to render markdown or not
+/markdown, /mark [on|off|only] - Switch whether to render markdown or not
 /system, /S <@name|prompt> - change system prompt
 /template, /t <@name|tmpl> - change template
 /search, /s <search_engine> - select a search engine to use
@@ -467,7 +467,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /help - Show this help message")
 	fmt.Println("  /info - Show current settings and conversation stats")
 	fmt.Println("  /history /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)")
-	fmt.Println("  /markdown, /mark [on|off] - Switch whether to render markdown or not")
+	fmt.Println("  /markdown, /mark [on|off|only] - Switch whether to render markdown or not")
 	fmt.Println("  /attach, /a <filename> - Attach a file to the conversation")
 	fmt.Println("  /detach, /d <filename|all> - Detach a file from the conversation")
 	fmt.Println("  /template, /t \"<tmpl|name>\" - Change the template")
