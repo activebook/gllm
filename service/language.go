@@ -59,6 +59,9 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 		}
 	}
 
+	// Set up code tool settings
+	exeCode := IsCodeExecutionEnabled()
+
 	// Create a channel to receive notifications
 	notifyCh := make(chan StreamNotify, 10) // Buffer to prevent blocking
 	proceedCh := make(chan bool)            // For main -> sub communication
@@ -75,6 +78,7 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 		ProcChan:      notifyCh,
 		ProceedChan:   proceedCh,
 		UseSearchTool: useSearch,
+		UseCodeTool:   exeCode,
 	}
 
 	// Check if the endpoint is compatible with OpenAI

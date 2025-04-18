@@ -99,7 +99,7 @@ func (ll *LangLogic) gemini2Stream() error {
 	if ll.UseSearchTool {
 		config.Tools = append(config.Tools, &genai.Tool{GoogleSearch: &genai.GoogleSearch{}})
 	}
-	if ll.UseCodeTool {
+	if ll.UseCodeTool && !ll.UseSearchTool {
 		config.Tools = append(config.Tools, &genai.Tool{CodeExecution: &genai.ToolCodeExecution{}})
 	}
 

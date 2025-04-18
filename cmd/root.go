@@ -31,6 +31,7 @@ var (
 	sysPromptFlag string   // gllm "Act as shell" --system-prompt(-S) @shell-assistant
 	templateFlag  string   // gllm --template(-t) @coder
 	searchFlag    string   // gllm --search(-s) "What is the stock price of Tesla right now?"
+	codeFlag      bool     // gllm --code(-C) "print('Hello, World!')"
 	referenceFlag int      // gllm --reference(-r) 3 "What is the stock price of Tesla right now?"
 	convoName     string   // gllm --conversation(-c) "My Conversation" "What is the stock price of Tesla right now?"
 
@@ -159,6 +160,13 @@ Configure your API keys and preferred models, then start chatting or executing c
 				} else {
 					// Normal mode
 					searchFlag = ""
+				}
+
+				// Code execution
+				if codeFlag {
+					service.EnableCodeExecution()
+				} else {
+					service.DisableCodeExecution()
 				}
 
 				// Check if -c/--conversation was used without a value
@@ -332,6 +340,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&convoName, "conversation", "c", "", "Specify a conversation name to track chat session (optional)")
 	rootCmd.Flags().Lookup("conversation").NoOptDefVal = service.GetDefaultConvoName() // This sets a default when flag is used without value
 
+	rootCmd.Flags().BoolVarP(&codeFlag, "code", "C", false, "Enable model to generate and run Python code (only for gemini)")
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
 
 	// Add more persistent flags here if needed (e.g., --verbose, --log-file)
