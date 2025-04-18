@@ -11,8 +11,13 @@ import (
 	"sync"
 
 	"github.com/google/generative-ai-go/genai"
+	"github.com/spf13/viper"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 )
+
+func shouldSaveSearchResults() bool {
+	return viper.GetBool("search_engines.results.save")
+}
 
 // ConversationManager is an interface for handling conversation history
 type ConversationManager interface {
@@ -164,6 +169,18 @@ func (c *OpenChatConversation) PushMessages(messages []*model.ChatCompletionMess
 func (c *OpenChatConversation) Save() error {
 	if !c.ShouldLoad || len(c.Messages) == 0 {
 		return nil
+	}
+
+	if !shouldSaveSearchResults() {
+		// Most major systems (including ChatGPT and Google's Gemini) indeed discard search results between turns
+		// Clear content for tool messages before saving
+		empty := ""
+		for _, msg := range c.Messages {
+			if msg.Role == model.ChatMessageRoleTool {
+				//msg.Content = nil // or "" if Content is a string
+				msg.Content = &model.ChatCompletionMessageContent{StringValue: &empty}
+			}
+		}
 	}
 
 	data, err := json.MarshalIndent(c.Messages, "", "  ")
@@ -327,12 +344,18 @@ func (g *GeminiConversation) serializeHistory(history []*genai.Content) ([]byte,
 			case genai.FunctionResponse:
 				sp.Type = "function_response"
 				sp.Name = v.Name
-				sp.Args = v.Response
+				if shouldSaveSearchResults() {
+					// Most major systems (including ChatGPT and Google's Gemini) indeed discard search results between turns
+					sp.Args = v.Response
+				}
 
 			case *genai.FunctionResponse:
 				sp.Type = "function_response"
 				sp.Name = v.Name
-				sp.Args = v.Response
+				if shouldSaveSearchResults() {
+					// Most major systems (including ChatGPT and Google's Gemini) indeed discard search results between turns
+					sp.Args = v.Response
+				}
 
 			case genai.ExecutableCode:
 				sp.Type = "executable_code"

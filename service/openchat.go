@@ -193,7 +193,7 @@ func (ll *LangLogic) openchatStream() error {
 				// For reasoning model
 				text := *delta.ReasoningContent
 				reasoningContent.WriteString(text)
-				ll.ProcChan <- StreamNotify{Status: StatusData, Data: text}
+				ll.ProcChan <- StreamNotify{Status: StatusReasoningData, Data: text}
 			} else {
 				text := delta.Content
 				assistContent.WriteString(text)
@@ -474,7 +474,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 				// For reasoning model
 				text := *delta.ReasoningContent
 				reasoningBuffer.WriteString(text)
-				c.proc <- StreamNotify{Status: StatusData, Data: text}
+				c.proc <- StreamNotify{Status: StatusReasoningData, Data: text}
 			} else if delta.Content != "" {
 				text := delta.Content
 				contentBuffer.WriteString(text)

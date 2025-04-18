@@ -10,6 +10,7 @@ const (
 	StatusError
 	StatusData
 	StatusReasoning
+	StatusReasoningData
 	StatusReasoningOver
 	StatusFunctionCalling
 	StatusFunctionCallingOver

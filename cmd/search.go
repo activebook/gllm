@@ -213,6 +213,52 @@ var searchDefaultCmd = &cobra.Command{
 	},
 }
 
+var searchSaveCmd = &cobra.Command{
+	Use:   "save [on|off]",
+	Short: "Enable or disable saving search results",
+	Long: `Enable or disable saving search results to conversation history.
+Keep in mind:
+  When set on, the search result is saved into the conversation context before continuing with the LLM step,
+  it could consume more tokens and could potentially exceed the maximum context length of the LLM.
+  If you want to keep them for future LLM turns or debugging or you know exactly what you want, set it on.
+  Otherelse, you should set it to off.
+`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) != 1 {
+			fmt.Println("Usage: gllm search save [on|off]")
+			var res string
+			rs := viper.GetBool("search_engines.results.save")
+			switch rs {
+			case true:
+				res = switchOnColor + "on" + resetColor
+			case false:
+				res = switchOffColor + "off" + resetColor
+			}
+			fmt.Printf("Current search result saving status: %s\n", res)
+			return
+		}
+		mode := strings.ToLower(args[0])
+		switch mode {
+		case "on":
+			viper.Set("search_engines.results.save", true)
+			if err := viper.WriteConfig(); err != nil {
+				service.Errorf("Error saving configuration: %s\n", err)
+				return
+			}
+			fmt.Println("Saving of search results is: " + switchOnColor + "on" + resetColor)
+		case "off":
+			viper.Set("search_engines.results.save", false)
+			if err := viper.WriteConfig(); err != nil {
+				service.Errorf("Error saving configuration: %s\n", err)
+				return
+			}
+			fmt.Println("Saving of search results is: " + switchOffColor + "off" + resetColor)
+		default:
+			fmt.Println("Usage: gllm search save [on|off]")
+		}
+	},
+}
+
 // maskAPIKey returns a masked version of the API key for display
 func maskAPIKey(key string) string {
 	return key
@@ -307,6 +353,7 @@ func init() {
 	searchCmd.AddCommand(searchBingCmd)
 	searchCmd.AddCommand(searchListCmd)
 	searchCmd.AddCommand(searchDefaultCmd)
+	searchCmd.AddCommand(searchSaveCmd)
 
 	// Google flags
 	searchGoogleCmd.Flags().StringP("key", "k", "", "Google Custom Search API key")

@@ -157,8 +157,17 @@ func tavilyFormatResponse(tavilyResp *TavilyResponse) (map[string]any, error) {
 	}
 	results = append(results, info)
 
-	for _, r := range tavilyResp.Results {
-		// Extract displayLink from the URL (e.g., "www.britannica.com")
+	// Collect all links
+	links := make([]string, 0, len(tavilyResp.Results))
+	for _, result := range tavilyResp.Results {
+		links = append(links, result.URL)
+	}
+
+	// Fetch contents for all links
+	contents := FetchProcess(links)
+
+	// Convert results to map[string]any
+	for i, r := range tavilyResp.Results {
 		displayLink := ""
 		parsedURL, err := url.Parse(r.URL)
 		if err == nil {
@@ -170,6 +179,7 @@ func tavilyFormatResponse(tavilyResp *TavilyResponse) (map[string]any, error) {
 			"link":        r.URL,
 			"displayLink": displayLink,
 			"snippet":     r.Content,
+			"content":     contents[i], // Attach fetched content here
 		}
 		results = append(results, resultMap)
 	}
@@ -197,13 +207,24 @@ func GoogleSearch(query string) (map[string]any, error) {
 		return nil, fmt.Errorf("[Google]Error making API call: %v", err)
 	}
 
-	results := make([]any, 0, len(resp.Items))
+	// Collect all links
+	links := make([]string, 0, len(resp.Items))
 	for _, result := range resp.Items {
+		links = append(links, result.Link)
+	}
+
+	// Fetch contents for all links
+	contents := FetchProcess(links)
+
+	// Convert results to map[string]any
+	results := make([]any, 0, len(resp.Items))
+	for i, result := range resp.Items {
 		resultMap := map[string]any{
 			"title":       result.Title,
 			"link":        result.Link,
 			"displayLink": result.DisplayLink,
 			"snippet":     result.Snippet,
+			"content":     contents[i], // Attach fetched content here
 		}
 		results = append(results, resultMap)
 	}
@@ -301,30 +322,38 @@ func RetrieveReferences(references []*map[string]any) string {
 		return ""
 	}
 	sb := strings.Builder{}
-	sb.WriteString("References:\n")
+	sb.WriteString("### References:\n")
 	index, total := 0, 0
 	for _, ref := range references {
 		if ref == nil {
 			continue
 		}
-
 		if results, ok := (*ref)["results"].([]any); ok {
 			for _, result := range results {
 				if linkMap, ok := result.(map[string]any); ok {
-					if link, ok := linkMap["link"].(string); ok {
-						title, hasTitle := linkMap["title"].(string)
-						displayLink := linkMap["displayLink"].(string)
-						// Choose the best description (title or displayLink)
-						description := displayLink
-						if hasTitle && title != "" {
-							description = title
-						}
-						// Print in a more readable format with truncation
+					link, hasLink := linkMap["link"].(string)
+					title, hasTitle := linkMap["title"].(string)
+					displayLink, hasDisplayLink := linkMap["displayLink"].(string)
+					source := displayLink
+					if !hasDisplayLink {
+						source = link
+					}
+					if hasLink && link != "" {
 						total++
 						if index < maxReferences {
 							index++
-							sb.WriteString(fmt.Sprintf("[%d] %s\n    %s: %s\n", index, TruncateString(description, 60),
-								TruncateString(displayLink, 30), link))
+							// Markdown: 1. **[Title](URL)**
+							//           Source: [Source](URL)
+							desc := source
+							if hasTitle && title != "" {
+								desc = title
+							}
+							sb.WriteString(fmt.Sprintf("%d. **%s**  \n   Source: [%s](%s)\n",
+								index,
+								TruncateString(desc, 80),
+								TruncateString(source, 30),
+								link,
+							))
 						}
 					}
 				}
@@ -332,7 +361,8 @@ func RetrieveReferences(references []*map[string]any) string {
 		}
 	}
 	if total > maxReferences {
-		sb.WriteString(fmt.Sprintf("...and %d more references. Use the '-r' flag to view more.\n", total-maxReferences))
+		sb.WriteString("\n")
+		sb.WriteString(fmt.Sprintf("> **...and %d more references. Use the `-r` flag to view more.**\n", total-maxReferences))
 	}
 	return sb.String()
 }
