@@ -135,13 +135,14 @@ gllm system add --name coder --content "You are an expert Go programmer..."
 gllm system default coder                 # Set default system prompt
 ```
 
-### 🔹 New update! & Search Engine Management (Only support google and tavily)
+### 🔹 New update! & Search Engine Management
 
 ```sh
 gllm search list                          # List available search engines   
 gllm search google --key $API_KEY --cx $SEARCH_ENGINE_ID # Use Google Search Engine
 gllm search tavily --key $API_KEY                       # Use Tavily Search Engine
 gllm search default [google,tavily]     # Set default search engine
+gllm search save [on|off]         # Save search results on conversation history (careful! could induce token consumption. default: off)
 ```
 
 ### 🔹 New update! & Conversation Management
@@ -231,37 +232,80 @@ This project includes various features to enhance usability and efficiency. Belo
 
 ## Installation & Usage
 
-| Feature             | Description |
-|---------------------|-------------|
-| **Installation & Upgrade** | Easily install or upgrade using brew. <br> --- <br> ![Install](screenshots/install.png) ![Upgrade](screenshots/upgrade.png) |
-| **How to Use** | Just try --help. <br> --- <br> ![How to Use](screenshots/howto.png) |
+- **Installation & Upgrade**  
+  Easily install or upgrade using Homebrew:  
+  - **Install**  
+    ![Install Screenshot](screenshots/install.png)  
+  - **Upgrade**  
+    ![Upgrade Screenshot](screenshots/upgrade.png)
+
+- **How to Use**  
+  Simply run:
+  ![Help Screenshot](screenshots/howto.png)
+
+---
 
 ## Core Functionalities
 
-| Feature            | Description |
-|--------------------|-------------|
-| **General Usage** | Good to know. <br> --- <br> ![Usage](screenshots/usage.png) |
-| **Search with RAG** | Smarter search. <br> --- <br> ![Search](screenshots/search.png) |
-| **Configuration** | Customize settings for specific use cases. <br> --- <br> ![Config](screenshots/config.png) |
-| **Reasoning** | Enables advanced reasoning capabilities. <br> --- <br> ![Reasoning](screenshots/reasoning.png) |
+- **General Usage**  
+  Quick overview of core commands.  
+  ![Usage Screenshot](screenshots/usage.png)
+
+- **Search Info**  
+  Perform smart, targeted searches.  
+  ![Search Screenshot](screenshots/search.png)
+
+- **Search Thoroughly**  
+  Deep‑dive web searches for comprehensive results.  
+  ![Search Example](screenshots/searchex.png)
+
+- **Configuration**  
+  Customize settings to fit your workflow.  
+  ![Config Screenshot](screenshots/config.png)
+
+- **Reasoning**  
+  Leverage advanced reasoning capabilities.  
+  ![Reasoning Screenshot](screenshots/reasoning.png)
+
+---
 
 ## Additional Features
 
-| Feature           | Description |
-|------------------|-------------|
-| **Multi-Search** | Conduct multiple searches in one go. <br> --- <br> ![Multi](screenshots/multisearch.png) |
-| **Multi-turn**   | Continue prevous conversation. <br> --- <br> ![Multi](screenshots/conversation.png) |
-| **Reading PDFs** | Extract and analyze content from PDFs. (Gemini Only)  <br> --- <br> ![PDF](screenshots/pdf.png) |
-| **Markdown Format**   | Readable markdown format. <br> --- <br> ![Markdown](screenshots/markdown.png) |
+- **Multi-Search**  
+  Run multiple searches in one command.  
+  ![Multi-Search Screenshot](screenshots/multisearch.png)
+
+- **Multi-Turn**  
+  Continue previous conversations seamlessly.  
+  ![Conversation Screenshot](screenshots/conversation.png)
+
+- **PDF Reading** *(Gemini only)*  
+  Extract and analyze PDF content.  
+  ![PDF Screenshot](screenshots/pdf.png)
+
+- **Markdown Output**  
+  Generate clean, readable Markdown.  
+  ![Markdown Screenshot](screenshots/markdown.png)
+
+---
 
 ## Interactive Chat Features
 
-| Feature           | Description |
-|------------------|-------------|
-| **Chat Mode** | Interactive chat session mode. <br> --- <br> ![ChatMode](screenshots/chatmode.png) |
-| **Follow up**   | Continue follow-up chat. <br> --- <br> ![FollowUP](screenshots/chatmode2.png) |
-| **Chat History with tool calls**   | Check out chat context. <br> --- <br> ![Context](screenshots/chathistory.png) |
-| **Chat History with Reasoning**   | Check out chat context. <br> --- <br> ![Context](screenshots/chathistory2.png) |
+- **Chat Mode**  
+  Enter an interactive chat session.  
+  ![Chat Mode Screenshot](screenshots/chatmode.png)
+
+- **Follow-Up**  
+  Pose follow‑up questions in the same session.  
+  ![Follow-Up Screenshot](screenshots/chatmode2.png)
+
+- **Chat History with Tool Calls**  
+  View your conversation context and tool usage.  
+  ![Tool Calls Screenshot](screenshots/chathistory.png)
+
+- **Chat History with Reasoning**  
+  Inspect past reasoning steps alongside your chat.  
+  ![Reasoning History Screenshot](screenshots/chathistory2.png)
 
 For more details, using `gllm --help` to check.
 
@@ -269,7 +313,8 @@ For more details, using `gllm --help` to check.
 
 ## 🏗 Contributing
 
-@xinasuka {
+@cite {
+  @author: Charles Liu
   @github: <https://github.com/activebook>
   @website: <https://activebook.github.io>
 }
