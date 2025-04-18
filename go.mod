@@ -14,8 +14,9 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
-	github.com/volcengine/volcengine-go-sdk v1.1.1
+	github.com/volcengine/volcengine-go-sdk v1.1.4
 	google.golang.org/api v0.215.0
+	google.golang.org/genai v1.1.0
 )
 
 require (
@@ -85,7 +86,6 @@ require (
 	golang.org/x/term v0.31.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
-	google.golang.org/genai v1.1.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241209162323-e6fa225c2576 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241223144023-3abc09e42ca8 // indirect
 	google.golang.org/grpc v1.67.3 // indirect
