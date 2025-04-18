@@ -119,6 +119,7 @@ func (ll *LangLogic) gemini2Stream() error {
 
 	// Stream the responses
 	references := make([]*map[string]interface{}, 0, 1)
+	queries := make([]string, 0, 1)
 	state := stateNormal
 	for resp, err := range iter {
 		if err != nil {
@@ -154,10 +155,19 @@ func (ll *LangLogic) gemini2Stream() error {
 			// Add references to the output if any
 			if candidate.GroundingMetadata != nil {
 				appendReferences(candidate.GroundingMetadata, &references)
+				queries = append(queries, candidate.GroundingMetadata.WebSearchQueries...)
 			}
 		}
 	}
 
+	// Add queries to the output if any
+	if len(queries) > 0 {
+		q := "\n\n" + "### 🌐 Queries:"
+		for _, query := range queries {
+			q += "\n`" + query + "`"
+		}
+		ll.ProcChan <- StreamNotify{Status: StatusData, Data: q}
+	}
 	// Add references to the output if any
 	if len(references) > 0 {
 		refs := "\n\n" + RetrieveReferences(references)

@@ -10,8 +10,8 @@ import (
 )
 
 func removeCitations(text string) string {
-	// Removes [1], [2, 3], [1,2,3], [1, 7, 8, 10, 16], etc.
-	re := regexp.MustCompile(`\[\s*\d+(?:\s*,\s*\d+)*\s*\]`)
+	// Removes an optional space before citations like [1], [2, 3], etc. and citations like [1-3].
+	re := regexp.MustCompile(`\s?\[\s*\d+(?:\s*,\s*\d+)*\s*\]`)
 	return re.ReplaceAllString(text, "")
 }
 
