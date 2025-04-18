@@ -156,6 +156,11 @@ and all default settings (e.g., default model, default system prompt, default te
 		// Default Configuration section
 		printSection("Default Configuration")
 
+		// Default System Prompt
+		fmt.Println("\nMarkdown Format:")
+		mark := GetMarkdownSwitch()
+		fmt.Printf("%v\n", mark)
+
 		// Default Model
 		fmt.Println("\nDefault Model:")
 		model := GetEffectiveModel()
