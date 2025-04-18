@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath" // Import filepath
 	"strings"
+	"sync"
 
 	"github.com/activebook/gllm/service"
 	homedir "github.com/mitchellh/go-homedir"
@@ -169,6 +170,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 					// set convo history path, if the path is not empty, it would load the history
 					service.NewOpenChatConversation(convoName, true)
 					service.NewGeminiConversation(convoName, true)
+					service.NewGemini2Conversation(convoName, true)
 				}
 
 				// Process all prompt building
@@ -224,6 +226,29 @@ func processAttachment(path string) *service.FileData {
 	return service.NewFileData(format, data, path)
 }
 
+// batchAttachments processes multiple attachments concurrently and adds the resulting
+// FileData objects to the provided files slice. It uses a WaitGroup to manage goroutines
+// and a channel to collect results safely.
+func batchAttachments(files *[]*service.FileData) {
+	var wg sync.WaitGroup
+	filesCh := make(chan *service.FileData, len(attachments))
+	for _, attachment := range attachments {
+		wg.Add(1)
+		go func(att string) {
+			defer wg.Done()
+			fileData := processAttachment(att)
+			if fileData != nil {
+				filesCh <- fileData
+			}
+		}(attachment)
+	}
+	wg.Wait()
+	close(filesCh)
+	for fileData := range filesCh {
+		*files = append(*files, fileData)
+	}
+}
+
 func buildPrompt(prompt string, isThereAttachment bool) (string, []*service.FileData) {
 	var finalPrompt strings.Builder
 	files := []*service.FileData{}
@@ -234,12 +259,7 @@ func buildPrompt(prompt string, isThereAttachment bool) (string, []*service.File
 
 	if isThereAttachment {
 		// Process attachments
-		for _, attachment := range attachments {
-			fileData := processAttachment(attachment)
-			if fileData != nil {
-				files = append(files, fileData)
-			}
-		}
+		batchAttachments(&files)
 	} else {
 		// No attachments specified, try stdin
 		stdinContent := readStdin()

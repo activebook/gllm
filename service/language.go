@@ -19,6 +19,7 @@ type LangLogic struct {
 	ProcChan      chan<- StreamNotify // Sub Channel to send notifications
 	ProceedChan   <-chan bool         // Sub Channel to receive proceed signal
 	UseSearchTool bool                // Use search tool
+	UseCodeTool   bool                // Use code tool
 }
 
 func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, modelInfo map[string]any, searchEngine map[string]any) {
@@ -89,7 +90,7 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 				Errorf("Stream error: %v\n", err)
 			}
 		case ModelGemini:
-			if err := ll.GenerateGeminiStream(); err != nil {
+			if err := ll.GenerateGemini2Stream(); err != nil {
 				Errorf("Stream error: %v\n", err)
 			}
 		}

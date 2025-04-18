@@ -2,11 +2,18 @@ package service
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/spf13/viper"
 )
+
+func removeCitations(text string) string {
+	// Removes [1], [2, 3], [1,2,3], [1, 7, 8, 10, 16], etc.
+	re := regexp.MustCompile(`\[\s*\d+(?:\s*,\s*\d+)*\s*\]`)
+	return re.ReplaceAllString(text, "")
+}
 
 type MarkdownRenderer struct {
 	buffer               strings.Builder
@@ -67,6 +74,8 @@ func (mr *MarkdownRenderer) RenderMarkdown() {
 	if len(output) == 0 {
 		return
 	}
+	// Remove citations
+	output = removeCitations(output)
 
 	// Print a separator or message
 	if mr.keepStreamingContent {
