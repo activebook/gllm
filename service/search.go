@@ -318,7 +318,7 @@ func NoneSearch(query string) (map[string]any, error) {
 }
 
 func RetrieveQueries(queries []string) string {
-	qs := "### 🌐 Queries:"
+	qs := "### 🔍 Queries:"
 	for _, query := range queries {
 		qs += "\n`" + query + "`"
 	}
