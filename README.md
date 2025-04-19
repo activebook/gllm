@@ -297,7 +297,7 @@ This project includes various features to enhance usability and efficiency. Belo
   ![PDF Screenshot](screenshots/pdf.png)
 
 - **Code Execution** *(Gemini only)*  
-  Execute Python code directly.
+  Execute Python code directly.  
   ![Code Execution Screenshot](screenshots/code.png)
 
 - **Markdown Output**  

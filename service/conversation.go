@@ -39,6 +39,13 @@ type BaseConversation struct {
 func (c *BaseConversation) SetPath(title string) {
 	dir := MakeUserSubDir("gllm", "convo")
 	c.Path = GetFilePath(dir, title+".json")
+	if c.ShouldLoad {
+		// Check if file exists, if not, create an empty one
+		if _, err := os.Stat(c.Path); os.IsNotExist(err) {
+			empty := []byte("[]")
+			_ = os.WriteFile(c.Path, empty, 0644)
+		}
+	}
 }
 
 func (c *BaseConversation) GetPath() string {

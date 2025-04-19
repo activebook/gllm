@@ -102,6 +102,7 @@ Special commands:
 			}
 			service.NewOpenChatConversation(convoName, true)
 			service.NewGeminiConversation(convoName, true)
+			service.NewGemini2Conversation(convoName, true)
 
 			// Process all prompt building
 			if cmd.Flags().Changed("attachment") {
@@ -233,7 +234,8 @@ func buildChatInfo(files []*service.FileData) *ChatInfo {
 	case service.ModelOpenAICompatible:
 		cm = service.GetOpenChatConversation()
 	case service.ModelGemini:
-		cm = service.GetGeminiConversation()
+		//cm = service.GetGeminiConversation()
+		cm = service.GetGemini2Conversation()
 	}
 
 	ci := ChatInfo{
@@ -346,31 +348,33 @@ func (ci *ChatInfo) addAttachFiles(input string) {
 				i++ // Skip the file path token
 
 				// Verify file exists and is not a directory
-				fileInfo, err := os.Stat(filePath)
-				if err != nil {
-					if os.IsNotExist(err) {
-						service.Errorf("File not found: %s\n", filePath)
-					} else {
-						service.Errorf("Error accessing file %s: %v\n", filePath, err)
+				if !checkIsLink(filePath) {
+					fileInfo, err := os.Stat(filePath)
+					if err != nil {
+						if os.IsNotExist(err) {
+							service.Errorf("File not found: %s\n", filePath)
+						} else {
+							service.Errorf("Error accessing file %s: %v\n", filePath, err)
+						}
+						continue
 					}
-					continue
-				}
-				if fileInfo.IsDir() {
-					service.Errorf("Cannot attach directory: %s\n", filePath)
-					continue
-				}
+					if fileInfo.IsDir() {
+						service.Errorf("Cannot attach directory: %s\n", filePath)
+						continue
+					}
 
-				// Check if file is already attached
-				found := false
-				for _, file := range ci.Files {
-					if file.Path() == filePath {
-						found = true
-						break
+					// Check if file is already attached
+					found := false
+					for _, file := range ci.Files {
+						if file.Path() == filePath {
+							found = true
+							break
+						}
 					}
-				}
-				if found {
-					service.Warnf("File already attached: %s", filePath)
-					continue
+					if found {
+						service.Warnf("File already attached: %s", filePath)
+						continue
+					}
 				}
 
 				// Process the attachment
