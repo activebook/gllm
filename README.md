@@ -245,84 +245,46 @@ This project includes various features to enhance usability and efficiency. Belo
 
 ## Installation & Usage
 
-- **Installation & Upgrade**  
-  Easily install or upgrade using Homebrew:  
-  - **Install**  
-    ![Install Screenshot](screenshots/install.png)  
-  - **Upgrade**  
-    ![Upgrade Screenshot](screenshots/upgrade.png)
-
-- **How to Use**  
-  Simply run:
-  ![Help Screenshot](screenshots/howto.png)
+| Topic | Description | Screenshot |
+|-------|-------------|------------|
+| **Install** | Easily install using Homebrew | ![Install Screenshot](screenshots/install.png) |
+| **Upgrade** | Upgrade to the latest version | ![Upgrade Screenshot](screenshots/upgrade.png) |
+| **How to Use** | Simply run the command | ![Help Screenshot](screenshots/howto.png) |
 
 ---
 
 ## Core Functionalities
 
-- **General Usage**  
-  Quick overview of core commands.  
-  ![Usage Screenshot](screenshots/usage.png)
-
-- **Search Info**  
-  Perform smart, targeted searches.  
-  ![Search Screenshot](screenshots/search.png)
-
-- **Search Thoroughly**  
-  Deep‑dive web searches for comprehensive results.  
-  ![Search Example](screenshots/searchex.png)
-
-- **Configuration**  
-  Customize settings to fit your workflow.  
-  ![Config Screenshot](screenshots/config.png)
-
-- **Reasoning**  
-  Leverage advanced reasoning capabilities.  
-  ![Reasoning Screenshot](screenshots/reasoning.png)
+| Functionality | Description | Screenshot |
+|---------------|-------------|------------|
+| **General Usage** | Quick overview of core commands | ![Usage Screenshot](screenshots/usage.png) |
+| **Search Info** | Perform smart, targeted searches | ![Search Screenshot](screenshots/search.png) |
+| **Search Thoroughly** | Deep-dive web searches for comprehensive results | ![Search Example](screenshots/searchex.png) |
+| **Configuration** | Customize settings to fit your workflow | ![Config Screenshot](screenshots/config.png) |
+| **Reasoning** | Leverage advanced reasoning capabilities | ![Reasoning Screenshot](screenshots/reasoning.png) |
 
 ---
 
 ## Additional Features
 
-- **Multi-Search**  
-  Run multiple searches in one command.  
-  ![Multi-Search Screenshot](screenshots/multisearch.png)
-
-- **Multi-Turn**  
-  Continue previous conversations seamlessly.  
-  ![Conversation Screenshot](screenshots/conversation.png)
-
-- **PDF Reading** *(Gemini only)*  
-  Extract and analyze PDF content.  
-  ![PDF Screenshot](screenshots/pdf.png)
-
-- **Code Execution** *(Gemini only)*  
-  Execute Python code directly.  
-  ![Code Execution Screenshot](screenshots/code.png)
-
-- **Markdown Output**  
-  Generate clean, readable Markdown.  
-  ![Markdown Screenshot](screenshots/markdown.png)
+| Feature | Description | Screenshot |
+|---------|-------------|------------|
+| **Multi-Search** | Run multiple searches in one command | ![Multi-Search Screenshot](screenshots/multisearch.png) |
+| **Multi-Turn** | Continue previous conversations seamlessly | ![Conversation Screenshot](screenshots/conversation.png) |
+| **PDF Reading** *(Gemini only)* | Extract and analyze PDF content | ![PDF Screenshot](screenshots/pdf.png) |
+| **Code Execution** *(Gemini only)* | Execute Python code directly | ![Code Execution Screenshot](screenshots/code.png) |
+| **Markdown Output** | Generate clean, readable Markdown | ![Markdown Screenshot](screenshots/markdown.png) |
 
 ---
 
 ## Interactive Chat Features
 
-- **Chat Mode**  
-  Enter an interactive chat session.  
-  ![Chat Mode Screenshot](screenshots/chatmode.png)
-
-- **Follow-Up**  
-  Pose follow‑up questions in the same session.  
-  ![Follow-Up Screenshot](screenshots/chatmode2.png)
-
-- **Chat History with Tool Calls**  
-  View your conversation context and tool usage.  
-  ![Tool Calls Screenshot](screenshots/chathistory.png)
-
-- **Chat History with Reasoning**  
-  Inspect past reasoning steps alongside your chat.  
-  ![Reasoning History Screenshot](screenshots/chathistory2.png)
+| Feature | Description | Screenshot |
+|---------|-------------|------------|
+| **Chat Mode** | Enter an interactive chat session | ![Chat Mode Screenshot](screenshots/chatmode.png) |
+| **Follow-Up** | Pose follow-up questions in the same session | ![Follow-Up Screenshot](screenshots/chatmode2.png) |
+| **Chat History with Tool Calls** | View your conversation context and tool usage | ![Tool Calls Screenshot](screenshots/chathistory.png) |
+| **Chat History with Reasoning** | Inspect past reasoning steps alongside your chat | ![Reasoning History Screenshot](screenshots/chathistory2.png) |
 
 For more details, using `gllm --help` to check.
 
