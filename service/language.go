@@ -19,6 +19,7 @@ type LangLogic struct {
 	ProcChan      chan<- StreamNotify // Sub Channel to send notifications
 	ProceedChan   <-chan bool         // Sub Channel to receive proceed signal
 	UseSearchTool bool                // Use search tool
+	UseCodeTool   bool                // Use code tool
 }
 
 func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, modelInfo map[string]any, searchEngine map[string]any) {
@@ -58,6 +59,9 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 		}
 	}
 
+	// Set up code tool settings
+	exeCode := IsCodeExecutionEnabled()
+
 	// Create a channel to receive notifications
 	notifyCh := make(chan StreamNotify, 10) // Buffer to prevent blocking
 	proceedCh := make(chan bool)            // For main -> sub communication
@@ -74,6 +78,7 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 		ProcChan:      notifyCh,
 		ProceedChan:   proceedCh,
 		UseSearchTool: useSearch,
+		UseCodeTool:   exeCode,
 	}
 
 	// Check if the endpoint is compatible with OpenAI
@@ -89,7 +94,7 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 				Errorf("Stream error: %v\n", err)
 			}
 		case ModelGemini:
-			if err := ll.GenerateGeminiStream(); err != nil {
+			if err := ll.GenerateGemini2Stream(); err != nil {
 				Errorf("Stream error: %v\n", err)
 			}
 		}

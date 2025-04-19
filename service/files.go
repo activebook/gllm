@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type FileData struct {
@@ -98,9 +99,9 @@ func CheckIfImageFromBytes(data []byte) (bool, string, error) {
 
 func GetMIMETypeByContent(data []byte) string {
 	detectedType := http.DetectContentType(data)
-	if detectedType == "application/octet-stream" {
-		return "text/plain"
-	}
+	// if detectedType == "application/octet-stream" {
+	// 	return "text/plain"
+	// }
 	return detectedType
 }
 
@@ -140,6 +141,18 @@ func GetMIMEType(filePath string) string {
 			return "text/xml"
 		case ".rtf":
 			return "text/rtf"
+		case ".mp3":
+			return "audio/mp3"
+		case ".wav":
+			return "audio/wav"
+		case ".aiff":
+			return "audio/aiff"
+		case ".acc":
+			return "audio/acc"
+		case ".ogg":
+			return "audio/ogg"
+		case ".flac":
+			return "audio/flac"
 		default:
 			//return "text/plain" // Default txt
 
@@ -158,6 +171,13 @@ func IsPDFMIMEType(mimeType string) bool {
 	return mimeType == "application/pdf"
 }
 
+func IsAudioMIMEType(mimeType string) bool {
+	return mimeType == "audio/mp3" || mimeType == "audio/mpeg" || mimeType == "audio/ogg" ||
+		mimeType == "audio/vnd.wave" || mimeType == "audio/x-wav" || mimeType == "audio/wav" ||
+		mimeType == "audio/aiff" || mimeType == "audio/x-aiff" || mimeType == "audio/flac" || mimeType == "audio/x-flac" ||
+		mimeType == "audio/aac" || mimeType == "audio/x-aac" || mimeType == "audio/x-ms-wma"
+}
+
 func IsExcelMIMEType(mimeType string) bool {
 	return mimeType == "application/vnd.ms-excel" ||
 		mimeType == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -169,7 +189,30 @@ func IsImageMIMEType(mimeType string) bool {
 }
 
 func IsTextMIMEType(mimeType string) bool {
-	return !IsImageMIMEType(mimeType) && !IsPDFMIMEType(mimeType) && !IsExcelMIMEType(mimeType)
+	if strings.HasPrefix(mimeType, "text/") {
+		return true
+	}
+	switch mimeType {
+	case "application/json",
+		"application/xml",
+		"application/javascript",
+		"application/x-javascript",
+		"application/x-python",
+		"application/x-sh",
+		"application/x-csh",
+		"application/x-perl",
+		"application/x-httpd-php",
+		"application/x-ruby",
+		"application/x-markdown",
+		"text/md",
+		"text/markdown":
+		return true
+	}
+	// Exclude known binary types
+	if IsImageMIMEType(mimeType) || IsPDFMIMEType(mimeType) || IsExcelMIMEType(mimeType) || IsAudioMIMEType(mimeType) {
+		return false
+	}
+	return false
 }
 
 func IsUnknownMIMEType(mimeType string) bool {

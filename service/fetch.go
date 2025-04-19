@@ -174,8 +174,10 @@ func fetchWorker(url string) string {
 	content, err := ExtractTextFromURL(url, nil)
 	if err != nil {
 		//Warnf("Can't extracting content from [%s]: %v", url, err)
-		Debugf("Can't extracting content from [%s]: %v", url, err)
-		return ""
+		Debugf("Error fetching URL [%s]: %v", url, err)
+		// Let user know something went wrong
+		// Especially if the URL is invalid, 401, 403 errors, etc.
+		return fmt.Sprintf("Error fetching URL [%s]: %v", url, err)
 	}
 	return strings.Join(content, "\n")
 }

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/activebook/gllm/service"
 	"github.com/spf13/viper"
 )
 
@@ -81,6 +82,10 @@ func hasStdinData() bool {
 	return (stat.Mode() & os.ModeCharDevice) == 0
 }
 
+func checkIsLink(source string) bool {
+	return strings.HasPrefix(source, "http") || strings.HasPrefix(source, "https")
+}
+
 // readContentFromPath reads content from a specified source path.
 // If the source is "-", it reads from standard input (os.Stdin).
 // Otherwise, it reads from the file at the given path.
@@ -88,6 +93,12 @@ func hasStdinData() bool {
 func readContentFromPath(source string) ([]byte, error) {
 	if source == "-" {
 		return io.ReadAll(os.Stdin)
+	}
+	if checkIsLink(source) {
+		// Fetch content from the URL
+		urls := []string{source}
+		datas := service.FetchProcess(urls)
+		return []byte(datas[0]), nil
 	}
 	return os.ReadFile(source)
 }

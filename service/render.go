@@ -2,11 +2,36 @@ package service
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/spf13/viper"
 )
+
+func removeCitations(text string) string {
+	// Step 1: Remove citations inside parentheses with commas
+	// This handles cases like ([1, 2, 3]) and ([7], [9], [10], [11], [12])
+	reParenCitations := regexp.MustCompile(`\(\s*(?:\[\s*\d+(?:\s*,\s*\d+)*\s*\](?:\s*,\s*)?)+\s*\)`)
+	text = reParenCitations.ReplaceAllString(text, "")
+
+	// Step 2: Remove standalone citations like [1], [2, 3], etc.
+	reCitations := regexp.MustCompile(`\s*\[\s*\d+(?:\s*,\s*\d+)*\s*\]`)
+	text = reCitations.ReplaceAllString(text, "")
+
+	// Step 3: Remove leftover empty parentheses (with or without spaces/commas inside)
+	reParens := regexp.MustCompile(`\(\s*[,]*\s*\)`)
+	text = reParens.ReplaceAllString(text, "")
+
+	// Step 4: Clean up leftover multiple commas and spaces
+	reCommas := regexp.MustCompile(`\s*,+\s*`)
+	text = reCommas.ReplaceAllString(text, " ")
+
+	// Clean up extra spaces
+	text = strings.TrimSpace(text)
+
+	return text
+}
 
 type MarkdownRenderer struct {
 	buffer               strings.Builder
@@ -67,6 +92,8 @@ func (mr *MarkdownRenderer) RenderMarkdown() {
 	if len(output) == 0 {
 		return
 	}
+	// Remove citations
+	output = removeCitations(output)
 
 	// Print a separator or message
 	if mr.keepStreamingContent {

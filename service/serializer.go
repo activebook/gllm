@@ -235,7 +235,13 @@ func DisplayGeminiConversationLog(data []byte, msgCount int, msgLength int) {
 							fmt.Printf("%s[File]%s", ContentTypeColors["file_data"], ResetColor)
 						}
 					default:
-						fmt.Printf("[%s content]", part.Type)
+						if part.Text != "" {
+							// For gemini2, there is not a specific type for text, so we use the default text type
+							preview := TruncateString(part.Text, msgLength)
+							fmt.Printf("%s", preview)
+						} else {
+							fmt.Printf("[%s content]", part.Type)
+						}
 					}
 					fmt.Println()
 				}

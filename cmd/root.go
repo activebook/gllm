@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath" // Import filepath
 	"strings"
+	"sync"
 
 	"github.com/activebook/gllm/service"
 	homedir "github.com/mitchellh/go-homedir"
@@ -30,6 +31,7 @@ var (
 	sysPromptFlag string   // gllm "Act as shell" --system-prompt(-S) @shell-assistant
 	templateFlag  string   // gllm --template(-t) @coder
 	searchFlag    string   // gllm --search(-s) "What is the stock price of Tesla right now?"
+	codeFlag      bool     // gllm --code(-C) "print('Hello, World!')"
 	referenceFlag int      // gllm --reference(-r) 3 "What is the stock price of Tesla right now?"
 	convoName     string   // gllm --conversation(-c) "My Conversation" "What is the stock price of Tesla right now?"
 
@@ -160,6 +162,13 @@ Configure your API keys and preferred models, then start chatting or executing c
 					searchFlag = ""
 				}
 
+				// Code execution
+				if codeFlag {
+					service.EnableCodeExecution()
+				} else {
+					service.DisableCodeExecution()
+				}
+
 				// Check if -c/--conversation was used without a value
 				if cmd.Flags().Changed("conversation") {
 					// Flag was used without a value, use a default name
@@ -169,6 +178,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 					// set convo history path, if the path is not empty, it would load the history
 					service.NewOpenChatConversation(convoName, true)
 					service.NewGeminiConversation(convoName, true)
+					service.NewGemini2Conversation(convoName, true)
 				}
 
 				// Process all prompt building
@@ -224,6 +234,29 @@ func processAttachment(path string) *service.FileData {
 	return service.NewFileData(format, data, path)
 }
 
+// batchAttachments processes multiple attachments concurrently and adds the resulting
+// FileData objects to the provided files slice. It uses a WaitGroup to manage goroutines
+// and a channel to collect results safely.
+func batchAttachments(files *[]*service.FileData) {
+	var wg sync.WaitGroup
+	filesCh := make(chan *service.FileData, len(attachments))
+	for _, attachment := range attachments {
+		wg.Add(1)
+		go func(att string) {
+			defer wg.Done()
+			fileData := processAttachment(att)
+			if fileData != nil {
+				filesCh <- fileData
+			}
+		}(attachment)
+	}
+	wg.Wait()
+	close(filesCh)
+	for fileData := range filesCh {
+		*files = append(*files, fileData)
+	}
+}
+
 func buildPrompt(prompt string, isThereAttachment bool) (string, []*service.FileData) {
 	var finalPrompt strings.Builder
 	files := []*service.FileData{}
@@ -234,12 +267,7 @@ func buildPrompt(prompt string, isThereAttachment bool) (string, []*service.File
 
 	if isThereAttachment {
 		// Process attachments
-		for _, attachment := range attachments {
-			fileData := processAttachment(attachment)
-			if fileData != nil {
-				files = append(files, fileData)
-			}
-		}
+		batchAttachments(&files)
 	} else {
 		// No attachments specified, try stdin
 		stdinContent := readStdin()
@@ -301,7 +329,7 @@ func init() {
 
 	// Define the flags
 	rootCmd.Flags().StringVarP(&modelFlag, "model", "m", "", "Specify the language model to use")
-	rootCmd.Flags().StringSliceVarP(&attachments, "attachment", "a", []string{}, "Specify file(s) or image(s) to append to the prompt")
+	rootCmd.Flags().StringSliceVarP(&attachments, "attachment", "a", []string{}, "Specify file(s), image(s), url(s) to append to the prompt")
 	rootCmd.Flags().StringVarP(&sysPromptFlag, "system-prompt", "S", "", "Specify a system prompt")
 	rootCmd.Flags().StringVarP(&templateFlag, "template", "t", "", "Specify a template to use")
 	rootCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
@@ -312,6 +340,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&convoName, "conversation", "c", "", "Specify a conversation name to track chat session (optional)")
 	rootCmd.Flags().Lookup("conversation").NoOptDefVal = service.GetDefaultConvoName() // This sets a default when flag is used without value
 
+	rootCmd.Flags().BoolVarP(&codeFlag, "code", "C", false, "Enable model to generate and run Python code (only for gemini)")
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
 
 	// Add more persistent flags here if needed (e.g., --verbose, --log-file)
