@@ -204,13 +204,15 @@ func (ll *LangLogic) openchatStream() error {
 	}
 
 	// keep response content
-	reasoning_content := reasoningContent.String()
 	msg := model.ChatCompletionMessage{
-		Role:             model.ChatMessageRoleAssistant,
-		ReasoningContent: &reasoning_content,
+		Role: model.ChatMessageRoleAssistant,
 		Content: &model.ChatCompletionMessageContent{
 			StringValue: volcengine.String(assistContent.String()),
 		}, Name: Ptr(""),
+	}
+	reasoning_content := reasoningContent.String()
+	if reasoning_content != "" {
+		msg.ReasoningContent = &reasoning_content
 	}
 	// Add the assistant's message to the conversation
 	convo.PushMessage(&msg)
@@ -535,7 +537,9 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 
 	// Update the assistant reasoning message
 	reasoning_content := reasoningBuffer.String()
-	assistantMessage.ReasoningContent = &reasoning_content
+	if reasoning_content != "" {
+		assistantMessage.ReasoningContent = &reasoning_content
+	}
 	// Set the content of the assistant message
 	assistantMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(contentBuffer.String()),
