@@ -329,7 +329,7 @@ func init() {
 
 	// Define the flags
 	rootCmd.Flags().StringVarP(&modelFlag, "model", "m", "", "Specify the language model to use")
-	rootCmd.Flags().StringSliceVarP(&attachments, "attachment", "a", []string{}, "Specify file(s) or image(s) to append to the prompt")
+	rootCmd.Flags().StringSliceVarP(&attachments, "attachment", "a", []string{}, "Specify file(s), image(s), url(s) to append to the prompt")
 	rootCmd.Flags().StringVarP(&sysPromptFlag, "system-prompt", "S", "", "Specify a system prompt")
 	rootCmd.Flags().StringVarP(&templateFlag, "template", "t", "", "Specify a template to use")
 	rootCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
