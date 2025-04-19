@@ -337,8 +337,7 @@ func init() {
 	// The key fix is using NoOptDefVal property which specifically handles the case when a flag is provided without a value.
 	rootCmd.Flags().StringVarP(&searchFlag, "search", "s", "", "To query an LLM with a search function")
 	rootCmd.Flags().Lookup("search").NoOptDefVal = service.GetNoneSearchEngineName() // This sets a default when flag is used without value
-	rootCmd.Flags().StringVarP(&convoName, "conversation", "c", "", "Specify a conversation name to track chat session (optional)")
-	rootCmd.Flags().Lookup("conversation").NoOptDefVal = service.GetDefaultConvoName() // This sets a default when flag is used without value
+	rootCmd.Flags().StringVarP(&convoName, "conversation", "c", "", "Specify a conversation name to track chat session")
 
 	rootCmd.Flags().BoolVarP(&codeFlag, "code", "C", false, "Enable model to generate and run Python code (only for gemini)")
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
