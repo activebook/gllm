@@ -47,11 +47,18 @@ brew upgrade gllm
 
 ```sh
 gllm "What is Go?"               # Default model & system prompt
-gllm "Summarize this" -a report.txt  # Use file as input
-gllm "Translate into English" -a image1.jpg  # Use image as input and vision model
 gllm "Where is the best place to visit in London?" -m @gpt4o # Switch model
 gllm "How to find a process and terminate it?" -t @shellmate  # Use shellmate prompt to specific shell question
 gllm -s "Who's the POTUS right now? and check what's his latest tariff policy" -m @gemini-pro -r 10 # Use Gemini model to search and set max references to 10
+```
+
+### 🔹 Attachments (Files, Image, Urls)
+
+```sh
+gllm "Summarize this" -a report.txt  # Use file as input
+gllm "Translate into English" -a image1.jpg  # Use image as input and vision model
+gllm "Summarize all:" -a "https://www.cnbc.com" -a "https://www.nytimes.com" # Attach multiple urls
+gllm "Transcribe this audio" -a speech.mp3  # Use audil as input (only for gemini multimodal models)
 ```
 
 ### 🔍 Search & Vision
@@ -176,6 +183,12 @@ echo "What is the capital of France?" | gllm # Use std input as text input
 echo "Who's the POTUS right now?" | gllm -s # Use std input as search query
 ```
 
+### 🔹 Python code execution (only for gemini2.0)
+
+```sh
+gllm --code "import time\\nstart = time.time()\\nis_prime = lambda n: n > 1 and all(n % d for d in range(2, int(n**0.5) + 1))\\nLIMIT = 100000\\ncount = sum(1 for x in range(LIMIT) if is_prime(x))\\nend = time.time()\\nprint(f'Number of primes less than {LIMIT}: {count}')\\nprint(f'Time taken: {end - start:.2f} seconds')" -m @gemini2.5
+```
+
 ### 🔹 Version Information
 
 ```sh
@@ -282,6 +295,10 @@ This project includes various features to enhance usability and efficiency. Belo
 - **PDF Reading** *(Gemini only)*  
   Extract and analyze PDF content.  
   ![PDF Screenshot](screenshots/pdf.png)
+
+- **Code Execution** *(Gemini only)*  
+  Execute Python code directly.
+  ![Code Execution Screenshot](screenshots/code.png)
 
 - **Markdown Output**  
   Generate clean, readable Markdown.  
