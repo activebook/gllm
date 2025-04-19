@@ -91,7 +91,8 @@ func (c *BaseConversation) Clear() error {
 		return nil
 	}
 	// Clear the content of the file by writing an empty string to it
-	err := os.WriteFile(c.Path, []byte(""), 0644)
+	empty := []byte("[]")
+	err := os.WriteFile(c.Path, empty, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to clear file: %w", err) // Return error if the file write fails
 	}
