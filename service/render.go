@@ -9,10 +9,16 @@ import (
 	"github.com/spf13/viper"
 )
 
+// removeCitations removes citation references from text, including:
+// - Parenthesized citations like ([1], [2,3])
+// - Standalone citations like [1] or [2,3]
+// - Empty parentheses
+// - Extra spaces (collapses multiple spaces to single space)
+// Returns the cleaned and trimmed text.
 func removeCitations(text string) string {
 	// Step 1: Remove citations inside parentheses with commas
 	// This handles cases like ([1, 2, 3]) and ([7], [9], [10], [11], [12])
-	reParenCitations := regexp.MustCompile(`\(\s*(?:\[\s*\d+(?:\s*,\s*\d+)*\s*\](?:\s*,\s*)?)+\s*\)`)
+	reParenCitations := regexp.MustCompile(`\s*\(\s*(?:\[\s*\d+(?:\s*,\s*\d+)*\s*\](?:\s*,\s*)?)+\s*\)`)
 	text = reParenCitations.ReplaceAllString(text, "")
 
 	// Step 2: Remove standalone citations like [1], [2, 3], etc.
@@ -23,13 +29,13 @@ func removeCitations(text string) string {
 	reParens := regexp.MustCompile(`\(\s*[,]*\s*\)`)
 	text = reParens.ReplaceAllString(text, "")
 
-	// Step 4: Clean up leftover multiple commas and spaces
-	reCommas := regexp.MustCompile(`\s*,+\s*`)
-	text = reCommas.ReplaceAllString(text, " ")
+	// Do NOT remove commas globally!
 
 	// Clean up extra spaces
-	text = strings.TrimSpace(text)
+	reSpaces := regexp.MustCompile(`[ ]{2,}`)
+	text = reSpaces.ReplaceAllString(text, " ")
 
+	text = strings.TrimSpace(text)
 	return text
 }
 
