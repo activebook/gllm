@@ -72,10 +72,11 @@ gllm "When was gpt4.5 released?" --search=google # Use specific search engine to
 ### 💬 Keep Conversations (Multi-turn chat)
 
 ```sh
-gllm -s "Who's the POTUS right now?" -c      # Start a conversation(default without name) and retain the full context (last 10 messages)
-gllm "Tell me again, who's the POTUS right now?" -c   # Continue the default conversation
-gllm "Let's talk about why we exist." -c=newtalk      # Start a new named conversation called 'newtalk'
-gllm -s "Look up what famous people have said about this." -c=newtalk  # Continue the 'newtalk' conversation
+gllm -s "Who's the POTUS right now?" -c abc     # Start a conversation and retain the full context (last 10 messages)
+gllm "Tell me again, who's the POTUS right now?" -c abc  # Continue the default conversation
+gllm "Let's talk about why we exist." -c newtalk      # Start a new named conversation called 'newtalk'
+gllm -s "Look up what famous people have said about this." -c newtalk  # Continue the 'newtalk' conversation
+gllm "Tell me more about his books." -c 1  # Continue the 'newtalk' conversation" with convo index (latest convo)
 ```
 
 ⚠️ Warning: If you're using **Gemini mode** and an **OpenAI-compatible model**, keep in mind that they **cannot be used within the same conversation**.  
@@ -88,7 +89,7 @@ gllm chat                       # Start chat with defaults
 gllm chat -m @gpt4o             # Start chat with a specific model
 gllm chat --sys-prompt coder    # Use a named system prompt
 gllm chat -c my_chat            # Start a new chat session
-gllm chat -c=1                  # Follow a previous chat session with a convo index
+gllm chat -c 1                  # Follow a previous chat session with a convo index
 gllm chat -s                    # Start a new conversation with search
 ```
 
