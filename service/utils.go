@@ -70,3 +70,5 @@ func GetStringValue(data map[string]interface{}, key string) string {
 	}
 	return ""
 }
+
+func Ptr[T any](t T) *T { return &t }

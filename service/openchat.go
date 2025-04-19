@@ -83,7 +83,7 @@ func (ll *LangLogic) openchatStream() error {
 			Role: model.ChatMessageRoleSystem,
 			Content: &model.ChatCompletionMessageContent{
 				StringValue: volcengine.String(ll.SystemPrompt),
-			},
+			}, Name: Ptr(""),
 		})
 	}
 
@@ -93,7 +93,7 @@ func (ll *LangLogic) openchatStream() error {
 		Role: model.ChatMessageRoleUser,
 		Content: &model.ChatCompletionMessageContent{
 			StringValue: volcengine.String(ll.UserPrompt),
-		},
+		}, Name: Ptr(""),
 	}
 	messages = append(messages, userMessage)
 	// Add image parts if available
@@ -101,6 +101,7 @@ func (ll *LangLogic) openchatStream() error {
 		userMessage = &model.ChatCompletionMessage{
 			Role:    model.ChatMessageRoleUser,
 			Content: &model.ChatCompletionMessageContent{ListValue: []*model.ChatCompletionMessageContentPart{}},
+			Name:    Ptr(""),
 		}
 		// Add all files
 		for _, file := range ll.Files {
@@ -209,7 +210,7 @@ func (ll *LangLogic) openchatStream() error {
 		ReasoningContent: &reasoning_content,
 		Content: &model.ChatCompletionMessageContent{
 			StringValue: volcengine.String(assistContent.String()),
-		},
+		}, Name: Ptr(""),
 	}
 	// Add the assistant's message to the conversation
 	convo.PushMessage(&msg)
@@ -257,7 +258,7 @@ func (ll *LangLogic) openchatStreamWithSearch() error {
 			Role: model.ChatMessageRoleSystem,
 			Content: &model.ChatCompletionMessageContent{
 				StringValue: volcengine.String(ll.SystemPrompt),
-			},
+			}, Name: Ptr(""),
 		})
 	}
 
@@ -267,7 +268,7 @@ func (ll *LangLogic) openchatStreamWithSearch() error {
 		Role: model.ChatMessageRoleUser,
 		Content: &model.ChatCompletionMessageContent{
 			StringValue: volcengine.String(ll.UserPrompt),
-		},
+		}, Name: Ptr(""),
 	}
 	messages = append(messages, userMessage)
 	// Add image parts if available
@@ -275,6 +276,7 @@ func (ll *LangLogic) openchatStreamWithSearch() error {
 		userMessage = &model.ChatCompletionMessage{
 			Role:    model.ChatMessageRoleUser,
 			Content: &model.ChatCompletionMessageContent{ListValue: []*model.ChatCompletionMessageContentPart{}},
+			Name:    Ptr(""),
 		}
 		// Add all files
 		for _, file := range ll.Files {
@@ -443,6 +445,7 @@ func (c *OpenChat) process() error {
 func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*model.ChatCompletionMessage, *map[string]model.ToolCall, error) {
 	assistantMessage := model.ChatCompletionMessage{
 		Role: model.ChatMessageRoleAssistant,
+		Name: Ptr(""),
 	}
 	toolCalls := make(map[string]model.ToolCall)
 	contentBuffer := strings.Builder{}
@@ -612,7 +615,7 @@ func (c *OpenChat) processToolCall(id string, toolCall model.ToolCall) (*model.C
 		Role: model.ChatMessageRoleTool,
 		Content: &model.ChatCompletionMessageContent{
 			StringValue: volcengine.String(string(resultsJSON)),
-		},
+		}, Name: Ptr(""),
 		ToolCallID: id,
 	}, nil
 }
