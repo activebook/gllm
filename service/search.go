@@ -317,12 +317,20 @@ func NoneSearch(query string) (map[string]any, error) {
 	}, nil
 }
 
+func RetrieveQueries(queries []string) string {
+	qs := "### 🌐 Queries:"
+	for _, query := range queries {
+		qs += "\n`" + query + "`"
+	}
+	return qs
+}
+
 func RetrieveReferences(references []*map[string]any) string {
 	if len(references) == 0 {
 		return ""
 	}
 	sb := strings.Builder{}
-	sb.WriteString("### References:\n")
+	sb.WriteString("### 🔗 References:\n")
 	index, total := 0, 0
 	for _, ref := range references {
 		if ref == nil {

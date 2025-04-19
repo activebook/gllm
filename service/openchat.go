@@ -321,6 +321,7 @@ type OpenChat struct {
 	proc          chan<- StreamNotify // Sub Channel to send notifications
 	proceed       <-chan bool         // Main Channel to receive proceed signal
 	maxRecursions int
+	queries       []string                  // List of queries to be sent to the AI assistant
 	references    []*map[string]interface{} // keep track of the references
 }
 
@@ -417,6 +418,13 @@ func (c *OpenChat) process() error {
 			break
 		}
 	}
+
+	// Add queries to the output if any
+	if len(c.queries) > 0 {
+		q := "\n\n" + RetrieveQueries(c.queries)
+		c.proc <- StreamNotify{Status: StatusData, Data: q}
+	}
+	// Add references to the output if any
 	if len(c.references) > 0 {
 		refs := "\n\n" + RetrieveReferences(c.references)
 		c.proc <- StreamNotify{Status: StatusData, Data: refs}
@@ -585,6 +593,7 @@ func (c *OpenChat) processToolCall(id string, toolCall model.ToolCall) (*model.C
 		return nil, fmt.Errorf("error performing search: %v", err)
 	}
 	// keep the search results for references
+	c.queries = append(c.queries, query)
 	c.references = append(c.references, &data)
 
 	// Convert search results to JSON string

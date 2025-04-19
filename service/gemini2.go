@@ -162,10 +162,7 @@ func (ll *LangLogic) gemini2Stream() error {
 
 	// Add queries to the output if any
 	if len(queries) > 0 {
-		q := "\n\n" + "### 🌐 Queries:"
-		for _, query := range queries {
-			q += "\n`" + query + "`"
-		}
+		q := "\n\n" + RetrieveQueries(queries)
 		ll.ProcChan <- StreamNotify{Status: StatusData, Data: q}
 	}
 	// Add references to the output if any
