@@ -12,6 +12,8 @@ const (
 	StatusReasoning
 	StatusReasoningData
 	StatusReasoningOver
+	StatusSearching
+	StatusSearchingOver
 	StatusFunctionCalling
 	StatusFunctionCallingOver
 )

@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"runtime"
 
 	"google.golang.org/genai"
 )
@@ -41,6 +43,36 @@ func (ll *LangLogic) getGemini2FilePart(file *FileData) genai.Part {
 			return genai.Part{}
 		}
 	}
+}
+
+func (ll *LangLogic) getGemini2CommandTool() *genai.Tool {
+	// All use the same search tool
+	tool := &genai.Tool{
+		FunctionDeclarations: []*genai.FunctionDeclaration{{
+			Name:        "execute_command",
+			Description: "Execute system commands on the user's device with confirmation.",
+			Parameters: &genai.Schema{
+				Type: genai.TypeObject,
+				Properties: map[string]*genai.Schema{
+					"command": {
+						Type:        genai.TypeString,
+						Description: "The command to be executed on the user's system.",
+					},
+					"description": {
+						Type:        genai.TypeString,
+						Description: "Explanation of what this command will do.",
+					},
+					"need_confirm": {
+						Type:        genai.TypeBoolean,
+						Description: "Whether this command requires explicit user confirmation before execution.",
+						Default:     true,
+					},
+				},
+				Required: []string{"command", "description", "need_confirm"},
+			},
+		}},
+	}
+	return tool
 }
 
 func (ll *LangLogic) gemini2Stream() error {
@@ -86,6 +118,7 @@ func (ll *LangLogic) gemini2Stream() error {
 		},
 		Tools: []*genai.Tool{
 			// Placeholder
+			ll.getGemini2CommandTool(),
 			//{CodeExecution: &genai.ToolCodeExecution{}},
 			//{GoogleSearch: &genai.GoogleSearch{}},
 		},
@@ -110,9 +143,6 @@ func (ll *LangLogic) gemini2Stream() error {
 		return err
 	}
 
-	// Stream the response
-	iter := chat.SendMessageStream(ctx, parts...)
-
 	// Signal that streaming has started
 	ll.ProcChan <- StreamNotify{Status: StatusStarted}
 	<-ll.ProceedChan // Wait for the main goroutine to tell sub-goroutine to proceed
@@ -120,44 +150,38 @@ func (ll *LangLogic) gemini2Stream() error {
 	// Stream the responses
 	references := make([]*map[string]interface{}, 0, 1)
 	queries := make([]string, 0, 1)
-	state := stateNormal
-	for resp, err := range iter {
+	streamParts := &parts
+	for i := 0; i < 5; i++ {
+		funcCall, err := ll.processGemini2Stream(ctx, chat, streamParts, &references, &queries)
 		if err != nil {
-			ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}
 			return err
 		}
-
-		// Process and send content
-		for _, candidate := range resp.Candidates {
-			for _, part := range candidate.Content.Parts {
-				// State transitions
-				switch state {
-				case stateNormal:
-					if part.Thought {
-						ll.ProcChan <- StreamNotify{Status: StatusReasoning, Data: ""}
-						state = stateReasoning
-					}
-				case stateReasoning:
-					if !part.Thought {
-						ll.ProcChan <- StreamNotify{Status: StatusReasoningOver, Data: ""}
-						state = stateNormal
-					}
-				}
-
-				// Actual data
-				if part.Thought && part.Text != "" {
-					ll.ProcChan <- StreamNotify{Status: StatusReasoningData, Data: part.Text}
-				} else if part.Text != "" {
-					ll.ProcChan <- StreamNotify{Status: StatusData, Data: part.Text}
-				}
-			}
-
-			// Add references to the output if any
-			if candidate.GroundingMetadata != nil {
-				appendReferences(candidate.GroundingMetadata, &references)
-				queries = append(queries, candidate.GroundingMetadata.WebSearchQueries...)
-			}
+		// No furtheer calls
+		if funcCall == nil {
+			break
 		}
+		// reconstruct the function call
+		// Although i think this is a bug in the gemini2 api
+		// we can safely reconstruct the function call part, because it's a funcCall part
+		lastContent := chat.History(false)[len(chat.History(false))-1]
+		if lastContent != nil && len(lastContent.Parts) == 0 {
+			// ** If we dont' keep the funcCall Name, the function call part would be disposed in chat history **
+			// I think it's a bug in the gemini2 api
+			// ** It will generate a invalid empty parameter erro in the chat history **
+			// So we must reconstruct the function call part
+			lastContent.Parts = []*genai.Part{{FunctionCall: funcCall}}
+		}
+
+		// Call function
+		ll.ProcChan <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("Function call: %v\n", funcCall.Name)}
+		// Handle tool call
+		funcResp, err := ll.handleGemini2ToolCall(funcCall)
+		if err != nil {
+			ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Function call error: %v", err)}
+			return err
+		}
+		// Send function response back through the chat session
+		streamParts = &[]genai.Part{{FunctionResponse: funcResp}}
 	}
 
 	// Add queries to the output if any
@@ -180,6 +204,142 @@ func (ll *LangLogic) gemini2Stream() error {
 	}
 	ll.ProcChan <- StreamNotify{Status: StatusFinished}
 	return err
+}
+
+func (ll *LangLogic) processGemini2Stream(ctx context.Context,
+	chat *genai.Chat, parts *[]genai.Part,
+	refs *[]*map[string]interface{},
+	queries *[]string) (*genai.FunctionCall, error) {
+
+	// Stream the response
+	ll.ProcChan <- StreamNotify{Status: StatusReasoning, Data: ""}
+	iter := chat.SendMessageStream(ctx, *parts...)
+	ll.ProcChan <- StreamNotify{Status: StatusReasoningOver, Data: ""}
+
+	state := stateNormal
+	var funcCall *genai.FunctionCall
+	for resp, err := range iter {
+		if err != nil {
+			ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}
+			return nil, err
+		}
+
+		// Process and send content
+		for _, candidate := range resp.Candidates {
+			// Process content
+			for _, part := range candidate.Content.Parts {
+				// Record function call, but don't process here
+				if part.FunctionCall != nil {
+					funcCall = part.FunctionCall
+					// If we keep the name, we could keep the funcCall
+					// But we must erase the name when we actually call that function
+					// Otherelse it will generate rudandent error
+					// But, if we don't keep the funcCall name
+					// It will dispose the funcCall, I think this is a bug!!!
+					// So we need reconstruct the funcCall
+					//part.Text = funcCall.Name
+
+					// function call wouldn't have text
+					// so pass here
+					continue
+				}
+
+				// State transitions
+				switch state {
+				case stateNormal:
+					if part.Thought {
+						ll.ProcChan <- StreamNotify{Status: StatusReasoning, Data: ""}
+						state = stateReasoning
+					}
+				case stateReasoning:
+					if !part.Thought {
+						ll.ProcChan <- StreamNotify{Status: StatusReasoningOver, Data: ""}
+						state = stateNormal
+					}
+				}
+				// Actual text data
+				if part.Thought && part.Text != "" {
+					ll.ProcChan <- StreamNotify{Status: StatusReasoningData, Data: part.Text}
+				} else if part.Text != "" {
+					ll.ProcChan <- StreamNotify{Status: StatusData, Data: part.Text}
+				}
+			}
+
+			// Add references to the output if any
+			if candidate.GroundingMetadata != nil {
+				appendReferences(candidate.GroundingMetadata, refs)
+				*queries = append(*queries, candidate.GroundingMetadata.WebSearchQueries...)
+			}
+		}
+	}
+	return funcCall, nil
+}
+
+func (ll *LangLogic) handleGemini2ToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+	// Check if the model requested a tool call
+	if call.Name == "execute_command" {
+		cmdStr := call.Args["command"].(string)
+		needConfirm, ok := call.Args["need_confirm"].(bool)
+		if !ok {
+			needConfirm = true
+		}
+		if needConfirm {
+			outStr := fmt.Sprintf("First show user the command that would be executed,\n"+
+				"Here is the command: [%s]\n"+
+				"And, let user confirm:\n"+
+				"I am about to execute the following command:\n"+
+				"`%s`\n"+
+				"Would you like me to proceed?", cmdStr, cmdStr)
+			return &genai.FunctionResponse{
+				ID:   call.ID,
+				Name: call.Name,
+				Response: map[string]any{
+					"output": outStr,
+					"error":  "",
+				},
+			}, nil
+		}
+		// Log that we're executing the command
+		ll.ProcChan <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("%s\n", cmdStr)}
+		var errStr string
+
+		// Do the real command
+		ll.ProcChan <- StreamNotify{Status: StatusFunctionCalling, Data: ""}
+		var out []byte
+		var err error
+		if runtime.GOOS == "windows" {
+			out, err = exec.Command("cmd", "/C", cmdStr).CombinedOutput()
+		} else {
+			out, err = exec.Command("sh", "-c", cmdStr).CombinedOutput()
+		}
+		ll.ProcChan <- StreamNotify{Status: StatusFunctionCallingOver, Data: ""}
+		<-ll.ProceedChan
+
+		if err != nil {
+			errStr = fmt.Sprintf("failed to execute command: %v", err)
+		}
+
+		// Output the result
+		outStr := string(out)
+		if len(outStr) == 0 {
+			outStr = "[Result] Command executed with no output.\n[Explanation] This is typical for commands that modify system state silently but do not produce any output. Maybe we should use other command to check the result.\n"
+		} else {
+			outStr = outStr + "\n"
+		}
+		ll.ProcChan <- StreamNotify{Status: StatusData, Data: outStr}
+
+		// Send the output back as a tool response
+		resp := &genai.FunctionResponse{
+			ID:   call.ID,
+			Name: call.Name,
+			Response: map[string]any{
+				"output": outStr,
+				"error":  errStr,
+			},
+		}
+		return resp, nil
+	}
+	return nil, fmt.Errorf("unknown tool call: %v", call.Name)
 }
 
 func appendReferences(metadata *genai.GroundingMetadata, refs *[]*map[string]interface{}) {
