@@ -1,6 +1,6 @@
 # gllm - Golang Command-Line LLM Companion
 
-`gllm` is a powerful command-line tool designed to interact seamlessly with various Large Language Models (LLMs). Supports features like interactive chat, multi-turn conversations, file attachments, search integration, and extensive customization.
+`gllm` is a powerful command-line tool designed to interact seamlessly with various Large Language Models (LLMs). Supports features like interactive chat, multi-turn conversations, file attachments, search integration, command agent, and extensive customization.
 
 ## 🚀 Features  
 
@@ -15,6 +15,7 @@
 - **Multi-turn Chat**: Engage in multiple rounds of conversation.  
 - **Check out history and context**: In chat mode or multi-turn chat, easily view the full context.
 - **Configuration Management**: Customize model behavior and settings.  
+- **Command Agent Mode**: Let LLMs plan and execute commands with your confirmation.
 - **Version Control**: Easily track and update your setup.  
 
 ---
@@ -173,6 +174,14 @@ gllm markdown off           # disable markdown output
 gllm markdown only          # only render markdown output
 ```
 
+### 🔹 New update! & Plugins Management
+
+```sh
+gllm plugin list            # list all plugins, loaded add a checkmark before the name
+gllm plugin load exec       # load exec plugin, to execute the command
+gllm plugin unload exec     # unload exec plugin
+```
+
 ### 🔹 Std input Support
 
 ```sh
@@ -234,6 +243,7 @@ search_engines:
 - Check reasoning details.
 - Easy to read markdown formatted output.
 - Supports multiple conversations.
+- Powerful and flexible Command Agent mode.
 - Check out context details.
 
 Start using `gllm` today and supercharge your command-line AI experience! 🚀
@@ -286,6 +296,7 @@ This project includes various features to enhance usability and efficiency. Belo
 | **Follow-Up**: Pose follow-up questions in the same session | ![Follow-Up Screenshot](screenshots/chatmode2.png) |
 | **Chat History with Tool Calls**: View your conversation context and tool usage | ![Tool Calls Screenshot](screenshots/chathistory.png) |
 | **Chat History with Reasoning**: Inspect past reasoning steps alongside your chat | ![Reasoning History Screenshot](screenshots/chathistory2.png) |
+| **Command Agent mode**: Utilize the power of command-line agents | ![Command Agent Screenshot](screenshots/commandagent.png) |
 
 For more details, using `gllm --help` to check.
 
