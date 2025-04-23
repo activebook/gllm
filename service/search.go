@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	serp "github.com/serpapi/google-search-results-golang"
+	//serp "github.com/serpapi/google-search-results-golang"
 	"google.golang.org/api/customsearch/v1"
 	"google.golang.org/api/option"
 )
@@ -243,40 +243,44 @@ func BingSearch(query string) (map[string]any, error) {
 }
 
 func SerpAPISearch(query string, engine string) (map[string]any, error) {
-	parameter := map[string]string{
-		"engine":     engine,
-		"q":          query,
-		"count":      "10",
-		"first":      "1",
-		"safeSearch": "off",
-	}
-
-	search := serp.NewGoogleSearch(parameter, searchApiKey)
-	results, err := search.GetJSON()
-	if err != nil {
-		//Errorf("[SerpAPI]Error getting JSON: %v", err)
-		return nil, fmt.Errorf("[SerpAPI]Error getting JSON: %v", err)
-	}
-	organic_results := results["organic_results"]
-	search_meta := results["search_metadata"]
-	var total_time_taken float32
-	if metaMap, ok := search_meta.(map[string]interface{}); ok {
-		if totalTime, ok := metaMap["total_time_taken"].(float64); ok {
-			total_time_taken = float32(totalTime)
+	// Placeholder
+	return map[string]any{}, nil
+	/*
+		parameter := map[string]string{
+			"engine":     engine,
+			"q":          query,
+			"count":      "10",
+			"first":      "1",
+			"safeSearch": "off",
 		}
-	}
 
-	formatted_results, err := formatSerpAPIResponse(organic_results)
-	if err != nil {
-		Errorf("[SerpAPI]Error formatting response: %v", err)
-		return nil, fmt.Errorf("[SerpAPI]Error formatting response: %v", err)
-	}
-	response := map[string]any{
-		"results":                  formatted_results,
-		"search_engine_latency_ms": total_time_taken,
-	}
+		search := serp.NewGoogleSearch(parameter, searchApiKey)
+		results, err := search.GetJSON()
+		if err != nil {
+			//Errorf("[SerpAPI]Error getting JSON: %v", err)
+			return nil, fmt.Errorf("[SerpAPI]Error getting JSON: %v", err)
+		}
+		organic_results := results["organic_results"]
+		search_meta := results["search_metadata"]
+		var total_time_taken float32
+		if metaMap, ok := search_meta.(map[string]interface{}); ok {
+			if totalTime, ok := metaMap["total_time_taken"].(float64); ok {
+				total_time_taken = float32(totalTime)
+			}
+		}
 
-	return response, nil
+		formatted_results, err := formatSerpAPIResponse(organic_results)
+		if err != nil {
+			Errorf("[SerpAPI]Error formatting response: %v", err)
+			return nil, fmt.Errorf("[SerpAPI]Error formatting response: %v", err)
+		}
+		response := map[string]any{
+			"results":                  formatted_results,
+			"search_engine_latency_ms": total_time_taken,
+		}
+
+		return response, nil
+	*/
 }
 
 // formatSerpAPIResponse formats the SerpAPI response into a standardized structure
