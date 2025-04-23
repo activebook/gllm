@@ -118,7 +118,6 @@ func (ll *LangLogic) gemini2Stream() error {
 		},
 		Tools: []*genai.Tool{
 			// Placeholder
-			ll.getGemini2CommandTool(),
 			//{CodeExecution: &genai.ToolCodeExecution{}},
 			//{GoogleSearch: &genai.GoogleSearch{}},
 		},
@@ -128,6 +127,9 @@ func (ll *LangLogic) gemini2Stream() error {
 		config.SystemInstruction = &genai.Content{Parts: []*genai.Part{{Text: ll.SystemPrompt}}}
 	}
 	// Tools
+	if IsExecPluginLoaded() {
+		config.Tools = append(config.Tools, ll.getGemini2CommandTool())
+	}
 	// Remember: CodeExecution and GoogleSearch cannot be enabled at the same time
 	if ll.UseSearchTool {
 		config.Tools = append(config.Tools, &genai.Tool{GoogleSearch: &genai.GoogleSearch{}})
@@ -191,10 +193,9 @@ func (ll *LangLogic) gemini2Stream() error {
 	}
 	// Add references to the output if any
 	if len(references) > 0 {
-		refs := "\n\n" + RetrieveReferences(references)
+		refs := "\n\n" + RetrieveReferences(references) + "\n"
 		ll.ProcChan <- StreamNotify{Status: StatusData, Data: refs}
 	}
-	ll.ProcChan <- StreamNotify{Status: StatusData, Data: "\n"}
 
 	// Save the conversation history
 	convo.History = chat.History(false)
@@ -284,12 +285,9 @@ func (ll *LangLogic) handleGemini2ToolCall(call *genai.FunctionCall) (*genai.Fun
 			needConfirm = true
 		}
 		if needConfirm {
-			outStr := fmt.Sprintf("First show user the command that would be executed,\n"+
-				"Here is the command: [%s]\n"+
-				"And, let user confirm:\n"+
-				"I am about to execute the following command:\n"+
-				"`%s`\n"+
-				"Would you like me to proceed?", cmdStr, cmdStr)
+			// Response with a prompt to let user confirm
+			descStr := call.Args["description"].(string)
+			outStr := fmt.Sprintf(ExecRespTmplConfirm, cmdStr, descStr)
 			return &genai.FunctionResponse{
 				ID:   call.ID,
 				Name: call.Name,
@@ -316,24 +314,41 @@ func (ll *LangLogic) handleGemini2ToolCall(call *genai.FunctionCall) (*genai.Fun
 		<-ll.ProceedChan
 
 		if err != nil {
-			errStr = fmt.Sprintf("failed to execute command: %v", err)
+			var exitCode int
+			if exitError, ok := err.(*exec.ExitError); ok {
+				exitCode = exitError.ExitCode()
+			}
+			errStr = fmt.Sprintf("Command failed with exit code %d: %v", exitCode, err)
 		}
 
 		// Output the result
 		outStr := string(out)
-		if len(outStr) == 0 {
-			outStr = "[Result] Command executed with no output.\n[Explanation] This is typical for commands that modify system state silently but do not produce any output. Maybe we should use other command to check the result.\n"
-		} else {
+		if outStr != "" {
 			outStr = outStr + "\n"
+			ll.ProcChan <- StreamNotify{Status: StatusData, Data: outStr}
 		}
-		ll.ProcChan <- StreamNotify{Status: StatusData, Data: outStr}
+
+		// Format error info if present
+		errorInfo := ""
+		if errStr != "" {
+			errorInfo = fmt.Sprintf("Error: %s", errStr)
+		}
+		// Format output info
+		outputInfo := ""
+		if outStr != "" {
+			outputInfo = fmt.Sprintf("Output:\n%s", outStr)
+		} else {
+			outputInfo = "Output: <no output>"
+		}
+		// Create a response that prompts the LLM to provide insightful analysis of the command output
+		finalResponse := fmt.Sprintf(ExecRespTmplOutput, cmdStr, errorInfo, outputInfo)
 
 		// Send the output back as a tool response
 		resp := &genai.FunctionResponse{
 			ID:   call.ID,
 			Name: call.Name,
 			Response: map[string]any{
-				"output": outStr,
+				"output": finalResponse,
 				"error":  errStr,
 			},
 		}

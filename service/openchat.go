@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -67,6 +66,8 @@ func (ll *LangLogic) getOpenChatFilePart(file *FileData) *model.ChatCompletionMe
 	return part
 }
 
+// Deprecated: Use openchatStreamWithSearch instead
+/*
 func (ll *LangLogic) openchatStream() error {
 	// 1. Initialize the Client
 	ctx := context.Background()
@@ -227,6 +228,7 @@ func (ll *LangLogic) openchatStream() error {
 	ll.ProcChan <- StreamNotify{Status: StatusFinished}
 	return err
 }
+*/
 
 func (ll *LangLogic) openchatStreamWithSearch() error {
 
@@ -240,8 +242,11 @@ func (ll *LangLogic) openchatStreamWithSearch() error {
 	)
 
 	// Create a tool with the function
-	commandTool := ll.getOpenChatCommandTool()
-	tools := []*model.Tool{commandTool}
+	tools := []*model.Tool{}
+	if IsExecPluginLoaded() {
+		commandTool := ll.getOpenChatCommandTool()
+		tools = append(tools, commandTool)
+	}
 	if ll.UseSearchTool {
 		searchTool := ll.getOpenChatSearchTool()
 		tools = append(tools, searchTool)
@@ -472,7 +477,7 @@ func (c *OpenChat) process() error {
 	}
 	// Add references to the output if any
 	if len(c.references) > 0 {
-		refs := "\n\n" + RetrieveReferences(c.references)
+		refs := "\n\n" + RetrieveReferences(c.references) + "\n"
 		c.proc <- StreamNotify{Status: StatusData, Data: refs}
 	}
 	// No more message
@@ -534,43 +539,43 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 				contentBuffer.WriteString(text)
 				c.proc <- StreamNotify{Status: StatusData, Data: text}
 			}
-		}
 
-		// Handle tool calls in the stream
-		if len(response.Choices[0].Delta.ToolCalls) > 0 {
-			for _, toolCall := range response.Choices[0].Delta.ToolCalls {
-				id := toolCall.ID
-				functionName := toolCall.Function.Name
+			// Handle tool calls in the stream
+			if len(delta.ToolCalls) > 0 {
+				for _, toolCall := range delta.ToolCalls {
+					id := toolCall.ID
+					functionName := toolCall.Function.Name
 
-				// Skip if not our expected function
-				// Because some model made up function name
-				if functionName != "" && functionName != "web_search" && functionName != "execute_command" {
-					continue
-				}
-
-				// Handle streaming tool call parts
-				if id == "" && lastCallId != "" {
-					// Continue with previous tool call
-					if tc, exists := toolCalls[lastCallId]; exists {
-						tc.Function.Arguments += toolCall.Function.Arguments
-						toolCalls[lastCallId] = tc
+					// Skip if not our expected function
+					// Because some model made up function name
+					if functionName != "" && functionName != "web_search" && functionName != "execute_command" {
+						continue
 					}
-				} else if id != "" {
-					// Create or update a tool call
-					lastCallId = id
-					if tc, exists := toolCalls[id]; exists {
-						tc.Function.Arguments += toolCall.Function.Arguments
-						toolCalls[id] = tc
-					} else {
-						// Prepare to receive tool call arguments
-						c.proc <- StreamNotify{Status: StatusProcessing}
-						toolCalls[id] = model.ToolCall{
-							ID:   id,
-							Type: model.ToolTypeFunction,
-							Function: model.FunctionCall{
-								Name:      functionName,
-								Arguments: toolCall.Function.Arguments,
-							},
+
+					// Handle streaming tool call parts
+					if id == "" && lastCallId != "" {
+						// Continue with previous tool call
+						if tc, exists := toolCalls[lastCallId]; exists {
+							tc.Function.Arguments += toolCall.Function.Arguments
+							toolCalls[lastCallId] = tc
+						}
+					} else if id != "" {
+						// Create or update a tool call
+						lastCallId = id
+						if tc, exists := toolCalls[id]; exists {
+							tc.Function.Arguments += toolCall.Function.Arguments
+							toolCalls[id] = tc
+						} else {
+							// Prepare to receive tool call arguments
+							c.proc <- StreamNotify{Status: StatusProcessing}
+							toolCalls[id] = model.ToolCall{
+								ID:   id,
+								Type: model.ToolTypeFunction,
+								Function: model.FunctionCall{
+									Name:      functionName,
+									Arguments: toolCall.Function.Arguments,
+								},
+							}
 						}
 					}
 				}
@@ -636,12 +641,9 @@ func (c *OpenChat) processCommandToolCalls(toolCall *model.ToolCall, argsMap *ma
 		needConfirm = true
 	}
 	if needConfirm {
-		outStr := fmt.Sprintf("First show user the command that would be executed,\n"+
-			"Here is the command: [%s]\n"+
-			"And, let user confirm:\n"+
-			"I am about to execute the following command:\n"+
-			"`%s`\n"+
-			"Would you like me to proceed?", cmdStr, cmdStr)
+		// Response with a prompt to let user confirm
+		descStr := (*argsMap)["description"].(string)
+		outStr := fmt.Sprintf(ExecRespTmplConfirm, cmdStr, descStr)
 		return &model.ChatCompletionMessage{
 			Role: model.ChatMessageRoleTool,
 			Content: &model.ChatCompletionMessageContent{
@@ -670,28 +672,47 @@ func (c *OpenChat) processCommandToolCalls(toolCall *model.ToolCall, argsMap *ma
 	c.proc <- StreamNotify{Status: StatusFunctionCallingOver, Data: ""}
 	<-c.proceed
 
+	// Handle command exec failed
 	if err != nil {
-		errStr = fmt.Sprintf("failed to execute command: %v", err)
+		var exitCode int
+		if exitError, ok := err.(*exec.ExitError); ok {
+			exitCode = exitError.ExitCode()
+		}
+		errStr = fmt.Sprintf("Command failed with exit code %d: %v", exitCode, err)
 	}
 
 	// Output the result
 	outStr := string(out)
-	if len(outStr) == 0 {
-		outStr = "[Result] Command executed with no output.\n[Explanation] This is typical for commands that modify system state silently but do not produce any output. Maybe we should use other command to check the result.\n"
-	} else {
+	if outStr != "" {
 		outStr = outStr + "\n"
+		c.proc <- StreamNotify{Status: StatusData, Data: outStr}
 	}
-	c.proc <- StreamNotify{Status: StatusData, Data: outStr}
-	resultsJSON, _ := json.Marshal(map[string]string{
-		"output": outStr,
-		"error":  errStr,
-	})
+
+	// Format error info if present
+	errorInfo := ""
+	if errStr != "" {
+		errorInfo = fmt.Sprintf("Error: %s", errStr)
+	}
+	// Format output info
+	outputInfo := ""
+	if outStr != "" {
+		outputInfo = fmt.Sprintf("Output:\n%s", outStr)
+	} else {
+		outputInfo = "Output: <no output>"
+	}
+	// Create a response that prompts the LLM to provide insightful analysis of the command output
+	finalResponse := fmt.Sprintf(ExecRespTmplOutput, cmdStr, errorInfo, outputInfo)
+
+	// resultsJSON, _ := json.Marshal(map[string]string{
+	// 	"output": outStr,
+	// 	"error":  errStr,
+	// })
 
 	// Create and return the tool response message
 	return &model.ChatCompletionMessage{
 		Role: model.ChatMessageRoleTool,
 		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(string(resultsJSON)),
+			StringValue: volcengine.String(finalResponse),
 		}, Name: Ptr(""),
 		ToolCallID: toolCall.ID,
 	}, nil

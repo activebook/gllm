@@ -49,13 +49,28 @@ type GeminiMessage struct {
 }
 
 type GeminiPart struct {
-	Type             string                 `json:"type"` // text, function_call, function_response, image, file_data, etc.
-	Text             string                 `json:"text,omitempty"`
-	Name             string                 `json:"name,omitempty"`              // for function calls
-	Args             map[string]interface{} `json:"args,omitempty"`              // for function calls
-	FileData         map[string]interface{} `json:"file_data,omitempty"`         // for file attachments
-	InlineData       map[string]interface{} `json:"inline_data,omitempty"`       // for inline images
-	FunctionResponse map[string]interface{} `json:"function_response,omitempty"` // for function responses
+	Type             string                  `json:"type"` // text, function_call, function_response, image, file_data, etc.
+	Text             string                  `json:"text,omitempty"`
+	Name             string                  `json:"name,omitempty"`             // for function calls
+	Args             map[string]interface{}  `json:"args,omitempty"`             // for function calls
+	InlineData       *GeminiInlineData       `json:"inlineData,omitempty"`       // for inline images
+	FunctionCall     *GeminiFunctionCall     `json:"functionCall,omitempty"`     // for function responses
+	FunctionResponse *GeminiFunctionResponse `json:"functionResponse,omitempty"` // for function responses
+}
+
+type GeminiFunctionCall struct {
+	Name      string                 `json:"name,omitempty"`
+	Arguments map[string]interface{} `json:"args,omitempty"` // JSON string
+}
+
+type GeminiFunctionResponse struct {
+	Name     string                 `json:"name,omitempty"`
+	Response map[string]interface{} `json:"response,omitempty"` // JSON string
+}
+
+type GeminiInlineData struct {
+	MimeType string `json:"mimeType,omitempty"`
+	Data     string `json:"data,omitempty"`
 }
 
 // OpenAI message format with enhanced support for function calls and files
@@ -153,21 +168,17 @@ func DisplayGeminiConversationLog(data []byte, msgCount int, msgLength int) {
 			modelCount++
 		}
 		for _, part := range msg.Parts {
-			switch part.Type {
-			case "function_call":
+			switch {
+			case part.FunctionCall != nil:
 				functionCallCount++
-			case "function_response":
+			case part.FunctionResponse != nil:
 				functionResponseCount++
-			case "image":
-				imageCount++
-			case "file_data":
-				fileCount++
-			}
-			if part.InlineData != nil {
-				if mimeType, ok := part.InlineData["mime_type"].(string); ok {
-					if strings.HasPrefix(mimeType, "image/") {
-						imageCount++
-					}
+			case part.InlineData != nil:
+				mimeType := part.InlineData.MimeType
+				if strings.HasPrefix(mimeType, "image/") {
+					imageCount++
+				} else {
+					fileCount++
 				}
 			}
 		}
@@ -212,25 +223,21 @@ func DisplayGeminiConversationLog(data []byte, msgCount int, msgLength int) {
 					if j > 0 {
 						fmt.Print(" + ")
 					}
-					switch part.Type {
-					case "text":
-						preview := TruncateString(part.Text, msgLength)
-						fmt.Printf("%s", preview)
-					case "function_call":
-						fmt.Printf("%s[Function call: %s]%s", ContentTypeColors["function_call"], part.Name, ResetColor)
-						if len(part.Args) > 0 {
-							argStr, _ := json.Marshal(part.Args)
+					switch {
+					case part.FunctionCall != nil:
+						fmt.Printf("%s[Function call: %s]%s", ContentTypeColors["function_call"], part.FunctionCall.Name, ResetColor)
+						if len(part.FunctionCall.Arguments) > 0 {
+							argStr, _ := json.Marshal(part.FunctionCall.Arguments)
 							fmt.Printf(" args: %s", TruncateString(string(argStr), msgLength))
 						}
-					case "function_response":
+					case part.FunctionResponse != nil:
 						fmt.Printf("%s[Function response]%s", ContentTypeColors["function_response"], ResetColor)
-						respPreview, _ := json.Marshal(part.Args)
+						respPreview, _ := json.Marshal(part.FunctionResponse.Response)
 						fmt.Printf(" data: %s", TruncateString(string(respPreview), msgLength))
-					case "image":
-						fmt.Printf("%s[Image content]%s", ContentTypeColors["image"], ResetColor)
-					case "file_data":
-						if filename, ok := getFileName(part.FileData); ok {
-							fmt.Printf("%s[File: %s]%s", ContentTypeColors["file_data"], filename, ResetColor)
+					case part.InlineData != nil:
+						mimeType := part.InlineData.MimeType
+						if strings.HasPrefix(mimeType, "image/") {
+							fmt.Printf("%s[Image content]%s", ContentTypeColors["image"], ResetColor)
 						} else {
 							fmt.Printf("%s[File]%s", ContentTypeColors["file_data"], ResetColor)
 						}

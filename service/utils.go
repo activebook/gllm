@@ -71,4 +71,12 @@ func GetStringValue(data map[string]interface{}, key string) string {
 	return ""
 }
 
+func Contains(list []string, item string) bool {
+	for _, v := range list {
+		if v == item {
+			return true
+		}
+	}
+	return false
+}
 func Ptr[T any](t T) *T { return &t }
