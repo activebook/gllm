@@ -101,7 +101,7 @@ Special commands:
 				convoName = GenerateChatFilename()
 			}
 			service.NewOpenChatConversation(convoName, true)
-			service.NewGeminiConversation(convoName, true)
+			//service.NewGeminiConversation(convoName, true)
 			service.NewGemini2Conversation(convoName, true)
 
 			// Process all prompt building
