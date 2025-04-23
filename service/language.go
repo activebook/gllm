@@ -116,6 +116,7 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 			fmt.Print(notify.Data) // Print the streamed text
 		case StatusError:
 			StopSpinner(spinner)
+			Errorf("Stream error: %v\n", notify.Data)
 			return
 		case StatusFinished:
 			StopSpinner(spinner)
@@ -131,8 +132,13 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 			fmt.Print(resetColor)
 			fmt.Print(completeColor + "✓" + resetColor)
 			fmt.Println()
-		case StatusFunctionCalling:
+		case StatusSearching:
 			StartSpinner(spinner, "Searching...")
+		case StatusSearchingOver:
+			StopSpinner(spinner)
+			proceedCh <- true
+		case StatusFunctionCalling:
+			StartSpinner(spinner, "Fucntion Calling...")
 		case StatusFunctionCallingOver:
 			StopSpinner(spinner)
 			proceedCh <- true

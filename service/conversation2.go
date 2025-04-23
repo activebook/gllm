@@ -88,7 +88,16 @@ func (g *Gemini2Conversation) Save() error {
 		return nil
 	}
 
-	data, err := json.MarshalIndent(g.History, "", "  ")
+	// Remove any model messages with nil Parts before saving
+	filtered := make([]*genai.Content, 0, len(g.History))
+	for _, content := range g.History {
+		if content.Role == genai.RoleModel && content.Parts == nil {
+			continue // skip invalid model messages
+		}
+		filtered = append(filtered, content)
+	}
+
+	data, err := json.MarshalIndent(filtered, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to serialize conversation: %w", err)
 	}

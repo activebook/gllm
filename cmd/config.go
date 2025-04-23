@@ -153,6 +153,16 @@ and all default settings (e.g., default model, default system prompt, default te
 		}
 		w.Flush()
 
+		// Plugins section
+		printSection("Plugins")
+		plugins := GetLoadedPlugins()
+		fmt.Fprintln(w, " Plugin \t Loaded ")
+		fmt.Fprintln(w, "-------\t----------")
+		for name, loaded := range plugins {
+			fmt.Fprintf(w, "%s\t%v\n", name, loaded)
+		}
+		w.Flush()
+
 		// Default Configuration section
 		printSection("Default Configuration")
 

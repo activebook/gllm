@@ -103,10 +103,7 @@ func (mr *MarkdownRenderer) RenderMarkdown() {
 
 	// Print a separator or message
 	if mr.keepStreamingContent {
-		prefix := fmt.Sprintln("") + fmt.Sprintln("")
-		prefix = prefix + fmt.Sprintln("# **MARKDOWN OUTPUT**")
-		prefix = prefix + fmt.Sprintln("=================")
-		prefix = prefix + fmt.Sprintln()
+		prefix := "\n\n---\n\n# **MARKDOWN OUTPUT**\n\n---\n\n"
 		output = prefix + output
 	}
 
