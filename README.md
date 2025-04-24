@@ -285,6 +285,7 @@ This project includes various features to enhance usability and efficiency. Belo
 | **PDF Reading** *(Gemini only)*: Extract and analyze PDF content | ![PDF Screenshot](screenshots/pdf.png) |
 | **Code Execution** *(Gemini only)*: Execute Python code directly | ![Code Execution Screenshot](screenshots/code.png) |
 | **Markdown Output**: Generate clean, readable Markdown | ![Markdown Screenshot](screenshots/markdown.png) |
+| **One-Shot Agent**: Run task in one shot | ![One-Shot Screenshot](screenshots/oneshot.png) |
 
 ---
 
