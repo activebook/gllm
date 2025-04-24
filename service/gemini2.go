@@ -154,12 +154,12 @@ func (ll *LangLogic) gemini2Stream() error {
 	queries := make([]string, 0, 1)
 	streamParts := &parts
 	for i := 0; i < 5; i++ {
-		funcCall, err := ll.processGemini2Stream(ctx, chat, streamParts, &references, &queries)
+		funcCalls, err := ll.processGemini2Stream(ctx, chat, streamParts, &references, &queries)
 		if err != nil {
 			return err
 		}
 		// No furtheer calls
-		if funcCall == nil {
+		if len(*funcCalls) == 0 {
 			break
 		}
 		// reconstruct the function call
@@ -171,19 +171,27 @@ func (ll *LangLogic) gemini2Stream() error {
 			// I think it's a bug in the gemini2 api
 			// ** It will generate a invalid empty parameter erro in the chat history **
 			// So we must reconstruct the function call part
-			lastContent.Parts = []*genai.Part{{FunctionCall: funcCall}}
+			lastContent.Parts = []*genai.Part{}
+			for _, funcCall := range *funcCalls {
+				callPart := genai.Part{FunctionCall: funcCall}
+				lastContent.Parts = append(lastContent.Parts, &callPart)
+			}
 		}
 
-		// Call function
-		ll.ProcChan <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("Function call: %v\n", funcCall.Name)}
-		// Handle tool call
-		funcResp, err := ll.handleGemini2ToolCall(funcCall)
-		if err != nil {
-			ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Function call error: %v", err)}
-			return err
+		streamParts = &[]genai.Part{}
+		for _, funcCall := range *funcCalls {
+			// Add function call to the output
+			ll.ProcChan <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("Function call: %v\n", funcCall.Name)}
+			// Handle tool call
+			funcResp, err := ll.handleGemini2ToolCall(funcCall)
+			if err != nil {
+				ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Function call error: %v", err)}
+				return err
+			}
+			// Send function response back through the chat session
+			respPart := genai.Part{FunctionResponse: funcResp}
+			*streamParts = append(*streamParts, respPart)
 		}
-		// Send function response back through the chat session
-		streamParts = &[]genai.Part{{FunctionResponse: funcResp}}
 	}
 
 	// Add queries to the output if any
@@ -210,7 +218,7 @@ func (ll *LangLogic) gemini2Stream() error {
 func (ll *LangLogic) processGemini2Stream(ctx context.Context,
 	chat *genai.Chat, parts *[]genai.Part,
 	refs *[]*map[string]interface{},
-	queries *[]string) (*genai.FunctionCall, error) {
+	queries *[]string) (*[]*genai.FunctionCall, error) {
 
 	// Stream the response
 	ll.ProcChan <- StreamNotify{Status: StatusReasoning, Data: ""}
@@ -218,7 +226,7 @@ func (ll *LangLogic) processGemini2Stream(ctx context.Context,
 	ll.ProcChan <- StreamNotify{Status: StatusReasoningOver, Data: ""}
 
 	state := stateNormal
-	var funcCall *genai.FunctionCall
+	funcCalls := []*genai.FunctionCall{}
 	for resp, err := range iter {
 		if err != nil {
 			ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}
@@ -231,7 +239,7 @@ func (ll *LangLogic) processGemini2Stream(ctx context.Context,
 			for _, part := range candidate.Content.Parts {
 				// Record function call, but don't process here
 				if part.FunctionCall != nil {
-					funcCall = part.FunctionCall
+					funcCalls = append(funcCalls, part.FunctionCall)
 					// If we keep the name, we could keep the funcCall
 					// But we must erase the name when we actually call that function
 					// Otherelse it will generate rudandent error
@@ -273,10 +281,14 @@ func (ll *LangLogic) processGemini2Stream(ctx context.Context,
 			}
 		}
 	}
-	return funcCall, nil
+	return &funcCalls, nil
 }
 
 func (ll *LangLogic) handleGemini2ToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+	resp := genai.FunctionResponse{
+		ID:   call.ID,
+		Name: call.Name,
+	}
 	// Check if the model requested a tool call
 	if call.Name == "execute_command" {
 		cmdStr := call.Args["command"].(string)
@@ -288,14 +300,11 @@ func (ll *LangLogic) handleGemini2ToolCall(call *genai.FunctionCall) (*genai.Fun
 			// Response with a prompt to let user confirm
 			descStr := call.Args["description"].(string)
 			outStr := fmt.Sprintf(ExecRespTmplConfirm, cmdStr, descStr)
-			return &genai.FunctionResponse{
-				ID:   call.ID,
-				Name: call.Name,
-				Response: map[string]any{
-					"output": outStr,
-					"error":  "",
-				},
-			}, nil
+			resp.Response = map[string]any{
+				"output": outStr,
+				"error":  "",
+			}
+			return &resp, nil
 		}
 		// Log that we're executing the command
 		ll.ProcChan <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("%s\n", cmdStr)}
@@ -344,15 +353,11 @@ func (ll *LangLogic) handleGemini2ToolCall(call *genai.FunctionCall) (*genai.Fun
 		finalResponse := fmt.Sprintf(ExecRespTmplOutput, cmdStr, errorInfo, outputInfo)
 
 		// Send the output back as a tool response
-		resp := &genai.FunctionResponse{
-			ID:   call.ID,
-			Name: call.Name,
-			Response: map[string]any{
-				"output": finalResponse,
-				"error":  errStr,
-			},
+		resp.Response = map[string]any{
+			"output": finalResponse,
+			"error":  errStr,
 		}
-		return resp, nil
+		return &resp, nil
 	}
 	return nil, fmt.Errorf("unknown tool call: %v", call.Name)
 }
