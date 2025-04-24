@@ -632,6 +632,15 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 }
 
 func (c *OpenChat) processCommandToolCalls(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	// Create a tool message
+	// Tool Message's Content wouldn't be serialized in the response
+	// That's not a problem, because each time, the tool result could be different!
+	toolMessage := model.ChatCompletionMessage{
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Name:       Ptr(""),
+	}
+
 	cmdStr, ok := (*argsMap)["command"].(string)
 	if !ok {
 		return nil, fmt.Errorf("command not found in arguments")
@@ -644,13 +653,10 @@ func (c *OpenChat) processCommandToolCalls(toolCall *model.ToolCall, argsMap *ma
 		// Response with a prompt to let user confirm
 		descStr := (*argsMap)["description"].(string)
 		outStr := fmt.Sprintf(ExecRespTmplConfirm, cmdStr, descStr)
-		return &model.ChatCompletionMessage{
-			Role: model.ChatMessageRoleTool,
-			Content: &model.ChatCompletionMessageContent{
-				StringValue: volcengine.String(string(outStr)),
-			}, Name: Ptr(""),
-			ToolCallID: toolCall.ID,
-		}, nil
+		toolMessage.Content = &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(outStr),
+		}
+		return &toolMessage, nil
 	}
 
 	// Call function
@@ -709,13 +715,10 @@ func (c *OpenChat) processCommandToolCalls(toolCall *model.ToolCall, argsMap *ma
 	// })
 
 	// Create and return the tool response message
-	return &model.ChatCompletionMessage{
-		Role: model.ChatMessageRoleTool,
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(finalResponse),
-		}, Name: Ptr(""),
-		ToolCallID: toolCall.ID,
-	}, nil
+	toolMessage.Content = &model.ChatCompletionMessageContent{
+		StringValue: volcengine.String(finalResponse),
+	}
+	return &toolMessage, nil
 }
 
 func (c *OpenChat) processSearchToolCalls(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
