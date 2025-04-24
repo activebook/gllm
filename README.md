@@ -297,6 +297,7 @@ This project includes various features to enhance usability and efficiency. Belo
 | **Chat History with Tool Calls**: View your conversation context and tool usage | ![Tool Calls Screenshot](screenshots/chathistory.png) |
 | **Chat History with Reasoning**: Inspect past reasoning steps alongside your chat | ![Reasoning History Screenshot](screenshots/chathistory2.png) |
 | **Command Agent mode**: Utilize the power of command-line agents | ![Command Agent Screenshot](screenshots/commandagent.png) |
+| **Multi-Commands In One-Shot**: Run multiple commands in one shot | ![Multi-Commands Screenshot](screenshots/multicommands.png) |
 
 For more details, using `gllm --help` to check.
 
