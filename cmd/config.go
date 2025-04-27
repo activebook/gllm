@@ -183,8 +183,8 @@ and all default settings (e.g., default model, default system prompt, default te
 		w.Flush()
 
 		// Default Search Engine
-		fmt.Println("\nDefault Search Engine:")
-		searchEngine := GetEffectiveSearchEngine()
+		searchName, searchEngine := GetEffectiveSearchEngine()
+		fmt.Printf("\nDefault Search Engine: %v\n", searchName)
 		fmt.Fprintln(w, " PROPERTY \t VALUE ")
 		fmt.Fprintln(w, "----------\t-------")
 		pairs := []string{}

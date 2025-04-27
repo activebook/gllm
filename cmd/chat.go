@@ -610,7 +610,7 @@ func (ci *ChatInfo) callLLM(input string) {
 	sys_prompt := GetEffectiveSystemPrompt()
 	var searchEngine map[string]any
 	if searchFlag != "" {
-		searchEngine = GetEffectiveSearchEngine()
+		_, searchEngine = GetEffectiveSearchEngine()
 	}
 	service.CallLanguageModel(finalPrompt.String(), sys_prompt, ci.Files, modelInfo, searchEngine)
 

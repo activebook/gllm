@@ -263,7 +263,7 @@ func processQuery(prompt string, files []*service.FileData) {
 	sys_prompt := GetEffectiveSystemPrompt()
 	var searchEngine map[string]any
 	if searchFlag != "" {
-		searchEngine = GetEffectiveSearchEngine()
+		_, searchEngine = GetEffectiveSearchEngine()
 		service.SetMaxReferences(referenceFlag)
 	}
 	service.CallLanguageModel(prompt, sys_prompt, files, modelInfo, searchEngine)
