@@ -259,7 +259,7 @@ func buildPrompt(prompt string, isThereAttachment bool) (string, []*service.File
 
 func processQuery(prompt string, files []*service.FileData) {
 	// Call your LLM service here
-	modelInfo := GetEffectiveModel()
+	_, modelInfo := GetEffectiveModel()
 	sys_prompt := GetEffectiveSystemPrompt()
 	var searchEngine map[string]any
 	if searchFlag != "" {

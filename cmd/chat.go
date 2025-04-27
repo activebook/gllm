@@ -208,7 +208,7 @@ type ChatInfo struct {
 
 func buildChatInfo(files []*service.FileData) *ChatInfo {
 
-	modelInfo := GetEffectiveModel()
+	_, modelInfo := GetEffectiveModel()
 	provider := service.DetectModelProvider(modelInfo["endpoint"].(string))
 	var cm service.ConversationManager
 	switch provider {
@@ -606,7 +606,7 @@ func (ci *ChatInfo) callLLM(input string) {
 	var finalPrompt strings.Builder
 	appendText(&finalPrompt, GetEffectiveTemplate())
 	appendText(&finalPrompt, input)
-	modelInfo := GetEffectiveModel()
+	_, modelInfo := GetEffectiveModel()
 	sys_prompt := GetEffectiveSystemPrompt()
 	var searchEngine map[string]any
 	if searchFlag != "" {
