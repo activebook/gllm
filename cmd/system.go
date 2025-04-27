@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/activebook/gllm/service"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -14,10 +13,6 @@ import (
 var (
 	plainSystemPrompt string
 )
-
-func SetPlainSystemPrompt(prompt string) {
-	plainSystemPrompt = prompt
-}
 
 // systemCmd represents the base command when called without any subcommands
 var systemCmd = &cobra.Command{
@@ -44,32 +39,35 @@ var systemListCmd = &cobra.Command{
 	Short:   "List all saved system prompt names",
 	Run: func(cmd *cobra.Command, args []string) {
 		sys_prompts := viper.GetStringMapString("system_prompts")
-		defaultSysPrompt := viper.GetString("default.system_prompt")
 
 		if len(sys_prompts) == 0 {
 			fmt.Println("No system prompts defined yet. Use 'gllm system add'.")
 			return
 		}
 
-		fmt.Println("Available system prompts:")
-		// Sort keys for consistent output
-		names := make([]string, 0, len(sys_prompts))
-		for name := range sys_prompts {
-			names = append(names, name)
-		}
-		sort.Strings(names)
+		verbose, _ := cmd.Flags().GetBool("verbose")
 
-		for _, name := range names {
-			indicator := " "
-			if name == defaultSysPrompt {
-				indicator = "*" // Mark the default prompt
+		if verbose {
+			names := make([]string, 0, len(sys_prompts))
+			for name := range sys_prompts {
+				names = append(names, name)
 			}
-			fmt.Printf(" %s %s\n", indicator, name)
-		}
-		if defaultSysPrompt != "" {
-			fmt.Println("\n(*) Indicates the default system prompt.")
+			sort.Strings(names)
+			fmt.Println("Available system prompts (with details):")
+			for _, name := range names {
+				fmt.Printf(" **%s**\n %s\n---\n", name, sys_prompts[name])
+			}
 		} else {
-			fmt.Println("\nNo default system prompt set.")
+			fmt.Println("Available system prompts:")
+			// Sort keys for consistent output
+			names := make([]string, 0, len(sys_prompts))
+			for name := range sys_prompts {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+			for _, name := range names {
+				fmt.Printf(" %s\n", name)
+			}
 		}
 	},
 }
@@ -188,13 +186,6 @@ var systemRemoveCmd = &cobra.Command{
 		delete(sys_prompts, name)
 		viper.Set("system_prompts", sys_prompts)
 
-		// Check if the removed prompt was the default
-		defaultSysPrompt := viper.GetString("default.system_prompt")
-		if name == defaultSysPrompt {
-			viper.Set("default.system_prompt", "") // Clear the default
-			fmt.Printf("Note: Removed system prompt '%s' was the default. Default system prompt cleared.\n", name)
-		}
-
 		// Write the config file
 		if err := writeConfig(); err != nil {
 			return fmt.Errorf("failed to save configuration after removing system prompt: %w", err)
@@ -238,9 +229,6 @@ gllm system clear --force`,
 		// Delete the prompt
 		viper.Set("system_prompts", sys_prompts)
 
-		// Check if the removed prompt was the default
-		viper.Set("default.system_prompt", "") // Clear the default
-
 		// Write the config file
 		if err := writeConfig(); err != nil {
 			return fmt.Errorf("failed to save configuration after clearing system prompts: %w", err)
@@ -251,115 +239,38 @@ gllm system clear --force`,
 	},
 }
 
-var systemDefaultCmd = &cobra.Command{
-	Use:     "default <name>",
-	Aliases: []string{"def"},
-	Short:   "Set the default system prompt to use",
-	Long: `Set the default system prompt to use.
-If no name is provided, the default system prompt will be cleared.
-Example:
-  gllm system default coder`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			// Clear the default
-			viper.Set("default.system_prompt", "")
-			// Write the config file
-			if err := writeConfig(); err != nil {
-				return fmt.Errorf("failed to save default system prompt setting: %w", err)
-			}
-			fmt.Println("Default system prompt cleared.")
-			return nil
-		}
-		name := args[0]
-		sys_prompts := viper.GetStringMapString("system_prompts")
-
-		// Check if the prompt exists before setting it as default
-		if _, exists := sys_prompts[name]; !exists {
-			return fmt.Errorf("system prompt named '%s' not found. Cannot set as default", name)
-		}
-
-		viper.Set("default.system_prompt", name)
-
-		// Write the config file
-		if err := writeConfig(); err != nil {
-			return fmt.Errorf("failed to save default system prompt setting: %w", err)
-		}
-
-		fmt.Printf("Default system prompt set to '%s' successfully.\n", name)
-		return nil
-	},
-}
-
 func GetAllSystemPrompts() string {
-	defaultName := viper.GetString("default.system_prompt")
 	sys_prompts := viper.GetStringMapString("system_prompts")
-
 	var pairs []string
 	for name, content := range sys_prompts {
-		if name == defaultName {
-			pairs = append(pairs, fmt.Sprintf("*%s*:\n\t%s\n", name, content))
-			continue
-		} else {
-			pairs = append(pairs, fmt.Sprintf("%s:\n\t%s\n", name, content))
-		}
+		pairs = append(pairs, fmt.Sprintf("%s:\n\t%s\n", name, content))
 	}
 	sort.Strings(pairs)
 	return strings.Join(pairs, "\n")
 }
 
-func SetEffectiveSystemPrompt(name string) error {
+func SetEffectiveSystemPrompt(sys string) error {
+	// Reset system prompt to empty
+	if sys == "" {
+		plainSystemPrompt = ""
+		return nil
+	}
+	// Check if the system prompt is a plain string or a named one
+	if strings.ContainsAny(sys, " \t\n") {
+		plainSystemPrompt = sys
+		return nil
+	}
 	sys_prompts := viper.GetStringMapString("system_prompts")
-	if _, ok := sys_prompts[name]; !ok {
-		return fmt.Errorf("system prompt named '%s' not found", name)
+	if _, ok := sys_prompts[sys]; !ok {
+		return fmt.Errorf("system prompt named '%s' not found", sys)
 	}
-	viper.Set("default.system_prompt", name)
-	if err := writeConfig(); err != nil {
-		return fmt.Errorf("failed to save default system prompt setting: %w", err)
-	}
+	plainSystemPrompt = sys_prompts[sys]
 	return nil
 }
 
 // New helper function to get the effective system prompt based on config
 func GetEffectiveSystemPrompt() string {
-	if plainSystemPrompt != "" {
-		return plainSystemPrompt
-	}
-
-	defaultName := viper.GetString("default.system_prompt")
-	if defaultName == "" {
-		// If no default, return empty string
-		return ""
-	}
-	sys_prompts := viper.GetStringMapString("system_prompts")
-
-	// 1. Check if defaultName is set and exists in prompts
-	if defaultName != "" {
-		if content, ok := sys_prompts[defaultName]; ok {
-			return content
-		}
-		// If default_prompt references a non-existent prompt, fall through
-		service.Warnf("Warning: Default system prompt '%s' not found in configuration. Falling back...", defaultName)
-	}
-
-	// 2. If no valid default, check if any prompts exist
-	if len(sys_prompts) > 0 {
-		// Try to get the "first" one. Map iteration order isn't guaranteed,
-		// but this fulfills the requirement loosely. Sorting keys gives consistency.
-		names := make([]string, 0, len(sys_prompts))
-		for name := range sys_prompts {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		if len(names) > 0 {
-			firstPromptName := names[0]
-			logger.Debugf("Using first available system prompt '%s' as fallback.\n", firstPromptName)
-			return sys_prompts[firstPromptName]
-		}
-	}
-
-	// 3. If no default and no prompts, use the hardcoded default
-	logger.Debugln("Using built-in default system prompt.")
-	return defaultSystemPromptContent // Use the constant defined in root.go
+	return plainSystemPrompt
 }
 
 func init() {
@@ -376,8 +287,9 @@ func init() {
 	systemCmd.AddCommand(systemInfoCmd)
 	systemCmd.AddCommand(systemRemoveCmd)
 	systemCmd.AddCommand(systemClearCmd)
-	systemCmd.AddCommand(systemDefaultCmd)
 
+	// Add flags for systemListCmd
+	systemListCmd.Flags().BoolP("verbose", "v", false, "Show system prompt names and their content")
 	// Add flags for promptAddCmd
 	systemAddCmd.Flags().StringP("name", "n", "", "Name for the new system prompt (required)")
 	systemAddCmd.Flags().StringP("content", "c", "", "Content/text of the new system prompt (required)")

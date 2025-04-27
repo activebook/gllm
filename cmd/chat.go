@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/activebook/gllm/service"
 	"github.com/chzyer/readline"
@@ -45,45 +46,25 @@ Special commands:
 
 			// If model flag is provided, update the default model
 			if cmd.Flags().Changed("model") {
-				if StartsWith(modelFlag, "@") {
-					modelFlag = RemoveFirst(modelFlag, "@")
-					if err := SetEffectiveModel(modelFlag); err != nil {
-						service.Warnf("%v", err)
-						fmt.Println("Using default model instead")
-					}
-				} else {
-					service.Warnf("model[%s] should start with @", modelFlag)
+				if err := SetEffectiveModel(modelFlag); err != nil {
+					service.Warnf("%v", err)
 					fmt.Println("Using default model instead")
 				}
 			}
 
 			// If system prompt is provided, update the default system prompt
 			if sysPromptFlag != "" {
-				if StartsWith(sysPromptFlag, "@") {
-					// Using set system prompt
-					sysPromptFlag = RemoveFirst(sysPromptFlag, "@")
-					if err := SetEffectiveSystemPrompt(sysPromptFlag); err != nil {
-						service.Warnf("%v", err)
-						fmt.Println("Using default system prompt instead")
-					}
-				} else {
-					// Using plain adhoc system prompt
-					SetPlainSystemPrompt(sysPromptFlag)
+				if err := SetEffectiveSystemPrompt(sysPromptFlag); err != nil {
+					service.Warnf("%v", err)
+					fmt.Println("Using default system prompt instead")
 				}
 			}
 
 			// If template is provided, update the default template
 			if templateFlag != "" {
-				if StartsWith(templateFlag, "@") {
-					// Using set template
-					templateFlag = RemoveFirst(templateFlag, "@")
-					if err := SetEffectiveTemplate(templateFlag); err != nil {
-						service.Warnf("%v", err)
-						fmt.Println("Using default template instead")
-					}
-				} else {
-					// Using plain adhoc template
-					SetPlainTemplate(templateFlag)
+				if err := SetEffectiveSystemPrompt(sysPromptFlag); err != nil {
+					service.Warnf("%v", err)
+					fmt.Println("Using default system prompt instead")
 				}
 			}
 
@@ -282,36 +263,20 @@ func (ci *ChatInfo) clearContext() {
 }
 
 func (ci *ChatInfo) setTemplate(template string) {
-	if StartsWith(template, "@") {
-		// Using set template
-		template = RemoveFirst(template, "@")
-		if err := SetEffectiveTemplate(template); err != nil {
-			service.Warnf("%v", err)
-			fmt.Println("Using default template instead")
-		} else {
-			fmt.Printf("Switched to template: %s\n", template)
-		}
+	if err := SetEffectiveTemplate(template); err != nil {
+		service.Warnf("%v", err)
+		fmt.Println("Ignore template prompt")
 	} else {
-		// Using plain adhoc system prompt
-		SetPlainTemplate(template)
-		fmt.Printf("Switched to adhoc template\nIf want to use a pre-defined template, use @template-name instead.\n")
+		fmt.Printf("Switched to template: %s\n", template)
 	}
 }
 
 func (ci *ChatInfo) setSystem(system string) {
-	if StartsWith(system, "@") {
-		// Using set system prompt
-		system = RemoveFirst(system, "@")
-		if err := SetEffectiveSystemPrompt(system); err != nil {
-			service.Warnf("%v", err)
-			fmt.Println("Using default system prompt instead")
-		} else {
-			fmt.Printf("Switched to system prompt: %s\n", system)
-		}
+	if err := SetEffectiveSystemPrompt(system); err != nil {
+		service.Warnf("%v", err)
+		fmt.Println("Igonre system prompt")
 	} else {
-		// Using plain adhoc system prompt
-		SetPlainSystemPrompt(system)
-		fmt.Printf("Switched to adhoc system prompt\nIf want to use a pre-defined system prompt, use @system-prompt-name instead.\n")
+		fmt.Printf("Switched to system prompt: %s\n", system)
 	}
 }
 
@@ -340,30 +305,37 @@ func (ci *ChatInfo) addAttachFiles(input string) {
 	// Split input into tokens
 	tokens := strings.Fields(input)
 
-	attachedAny := false
+	var wg sync.WaitGroup
+	var mu sync.Mutex
 	for i := 0; i < len(tokens); i++ {
 		if tokens[i] == "/a" {
 			if i+1 < len(tokens) {
+				// Check if there's a file path after /a
 				filePath := tokens[i+1]
 				i++ // Skip the file path token
 
-				// Verify file exists and is not a directory
-				if !checkIsLink(filePath) {
-					fileInfo, err := os.Stat(filePath)
-					if err != nil {
-						if os.IsNotExist(err) {
-							service.Errorf("File not found: %s\n", filePath)
-						} else {
-							service.Errorf("Error accessing file %s: %v\n", filePath, err)
-						}
-						continue
-					}
-					if fileInfo.IsDir() {
-						service.Errorf("Cannot attach directory: %s\n", filePath)
-						continue
-					}
+				wg.Add(1)
+				go func(filePath string) {
+					defer wg.Done()
 
+					// Verify file exists and is not a directory
+					if !checkIsLink(filePath) {
+						fileInfo, err := os.Stat(filePath)
+						if err != nil {
+							if os.IsNotExist(err) {
+								service.Errorf("File not found: %s\n", filePath)
+							} else {
+								service.Errorf("Error accessing file %s: %v\n", filePath, err)
+							}
+							return
+						}
+						if fileInfo.IsDir() {
+							service.Errorf("Cannot attach directory: %s\n", filePath)
+							return
+						}
+					}
 					// Check if file is already attached
+					mu.Lock()
 					found := false
 					for _, file := range ci.Files {
 						if file.Path() == filePath {
@@ -371,30 +343,36 @@ func (ci *ChatInfo) addAttachFiles(input string) {
 							break
 						}
 					}
+					mu.Unlock()
+					// If file is already attached, skip processing
 					if found {
 						service.Warnf("File already attached: %s", filePath)
-						continue
+						return
 					}
-				}
 
-				// Process the attachment
-				file := processAttachment(filePath)
-				if file == nil {
-					service.Errorf("Error loading attachment: %s\n", filePath)
-				} else {
+					// Process the attachment
+					file := processAttachment(filePath)
+					if file == nil {
+						service.Errorf("Error loading attachment: %s\n", filePath)
+						return
+					}
+
+					// Append the file to the list of attachments
+					mu.Lock()
 					ci.Files = append(ci.Files, file)
+					mu.Unlock()
 					fmt.Printf("Attachment loaded: %s\n", filePath)
-					attachedAny = true
-				}
+				}(filePath)
 			} else {
 				fmt.Println("Please specify a file path after /a")
 			}
 		}
 		// Ignore other tokens
 	}
+	wg.Wait()
 
-	if !attachedAny {
-		fmt.Println("No valid attachments were loaded")
+	if len(ci.Files) == 0 {
+		fmt.Println("No attachments were loaded")
 	}
 }
 
@@ -625,12 +603,27 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 
 func (ci *ChatInfo) callLLM(input string) {
 
-	prompt := input
+	var finalPrompt strings.Builder
+	appendText(&finalPrompt, GetEffectiveTemplate())
+	appendText(&finalPrompt, input)
 	modelInfo := GetEffectiveModel()
 	sys_prompt := GetEffectiveSystemPrompt()
 	var searchEngine map[string]any
 	if searchFlag != "" {
 		searchEngine = GetEffectiveSearchEngine()
 	}
-	service.CallLanguageModel(prompt, sys_prompt, ci.Files, modelInfo, searchEngine)
+	service.CallLanguageModel(finalPrompt.String(), sys_prompt, ci.Files, modelInfo, searchEngine)
+
+	// We must reset the files after processing
+	// We shouldn't pass the files to the next call each time
+	// Because the files are already in the context of this conversation
+	// The same to system prompt and template
+	// We shouldn't pass the system prompt and template to the next call each time
+
+	// Reset the files after processing
+	ci.Files = []*service.FileData{}
+	// Reset the system prompt
+	SetEffectiveSystemPrompt("")
+	// Reset the template
+	SetEffectiveTemplate("")
 }
