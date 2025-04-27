@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/activebook/gllm/service"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -15,8 +14,39 @@ var (
 	plainTemplate string
 )
 
-func SetPlainTemplate(prompt string) {
-	plainTemplate = prompt
+func GetAllTemplates() string {
+	templates := viper.GetStringMapString("templates")
+	var pairs []string
+	for name, content := range templates {
+		pairs = append(pairs, fmt.Sprintf("%s:\n\t%s\n", name, content))
+	}
+	sort.Strings(pairs)
+	return strings.Join(pairs, "\n")
+}
+
+func SetEffectiveTemplate(tmpl string) error {
+	// Reset template to empty
+	if tmpl == "" {
+		plainTemplate = ""
+		return nil
+	}
+	// Check if the template is a plain string or a named one
+	// If it contains spaces, tabs, or newlines, treat it as a plain string
+	if strings.ContainsAny(tmpl, " \t\n") {
+		plainTemplate = tmpl
+		return nil
+	}
+	templates := viper.GetStringMapString("templates")
+	if _, exists := templates[tmpl]; !exists {
+		return fmt.Errorf("template prompt named '%s' not found", tmpl)
+	}
+	plainTemplate = templates[tmpl]
+	return nil
+}
+
+// New helper function to get the effective template prompt based on config
+func GetEffectiveTemplate() string {
+	return plainTemplate
 }
 
 // templateCmd represents the base command when called without any subcommands
@@ -44,32 +74,36 @@ var templateListCmd = &cobra.Command{
 	Short:   "List all saved template prompt names",
 	Run: func(cmd *cobra.Command, args []string) {
 		templates := viper.GetStringMapString("templates")
-		defaultSysPrompt := viper.GetString("default.template")
 
 		if len(templates) == 0 {
 			fmt.Println("No template prompts defined yet. Use 'gllm template add'.")
 			return
 		}
 
-		fmt.Println("Available template prompts:")
-		// Sort keys for consistent output
-		names := make([]string, 0, len(templates))
-		for name := range templates {
-			names = append(names, name)
-		}
-		sort.Strings(names)
+		verbose, _ := cmd.Flags().GetBool("verbose")
 
-		for _, name := range names {
-			indicator := " "
-			if name == defaultSysPrompt {
-				indicator = "*" // Mark the default prompt
+		if verbose {
+			// Print name and details
+			names := make([]string, 0, len(templates))
+			for name := range templates {
+				names = append(names, name)
 			}
-			fmt.Printf(" %s %s\n", indicator, name)
-		}
-		if defaultSysPrompt != "" {
-			fmt.Println("\n(*) Indicates the default template prompt.")
+			sort.Strings(names)
+			fmt.Println("Available template prompts (with details):")
+			for _, name := range names {
+				fmt.Printf(" **%s**\n %s\n---\n", name, templates[name])
+			}
 		} else {
-			fmt.Println("\nNo default template prompt set.")
+			fmt.Println("Available template prompts:")
+			// Sort keys for consistent output
+			names := make([]string, 0, len(templates))
+			for name := range templates {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+			for _, name := range names {
+				fmt.Printf(" %s\n", name)
+			}
 		}
 	},
 }
@@ -188,13 +222,6 @@ var templateRemoveCmd = &cobra.Command{
 		delete(templates, name)
 		viper.Set("templates", templates)
 
-		// Check if the removed prompt was the default
-		defaultSysPrompt := viper.GetString("default.template")
-		if name == defaultSysPrompt {
-			viper.Set("default.template", "") // Clear the default
-			fmt.Printf("Note: Removed template prompt '%s' was the default. Default template prompt cleared.\n", name)
-		}
-
 		// Write the config file
 		if err := writeConfig(); err != nil {
 			return fmt.Errorf("failed to save configuration after removing template prompt: %w", err)
@@ -238,9 +265,6 @@ gllm template clear --force`,
 		// Delete the prompt
 		viper.Set("templates", templates)
 
-		// Check if the removed prompt was the default
-		viper.Set("default.template", "") // Clear the default
-
 		// Write the config file
 		if err := writeConfig(); err != nil {
 			return fmt.Errorf("failed to save configuration after clearing template prompts: %w", err)
@@ -249,115 +273,6 @@ gllm template clear --force`,
 		fmt.Println("All template prompts have been cleared.")
 		return nil
 	},
-}
-
-var templateDefaultCmd = &cobra.Command{
-	Use:     "default <name>",
-	Aliases: []string{"def"},
-	Short:   "Set the default template prompt to use",
-	Long: `Set the default template prompt to use.
-If no name is provided, the default template prompt will be cleared.
-Example:
-  gllm template default coder`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			viper.Set("default.template", "")
-			// Write the config file
-			if err := writeConfig(); err != nil {
-				return fmt.Errorf("failed to clear default template prompt: %w", err)
-			}
-			fmt.Println("Default template prompt cleared.")
-			return nil
-		}
-		name := args[0]
-		templates := viper.GetStringMapString("templates")
-
-		// Check if the prompt exists before setting it as default
-		if _, exists := templates[name]; !exists {
-			return fmt.Errorf("template prompt named '%s' not found. Cannot set as default", name)
-		}
-
-		viper.Set("default.template", name)
-
-		// Write the config file
-		if err := writeConfig(); err != nil {
-			return fmt.Errorf("failed to save default template prompt setting: %w", err)
-		}
-
-		fmt.Printf("Default template prompt set to '%s' successfully.\n", name)
-		return nil
-	},
-}
-
-func GetAllTemplates() string {
-	defaultName := viper.GetString("default.template")
-	templates := viper.GetStringMapString("templates")
-	var pairs []string
-	for name, content := range templates {
-		if name == defaultName {
-			pairs = append(pairs, fmt.Sprintf("*%s*:\n\t%s\n", name, content))
-			continue
-		} else {
-			pairs = append(pairs, fmt.Sprintf("%s:\n\t%s\n", name, content))
-		}
-	}
-	sort.Strings(pairs)
-	return strings.Join(pairs, "\n")
-}
-
-func SetEffectiveTemplate(name string) error {
-	templates := viper.GetStringMapString("templates")
-	if _, exists := templates[name]; !exists {
-		return fmt.Errorf("template prompt named '%s' not found", name)
-	}
-	viper.Set("default.template", name)
-	if err := writeConfig(); err != nil {
-		return fmt.Errorf("failed to save default template prompt setting: %w", err)
-	}
-	return nil
-}
-
-// New helper function to get the effective template prompt based on config
-func GetEffectiveTemplate() string {
-	if plainTemplate != "" {
-		return plainTemplate
-	}
-
-	defaultName := viper.GetString("default.template")
-	if defaultName == "" {
-		// No default set, return empty string
-		return ""
-	}
-	templates := viper.GetStringMapString("templates")
-
-	// 1. Check if defaultName is set and exists in prompts
-	if defaultName != "" {
-		if content, ok := templates[defaultName]; ok {
-			return content
-		}
-		// If default_prompt references a non-existent prompt, fall through
-		service.Warnf("Warning: Default template prompt '%s' not found in configuration. Falling back...", defaultName)
-	}
-
-	// 2. If no valid default, check if any prompts exist
-	if len(templates) > 0 {
-		// Try to get the "first" one. Map iteration order isn't guaranteed,
-		// but this fulfills the requirement loosely. Sorting keys gives consistency.
-		names := make([]string, 0, len(templates))
-		for name := range templates {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		if len(names) > 0 {
-			firstPromptName := names[0]
-			logger.Debugf("Using first available template prompt '%s' as fallback.\n", firstPromptName)
-			return templates[firstPromptName]
-		}
-	}
-
-	// 3. If no default and no prompts, use the hardcoded default
-	logger.Debugln("Using built-in default template prompt.")
-	return defaultTemplateContent // Use the constant defined in root.go
 }
 
 func init() {
@@ -371,8 +286,9 @@ func init() {
 	templateCmd.AddCommand(templateInfoCmd)
 	templateCmd.AddCommand(templateRemoveCmd)
 	templateCmd.AddCommand(templateClearCmd)
-	templateCmd.AddCommand(templateDefaultCmd)
 
+	// Add flags for templateListCmd
+	templateListCmd.Flags().BoolP("verbose", "v", false, "Show template names and their content")
 	// Add flags for promptAddCmd
 	templateAddCmd.Flags().StringP("name", "n", "", "Name for the new template prompt (required)")
 	templateAddCmd.Flags().StringP("content", "c", "", "Content/text of the new template prompt (required)")

@@ -99,45 +99,25 @@ Configure your API keys and preferred models, then start chatting or executing c
 
 				// If model flag is provided, update the default model
 				if cmd.Flags().Changed("model") {
-					if StartsWith(modelFlag, "@") {
-						modelFlag = RemoveFirst(modelFlag, "@")
-						if err := SetEffectiveModel(modelFlag); err != nil {
-							service.Warnf("%v", err)
-							fmt.Println("Using default model instead")
-						}
-					} else {
-						service.Warnf("model[%s] should start with @", modelFlag)
+					if err := SetEffectiveModel(modelFlag); err != nil {
+						service.Warnf("%v", err)
 						fmt.Println("Using default model instead")
 					}
 				}
 
 				// If system prompt is provided, update the default system prompt
 				if sysPromptFlag != "" {
-					if StartsWith(sysPromptFlag, "@") {
-						// Using set system prompt
-						sysPromptFlag = RemoveFirst(sysPromptFlag, "@")
-						if err := SetEffectiveSystemPrompt(sysPromptFlag); err != nil {
-							service.Warnf("%v", err)
-							fmt.Println("Using default system prompt instead")
-						}
-					} else {
-						// Using plain adhoc system prompt
-						SetPlainSystemPrompt(sysPromptFlag)
+					if err := SetEffectiveSystemPrompt(sysPromptFlag); err != nil {
+						service.Warnf("%v", err)
+						fmt.Println("Ignore system prompt")
 					}
 				}
 
 				// If template is provided, update the default template
 				if templateFlag != "" {
-					if StartsWith(templateFlag, "@") {
-						// Using set template
-						templateFlag = RemoveFirst(templateFlag, "@")
-						if err := SetEffectiveTemplate(templateFlag); err != nil {
-							service.Warnf("%v", err)
-							fmt.Println("Using default template instead")
-						}
-					} else {
-						// Using plain adhoc template
-						SetPlainTemplate(templateFlag)
+					if err := SetEffectiveTemplate(templateFlag); err != nil {
+						service.Warnf("%v", err)
+						fmt.Println("Ignore template prompt")
 					}
 				}
 
@@ -262,8 +242,8 @@ func buildPrompt(prompt string, isThereAttachment bool) (string, []*service.File
 	files := []*service.FileData{}
 
 	// Add user prompt and template
-	appendText(&finalPrompt, prompt)
 	appendText(&finalPrompt, GetEffectiveTemplate())
+	appendText(&finalPrompt, prompt)
 
 	if isThereAttachment {
 		// Process attachments

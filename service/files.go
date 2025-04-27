@@ -117,6 +117,24 @@ func GetMIMEType(filePath string) string {
 	if mimeType == "" {
 		// Default MIME types for common extensions not in the mime package
 		switch ext {
+		case ".json":
+			return "application/json"
+		case ".sh":
+			return "application/x-sh"
+		case ".csh":
+			return "application/x-csh"
+		case ".pl":
+			return "application/x-perl"
+		case ".rb":
+			return "application/x-ruby"
+		case ".php":
+			return "application/x-php"
+		case ".sql":
+			return "application/sql"
+		case ".go":
+			return "text/x-go"
+		case ".java":
+			return "text/x-java"
 		case ".xlsx":
 			return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 		case ".xls":
@@ -139,6 +157,10 @@ func GetMIMEType(filePath string) string {
 			return "text/csv"
 		case ".xml":
 			return "text/xml"
+		case ".yaml":
+			return "text/yaml"
+		case ".yml":
+			return "text/yaml"
 		case ".rtf":
 			return "text/rtf"
 		case ".mp3":
@@ -201,11 +223,26 @@ func IsTextMIMEType(mimeType string) bool {
 		"application/x-sh",
 		"application/x-csh",
 		"application/x-perl",
+		"application/x-shellscript",
+		"application/x-tcl",
+		"application/x-bash",
+		"application/x-awk",
+		"application/x-sql",
+		"application/x-php",
 		"application/x-httpd-php",
 		"application/x-ruby",
 		"application/x-markdown",
+		"text/html",
+		"text/plain",
+		"text/csv",
+		"text/rtf",
+		"text/xml",
+		"text/css",
+		"text/yaml",
 		"text/md",
-		"text/markdown":
+		"text/markdown",
+		"text/java",
+		"text/go":
 		return true
 	}
 	// Exclude known binary types
