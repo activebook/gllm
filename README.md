@@ -48,9 +48,9 @@ brew upgrade gllm
 
 ```sh
 gllm "What is Go?"               # Default model & system prompt
-gllm "Where is the best place to visit in London?" -m @gpt4o # Switch model
-gllm "How to find a process and terminate it?" -t @shellmate  # Use shellmate prompt to specific shell question
-gllm -s "Who's the POTUS right now? and check what's his latest tariff policy" -m @gemini-pro -r 10 # Use Gemini model to search and set max references to 10
+gllm "Where is the best place to visit in London?" -m gpt4o # Switch model
+gllm "How to find a process and terminate it?" -t shellmate  # Use shellmate prompt to specific shell question
+gllm -s "Who's the POTUS right now? and check what's his latest tariff policy" -m gemini-pro -r 10 # Use Gemini model to search and set max references to 10
 ```
 
 ### 🔹 Attachments (Files, Image, Urls)
@@ -66,7 +66,7 @@ gllm "Transcribe this audio" -a speech.mp3  # Use audil as input (only for gemin
 
 ```sh
 gllm "Who is the President of the United States right now?" --search # Use search to find latest news
-gllm "Who is he/she in this photo? And what is his/her current title?" -s -a "face.png" --model @gemini # Use vision model and search engine to find people in image
+gllm "Who is he/she in this photo? And what is his/her current title?" -s -a "face.png" --model gemini # Use vision model and search engine to find people in image
 gllm "When was gpt4.5 released?" --search=google # Use specific search engine to find latest news
 ```
 
@@ -87,7 +87,7 @@ These models handle chat messages differently, and mixing them will lead to unex
 
 ```sh
 gllm chat                       # Start chat with defaults
-gllm chat -m @gpt4o             # Start chat with a specific model
+gllm chat -m gpt4o             # Start chat with a specific model
 gllm chat --sys-prompt coder    # Use a named system prompt
 gllm chat -c my_chat            # Start a new chat session
 gllm chat -c 1                  # Follow a previous chat session with a convo index
@@ -102,8 +102,8 @@ gllm> /clear, /reset  # Clear context
 gllm> /help           # Show available commands
 gllm> /history /h [num] [chars]   # Show recent conversation history (default: 20 messages, 200 chars)
 gllm> /markdown, /mark [on|off|only]  # Switch whether to render markdown or not
-gllm> /system, /S [@name|prompt]  # change system prompt
-gllm> /template, /t [@name|tmpl]  # change template
+gllm> /system, /S [name|prompt]  # change system prompt
+gllm> /template, /t [name|tmpl]  # change template
 gllm> /search, /s [search_engine] # select a search engine to use
 gllm> /reference. /r [num]        # change link reference count
 gllm> /attach, /a [filename]      # Attach a file to the chat session
@@ -115,9 +115,9 @@ gllm> /detach, /d [filename|all]  # Detach a file to the chat session
 ### 🔹 Prompt Templates
 
 ```sh
-gllm --template @coder              # Use predefined coder prompt
+gllm --template coder              # Use predefined coder prompt
 gllm "Act as shell" --system-prompt "You are a Linux shell..."
-gllm --system-prompt @shell-assistant --template @shellmate
+gllm --system-prompt shell-assistant --template shellmate
 ```
 
 ### 🔹 Configuration Management
@@ -196,7 +196,7 @@ echo "Who's the POTUS right now?" | gllm -s # Use std input as search query
 ### 🔹 Python code execution (only for gemini2.0)
 
 ```sh
-gllm --code "import time\\nstart = time.time()\\nis_prime = lambda n: n > 1 and all(n % d for d in range(2, int(n**0.5) + 1))\\nLIMIT = 100000\\ncount = sum(1 for x in range(LIMIT) if is_prime(x))\\nend = time.time()\\nprint(f'Number of primes less than {LIMIT}: {count}')\\nprint(f'Time taken: {end - start:.2f} seconds')" -m @gemini2.5
+gllm --code "import time\\nstart = time.time()\\nis_prime = lambda n: n > 1 and all(n % d for d in range(2, int(n**0.5) + 1))\\nLIMIT = 100000\\ncount = sum(1 for x in range(LIMIT) if is_prime(x))\\nend = time.time()\\nprint(f'Number of primes less than {LIMIT}: {count}')\\nprint(f'Time taken: {end - start:.2f} seconds')" -m gemini2.5
 ```
 
 ### 🔹 Version Information
