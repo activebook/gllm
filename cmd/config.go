@@ -167,35 +167,24 @@ and all default settings (e.g., default model, default system prompt, default te
 		printSection("Default Configuration")
 
 		// Default System Prompt
-		fmt.Println("\nMarkdown Format:")
 		mark := GetMarkdownSwitch()
-		fmt.Printf("%v\n", mark)
+		fmt.Printf("\nMarkdown Format: %v\n", mark)
 
 		// Default Model
-		fmt.Println("\nDefault Model:")
-		model := GetEffectiveModel()
+		modelName, modelInfo := GetEffectiveModel()
+		fmt.Printf("\nDefault Model: %v\n", modelName)
 
 		// Format the model data as a table
 		fmt.Fprintln(w, " PROPERTY \t VALUE ")
 		fmt.Fprintln(w, "----------\t-------")
-		for property, value := range model {
+		for property, value := range modelInfo {
 			fmt.Fprintf(w, "%s\t%v\n", property, value)
 		}
 		w.Flush()
 
-		// Default System Prompt
-		fmt.Println("\nDefault System Prompt:")
-		prompt := GetEffectiveSystemPrompt()
-		fmt.Printf("%v\n", prompt)
-
-		// Default Template
-		fmt.Println("\nDefault Template:")
-		template := GetEffectiveTemplate()
-		fmt.Printf("%v\n", template)
-
 		// Default Search Engine
-		fmt.Println("\nDefault Search Engine:")
-		searchEngine := GetEffectiveSearchEngine()
+		searchName, searchEngine := GetEffectiveSearchEngine()
+		fmt.Printf("\nDefault Search Engine: %v\n", searchName)
 		fmt.Fprintln(w, " PROPERTY \t VALUE ")
 		fmt.Fprintln(w, "----------\t-------")
 		pairs := []string{}

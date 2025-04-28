@@ -415,7 +415,7 @@ func GetEffectModelName() string {
 }
 
 // GetEffectiveModel returns the configuration for the model to use
-func GetEffectiveModel() map[string]any {
+func GetEffectiveModel() (name string, details map[string]any) {
 	defaultName := viper.GetString("default.model")
 	modelsMap := viper.GetStringMap("models")
 
@@ -424,7 +424,7 @@ func GetEffectiveModel() map[string]any {
 		if modelConfig, ok := modelsMap[defaultName]; ok {
 			// Convert the map[string]interface{} to map[string]string
 			if configMap, ok := modelConfig.(map[string]interface{}); ok {
-				return configMap
+				return defaultName, configMap
 			}
 			service.Warnf("Warning: Default model '%s' has invalid configuration format", defaultName)
 		} else {
@@ -445,12 +445,12 @@ func GetEffectiveModel() map[string]any {
 
 		if modelConfig, ok := modelsMap[firstModelName]; ok {
 			if configMap, ok := modelConfig.(map[string]interface{}); ok {
-				return configMap
+				return firstModelName, configMap
 			}
 		}
 	}
 
 	// 3. No models available
 	logger.Debugln("No model to use!")
-	return nil
+	return "", nil
 }
