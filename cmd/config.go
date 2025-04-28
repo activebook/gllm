@@ -9,6 +9,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/activebook/gllm/service"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -60,33 +61,27 @@ var configPathCmd = &cobra.Command{
 // configModelCmd represents the config model command (stub for now)
 var configPrintCmd = &cobra.Command{
 	Use:     "print",
-	Aliases: []string{"pr", "all", "list", "ls"}, // Optional alias
+	Aliases: []string{"pr", "all", "list", "ls"},
 	Short:   "Print all configurations",
-	Long: `Print all configuration including all LLM models, system prompts, and templates.
-and all default settings (e.g., default model, default system prompt, default template).`,
+	Long:    `Print all configuration including all LLM models, system prompts, and templates. and all default settings (e.g., default model, default system prompt, default template).`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Create a tabwriter for formatted tabular output
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
-		// Helper function to print section headers
+		sectionColor := color.New(color.FgCyan, color.Bold).SprintFunc()
+		headerColor := color.New(color.FgYellow, color.Bold).SprintFunc()
+		highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
+		keyColor := color.New(color.FgMagenta, color.Bold).SprintFunc()
+
 		printSection := func(title string) {
 			fmt.Println()
-
-			// Calculate the full title with decorations
 			fullTitle := fmt.Sprintf("=== %s ===", strings.ToUpper(title))
-
-			// Calculate padding needed to center
 			lineWidth := 50
 			padding := (lineWidth - len(fullTitle)) / 2
-
-			// If padding is negative (title too long), ensure it's at least 0
 			if padding < 0 {
 				padding = 0
 			}
-
-			// Print the centered title
-			fmt.Printf("%s%s\n", strings.Repeat(" ", padding), fullTitle)
-			fmt.Println(strings.Repeat("-", lineWidth))
+			fmt.Printf("%s%s\n", strings.Repeat(" ", padding), sectionColor(fullTitle))
+			fmt.Println(color.New(color.FgCyan).Sprint(strings.Repeat("-", lineWidth)))
 		}
 
 		printSection("CONFIGURATION SUMMARY")
@@ -97,17 +92,14 @@ and all default settings (e.g., default model, default system prompt, default te
 		if err != nil {
 			service.Errorf("Error retrieving models: %s\n", err)
 		} else {
-			// Print headers for the table
-			fmt.Fprintln(w, " MODEL \t SETTINGS ")
-			fmt.Fprintln(w, "-------\t----------")
-
-			// Print model data
+			fmt.Fprintln(w, headerColor(" MODEL ")+"\t"+headerColor(" SETTINGS "))
+			fmt.Fprintln(w, headerColor("-------")+"\t"+headerColor("----------"))
 			defaultName := GetEffectModelName()
 			for name, settings := range models {
 				if name == defaultName {
-					fmt.Fprintf(w, "*%s*%v\n", name, settings)
+					fmt.Fprintf(w, "%s\t%v\n", highlightColor("*"+name+"*"), settings)
 				} else {
-					fmt.Fprintf(w, "%s%v\n", name, settings)
+					fmt.Fprintf(w, "%s\t%v\n", keyColor(name), settings)
 				}
 			}
 			w.Flush()
@@ -116,88 +108,83 @@ and all default settings (e.g., default model, default system prompt, default te
 		// System Prompts section
 		printSection("System Prompts")
 		sysPrompts := GetAllSystemPrompts()
-
-		// Print headers for the table
-		fmt.Fprintln(w, " NAME \t CONTENT ")
-		fmt.Fprintln(w, "------\t---------")
-
-		// Handle system prompts based on their structure
+		fmt.Fprintln(w, headerColor(" NAME ")+"\t"+headerColor(" CONTENT "))
+		fmt.Fprintln(w, headerColor("------")+"\t"+headerColor("---------"))
 		fmt.Fprintf(w, "%v\n", sysPrompts)
 		w.Flush()
 
 		// Templates section
 		printSection("Templates")
 		templates := GetAllTemplates()
-
-		// Print headers for the table
-		fmt.Fprintln(w, " NAME \t CONTENT ")
-		fmt.Fprintln(w, "------\t---------")
-
-		// Handle templates based on their structure
+		fmt.Fprintln(w, headerColor(" NAME ")+"\t"+headerColor(" CONTENT "))
+		fmt.Fprintln(w, headerColor("------")+"\t"+headerColor("---------"))
 		fmt.Fprintf(w, "%v\n", templates)
 		w.Flush()
 
 		// Search Engines section
 		printSection("Search Engines")
 		searchEngines := GetAllSearchEngines()
-		fmt.Fprintln(w, " Search \t SETTINGS ")
-		fmt.Fprintln(w, "-------\t----------")
-		// Print model data
-		defaultName := GetEffectSearchEnginelName()
+		fmt.Fprintln(w, headerColor(" Search ")+"\t"+headerColor(" SETTINGS "))
+		fmt.Fprintln(w, headerColor("-------")+"\t"+headerColor("----------"))
+		defaultSearch := GetEffectSearchEnginelName()
 		for name, settings := range searchEngines {
-			if name == defaultName {
-				fmt.Fprintf(w, "*%s*%v\n", name, settings)
+			coloredName := name
+			if name == defaultSearch {
+				coloredName = highlightColor("*" + name + "*")
 			} else {
-				fmt.Fprintf(w, "%s%v\n", name, settings)
+				coloredName = keyColor(name)
 			}
+			fmt.Fprintf(w, "%s\t%s\n", coloredName, (fmt.Sprintf("%v", settings)))
 		}
 		w.Flush()
 
 		// Plugins section
 		printSection("Plugins")
 		plugins := GetLoadedPlugins()
-		fmt.Fprintln(w, " Plugin \t Loaded ")
-		fmt.Fprintln(w, "-------\t----------")
+		fmt.Fprintln(w, headerColor(" Plugin ")+"\t"+headerColor(" Loaded "))
+		fmt.Fprintln(w, headerColor("-------")+"\t"+headerColor("----------"))
 		for name, loaded := range plugins {
-			fmt.Fprintf(w, "%s\t%v\n", name, loaded)
+			loadedStr := highlightColor("Yes")
+			if !loaded {
+				loadedStr = color.New(color.FgRed, color.Bold).Sprint("No")
+			}
+			fmt.Fprintf(w, "%s\t%s\n", keyColor(name), loadedStr)
 		}
 		w.Flush()
 
 		// Default Configuration section
 		printSection("Default Configuration")
 
-		// Default System Prompt
 		mark := GetMarkdownSwitch()
-		fmt.Printf("\nMarkdown Format: %v\n", mark)
+		fmt.Printf("\n%s: %v\n", keyColor("Markdown Format"), mark)
 
-		// Default Model
 		modelName, modelInfo := GetEffectiveModel()
-		fmt.Printf("\nDefault Model: %v\n", modelName)
-
-		// Format the model data as a table
-		fmt.Fprintln(w, " PROPERTY \t VALUE ")
-		fmt.Fprintln(w, "----------\t-------")
+		fmt.Printf("\n%s: %v\n", keyColor("Default Model"), highlightColor(modelName))
+		fmt.Fprintln(w, headerColor(" PROPERTY ")+"\t"+headerColor(" VALUE "))
+		fmt.Fprintln(w, headerColor("----------")+"\t"+headerColor("-------"))
 		for property, value := range modelInfo {
-			fmt.Fprintf(w, "%s\t%v\n", property, value)
+			fmt.Fprintf(w, "%s\t%s\n", keyColor(property), (fmt.Sprintf("%v", value)))
 		}
 		w.Flush()
 
-		// Default Search Engine
 		searchName, searchEngine := GetEffectiveSearchEngine()
-		fmt.Printf("\nDefault Search Engine: %v\n", searchName)
-		fmt.Fprintln(w, " PROPERTY \t VALUE ")
-		fmt.Fprintln(w, "----------\t-------")
-		pairs := []string{}
+		fmt.Printf("\n%s: %v\n", keyColor("Default Search Engine"), (searchName))
+		fmt.Fprintln(w, headerColor(" PROPERTY ")+"\t"+headerColor(" VALUE "))
+		fmt.Fprintln(w, headerColor("----------")+"\t"+headerColor("-------"))
+		pairs := []struct{ k, v string }{}
 		for property, value := range searchEngine {
-			pairs = append(pairs, fmt.Sprintf("%s\t%v", property, value))
+			pairs = append(pairs, struct{ k, v string }{
+				keyColor(property),
+				highlightColor(fmt.Sprintf("%v", value)),
+			})
 		}
-		sort.Sort(sort.Reverse(sort.StringSlice(pairs)))
+		sort.Slice(pairs, func(i, j int) bool { return pairs[i].k > pairs[j].k })
 		for _, pair := range pairs {
-			fmt.Fprintln(w, pair)
+			fmt.Fprintf(w, "%s\t%s\n", pair.k, pair.v)
 		}
 		w.Flush()
 
-		fmt.Println(strings.Repeat("=", 50))
+		fmt.Println(color.New(color.FgCyan, color.Bold).Sprint(strings.Repeat("=", 50)))
 	},
 }
 

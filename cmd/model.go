@@ -388,6 +388,7 @@ func GetAllModels() (map[string]string, error) {
 			for k, v := range configMap {
 				pairs = append(pairs, fmt.Sprintf("\t%s: %v", k, v))
 			}
+			sort.Strings(pairs)
 			models[k] = strings.Join(pairs, "\n")
 		} else {
 			return nil, fmt.Errorf("invalid model configuration for '%s'", k)
