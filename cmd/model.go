@@ -21,6 +21,9 @@ func init() {
 	modelCmd.AddCommand(modelClearCmd)
 	modelCmd.AddCommand(modelDefaultCmd)
 
+	// Add flags to the list command
+	modelListCmd.Flags().BoolP("verbose", "v", false, "Show model names and their content")
+
 	// Add required flags to the add command
 	modelAddCmd.Flags().StringP("name", "n", "", "Model name (required)")
 	modelAddCmd.Flags().StringP("endpoint", "e", "", "API endpoint URL (required)")
