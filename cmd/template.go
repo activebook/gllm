@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -73,6 +74,7 @@ var templateListCmd = &cobra.Command{
 	Aliases: []string{"ls"},
 	Short:   "List all saved template prompt names",
 	Run: func(cmd *cobra.Command, args []string) {
+		keyColor := color.New(color.FgMagenta, color.Bold).SprintFunc()
 		templates := viper.GetStringMapString("templates")
 
 		if len(templates) == 0 {
@@ -91,7 +93,7 @@ var templateListCmd = &cobra.Command{
 			sort.Strings(names)
 			fmt.Println("Available template prompts (with details):")
 			for _, name := range names {
-				fmt.Printf(" **%s**\n %s\n---\n", name, templates[name])
+				fmt.Printf(" %s\n %s\n\n", keyColor(name), templates[name])
 			}
 		} else {
 			fmt.Println("Available template prompts:")
@@ -102,7 +104,7 @@ var templateListCmd = &cobra.Command{
 			}
 			sort.Strings(names)
 			for _, name := range names {
-				fmt.Printf(" %s\n", name)
+				fmt.Printf(" %s\n", keyColor(name))
 			}
 		}
 	},
