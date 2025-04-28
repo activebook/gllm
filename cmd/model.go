@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/service"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -71,28 +72,44 @@ var modelListCmd = &cobra.Command{
 	Aliases: []string{"ls"},
 	Short:   "List all set models",
 	Run: func(cmd *cobra.Command, args []string) {
-		models := viper.GetStringMapString("models")
+		highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
+		keyColor := color.New(color.FgMagenta, color.Bold).SprintFunc()
+		modelsMap := viper.GetStringMap("models")
 		defaultModel := viper.GetString("default.model")
 
-		if len(models) == 0 {
+		if len(modelsMap) == 0 {
 			fmt.Println("No model defined yet. Use 'gllm model add'.")
 			return
 		}
 
+		verbose, _ := cmd.Flags().GetBool("verbose")
+
 		fmt.Println("Available models:")
 		// Sort keys for consistent output
-		names := make([]string, 0, len(models))
-		for name := range models {
+		names := make([]string, 0, len(modelsMap))
+		for name := range modelsMap {
 			names = append(names, name)
 		}
 		sort.Strings(names)
 
 		for _, name := range names {
 			indicator := " "
+			pname := ""
 			if name == defaultModel {
-				indicator = "*" // Mark the default model
+				indicator = highlightColor("*") // Mark the default model
+				pname = highlightColor(name)
+			} else {
+				indicator = " "
+				pname = keyColor(name)
 			}
-			fmt.Printf(" %s %s\n", indicator, name)
+			fmt.Printf(" %s %s\n", indicator, pname)
+			if verbose {
+				if configMap, ok := modelsMap[name].(map[string]interface{}); ok {
+					for key, value := range configMap {
+						fmt.Printf("\t%s: %v\n", key, value)
+					}
+				}
+			}
 		}
 		if defaultModel != "" {
 			fmt.Println("\n(*) Indicates the default model.")
