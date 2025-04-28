@@ -168,14 +168,14 @@ var configPrintCmd = &cobra.Command{
 		w.Flush()
 
 		searchName, searchEngine := GetEffectiveSearchEngine()
-		fmt.Printf("\n%s: %v\n", keyColor("Default Search Engine"), (searchName))
+		fmt.Printf("\n%s: %v\n", keyColor("Default Search Engine"), highlightColor(searchName))
 		fmt.Fprintln(w, headerColor(" PROPERTY ")+"\t"+headerColor(" VALUE "))
 		fmt.Fprintln(w, headerColor("----------")+"\t"+headerColor("-------"))
 		pairs := []struct{ k, v string }{}
 		for property, value := range searchEngine {
 			pairs = append(pairs, struct{ k, v string }{
 				keyColor(property),
-				highlightColor(fmt.Sprintf("%v", value)),
+				(fmt.Sprintf("%v", value)),
 			})
 		}
 		sort.Slice(pairs, func(i, j int) bool { return pairs[i].k > pairs[j].k })
