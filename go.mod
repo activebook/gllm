@@ -12,9 +12,9 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
-	github.com/volcengine/volcengine-go-sdk v1.1.4
+	github.com/volcengine/volcengine-go-sdk v1.1.17
 	google.golang.org/api v0.230.0
-	google.golang.org/genai v1.1.0
+	google.golang.org/genai v1.11.1
 )
 
 require (
