@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/utils"
@@ -553,21 +554,11 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 					}
 
 					// Handle streaming tool call parts
-					if id == "" && lastCallId != "" {
-						// Continue with previous tool call
-						if tc, exists := toolCalls[lastCallId]; exists {
-							tc.Function.Arguments += toolCall.Function.Arguments
-							toolCalls[lastCallId] = tc
-						}
-					} else if id != "" {
-						// Create or update a tool call
+					// Corrected: Removed the extra '}' that was here.
+					if id != "" { // This handles the start of a new tool call with an ID
 						lastCallId = id
-						if tc, exists := toolCalls[id]; exists {
-							tc.Function.Arguments += toolCall.Function.Arguments
-							toolCalls[id] = tc
-						} else {
-							// Prepare to receive tool call arguments
-							c.proc <- StreamNotify{Status: StatusProcessing}
+						if _, exists := toolCalls[id]; !exists {
+							c.proc <- StreamNotify{Status: StatusProcessing} // Notify only for new tool calls
 							toolCalls[id] = model.ToolCall{
 								ID:   id,
 								Type: model.ToolTypeFunction,
@@ -576,6 +567,34 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 									Arguments: toolCall.Function.Arguments,
 								},
 							}
+						} else {
+							// This case should ideally not happen if IDs are unique per call segment.
+							// If it does, it means we are receiving arguments for an existing call ID.
+							tc := toolCalls[id]
+							tc.Function.Arguments += toolCall.Function.Arguments
+							toolCalls[id] = tc
+						}
+					} else if id == "" && toolCall.Function.Name != "" { // Start of a new tool call, but ID is missing in the first delta
+						// This is a new case: if ID is initially empty but function name is present,
+						// it's likely a new call that needs an ID.
+						// Or, if the API guarantees an ID later, this might need adjustment.
+						// For now, generate an ID if it's missing for a new named function call.
+						generatedID := uuid.New().String()
+						lastCallId = generatedID
+						c.proc <- StreamNotify{Status: StatusProcessing} // Notify for new tool calls
+						toolCalls[generatedID] = model.ToolCall{
+							ID:   generatedID,
+							Type: model.ToolTypeFunction,
+							Function: model.FunctionCall{
+								Name:      toolCall.Function.Name,
+								Arguments: toolCall.Function.Arguments,
+							},
+						}
+					} else if id == "" && lastCallId != "" { // Continuation of a tool call identified by lastCallId
+						// This is the original logic for streaming arguments for an ongoing call
+						if tc, exists := toolCalls[lastCallId]; exists {
+							tc.Function.Arguments += toolCall.Function.Arguments
+							toolCalls[lastCallId] = tc
 						}
 					}
 				}
