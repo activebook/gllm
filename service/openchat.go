@@ -430,6 +430,9 @@ func (c *OpenChat) process() error {
 			Temperature: &c.temperature,
 			Messages:    convo.Messages,
 			Tools:       c.tools,
+			// Thinking: &model.Thinking{
+			// 	Type: model.ThinkingTypeAuto,
+			// },
 		}
 
 		// Make the streaming request
