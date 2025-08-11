@@ -625,11 +625,12 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		return nil, fmt.Errorf("error parsing arguments: %v", err)
 	}
 
-	if toolCall.Function.Name == "execute_command" {
+	switch toolCall.Function.Name {
+	case "execute_command":
 		return c.processCommandToolCalls(&toolCall, &argsMap)
-	} else if toolCall.Function.Name == "web_search" {
+	case "web_search":
 		return c.processSearchToolCalls(&toolCall, &argsMap)
-	} else {
+	default:
 		return nil, fmt.Errorf("unknown function name: %s", toolCall.Function.Name)
 	}
 }

@@ -8,7 +8,7 @@ import (
 	openai "github.com/sashabaranov/go-openai"
 )
 
-func main() {
+func dummapi() {
 	cfg := openai.DefaultConfig(os.Getenv("OPENAI_API_KEY"))
 	cfg.BaseURL = "https://api.groq.com/openai/v1"
 	client := openai.NewClientWithConfig(cfg)
