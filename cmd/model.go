@@ -48,6 +48,16 @@ func init() {
 	modelClearCmd.Flags().BoolP("force", "f", false, "Clear all models without confirmation prompt")
 }
 
+// encodeModelName encodes model names that contain dots to avoid Viper path interpretation issues
+func encodeModelName(name string) string {
+	return strings.ReplaceAll(name, ".", "#dot#")
+}
+
+// decodeModelName decodes model names that were encoded to avoid Viper path interpretation issues
+func decodeModelName(name string) string {
+	return strings.ReplaceAll(name, "#dot#", ".")
+}
+
 // configCmd represents the base command when called without any subcommands
 var modelCmd = &cobra.Command{
 	Use:     "model",
@@ -55,7 +65,7 @@ var modelCmd = &cobra.Command{
 	Short:   "Manage gllm model configuration",
 	Long:    `The 'gllm model' command allows you to manage your configured large language models(llms).`,
 	// Run: func(cmd *cobra.Command, args []string) {
-	//  fmt.Println("Use 'gllm config [subcommand] --help' for more information.")
+	// 	fmt.Println("Use 'gllm config [subcommand] --help' for more information.")
 	// },
 	// Suggest showing help if 'gllm config' is run without subcommand
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -88,14 +98,15 @@ var modelListCmd = &cobra.Command{
 		// Sort keys for consistent output
 		names := make([]string, 0, len(modelsMap))
 		for name := range modelsMap {
-			names = append(names, name)
+			names = append(names, decodeModelName(name))
 		}
 		sort.Strings(names)
 
 		for _, name := range names {
 			indicator := " "
 			pname := ""
-			if name == defaultModel {
+			encodedName := encodeModelName(name)
+			if encodedName == defaultModel {
 				indicator = highlightColor("*") // Mark the default model
 				pname = highlightColor(name)
 			} else {
@@ -104,7 +115,7 @@ var modelListCmd = &cobra.Command{
 			}
 			fmt.Printf(" %s %s\n", indicator, pname)
 			if verbose {
-				if configMap, ok := modelsMap[name].(map[string]interface{}); ok {
+				if configMap, ok := modelsMap[encodedName].(map[string]interface{}); ok {
 					for key, value := range configMap {
 						fmt.Printf("\t%s: %v\n", key, value)
 					}
@@ -144,8 +155,10 @@ gllm model add --name gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --t
 			modelsMap = make(map[string]interface{})
 		}
 
+		encodedName := encodeModelName(name)
+
 		// Check if model already exists
-		if _, exists := modelsMap[name]; exists {
+		if _, exists := modelsMap[encodedName]; exists {
 			return fmt.Errorf("model named '%s' already exists. Use 'remove' first or use 'set' to change its config or choose a different name", name)
 		}
 
@@ -158,13 +171,13 @@ gllm model add --name gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --t
 		}
 
 		// Add the new model
-		modelsMap[name] = newModel
+		modelsMap[encodedName] = newModel
 		viper.Set("models", modelsMap)
 
 		// Set default model if none exists
 		defaultModel := viper.GetString("default.model")
 		if defaultModel == "" {
-			viper.Set("default.model", name)
+			viper.Set("default.model", encodedName)
 		}
 
 		// Write the config file
@@ -186,6 +199,7 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 0.7
 	Args: cobra.ExactArgs(1), // Requires exactly one argument (the name)
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
+		encodedName := encodeModelName(name)
 
 		// Get or create model configuration
 		modelsMap := viper.GetStringMap("models")
@@ -195,7 +209,7 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 0.7
 
 		// Get or create model entry
 		var modelConfig map[string]interface{}
-		if existingConfig, exists := modelsMap[name]; exists {
+		if existingConfig, exists := modelsMap[encodedName]; exists {
 			var ok bool
 			if modelConfig, ok = existingConfig.(map[string]interface{}); !ok {
 				modelConfig = make(map[string]interface{})
@@ -222,7 +236,7 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 0.7
 		}
 
 		// Update the entry
-		modelsMap[name] = modelConfig
+		modelsMap[encodedName] = modelConfig
 		viper.Set("models", modelsMap)
 
 		// Write the config file
@@ -247,11 +261,12 @@ var modelInfoCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
+		encodedName := encodeModelName(name)
 
 		// Get the models map with nested structure
 		modelsMap := viper.GetStringMap("models")
 
-		modelConfig, exists := modelsMap[name]
+		modelConfig, exists := modelsMap[encodedName]
 		if !exists {
 			return fmt.Errorf("model named '%s' not found", name)
 		}
@@ -282,9 +297,10 @@ gllm model remove gpt4 --force`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
+		encodedName := encodeModelName(name)
 		modelsMap := viper.GetStringMap("models")
 
-		if _, exists := modelsMap[name]; !exists {
+		if _, exists := modelsMap[encodedName]; !exists {
 			cmd.SilenceUsage = true // Don't show usage for this error
 			if force, _ := cmd.Flags().GetBool("force"); force {
 				fmt.Printf("Model '%s' does not exist, nothing to remove.\n", name)
@@ -294,12 +310,12 @@ gllm model remove gpt4 --force`,
 		}
 
 		// Delete the prompt
-		delete(modelsMap, name)
+		delete(modelsMap, encodedName)
 		viper.Set("models", modelsMap)
 
 		// Check if the removed model was the default
 		defaultPrompt := viper.GetString("default.model")
-		if name == defaultPrompt {
+		if encodedName == defaultPrompt {
 			viper.Set("default.model", "") // Clear the default
 			fmt.Printf("Note: Removed model '%s' was the default. Default model cleared.\n", name)
 		}
@@ -367,14 +383,15 @@ var modelDefaultCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
-		models := viper.GetStringMapString("models")
+		encodedName := encodeModelName(name)
+		models := viper.GetStringMap("models")
 
 		// Check if the model exists before setting it as default
-		if _, exists := models[name]; !exists {
+		if _, exists := models[encodedName]; !exists {
 			return fmt.Errorf("model named '%s' not found. Cannot set as default", name)
 		}
 
-		viper.Set("default.model", name)
+		viper.Set("default.model", encodedName)
 
 		// Write the config file
 		if err := writeConfig(); err != nil {
@@ -401,6 +418,7 @@ func GetAllModels() (map[string]string, error) {
 
 	models := make(map[string]string)
 	for _, k := range keys {
+		decodedName := decodeModelName(k)
 		v := modelsMap[k]
 		if configMap, ok := v.(map[string]interface{}); ok {
 			// Convert the inner map to a string representation
@@ -409,21 +427,22 @@ func GetAllModels() (map[string]string, error) {
 				pairs = append(pairs, fmt.Sprintf("\t%s: %v", k, v))
 			}
 			sort.Strings(pairs)
-			models[k] = strings.Join(pairs, "\n")
+			models[decodedName] = strings.Join(pairs, "\n")
 		} else {
-			return nil, fmt.Errorf("invalid model configuration for '%s'", k)
+			return nil, fmt.Errorf("invalid model configuration for '%s'", decodedName)
 		}
 	}
 	return models, nil
 }
 
 func SetEffectiveModel(name string) error {
+	encodedName := encodeModelName(name)
 	modelsMap := viper.GetStringMap("models")
-	if _, ok := modelsMap[name]; !ok {
+	if _, ok := modelsMap[encodedName]; !ok {
 		return fmt.Errorf("model named '%s' not found", name)
 	}
 
-	viper.Set("default.model", name)
+	viper.Set("default.model", encodedName)
 	if err := writeConfig(); err != nil {
 		return fmt.Errorf("failed to update configuration: %w", err)
 	}
@@ -432,7 +451,7 @@ func SetEffectiveModel(name string) error {
 
 func GetEffectModelName() string {
 	defaultName := viper.GetString("default.model")
-	return defaultName
+	return decodeModelName(defaultName)
 }
 
 // GetEffectiveModel returns the configuration for the model to use
@@ -445,7 +464,7 @@ func GetEffectiveModel() (name string, details map[string]any) {
 		if modelConfig, ok := modelsMap[defaultName]; ok {
 			// Convert the map[string]interface{} to map[string]string
 			if configMap, ok := modelConfig.(map[string]interface{}); ok {
-				return defaultName, configMap
+				return decodeModelName(defaultName), configMap
 			}
 			service.Warnf("Warning: Default model '%s' has invalid configuration format", defaultName)
 		} else {
@@ -466,7 +485,7 @@ func GetEffectiveModel() (name string, details map[string]any) {
 
 		if modelConfig, ok := modelsMap[firstModelName]; ok {
 			if configMap, ok := modelConfig.(map[string]interface{}); ok {
-				return firstModelName, configMap
+				return decodeModelName(firstModelName), configMap
 			}
 		}
 	}

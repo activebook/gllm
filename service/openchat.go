@@ -158,7 +158,6 @@ func (ll *LangLogic) openchatStreamWithSearch() error {
 	// Process the chat with recursive tool call handling
 	err = chat.process()
 	if err != nil {
-		//ll.ProcChan <- StreamNotify{Status: StatusError}
 		return fmt.Errorf("error processing chat: %v", err)
 	}
 	return nil
