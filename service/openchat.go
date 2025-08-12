@@ -372,7 +372,11 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 					state = stateReasoning
 				}
 			case stateReasoning:
-				if delta.ReasoningContent == nil {
+				// If reasoning content is empty, switch back to normal state
+				// This is to handle the case where reasoning content is empty but we already have content
+				// Aka, the model is done with reasoning content and starting to output normal content
+				if delta.ReasoningContent == nil ||
+					(*delta.ReasoningContent == "" && delta.Content != "") {
 					c.proc <- StreamNotify{Status: StatusReasoningOver, Data: ""}
 					state = stateNormal
 				}
