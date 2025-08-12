@@ -79,4 +79,8 @@ func Contains(list []string, item string) bool {
 	}
 	return false
 }
+
+func HasContent(s *string) bool {
+	return s != nil && *s != ""
+}
 func Ptr[T any](t T) *T { return &t }
