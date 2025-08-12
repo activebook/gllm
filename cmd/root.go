@@ -261,12 +261,13 @@ func processQuery(prompt string, files []*service.FileData) {
 	// Call your LLM service here
 	_, modelInfo := GetEffectiveModel()
 	sys_prompt := GetEffectiveSystemPrompt()
+	maxRecursions := GetMaxRecursions()
 	var searchEngine map[string]any
 	if searchFlag != "" {
 		_, searchEngine = GetEffectiveSearchEngine()
 		service.SetMaxReferences(referenceFlag)
 	}
-	service.CallLanguageModel(prompt, sys_prompt, files, modelInfo, searchEngine)
+	service.CallLanguageModel(prompt, sys_prompt, files, modelInfo, searchEngine, maxRecursions)
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

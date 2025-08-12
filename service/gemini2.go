@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"runtime"
 
-	"github.com/spf13/viper"
 	"google.golang.org/genai"
 )
 
@@ -154,13 +153,10 @@ func (ll *LangLogic) gemini2Stream() error {
 	references := make([]*map[string]interface{}, 0, 1)
 	queries := make([]string, 0, 1)
 	streamParts := &parts
-	
-	// Get maxRecursions from config with default value of 5
-	maxRecursions := viper.GetInt("max_recursions")
-	if maxRecursions <= 0 {
-		maxRecursions = 5 // Default value
-	}
-	
+
+	// Use maxRecursions from LangLogic
+	maxRecursions := ll.MaxRecursions
+
 	for i := 0; i < maxRecursions; i++ {
 		funcCalls, err := ll.processGemini2Stream(ctx, chat, streamParts, &references, &queries)
 		if err != nil {

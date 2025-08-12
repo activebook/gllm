@@ -158,7 +158,7 @@ var configPrintCmd = &cobra.Command{
 
 		mark := GetMarkdownSwitch()
 		fmt.Printf("\n%s: %v\n", keyColor("Markdown Format"), mark)
-		
+
 		// Display max recursions value
 		maxRecursions := viper.GetInt("max_recursions")
 		if maxRecursions <= 0 {
@@ -306,4 +306,12 @@ var configSetCmd = &cobra.Command{
 
 		fmt.Printf("Configuration '%s' set to '%s' successfully.\n", key, value)
 	},
+}
+
+func GetMaxRecursions() int {
+	maxRecursions := viper.GetInt("max_recursions")
+	if maxRecursions <= 0 {
+		maxRecursions = 5 // Default value
+	}
+	return maxRecursions
 }

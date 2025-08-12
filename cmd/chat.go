@@ -76,12 +76,6 @@ Special commands:
 				searchFlag = ""
 			}
 			service.SetMaxReferences(referenceFlag)
-			
-			// Set max recursions if changed
-			if cmd.Flags().Changed("max-recursions") {
-				maxRecursions, _ := cmd.Flags().GetInt("max-recursions")
-				viper.Set("max_recursions", maxRecursions)
-			}
 
 			// Always save a conversation file regardless of the flag
 			if !cmd.Flags().Changed("conversation") {
@@ -109,6 +103,7 @@ Special commands:
 
 		// Build the ChatInfo object
 		chatInfo := buildChatInfo(files)
+		chatInfo.maxRecursions = GetMaxRecursions()
 
 		// Start the REPL
 		chatInfo.startREPL()
@@ -205,11 +200,12 @@ func (ci *ChatInfo) startREPL() {
 }
 
 type ChatInfo struct {
-	Model      string
-	Provider   string
-	Files      []*service.FileData
-	Conversion service.ConversationManager
-	QuitFlag   bool
+	Model         string
+	Provider      string
+	Files         []*service.FileData
+	Conversion    service.ConversationManager
+	QuitFlag      bool
+	maxRecursions int
 }
 
 func buildChatInfo(files []*service.FileData) *ChatInfo {
@@ -226,11 +222,12 @@ func buildChatInfo(files []*service.FileData) *ChatInfo {
 	}
 
 	ci := ChatInfo{
-		Model:      modelInfo["model"].(string),
-		Provider:   provider,
-		Files:      files,
-		Conversion: cm,
-		QuitFlag:   false,
+		Model:         modelInfo["model"].(string),
+		Provider:      provider,
+		Files:         files,
+		Conversion:    cm,
+		QuitFlag:      false,
+		maxRecursions: 5,
 	}
 	return &ci
 }
@@ -618,7 +615,7 @@ func (ci *ChatInfo) callLLM(input string) {
 	if searchFlag != "" {
 		_, searchEngine = GetEffectiveSearchEngine()
 	}
-	service.CallLanguageModel(finalPrompt.String(), sys_prompt, ci.Files, modelInfo, searchEngine)
+	service.CallLanguageModel(finalPrompt.String(), sys_prompt, ci.Files, modelInfo, searchEngine, ci.maxRecursions)
 
 	// We must reset the files after processing
 	// We shouldn't pass the files to the next call each time
