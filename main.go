@@ -1,11 +1,12 @@
 // File: main.go
 package main
 
-import (
-	// Use the module path you defined in 'go mod init' + '/cmd'
-	"github.com/activebook/gllm/cmd"
-)
+import "github.com/activebook/gllm/cmd"
+
+// Use the module path you defined in 'go mod init' + '/cmd'
 
 func main() {
+
+	//test.TestOpenai()
 	cmd.Execute()
 }

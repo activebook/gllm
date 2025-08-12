@@ -66,170 +66,6 @@ func (ll *LangLogic) getOpenChatFilePart(file *FileData) *model.ChatCompletionMe
 	return part
 }
 
-// Deprecated: Use openchatStreamWithSearch instead
-/*
-func (ll *LangLogic) openchatStream() error {
-	// 1. Initialize the Client
-	ctx := context.Background()
-	// Create a client config with custom base URL
-	client := arkruntime.NewClientWithApiKey(
-		ll.ApiKey,
-		arkruntime.WithTimeout(30*time.Minute),
-		arkruntime.WithBaseUrl(ll.EndPoint),
-	)
-
-	// 2. Prepare the Messages for Chat Completion
-	// Initialize messages slice with proper capacity
-	messages := make([]*model.ChatCompletionMessage, 0, 2)
-
-	// Only add system message if not empty
-	if ll.SystemPrompt != "" {
-		messages = append(messages, &model.ChatCompletionMessage{
-			Role: model.ChatMessageRoleSystem,
-			Content: &model.ChatCompletionMessageContent{
-				StringValue: volcengine.String(ll.SystemPrompt),
-			}, Name: Ptr(""),
-		})
-	}
-
-	var userMessage *model.ChatCompletionMessage
-	// Add user message
-	userMessage = &model.ChatCompletionMessage{
-		Role: model.ChatMessageRoleUser,
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(ll.UserPrompt),
-		}, Name: Ptr(""),
-	}
-	messages = append(messages, userMessage)
-	// Add image parts if available
-	if len(ll.Files) > 0 {
-		userMessage = &model.ChatCompletionMessage{
-			Role:    model.ChatMessageRoleUser,
-			Content: &model.ChatCompletionMessageContent{ListValue: []*model.ChatCompletionMessageContentPart{}},
-			Name:    Ptr(""),
-		}
-		// Add all files
-		for _, file := range ll.Files {
-			if file != nil {
-				part := ll.getOpenChatFilePart(file)
-				if part != nil {
-					userMessage.Content.ListValue = append(userMessage.Content.ListValue, part)
-				}
-			}
-		}
-		messages = append(messages, userMessage)
-	}
-
-	// Signal that streaming has started
-	ll.ProcChan <- StreamNotify{Status: StatusStarted}
-	<-ll.ProceedChan // Wait for the main goroutine to tell sub-goroutine to proceed
-
-	// Load previous messages if any
-	convo := GetOpenChatConversation()
-	err := convo.Load()
-	if err != nil {
-		ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}
-		return err
-	}
-	convo.PushMessages(messages) // Add new messages to the conversation
-
-	ll.ProcChan <- StreamNotify{Status: StatusProcessing}
-
-	// 3. Create the Chat Completion Request for Streaming
-	request := model.CreateChatCompletionRequest{
-		Model:       ll.ModelName,
-		Messages:    convo.Messages,
-		Temperature: &ll.Temperature, // Directly use the float32 value here
-		// MaxTokens:   150,         // Optional: limit output length
-		// TopP:        1.0,         // Optional: nucleus sampling
-		// N:           1,           // How many chat completion choices to generate for each input message.
-	}
-
-	// 4. Initiate Streaming Chat Completion
-	stream, err := client.CreateChatCompletionStream(ctx, request)
-	if err != nil {
-		ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to create chat completion stream: %v", err)}
-		return err
-	}
-	// IMPORTANT: Always close the stream when done.
-	defer stream.Close()
-
-	// Signal that streaming has started
-	ll.ProcChan <- StreamNotify{Status: StatusStarted}
-	<-ll.ProceedChan // Wait for the main goroutine to tell sub-goroutine to proceed
-
-	// 5. Process the Stream
-	state := stateNormal
-	assistContent := strings.Builder{}
-	reasoningContent := strings.Builder{}
-	for {
-		response, err := stream.Recv()
-		// Check for the end of the stream
-		if errors.Is(err, io.EOF) {
-			// Indicate stream end
-			ll.ProcChan <- StreamNotify{Status: StatusData, Data: "\n"}
-			break // Exit the loop when the stream is done
-		}
-		// Handle potential errors during streaming
-		if err != nil {
-			ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("error receiving stream response: %v", err)}
-			return err
-		}
-
-		// Extract and print the text chunk from the response delta
-		// For streaming, the actual content is in the Delta field
-		if len(response.Choices) > 0 {
-			delta := (response.Choices[0].Delta)
-
-			// State transitions
-			switch state {
-			case stateNormal:
-				if delta.ReasoningContent != nil {
-					ll.ProcChan <- StreamNotify{Status: StatusReasoning, Data: ""}
-					state = stateReasoning
-				}
-			case stateReasoning:
-				if delta.ReasoningContent == nil {
-					ll.ProcChan <- StreamNotify{Status: StatusReasoningOver, Data: ""}
-					state = stateNormal
-				}
-			}
-
-			if delta.ReasoningContent != nil {
-				// For reasoning model
-				text := *delta.ReasoningContent
-				reasoningContent.WriteString(text)
-				ll.ProcChan <- StreamNotify{Status: StatusReasoningData, Data: text}
-			} else {
-				text := delta.Content
-				assistContent.WriteString(text)
-				ll.ProcChan <- StreamNotify{Status: StatusData, Data: text}
-			}
-		}
-	}
-
-	// keep response content
-	msg := model.ChatCompletionMessage{
-		Role: model.ChatMessageRoleAssistant,
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(assistContent.String()),
-		}, Name: Ptr(""),
-	}
-	reasoning_content := reasoningContent.String()
-	if reasoning_content != "" {
-		msg.ReasoningContent = &reasoning_content
-	}
-	// Add the assistant's message to the conversation
-	convo.PushMessage(&msg)
-	err = convo.Save()
-	if err != nil {
-		return fmt.Errorf("failed to save conversation: %v", err)
-	}
-	ll.ProcChan <- StreamNotify{Status: StatusFinished}
-	return err
-}
-*/
-
 func (ll *LangLogic) openchatStreamWithSearch() error {
 
 	// 1. Initialize the Client
@@ -261,7 +97,7 @@ func (ll *LangLogic) openchatStreamWithSearch() error {
 		proc:          ll.ProcChan,
 		proceed:       ll.ProceedChan,
 		references:    make([]*map[string]interface{}, 0, 1),
-		maxRecursions: 5, // Limit recursion depth to prevent infinite loops
+		maxRecursions: ll.MaxRecursions, // Use configured value from LangLogic
 	}
 
 	// 2. Prepare the Messages for Chat Completion
@@ -322,8 +158,6 @@ func (ll *LangLogic) openchatStreamWithSearch() error {
 	// Process the chat with recursive tool call handling
 	err = chat.process()
 	if err != nil {
-		ll.ProcChan <- StreamNotify{Status: StatusError}
-		Warnf("Error processing chat: %v\n", err)
 		return fmt.Errorf("error processing chat: %v", err)
 	}
 	return nil
@@ -336,9 +170,9 @@ type OpenChat struct {
 	model         string
 	temperature   float32
 	tools         []*model.Tool
-	proc          chan<- StreamNotify // Sub Channel to send notifications
-	proceed       <-chan bool         // Main Channel to receive proceed signal
-	maxRecursions int
+	proc          chan<- StreamNotify       // Sub Channel to send notifications
+	proceed       <-chan bool               // Main Channel to receive proceed signal
+	maxRecursions int                       // Maximum number of recursions for model calls
 	queries       []string                  // List of queries to be sent to the AI assistant
 	references    []*map[string]interface{} // keep track of the references
 }
@@ -430,14 +264,23 @@ func (c *OpenChat) process() error {
 			Temperature: &c.temperature,
 			Messages:    convo.Messages,
 			Tools:       c.tools,
+			// Thinking: &model.Thinking{
+			// 	Type: model.ThinkingTypeAuto,
+			// },
 		}
 
 		// Make the streaming request
 		stream, err := c.client.CreateChatCompletionStream(*c.ctx, req)
 		if err != nil {
+			errMsg := fmt.Sprintf("Failed to create chat completion stream for model %s: %v", c.model, err)
+			c.proc <- StreamNotify{Status: StatusError, Data: errMsg}
 			return fmt.Errorf("stream creation error: %v", err)
 		}
-		defer stream.Close()
+		defer func() {
+			if stream != nil {
+				stream.Close()
+			}
+		}()
 
 		c.proc <- StreamNotify{Status: StatusStarted}
 		<-c.proceed // Wait for the main goroutine to tell sub-goroutine to proceed
@@ -445,6 +288,8 @@ func (c *OpenChat) process() error {
 		// Process the stream and collect tool calls
 		assistantMessage, toolCalls, err := c.processStream(stream)
 		if err != nil {
+			errMsg := fmt.Sprintf("Error while processing stream response: %v", err)
+			c.proc <- StreamNotify{Status: StatusError, Data: errMsg}
 			return fmt.Errorf("error processing stream: %v", err)
 		}
 
@@ -458,6 +303,8 @@ func (c *OpenChat) process() error {
 				toolMessage, err := c.processToolCall(toolCall)
 				if err != nil {
 					Warnf("Processing tool call: %v\n", err)
+					// Send error info to user but continue processing other tool calls
+					c.proc <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("\n%sWarning:%s Error processing tool call '%s': %v\n", warnColor, resetColor, toolCall.Function.Name, err)}
 					continue
 				}
 				// Add the tool response to the conversation
@@ -484,6 +331,8 @@ func (c *OpenChat) process() error {
 	// Save the conversation
 	err := convo.Save()
 	if err != nil {
+		errMsg := fmt.Sprintf("Failed to save conversation: %v", err)
+		c.proc <- StreamNotify{Status: StatusError, Data: errMsg}
 		return fmt.Errorf("failed to save conversation: %v", err)
 	}
 	c.proc <- StreamNotify{Status: StatusFinished}
@@ -508,7 +357,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 			break
 		}
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("error receiving stream data: %v", err)
 		}
 
 		// Handle regular content
@@ -622,11 +471,12 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		return nil, fmt.Errorf("error parsing arguments: %v", err)
 	}
 
-	if toolCall.Function.Name == "execute_command" {
+	switch toolCall.Function.Name {
+	case "execute_command":
 		return c.processCommandToolCalls(&toolCall, &argsMap)
-	} else if toolCall.Function.Name == "web_search" {
+	case "web_search":
 		return c.processSearchToolCalls(&toolCall, &argsMap)
-	} else {
+	default:
 		return nil, fmt.Errorf("unknown function name: %s", toolCall.Function.Name)
 	}
 }
@@ -643,7 +493,7 @@ func (c *OpenChat) processCommandToolCalls(toolCall *model.ToolCall, argsMap *ma
 
 	cmdStr, ok := (*argsMap)["command"].(string)
 	if !ok {
-		return nil, fmt.Errorf("command not found in arguments")
+		return nil, fmt.Errorf("command not found in arguments for tool call ID %s", toolCall.ID)
 	}
 	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
 	if !ok {
@@ -651,7 +501,10 @@ func (c *OpenChat) processCommandToolCalls(toolCall *model.ToolCall, argsMap *ma
 	}
 	if needConfirm {
 		// Response with a prompt to let user confirm
-		descStr := (*argsMap)["description"].(string)
+		descStr, ok := (*argsMap)["description"].(string)
+		if !ok {
+			return nil, fmt.Errorf("description not found in arguments for tool call ID %s", toolCall.ID)
+		}
 		outStr := fmt.Sprintf(ExecRespTmplConfirm, cmdStr, descStr)
 		toolMessage.Content = &model.ChatCompletionMessageContent{
 			StringValue: volcengine.String(outStr),
@@ -685,6 +538,8 @@ func (c *OpenChat) processCommandToolCalls(toolCall *model.ToolCall, argsMap *ma
 			exitCode = exitError.ExitCode()
 		}
 		errStr = fmt.Sprintf("Command failed with exit code %d: %v", exitCode, err)
+		// Send error details to user
+		c.proc <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("\n%sError:%s %s\n", errorColor, resetColor, errStr)}
 	}
 
 	// Output the result
@@ -709,11 +564,6 @@ func (c *OpenChat) processCommandToolCalls(toolCall *model.ToolCall, argsMap *ma
 	// Create a response that prompts the LLM to provide insightful analysis of the command output
 	finalResponse := fmt.Sprintf(ExecRespTmplOutput, cmdStr, errorInfo, outputInfo)
 
-	// resultsJSON, _ := json.Marshal(map[string]string{
-	// 	"output": outStr,
-	// 	"error":  errStr,
-	// })
-
 	// Create and return the tool response message
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(finalResponse),
@@ -724,7 +574,7 @@ func (c *OpenChat) processCommandToolCalls(toolCall *model.ToolCall, argsMap *ma
 func (c *OpenChat) processSearchToolCalls(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	query, ok := (*argsMap)["query"].(string)
 	if !ok {
-		return nil, fmt.Errorf("query not found in arguments")
+		return nil, fmt.Errorf("query not found in arguments for tool call ID %s", toolCall.ID)
 	}
 
 	Debugf("\nFunction Calling: %s(%+v)\n", toolCall.Function.Name, query)
@@ -748,12 +598,15 @@ func (c *OpenChat) processSearchToolCalls(toolCall *model.ToolCall, argsMap *map
 		// Use None Search Engine
 		data, err = NoneSearch(query)
 	default:
+		err = fmt.Errorf("unknown search engine: %s", engine)
 	}
 
 	if err != nil {
 		c.proc <- StreamNotify{Status: StatusSearchingOver, Data: ""}
 		<-c.proceed
 		Warnf("Performing search: %v", err)
+		errMsg := fmt.Sprintf("Error performing search for query '%s': %v", query, err)
+		c.proc <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("\n%sError:%s %s\n", errorColor, resetColor, errMsg)}
 		return nil, fmt.Errorf("error performing search: %v", err)
 	}
 	// keep the search results for references
@@ -766,6 +619,8 @@ func (c *OpenChat) processSearchToolCalls(toolCall *model.ToolCall, argsMap *map
 		// TODO: Potentially send an error FunctionResponse back to the model
 		c.proc <- StreamNotify{Status: StatusSearchingOver, Data: ""}
 		<-c.proceed
+		errMsg := fmt.Sprintf("Error marshaling search results for query '%s': %v", query, err)
+		c.proc <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("\n%sError:%s %s\n", errorColor, resetColor, errMsg)}
 		return nil, fmt.Errorf("error marshaling results: %v", err)
 	}
 

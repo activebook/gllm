@@ -261,12 +261,13 @@ func processQuery(prompt string, files []*service.FileData) {
 	// Call your LLM service here
 	_, modelInfo := GetEffectiveModel()
 	sys_prompt := GetEffectiveSystemPrompt()
+	maxRecursions := GetMaxRecursions()
 	var searchEngine map[string]any
 	if searchFlag != "" {
 		_, searchEngine = GetEffectiveSearchEngine()
 		service.SetMaxReferences(referenceFlag)
 	}
-	service.CallLanguageModel(prompt, sys_prompt, files, modelInfo, searchEngine)
+	service.CallLanguageModel(prompt, sys_prompt, files, modelInfo, searchEngine, maxRecursions)
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -318,6 +319,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&searchFlag, "search", "s", "", "To query an LLM with a search function")
 	rootCmd.Flags().Lookup("search").NoOptDefVal = service.GetNoneSearchEngineName() // This sets a default when flag is used without value
 	rootCmd.Flags().StringVarP(&convoName, "conversation", "c", "", "Specify a conversation name to track chat session")
+	rootCmd.Flags().Int("max-recursions", 5, "Maximum number of Model calling recursions")
 
 	rootCmd.Flags().BoolVarP(&codeFlag, "code", "C", false, "Enable model to generate and run Python code (only for gemini)")
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
@@ -364,6 +366,7 @@ func initConfig() {
 	// Set default log settings in Viper *before* reading the config
 	// This ensures these keys exist even if not in the file
 	viper.SetDefault("log.level", "info")
+	viper.SetDefault("max_recursions", 5) // Default max recursions value
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {

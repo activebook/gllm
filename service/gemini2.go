@@ -153,7 +153,11 @@ func (ll *LangLogic) gemini2Stream() error {
 	references := make([]*map[string]interface{}, 0, 1)
 	queries := make([]string, 0, 1)
 	streamParts := &parts
-	for i := 0; i < 5; i++ {
+
+	// Use maxRecursions from LangLogic
+	maxRecursions := ll.MaxRecursions
+
+	for i := 0; i < maxRecursions; i++ {
 		funcCalls, err := ll.processGemini2Stream(ctx, chat, streamParts, &references, &queries)
 		if err != nil {
 			return err
@@ -221,9 +225,10 @@ func (ll *LangLogic) processGemini2Stream(ctx context.Context,
 	queries *[]string) (*[]*genai.FunctionCall, error) {
 
 	// Stream the response
-	ll.ProcChan <- StreamNotify{Status: StatusReasoning, Data: ""}
+	ll.ProcChan <- StreamNotify{Status: StatusProcessing}
 	iter := chat.SendMessageStream(ctx, *parts...)
-	ll.ProcChan <- StreamNotify{Status: StatusReasoningOver, Data: ""}
+	ll.ProcChan <- StreamNotify{Status: StatusStarted}
+	<-ll.ProceedChan // Wait for the main goroutine to tell sub-goroutine to proceed
 
 	state := stateNormal
 	funcCalls := []*genai.FunctionCall{}

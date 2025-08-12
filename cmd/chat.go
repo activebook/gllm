@@ -199,11 +199,12 @@ func (ci *ChatInfo) startREPL() {
 }
 
 type ChatInfo struct {
-	Model      string
-	Provider   string
-	Files      []*service.FileData
-	Conversion service.ConversationManager
-	QuitFlag   bool
+	Model         string
+	Provider      string
+	Files         []*service.FileData
+	Conversion    service.ConversationManager
+	QuitFlag      bool
+	maxRecursions int
 }
 
 func buildChatInfo(files []*service.FileData) *ChatInfo {
@@ -218,13 +219,14 @@ func buildChatInfo(files []*service.FileData) *ChatInfo {
 		//cm = service.GetGeminiConversation()
 		cm = service.GetGemini2Conversation()
 	}
-
+	mr := GetMaxRecursions()
 	ci := ChatInfo{
-		Model:      modelInfo["model"].(string),
-		Provider:   provider,
-		Files:      files,
-		Conversion: cm,
-		QuitFlag:   false,
+		Model:         modelInfo["model"].(string),
+		Provider:      provider,
+		Files:         files,
+		Conversion:    cm,
+		QuitFlag:      false,
+		maxRecursions: mr,
 	}
 	return &ci
 }
@@ -612,7 +614,7 @@ func (ci *ChatInfo) callLLM(input string) {
 	if searchFlag != "" {
 		_, searchEngine = GetEffectiveSearchEngine()
 	}
-	service.CallLanguageModel(finalPrompt.String(), sys_prompt, ci.Files, modelInfo, searchEngine)
+	service.CallLanguageModel(finalPrompt.String(), sys_prompt, ci.Files, modelInfo, searchEngine, ci.maxRecursions)
 
 	// We must reset the files after processing
 	// We shouldn't pass the files to the next call each time
