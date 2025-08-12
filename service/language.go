@@ -104,17 +104,19 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 				notifyCh <- StreamNotify{Status: StatusError, Data: errMsg}
 			}
 		}()
-		
+
 		switch provider {
 		case ModelOpenAICompatible:
 			if err := ll.GenerateOpenChatStream(); err != nil {
-				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("OpenChat stream error: %v", err)}
-				Errorf("Stream error: %v\n", err)
+				//notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("OpenChat stream error: %v", err)}
+				//Errorf("Stream error: %v\n", err)
+				notifyCh <- StreamNotify{Status: StatusError}
 			}
 		case ModelGemini:
 			if err := ll.GenerateGemini2Stream(); err != nil {
-				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Gemini stream error: %v", err)}
-				Errorf("Stream error: %v\n", err)
+				//notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Gemini stream error: %v", err)}
+				//Errorf("Stream error: %v\n", err)
+				notifyCh <- StreamNotify{Status: StatusError}
 			}
 		default:
 			notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Unsupported model provider: %s", provider)}
@@ -138,8 +140,6 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 		case StatusError:
 			StopSpinner(spinner)
 			Errorf("Stream error: %v\n", notify.Data)
-			// Show error to user with more context
-			fmt.Printf("\n%sError:%s %v\n", errorColor, resetColor, notify.Data)
 			return
 		case StatusFinished:
 			StopSpinner(spinner)
