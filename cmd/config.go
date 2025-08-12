@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -24,7 +25,7 @@ var configCmd = &cobra.Command{
 Use subcommands to target specific configuration areas like models or prompts,
 or use 'config path' to see where the configuration file is located.`,
 	// Run: func(cmd *cobra.Command, args []string) {
-	//  fmt.Println("Use 'gllm config [subcommand] --help' for more information.")
+	// 	fmt.Println("Use 'gllm config [subcommand] --help' for more information.")
 	// },
 	// Suggest showing help if 'gllm config' is run without subcommand
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -195,6 +196,98 @@ func init() {
 	// Add subcommands to configCmd
 	configCmd.AddCommand(configPathCmd)
 	configCmd.AddCommand(configPrintCmd)
+	configCmd.AddCommand(configSetCmd) // Register the config set command
+	configCmd.AddCommand(configMaxRecursionsCmd)
 
 	// Add flags for other prompt commands if needed in the future
+}
+
+// configMaxRecursionsCmd represents the config max-recursions command
+var configMaxRecursionsCmd = &cobra.Command{
+	Use:     "max-recursions [value]",
+	Aliases: []string{"mr"},
+	Short:   "Get or set the maximum number of recursions allowed",
+	Long: `Get or set the maximum number of recursions allowed in the application.
+
+If no value is provided, the current setting is displayed.
+If a value is provided, it sets the new maximum recursions value.`,
+	Args: cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) == 0 {
+			// No argument provided - show current value
+			maxRecursions := viper.GetInt("max_recursions")
+			if maxRecursions <= 0 {
+				maxRecursions = 5 // Default value
+			}
+			fmt.Printf("Current maximum recursions: %d\n", maxRecursions)
+		} else {
+			// Argument provided - parse and set new value
+			var err error
+			newValue := args[0]
+			maxRecursions, err := strconv.Atoi(newValue)
+			if err != nil {
+				service.Errorf("Invalid value: %s. Please provide a valid integer.\n", newValue)
+				return
+			}
+			
+			if maxRecursions < 1 {
+				service.Errorf("Value must be a positive integer (at least 1).\n")
+				return
+			}
+			
+			// Set the new value in viper
+			viper.Set("max_recursions", maxRecursions)
+			
+			// Save the configuration to file
+			err = viper.WriteConfig()
+			if err != nil {
+				service.Errorf("Error saving config: %s\n", err)
+				return
+			}
+			
+			fmt.Printf("Maximum recursions set to: %d\n", maxRecursions)
+		}
+	},
+}
+
+// configSetCmd represents the command to set configuration values
+var configSetCmd = &cobra.Command{
+	Use:   "set",
+	Short: "Set a configuration value",
+	Long:  `Set a configuration value that will persist across sessions.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) != 2 {
+			service.Errorf("Usage: gllm config set <key> <value>\n")
+			return
+		}
+
+		key := args[0]
+		value := args[1]
+
+		switch key {
+		case "max_recursions":
+			// Parse the value as an integer
+			num, err := strconv.Atoi(value)
+			if err != nil {
+				service.Errorf("Invalid value for max_recursions: %s (must be an integer)\n", value)
+				return
+			}
+			if num <= 0 {
+				service.Errorf("Invalid value for max_recursions: %d (must be positive)\n", num)
+				return
+			}
+			viper.Set("max_recursions", num)
+		default:
+			service.Errorf("Unknown configuration key: %s\n", key)
+			return
+		}
+
+		// Write the config file
+		if err := writeConfig(); err != nil {
+			service.Errorf("Error saving configuration: %s\n", err)
+			return
+		}
+
+		fmt.Printf("Configuration '%s' set to '%s' successfully.\n", key, value)
+	},
 }

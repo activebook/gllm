@@ -76,6 +76,12 @@ Special commands:
 				searchFlag = ""
 			}
 			service.SetMaxReferences(referenceFlag)
+			
+			// Set max recursions if changed
+			if cmd.Flags().Changed("max-recursions") {
+				maxRecursions, _ := cmd.Flags().GetInt("max-recursions")
+				viper.Set("max_recursions", maxRecursions)
+			}
 
 			// Always save a conversation file regardless of the flag
 			if !cmd.Flags().Changed("conversation") {

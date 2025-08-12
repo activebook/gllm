@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/viper"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/utils"
@@ -88,6 +89,12 @@ func (ll *LangLogic) openchatStreamWithSearch() error {
 		tools = append(tools, searchTool)
 	}
 
+	// Get maxRecursions from config with default value of 5
+	maxRecursions := viper.GetInt("max_recursions")
+	if maxRecursions <= 0 {
+		maxRecursions = 5 // Default value
+	}
+
 	chat := &OpenChat{
 		client:        client,
 		ctx:           &ctx,
@@ -97,7 +104,7 @@ func (ll *LangLogic) openchatStreamWithSearch() error {
 		proc:          ll.ProcChan,
 		proceed:       ll.ProceedChan,
 		references:    make([]*map[string]interface{}, 0, 1),
-		maxRecursions: 5, // Limit recursion depth to prevent infinite loops
+		maxRecursions: maxRecursions, // Use configured value or default
 	}
 
 	// 2. Prepare the Messages for Chat Completion
