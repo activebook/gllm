@@ -225,9 +225,10 @@ func (ll *LangLogic) processGemini2Stream(ctx context.Context,
 	queries *[]string) (*[]*genai.FunctionCall, error) {
 
 	// Stream the response
-	ll.ProcChan <- StreamNotify{Status: StatusReasoning, Data: ""}
+	ll.ProcChan <- StreamNotify{Status: StatusProcessing}
 	iter := chat.SendMessageStream(ctx, *parts...)
-	ll.ProcChan <- StreamNotify{Status: StatusReasoningOver, Data: ""}
+	ll.ProcChan <- StreamNotify{Status: StatusStarted}
+	<-ll.ProceedChan // Wait for the main goroutine to tell sub-goroutine to proceed
 
 	state := stateNormal
 	funcCalls := []*genai.FunctionCall{}

@@ -274,9 +274,15 @@ func (c *OpenChat) process() error {
 		// Make the streaming request
 		stream, err := c.client.CreateChatCompletionStream(*c.ctx, req)
 		if err != nil {
+			errMsg := fmt.Sprintf("Failed to create chat completion stream for model %s: %v", c.model, err)
+			c.proc <- StreamNotify{Status: StatusError, Data: errMsg}
 			return fmt.Errorf("stream creation error: %v", err)
 		}
-		defer stream.Close()
+		defer func() {
+			if stream != nil {
+				stream.Close()
+			}
+		}()
 
 		c.proc <- StreamNotify{Status: StatusStarted}
 		<-c.proceed // Wait for the main goroutine to tell sub-goroutine to proceed
@@ -284,6 +290,8 @@ func (c *OpenChat) process() error {
 		// Process the stream and collect tool calls
 		assistantMessage, toolCalls, err := c.processStream(stream)
 		if err != nil {
+			errMsg := fmt.Sprintf("Error while processing stream response: %v", err)
+			c.proc <- StreamNotify{Status: StatusError, Data: errMsg}
 			return fmt.Errorf("error processing stream: %v", err)
 		}
 
@@ -297,6 +305,8 @@ func (c *OpenChat) process() error {
 				toolMessage, err := c.processToolCall(toolCall)
 				if err != nil {
 					Warnf("Processing tool call: %v\n", err)
+					// Send error info to user but continue processing other tool calls
+					c.proc <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("\n%sWarning:%s Error processing tool call '%s': %v\n", warnColor, resetColor, toolCall.Function.Name, err)}
 					continue
 				}
 				// Add the tool response to the conversation
@@ -323,6 +333,8 @@ func (c *OpenChat) process() error {
 	// Save the conversation
 	err := convo.Save()
 	if err != nil {
+		errMsg := fmt.Sprintf("Failed to save conversation: %v", err)
+		c.proc <- StreamNotify{Status: StatusError, Data: errMsg}
 		return fmt.Errorf("failed to save conversation: %v", err)
 	}
 	c.proc <- StreamNotify{Status: StatusFinished}
@@ -347,7 +359,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 			break
 		}
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("error receiving stream data: %v", err)
 		}
 
 		// Handle regular content
@@ -483,7 +495,7 @@ func (c *OpenChat) processCommandToolCalls(toolCall *model.ToolCall, argsMap *ma
 
 	cmdStr, ok := (*argsMap)["command"].(string)
 	if !ok {
-		return nil, fmt.Errorf("command not found in arguments")
+		return nil, fmt.Errorf("command not found in arguments for tool call ID %s", toolCall.ID)
 	}
 	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
 	if !ok {
@@ -491,7 +503,10 @@ func (c *OpenChat) processCommandToolCalls(toolCall *model.ToolCall, argsMap *ma
 	}
 	if needConfirm {
 		// Response with a prompt to let user confirm
-		descStr := (*argsMap)["description"].(string)
+		descStr, ok := (*argsMap)["description"].(string)
+		if !ok {
+			return nil, fmt.Errorf("description not found in arguments for tool call ID %s", toolCall.ID)
+		}
 		outStr := fmt.Sprintf(ExecRespTmplConfirm, cmdStr, descStr)
 		toolMessage.Content = &model.ChatCompletionMessageContent{
 			StringValue: volcengine.String(outStr),
@@ -525,6 +540,8 @@ func (c *OpenChat) processCommandToolCalls(toolCall *model.ToolCall, argsMap *ma
 			exitCode = exitError.ExitCode()
 		}
 		errStr = fmt.Sprintf("Command failed with exit code %d: %v", exitCode, err)
+		// Send error details to user
+		c.proc <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("\n%sError:%s %s\n", errorColor, resetColor, errStr)}
 	}
 
 	// Output the result
@@ -549,11 +566,6 @@ func (c *OpenChat) processCommandToolCalls(toolCall *model.ToolCall, argsMap *ma
 	// Create a response that prompts the LLM to provide insightful analysis of the command output
 	finalResponse := fmt.Sprintf(ExecRespTmplOutput, cmdStr, errorInfo, outputInfo)
 
-	// resultsJSON, _ := json.Marshal(map[string]string{
-	// 	"output": outStr,
-	// 	"error":  errStr,
-	// })
-
 	// Create and return the tool response message
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(finalResponse),
@@ -564,7 +576,7 @@ func (c *OpenChat) processCommandToolCalls(toolCall *model.ToolCall, argsMap *ma
 func (c *OpenChat) processSearchToolCalls(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	query, ok := (*argsMap)["query"].(string)
 	if !ok {
-		return nil, fmt.Errorf("query not found in arguments")
+		return nil, fmt.Errorf("query not found in arguments for tool call ID %s", toolCall.ID)
 	}
 
 	Debugf("\nFunction Calling: %s(%+v)\n", toolCall.Function.Name, query)
@@ -588,12 +600,15 @@ func (c *OpenChat) processSearchToolCalls(toolCall *model.ToolCall, argsMap *map
 		// Use None Search Engine
 		data, err = NoneSearch(query)
 	default:
+		err = fmt.Errorf("unknown search engine: %s", engine)
 	}
 
 	if err != nil {
 		c.proc <- StreamNotify{Status: StatusSearchingOver, Data: ""}
 		<-c.proceed
 		Warnf("Performing search: %v", err)
+		errMsg := fmt.Sprintf("Error performing search for query '%s': %v", query, err)
+		c.proc <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("\n%sError:%s %s\n", errorColor, resetColor, errMsg)}
 		return nil, fmt.Errorf("error performing search: %v", err)
 	}
 	// keep the search results for references
@@ -606,6 +621,8 @@ func (c *OpenChat) processSearchToolCalls(toolCall *model.ToolCall, argsMap *map
 		// TODO: Potentially send an error FunctionResponse back to the model
 		c.proc <- StreamNotify{Status: StatusSearchingOver, Data: ""}
 		<-c.proceed
+		errMsg := fmt.Sprintf("Error marshaling search results for query '%s': %v", query, err)
+		c.proc <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("\n%sError:%s %s\n", errorColor, resetColor, errMsg)}
 		return nil, fmt.Errorf("error marshaling results: %v", err)
 	}
 

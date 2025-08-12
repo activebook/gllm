@@ -97,15 +97,27 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 
 	// Start the generation in a goroutine
 	go func() {
+		defer func() {
+			// Recover from panics and convert them to errors
+			if r := recover(); r != nil {
+				errMsg := fmt.Sprintf("Panic occurred: %v", r)
+				notifyCh <- StreamNotify{Status: StatusError, Data: errMsg}
+			}
+		}()
+		
 		switch provider {
 		case ModelOpenAICompatible:
 			if err := ll.GenerateOpenChatStream(); err != nil {
+				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("OpenChat stream error: %v", err)}
 				Errorf("Stream error: %v\n", err)
 			}
 		case ModelGemini:
 			if err := ll.GenerateGemini2Stream(); err != nil {
+				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Gemini stream error: %v", err)}
 				Errorf("Stream error: %v\n", err)
 			}
+		default:
+			notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Unsupported model provider: %s", provider)}
 		}
 	}()
 
@@ -126,6 +138,8 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 		case StatusError:
 			StopSpinner(spinner)
 			Errorf("Stream error: %v\n", notify.Data)
+			// Show error to user with more context
+			fmt.Printf("\n%sError:%s %v\n", errorColor, resetColor, notify.Data)
 			return
 		case StatusFinished:
 			StopSpinner(spinner)
@@ -147,7 +161,7 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 			StopSpinner(spinner)
 			proceedCh <- true
 		case StatusFunctionCalling:
-			StartSpinner(spinner, "Fucntion Calling...")
+			StartSpinner(spinner, "Function Calling...")
 		case StatusFunctionCallingOver:
 			StopSpinner(spinner)
 			proceedCh <- true
