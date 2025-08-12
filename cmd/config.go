@@ -158,6 +158,13 @@ var configPrintCmd = &cobra.Command{
 
 		mark := GetMarkdownSwitch()
 		fmt.Printf("\n%s: %v\n", keyColor("Markdown Format"), mark)
+		
+		// Display max recursions value
+		maxRecursions := viper.GetInt("max_recursions")
+		if maxRecursions <= 0 {
+			maxRecursions = 5 // Default value
+		}
+		fmt.Printf("%s: %d\n", keyColor("Max Recursions"), maxRecursions)
 
 		modelName, modelInfo := GetEffectiveModel()
 		fmt.Printf("\n%s: %v\n", keyColor("Default Model"), highlightColor(modelName))
@@ -206,8 +213,8 @@ func init() {
 var configMaxRecursionsCmd = &cobra.Command{
 	Use:     "max-recursions [value]",
 	Aliases: []string{"mr"},
-	Short:   "Get or set the maximum number of recursions allowed",
-	Long: `Get or set the maximum number of recursions allowed in the application.
+	Short:   "Get or set the maximum number of Model calling recursions allowed",
+	Long: `Get or set the maximum number of Model calling recursions allowed in the application.
 
 If no value is provided, the current setting is displayed.
 If a value is provided, it sets the new maximum recursions value.`,
@@ -219,6 +226,15 @@ If a value is provided, it sets the new maximum recursions value.`,
 			if maxRecursions <= 0 {
 				maxRecursions = 5 // Default value
 			}
+			// Set the new value in viper
+			viper.Set("max_recursions", maxRecursions)
+
+			// Save the configuration to file
+			err := viper.WriteConfig()
+			if err != nil {
+				service.Errorf("Error saving config: %s\n", err)
+				return
+			}
 			fmt.Printf("Current maximum recursions: %d\n", maxRecursions)
 		} else {
 			// Argument provided - parse and set new value
@@ -229,22 +245,22 @@ If a value is provided, it sets the new maximum recursions value.`,
 				service.Errorf("Invalid value: %s. Please provide a valid integer.\n", newValue)
 				return
 			}
-			
+
 			if maxRecursions < 1 {
 				service.Errorf("Value must be a positive integer (at least 1).\n")
 				return
 			}
-			
+
 			// Set the new value in viper
 			viper.Set("max_recursions", maxRecursions)
-			
+
 			// Save the configuration to file
 			err = viper.WriteConfig()
 			if err != nil {
 				service.Errorf("Error saving config: %s\n", err)
 				return
 			}
-			
+
 			fmt.Printf("Maximum recursions set to: %d\n", maxRecursions)
 		}
 	},

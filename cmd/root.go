@@ -318,7 +318,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&searchFlag, "search", "s", "", "To query an LLM with a search function")
 	rootCmd.Flags().Lookup("search").NoOptDefVal = service.GetNoneSearchEngineName() // This sets a default when flag is used without value
 	rootCmd.Flags().StringVarP(&convoName, "conversation", "c", "", "Specify a conversation name to track chat session")
-	rootCmd.Flags().Int("max-recursions", 5, "Maximum number of Model calling recursions (default 5)")
+	rootCmd.Flags().Int("max-recursions", 5, "Maximum number of Model calling recursions")
 
 	rootCmd.Flags().BoolVarP(&codeFlag, "code", "C", false, "Enable model to generate and run Python code (only for gemini)")
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
