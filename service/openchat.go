@@ -367,7 +367,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 			// State transitions
 			switch state {
 			case stateNormal:
-				if delta.ReasoningContent != nil {
+				if HasContent(delta.ReasoningContent) {
 					c.proc <- StreamNotify{Status: StatusReasoning, Data: ""}
 					state = stateReasoning
 				}
@@ -378,7 +378,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 				}
 			}
 
-			if delta.ReasoningContent != nil {
+			if HasContent(delta.ReasoningContent) {
 				// For reasoning model
 				text := *delta.ReasoningContent
 				reasoningBuffer.WriteString(text)
