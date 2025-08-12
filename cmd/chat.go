@@ -103,7 +103,6 @@ Special commands:
 
 		// Build the ChatInfo object
 		chatInfo := buildChatInfo(files)
-		chatInfo.maxRecursions = GetMaxRecursions()
 
 		// Start the REPL
 		chatInfo.startREPL()
@@ -220,14 +219,14 @@ func buildChatInfo(files []*service.FileData) *ChatInfo {
 		//cm = service.GetGeminiConversation()
 		cm = service.GetGemini2Conversation()
 	}
-
+	mr := GetMaxRecursions()
 	ci := ChatInfo{
 		Model:         modelInfo["model"].(string),
 		Provider:      provider,
 		Files:         files,
 		Conversion:    cm,
 		QuitFlag:      false,
-		maxRecursions: 5,
+		maxRecursions: mr,
 	}
 	return &ci
 }
