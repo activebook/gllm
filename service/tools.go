@@ -32,6 +32,18 @@ Would you like me to run this command for you? Please confirm with 'yes', 'proce
 Status:
 %s
 %s`
+
+	// ExecRespTmplConfirmFileOp is the template for the response to the user before performing file operations.
+	ExecRespTmplConfirmFileOp = "Based on your request, I'm about to perform the following file operation:\n\n" +
+		"```\n%s\n```\n\n" +
+		"This operation will %s\n\n" +
+		`**Check:** 
+- First, Proceed with caution. Check whether this operation may make irreversible changes or affect critical parts of your system. 
+- Second, Ensure that the operation is safe and does not contain any malicious or harmful actions.
+- Third, If you deem it's safe, execute the operation. If not, let user to choose whether to proceed or modify the operation.
+Such as:
+Would you like me to proceed with this operation? Please confirm with 'yes', 'proceed', or provide alternative instructions.
+`
 )
 
 var (
@@ -176,6 +188,12 @@ func (ll *LangLogic) getOpenChatTools() []*model.Tool {
 					"type":        "string",
 					"description": "The path of the file to delete.",
 				},
+				"need_confirm": map[string]interface{}{
+					"type": "boolean",
+					"description": "Specifies whether to prompt the user for confirmation before deleting the file. " +
+						"This should always be true for safety.",
+					"default": true,
+				},
 			},
 			"required": []string{"path"},
 		},
@@ -196,6 +214,12 @@ func (ll *LangLogic) getOpenChatTools() []*model.Tool {
 				"path": map[string]interface{}{
 					"type":        "string",
 					"description": "The path of the directory to delete.",
+				},
+				"need_confirm": map[string]interface{}{
+					"type": "boolean",
+					"description": "Specifies whether to prompt the user for confirmation before deleting the directory. " +
+						"This should always be true for safety.",
+					"default": true,
 				},
 			},
 			"required": []string{"path"},
@@ -221,6 +245,12 @@ func (ll *LangLogic) getOpenChatTools() []*model.Tool {
 				"destination": map[string]interface{}{
 					"type":        "string",
 					"description": "The new path for the file or directory.",
+				},
+				"need_confirm": map[string]interface{}{
+					"type": "boolean",
+					"description": "Specifies whether to prompt the user for confirmation before moving the file or directory. " +
+						"This should always be true for safety.",
+					"default": true,
 				},
 			},
 			"required": []string{"source", "destination"},
@@ -580,6 +610,22 @@ func (c *OpenChat) processDeleteFileToolCall(toolCall *model.ToolCall, argsMap *
 		return nil, fmt.Errorf("path not found in arguments")
 	}
 
+	// Check if confirmation is needed
+	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
+	if !ok {
+		// Default to true for safety
+		needConfirm = true
+	}
+
+	if needConfirm {
+		// Response with a prompt to let user confirm
+		outStr := fmt.Sprintf(ExecRespTmplConfirmFileOp, fmt.Sprintf("delete file %s", path), fmt.Sprintf("delete the file at path: %s", path))
+		toolMessage.Content = &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(outStr),
+		}
+		return &toolMessage, nil
+	}
+
 	// Delete the file
 	err := os.Remove(path)
 	if err != nil {
@@ -607,6 +653,22 @@ func (c *OpenChat) processDeleteDirectoryToolCall(toolCall *model.ToolCall, args
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
 		return nil, fmt.Errorf("path not found in arguments")
+	}
+
+	// Check if confirmation is needed
+	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
+	if !ok {
+		// Default to true for safety
+		needConfirm = true
+	}
+
+	if needConfirm {
+		// Response with a prompt to let user confirm
+		outStr := fmt.Sprintf(ExecRespTmplConfirmFileOp, fmt.Sprintf("delete directory %s", path), fmt.Sprintf("delete the directory at path: %s and all its contents", path))
+		toolMessage.Content = &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(outStr),
+		}
+		return &toolMessage, nil
 	}
 
 	// Delete the directory
@@ -641,6 +703,22 @@ func (c *OpenChat) processMoveToolCall(toolCall *model.ToolCall, argsMap *map[st
 	destination, ok := (*argsMap)["destination"].(string)
 	if !ok {
 		return nil, fmt.Errorf("destination not found in arguments")
+	}
+
+	// Check if confirmation is needed
+	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
+	if !ok {
+		// Default to true for safety
+		needConfirm = true
+	}
+
+	if needConfirm {
+		// Response with a prompt to let user confirm
+		outStr := fmt.Sprintf(ExecRespTmplConfirmFileOp, fmt.Sprintf("move %s to %s", source, destination), fmt.Sprintf("move the file or directory from %s to %s", source, destination))
+		toolMessage.Content = &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(outStr),
+		}
+		return &toolMessage, nil
 	}
 
 	// Move/rename the file or directory
