@@ -9,10 +9,6 @@ import (
 	"google.golang.org/genai"
 )
 
-func (ll *LangLogic) GenerateGemini2Stream() error {
-	return ll.gemini2Stream()
-}
-
 func (ll *LangLogic) getGemini2FilePart(file *FileData) genai.Part {
 
 	mimeType := file.Format()
@@ -75,7 +71,7 @@ func (ll *LangLogic) getGemini2CommandTool() *genai.Tool {
 	return tool
 }
 
-func (ll *LangLogic) gemini2Stream() error {
+func (ll *LangLogic) GenerateGemini2Stream() error {
 	// Setup the Gemini client
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{

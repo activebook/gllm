@@ -22,16 +22,6 @@ const (
 	stateReasoning
 )
 
-func (ll *LangLogic) GenerateOpenChatStream() error {
-	// if !ll.UseSearchTool {
-	// 	return ll.openchatStream()
-	// } else {
-	// 	return ll.openchatStreamWithSearch()
-	// }
-
-	return ll.openchatStreamWithSearch()
-}
-
 func (ll *LangLogic) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessageContentPart {
 
 	var part *model.ChatCompletionMessageContentPart
@@ -64,7 +54,7 @@ func (ll *LangLogic) getOpenChatFilePart(file *FileData) *model.ChatCompletionMe
 	return part
 }
 
-func (ll *LangLogic) openchatStreamWithSearch() error {
+func (ll *LangLogic) GenerateOpenChatStream() error {
 
 	// 1. Initialize the Client
 	ctx := context.Background()
