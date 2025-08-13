@@ -387,13 +387,9 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	}
 
 	// Call function
-	var argsList []string
-	for k, v := range argsMap {
-		argsList = append(argsList, fmt.Sprintf("%s=%v", k, v))
-	}
 	c.proc <- StreamNotify{
 		Status: StatusFunctionCalling,
-		Data:   fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, strings.Join(argsList, ", ")),
+		Data:   fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, formatToolCallArguments(argsMap)),
 	}
 
 	var msg *model.ChatCompletionMessage
@@ -433,4 +429,18 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	c.proc <- StreamNotify{Status: StatusFunctionCallingOver}
 	<-c.proceed
 	return msg, err
+}
+
+func formatToolCallArguments(argsMap map[string]interface{}) string {
+	var argsList []string
+	for k, v := range argsMap {
+		switch val := v.(type) {
+		case []interface{}, map[string]interface{}:
+			jsonStr, _ := json.Marshal(val)
+			argsList = append(argsList, fmt.Sprintf("%s=%s", k, string(jsonStr)))
+		default:
+			argsList = append(argsList, fmt.Sprintf("%s=%v", k, v))
+		}
+	}
+	return strings.Join(argsList, ", ")
 }
