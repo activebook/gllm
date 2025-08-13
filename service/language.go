@@ -155,12 +155,8 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 			fmt.Print(resetColor)
 			fmt.Print(completeColor + "✓" + resetColor)
 			fmt.Println()
-		case StatusSearching:
-			StartSpinner(spinner, "Searching...")
-		case StatusSearchingOver:
-			StopSpinner(spinner)
-			proceedCh <- true
 		case StatusFunctionCalling:
+			fmt.Print(notify.Data) // Print the function call message
 			StartSpinner(spinner, "Function Calling...")
 		case StatusFunctionCallingOver:
 			StopSpinner(spinner)

@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 
@@ -80,13 +78,17 @@ func (ll *LangLogic) openchatStreamWithSearch() error {
 	// Create a tool with the function
 	tools := []*model.Tool{}
 	if IsExecPluginLoaded() {
-		commandTool := ll.getOpenChatCommandTool()
-		tools = append(tools, commandTool)
+		//commandTool := ll.getOpenChatCommandTool()
+		//tools = append(tools, commandTool)
 	}
 	if ll.UseSearchTool {
 		searchTool := ll.getOpenChatSearchTool()
 		tools = append(tools, searchTool)
 	}
+
+	// Add file operation tools
+	fileTools := ll.getOpenChatTools()
+	tools = append(tools, fileTools...)
 
 	chat := &OpenChat{
 		client:        client,
@@ -177,76 +179,6 @@ type OpenChat struct {
 	references    []*map[string]interface{} // keep track of the references
 }
 
-func (ll *LangLogic) getOpenChatSearchTool() *model.Tool {
-
-	engine := GetSearchEngine()
-	switch engine {
-	case GoogleSearchEngine:
-		// Use Google Search Engine
-	case BingSearchEngine:
-		// Use Bing Search Engine
-	case TavilySearchEngine:
-		// Use Tavily Search Engine
-	case NoneSearchEngine:
-		// Use None Search Engine
-	default:
-	}
-
-	searchFunc := model.FunctionDefinition{
-		Name:        "web_search",
-		Description: "Retrieve the most relevant and up-to-date information from the web.",
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"query": map[string]interface{}{
-					"type":        "string",
-					"description": "The search term or question to find information about.",
-				},
-			},
-			"required": []string{"query"},
-		},
-	}
-	searchTool := model.Tool{
-		Type:     model.ToolTypeFunction,
-		Function: &searchFunc,
-	}
-
-	return &searchTool
-}
-
-func (ll *LangLogic) getOpenChatCommandTool() *model.Tool {
-	commandFunc := model.FunctionDefinition{
-		Name:        "execute_command",
-		Description: "Execute system commands on the user's device with confirmation.",
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"command": map[string]interface{}{
-					"type":        "string",
-					"description": "The command to be executed on the user's system.",
-				},
-				"description": map[string]interface{}{
-					"type":        "string",
-					"description": "Explanation of what this command will do.",
-				},
-				"need_confirm": map[string]interface{}{
-					"type":        "boolean",
-					"description": "Whether this command requires explicit user confirmation before execution.",
-					"default":     true,
-				},
-			},
-			"required": []string{"command", "description", "need_confirm"},
-		},
-	}
-
-	commandTool := model.Tool{
-		Type:     model.ToolTypeFunction,
-		Function: &commandFunc,
-	}
-
-	return &commandTool
-}
-
 func (c *OpenChat) process() error {
 	convo := GetOpenChatConversation()
 
@@ -272,15 +204,9 @@ func (c *OpenChat) process() error {
 		// Make the streaming request
 		stream, err := c.client.CreateChatCompletionStream(*c.ctx, req)
 		if err != nil {
-			errMsg := fmt.Sprintf("Failed to create chat completion stream for model %s: %v", c.model, err)
-			c.proc <- StreamNotify{Status: StatusError, Data: errMsg}
 			return fmt.Errorf("stream creation error: %v", err)
 		}
-		defer func() {
-			if stream != nil {
-				stream.Close()
-			}
-		}()
+		defer stream.Close()
 
 		c.proc <- StreamNotify{Status: StatusStarted}
 		<-c.proceed // Wait for the main goroutine to tell sub-goroutine to proceed
@@ -288,8 +214,6 @@ func (c *OpenChat) process() error {
 		// Process the stream and collect tool calls
 		assistantMessage, toolCalls, err := c.processStream(stream)
 		if err != nil {
-			errMsg := fmt.Sprintf("Error while processing stream response: %v", err)
-			c.proc <- StreamNotify{Status: StatusError, Data: errMsg}
 			return fmt.Errorf("error processing stream: %v", err)
 		}
 
@@ -401,7 +325,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 
 					// Skip if not our expected function
 					// Because some model made up function name
-					if functionName != "" && functionName != "web_search" && functionName != "execute_command" {
+					if functionName != "" && functionName != "web_search" && functionName != "shell" {
 						continue
 					}
 
@@ -475,167 +399,42 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		return nil, fmt.Errorf("error parsing arguments: %v", err)
 	}
 
-	switch toolCall.Function.Name {
-	case "execute_command":
-		return c.processCommandToolCalls(&toolCall, &argsMap)
-	case "web_search":
-		return c.processSearchToolCalls(&toolCall, &argsMap)
-	default:
-		return nil, fmt.Errorf("unknown function name: %s", toolCall.Function.Name)
-	}
-}
-
-func (c *OpenChat) processCommandToolCalls(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	// Create a tool message
-	// Tool Message's Content wouldn't be serialized in the response
-	// That's not a problem, because each time, the tool result could be different!
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	cmdStr, ok := (*argsMap)["command"].(string)
-	if !ok {
-		return nil, fmt.Errorf("command not found in arguments for tool call ID %s", toolCall.ID)
-	}
-	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
-	if !ok {
-		needConfirm = true
-	}
-	if needConfirm {
-		// Response with a prompt to let user confirm
-		descStr, ok := (*argsMap)["description"].(string)
-		if !ok {
-			return nil, fmt.Errorf("description not found in arguments for tool call ID %s", toolCall.ID)
-		}
-		outStr := fmt.Sprintf(ExecRespTmplConfirm, cmdStr, descStr)
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(outStr),
-		}
-		return &toolMessage, nil
-	}
-
 	// Call function
-	c.proc <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("Function call: %v\n", toolCall.Function.Name)}
+	c.proc <- StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%+v)\n", toolCall.Function.Name, argsMap)}
 
-	// Log that we're executing the command
-	c.proc <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("%s\n", cmdStr)}
-	var errStr string
-
-	// Do the real command
-	c.proc <- StreamNotify{Status: StatusFunctionCalling, Data: ""}
-	var out []byte
+	var msg *model.ChatCompletionMessage
 	var err error
-	if runtime.GOOS == "windows" {
-		out, err = exec.Command("cmd", "/C", cmdStr).CombinedOutput()
-	} else {
-		out, err = exec.Command("sh", "-c", cmdStr).CombinedOutput()
-	}
-	c.proc <- StreamNotify{Status: StatusFunctionCallingOver, Data: ""}
-	<-c.proceed
-
-	// Handle command exec failed
-	if err != nil {
-		var exitCode int
-		if exitError, ok := err.(*exec.ExitError); ok {
-			exitCode = exitError.ExitCode()
-		}
-		errStr = fmt.Sprintf("Command failed with exit code %d: %v", exitCode, err)
-		// Send error details to user
-		c.proc <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("\n%sError:%s %s\n", errorColor, resetColor, errStr)}
-	}
-
-	// Output the result
-	outStr := string(out)
-	if outStr != "" {
-		outStr = outStr + "\n"
-		c.proc <- StreamNotify{Status: StatusData, Data: outStr}
-	}
-
-	// Format error info if present
-	errorInfo := ""
-	if errStr != "" {
-		errorInfo = fmt.Sprintf("Error: %s", errStr)
-	}
-	// Format output info
-	outputInfo := ""
-	if outStr != "" {
-		outputInfo = fmt.Sprintf("Output:\n%s", outStr)
-	} else {
-		outputInfo = "Output: <no output>"
-	}
-	// Create a response that prompts the LLM to provide insightful analysis of the command output
-	finalResponse := fmt.Sprintf(ExecRespTmplOutput, cmdStr, errorInfo, outputInfo)
-
-	// Create and return the tool response message
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(finalResponse),
-	}
-	return &toolMessage, nil
-}
-
-func (c *OpenChat) processSearchToolCalls(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	query, ok := (*argsMap)["query"].(string)
-	if !ok {
-		return nil, fmt.Errorf("query not found in arguments for tool call ID %s", toolCall.ID)
-	}
-
-	Debugf("\nFunction Calling: %s(%+v)\n", toolCall.Function.Name, query)
-	c.proc <- StreamNotify{Status: StatusSearching, Data: ""}
-
-	// Call the search function
-	engine := GetSearchEngine()
-	var data map[string]any
-	var err error
-	switch engine {
-	case GoogleSearchEngine:
-		// Use Google Search Engine
-		data, err = GoogleSearch(query)
-	case BingSearchEngine:
-		// Use Bing Search Engine
-		data, err = BingSearch(query)
-	case TavilySearchEngine:
-		// Use Tavily Search Engine
-		data, err = TavilySearch(query)
-	case NoneSearchEngine:
-		// Use None Search Engine
-		data, err = NoneSearch(query)
+	switch toolCall.Function.Name {
+	case "shell":
+		msg, err = c.processShellToolCall(&toolCall, &argsMap)
+	case "web_search":
+		msg, err = c.processSearchToolCall(&toolCall, &argsMap)
+	case "read_file":
+		msg, err = c.processReadFileToolCall(&toolCall, &argsMap)
+	case "write_file":
+		msg, err = c.processWriteFileToolCall(&toolCall, &argsMap)
+	case "create_directory":
+		msg, err = c.processCreateDirectoryToolCall(&toolCall, &argsMap)
+	case "list_directory":
+		msg, err = c.processListDirectoryToolCall(&toolCall, &argsMap)
+	case "delete_file":
+		msg, err = c.processDeleteFileToolCall(&toolCall, &argsMap)
+	case "delete_directory":
+		msg, err = c.processDeleteDirectoryToolCall(&toolCall, &argsMap)
+	case "move":
+		msg, err = c.processMoveToolCall(&toolCall, &argsMap)
+	case "search_files":
+		msg, err = c.processSearchFilesToolCall(&toolCall, &argsMap)
+	case "search_text_in_file":
+		msg, err = c.processSearchTextInFileToolCall(&toolCall, &argsMap)
+	case "read_multiple_files":
+		msg, err = c.processReadMultipleFilesToolCall(&toolCall, &argsMap)
 	default:
-		err = fmt.Errorf("unknown search engine: %s", engine)
+		msg = nil
+		err = fmt.Errorf("unknown function name: %s", toolCall.Function.Name)
 	}
-
-	if err != nil {
-		c.proc <- StreamNotify{Status: StatusSearchingOver, Data: ""}
-		<-c.proceed
-		Warnf("Performing search: %v", err)
-		errMsg := fmt.Sprintf("Error performing search for query '%s': %v", query, err)
-		c.proc <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("\n%sError:%s %s\n", errorColor, resetColor, errMsg)}
-		return nil, fmt.Errorf("error performing search: %v", err)
-	}
-	// keep the search results for references
-	c.queries = append(c.queries, query)
-	c.references = append(c.references, &data)
-
-	// Convert search results to JSON string
-	resultsJSON, err := json.Marshal(data)
-	if err != nil {
-		// TODO: Potentially send an error FunctionResponse back to the model
-		c.proc <- StreamNotify{Status: StatusSearchingOver, Data: ""}
-		<-c.proceed
-		errMsg := fmt.Sprintf("Error marshaling search results for query '%s': %v", query, err)
-		c.proc <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("\n%sError:%s %s\n", errorColor, resetColor, errMsg)}
-		return nil, fmt.Errorf("error marshaling results: %v", err)
-	}
-
-	c.proc <- StreamNotify{Status: StatusSearchingOver, Data: ""}
+	// Function call is done
+	c.proc <- StreamNotify{Status: StatusFunctionCallingOver}
 	<-c.proceed
-	// Create and return the tool response message
-	return &model.ChatCompletionMessage{
-		Role: model.ChatMessageRoleTool,
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(string(resultsJSON)),
-		}, Name: Ptr(""),
-		ToolCallID: toolCall.ID,
-	}, nil
+	return msg, err
 }
