@@ -69,6 +69,13 @@ Special commands:
 				}
 			}
 
+			// Deep dive
+			if deepDiveFlag {
+				service.SetDeepDive(deepDiveFlag)
+			} else {
+				service.SetDeepDive(false)
+			}
+
 			if cmd.Flags().Changed("search") {
 				// Search mode
 				SetEffectSearchEnginelName(searchFlag)
@@ -128,6 +135,7 @@ func init() {
 	chatCmd.Flags().BoolVarP(&toolsFlag, "tools", "t", true, "Enable or disable tools for the chat session")
 	chatCmd.Flags().Lookup("search").NoOptDefVal = service.GetDefaultSearchEngineName()
 	chatCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
+	chatCmd.Flags().BoolVar(&deepDiveFlag, "deep-dive", false, "Enable deep dive search to fetch all links from search results")
 }
 
 func (ci *ChatInfo) startREPL() {
@@ -635,15 +643,18 @@ func (ci *ChatInfo) callLLM(input string) {
 	appendText(&finalPrompt, input)
 	_, modelInfo := GetEffectiveModel()
 	sys_prompt := GetEffectiveSystemPrompt()
-	var searchEngine map[string]any
-	if searchFlag != "" {
-		_, searchEngine = GetEffectiveSearchEngine()
-	}
+
 	if !toolsFlag {
 		// if tools flag are not set, check if they are enabled globally
 		toolsFlag = AreToolsEnabled()
 	}
 	useTools := toolsFlag
+
+	var searchEngine map[string]any
+	if searchFlag != "" || useTools {
+		_, searchEngine = GetEffectiveSearchEngine()
+	}
+
 	service.CallLanguageModel(finalPrompt.String(), sys_prompt, ci.Files, modelInfo, searchEngine, useTools, ci.maxRecursions)
 
 	// We must reset the files after processing

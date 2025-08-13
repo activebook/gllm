@@ -33,6 +33,7 @@ var (
 	searchFlag    string   // gllm --search(-s) "What is the stock price of Tesla right now?"
 	toolsFlag     bool     // gllm --tools(-t) "Move a.txt to folder b"
 	codeFlag      bool     // gllm --code(-C) "print('Hello, World!')"
+	deepDiveFlag  bool     // gllm --deep-dive "Tell me current tariff war results"
 	referenceFlag int      // gllm --reference(-r) 3 "What is the stock price of Tesla right now?"
 	convoName     string   // gllm --conversation(-c) "My Conversation" "What is the stock price of Tesla right now?"
 
@@ -156,6 +157,13 @@ Configure your API keys and preferred models, then start chatting or executing c
 					service.DisableCodeExecution()
 				}
 
+				// Deep dive
+				if deepDiveFlag {
+					service.SetDeepDive(deepDiveFlag)
+				} else {
+					service.SetDeepDive(false)
+				}
+
 				// Check if -c/--conversation was used without a value
 				if cmd.Flags().Changed("conversation") {
 					// Flag was used without a value, use a default name
@@ -269,12 +277,15 @@ func processQuery(prompt string, files []*service.FileData) {
 	_, modelInfo := GetEffectiveModel()
 	sys_prompt := GetEffectiveSystemPrompt()
 	maxRecursions := GetMaxRecursions()
+	useTools := toolsFlag
+
 	var searchEngine map[string]any
-	if searchFlag != "" {
+	// If search flag is set, use the effective search engine
+	// If toolsFlag is set, we also need to use the search engine
+	if searchFlag != "" || useTools {
 		_, searchEngine = GetEffectiveSearchEngine()
 		service.SetMaxReferences(referenceFlag)
 	}
-	useTools := toolsFlag
 
 	service.CallLanguageModel(prompt, sys_prompt, files, modelInfo, searchEngine, useTools, maxRecursions)
 }
@@ -334,6 +345,7 @@ func init() {
 	// These flags are not persistent, so they only apply to this command
 	rootCmd.Flags().BoolVarP(&toolsFlag, "tools", "t", false, "Enable model to use embedding tools")
 	rootCmd.Flags().BoolVarP(&codeFlag, "code", "C", false, "Enable model to generate and run Python code (only for gemini)")
+	rootCmd.Flags().BoolVarP(&deepDiveFlag, "deep-dive", "", false, "Fetch more details from the search (default: off)")
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
 
 	// Add more persistent flags here if needed (e.g., --verbose, --log-file)
