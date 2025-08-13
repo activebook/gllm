@@ -149,7 +149,7 @@ var configPrintCmd = &cobra.Command{
 		if !toolsEnabled {
 			toolsStatus = color.New(color.FgRed, color.Bold).Sprint("No")
 		}
-		for _, tool := range availableTools {
+		for _, tool := range service.GetAllEmbeddingTools() {
 			fmt.Fprintf(w, "%s\t%s\n", keyColor(tool), toolsStatus)
 		}
 		w.Flush()

@@ -312,7 +312,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 
 					// Skip if not our expected function
 					// Because some model made up function name
-					if functionName != "" && functionName != "web_search" && functionName != "shell" {
+					if functionName != "" && !AvailableEmbeddingTool(functionName) {
 						continue
 					}
 
@@ -387,7 +387,14 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	}
 
 	// Call function
-	c.proc <- StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%+v)\n", toolCall.Function.Name, argsMap)}
+	var argsList []string
+	for k, v := range argsMap {
+		argsList = append(argsList, fmt.Sprintf("%s=%v", k, v))
+	}
+	c.proc <- StreamNotify{
+		Status: StatusFunctionCalling,
+		Data:   fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, strings.Join(argsList, ", ")),
+	}
 
 	var msg *model.ChatCompletionMessage
 	var err error

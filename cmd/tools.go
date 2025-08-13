@@ -3,26 +3,10 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/activebook/gllm/service"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-)
-
-var (
-	availableTools = []string{
-		"shell",
-		"read_file",
-		"write_file",
-		"create_directory",
-		"list_directory",
-		"delete_file",
-		"delete_directory",
-		"move",
-		"search_files",
-		"search_text_in_file",
-		"read_multiple_files",
-		"web_search",
-	}
 )
 
 var toolsCmd = &cobra.Command{
@@ -109,7 +93,7 @@ func SwitchUseTools(s string) error {
 func ListEmbeddingTools() {
 	enabled := AreToolsEnabled()
 	fmt.Println("Available tools:")
-	for _, tool := range availableTools {
+	for _, tool := range service.GetAllEmbeddingTools() {
 		if enabled {
 			fmt.Printf("[✔] %s\n", tool)
 		} else {

@@ -39,20 +39,35 @@ Status:
 %s`
 )
 
-// File and folder operation tools for LLM
-// list all function names here:
-// - read_file
-// - write_file
-// - create_directory
-// - list_directory
-// - delete_file
-// - delete_directory
-// - move
-// - search_files
-// - search_text_in_file
-// - read_multiple_files
-// - shell
-// - web_search
+var (
+	embeddingTools = []string{
+		"shell",
+		"read_file",
+		"write_file",
+		"create_directory",
+		"list_directory",
+		"delete_file",
+		"delete_directory",
+		"move",
+		"search_files",
+		"search_text_in_file",
+		"read_multiple_files",
+		"web_search",
+	}
+)
+
+func GetAllEmbeddingTools() []string {
+	return embeddingTools
+}
+
+func AvailableEmbeddingTool(toolName string) bool {
+	for _, tool := range embeddingTools {
+		if tool == toolName {
+			return true
+		}
+	}
+	return false
+}
 
 // Tool definitions for file operations
 func (ll *LangLogic) getOpenChatTools() []*model.Tool {
