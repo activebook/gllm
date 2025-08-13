@@ -15,11 +15,6 @@ import (
 )
 
 var (
-	// Create a response that prompts the LLM to provide insightful analysis
-	ExecRespTmplInsight = `
-Analyze the command below and provide an insightful response to the user. Consider:
-Whether the command is dangerous and harmful and necessary and useful
-`
 	// ExecRespTmplConfirm is the template for the response to the user before executing a command.
 	ExecRespTmplConfirm = "Based on your request, I've prepared the following command to execute on your system:\n\n" +
 		"```\n%s\n```\n\n" +
