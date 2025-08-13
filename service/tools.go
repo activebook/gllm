@@ -61,6 +61,7 @@ var (
 		"search_files",
 		"search_text_in_file",
 		"read_multiple_files",
+		"web_fetch",
 		"web_search",
 	}
 )
@@ -86,9 +87,30 @@ func (ll *LangLogic) getOpenChatTools() []*model.Tool {
 	shellTool := ll.getOpenChatShellTool()
 	tools = append(tools, shellTool)
 
-	// Search tool
+	// Web search tool
 	webSearchTool := ll.getOpenChatWebSearchTool()
 	tools = append(tools, webSearchTool)
+
+	// Web fetch tool
+	webFetchFunc := model.FunctionDefinition{
+		Name:        "web_fetch",
+		Description: "Fetch content from a URL and extract the main text content.",
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"url": map[string]interface{}{
+					"type":        "string",
+					"description": "The URL to fetch content from.",
+				},
+			},
+			"required": []string{"url"},
+		},
+	}
+	webFetchTool := model.Tool{
+		Type:     model.ToolTypeFunction,
+		Function: &webFetchFunc,
+	}
+	tools = append(tools, &webFetchTool)
 
 	// Read file tool
 	readFileFunc := model.FunctionDefinition{
@@ -1045,6 +1067,39 @@ func (c *OpenChat) processShellToolCall(toolCall *model.ToolCall, argsMap *map[s
 	// Create and return the tool response message
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(finalResponse),
+	}
+	return &toolMessage, nil
+}
+
+func (c *OpenChat) processWebFetchToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	toolMessage := model.ChatCompletionMessage{
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Name:       Ptr(""),
+	}
+
+	url, ok := (*argsMap)["url"].(string)
+	if !ok {
+		return nil, fmt.Errorf("url not found in arguments for tool call ID %s", toolCall.ID)
+	}
+
+	// Call the fetch function
+	results := FetchProcess([]string{url})
+
+	// Check if FetchProcess returned any results
+	if len(results) == 0 {
+		// If no content was fetched or extracted, create an error message for the user.
+		response := fmt.Sprintf("Failed to fetch content from %s or no content was extracted. Please check the URL or try again.", url)
+		toolMessage.Content = &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(response),
+		}
+		return &toolMessage, nil
+	}
+
+	// Create and return the tool response message
+	response := fmt.Sprintf("Fetched content from %s:\n%s", url, results[0])
+	toolMessage.Content = &model.ChatCompletionMessageContent{
+		StringValue: volcengine.String(response),
 	}
 	return &toolMessage, nil
 }

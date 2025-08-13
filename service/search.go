@@ -201,8 +201,13 @@ func tavilyFormatResponse(tavilyResp *TavilyResponse) (map[string]any, error) {
 			"link":        r.URL,
 			"displayLink": displayLink,
 			"snippet":     r.Content,
-			"content":     contents[i], // Attach fetched content here
 		}
+		
+		// Safely add content if it exists
+		if i < len(contents) {
+			resultMap["content"] = contents[i]
+		}
+		
 		results = append(results, resultMap)
 	}
 
@@ -257,8 +262,13 @@ func GoogleSearch(query string) (map[string]any, error) {
 			"link":        result.Link,
 			"displayLink": result.DisplayLink,
 			"snippet":     result.Snippet,
-			"content":     contents[i], // Attach fetched content here
 		}
+		
+		// Safely add content if it exists
+		if i < len(contents) {
+			resultMap["content"] = contents[i]
+		}
+		
 		results = append(results, resultMap)
 	}
 

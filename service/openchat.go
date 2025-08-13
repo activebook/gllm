@@ -67,10 +67,11 @@ func (ll *LangLogic) GenerateOpenChatStream() error {
 
 	// Create a tool with the function
 	tools := []*model.Tool{}
-	if ll.UseSearchTool {
-		searchTool := ll.getOpenChatWebSearchTool()
-		tools = append(tools, searchTool)
-	}
+	// this would be duplicated with the tools in LangLogic
+	// if ll.UseSearchTool {
+	// 	searchTool := ll.getOpenChatWebSearchTool()
+	// 	tools = append(tools, searchTool)
+	// }
 	if ll.UseTools {
 		// Add embedding operation tools
 		embeddingTools := ll.getOpenChatTools()
@@ -396,6 +397,8 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	switch toolCall.Function.Name {
 	case "shell":
 		msg, err = c.processShellToolCall(&toolCall, &argsMap)
+	case "web_fetch":
+		msg, err = c.processWebFetchToolCall(&toolCall, &argsMap)
 	case "web_search":
 		msg, err = c.processWebSearchToolCall(&toolCall, &argsMap)
 	case "read_file":
