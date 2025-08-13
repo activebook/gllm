@@ -67,15 +67,15 @@ func (ll *LangLogic) GenerateOpenChatStream() error {
 
 	// Create a tool with the function
 	tools := []*model.Tool{}
-	// this would be duplicated with the tools in LangLogic
-	// if ll.UseSearchTool {
-	// 	searchTool := ll.getOpenChatWebSearchTool()
-	// 	tools = append(tools, searchTool)
-	// }
 	if ll.UseTools {
-		// Add embedding operation tools
+		// Add embedding operation tools, which includes the web_search tool
 		embeddingTools := ll.getOpenChatTools()
 		tools = append(tools, embeddingTools...)
+	} else if ll.UseSearchTool {
+		// Only add the search tool if general tools are not enabled,
+		// but the search flag is explicitly set.
+		searchTool := ll.getOpenChatWebSearchTool()
+		tools = append(tools, searchTool)
 	}
 
 	chat := &OpenChat{

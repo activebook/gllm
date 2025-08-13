@@ -149,6 +149,8 @@ Configure your API keys and preferred models, then start chatting or executing c
 					// if tools flag are not set, check if they are enabled globally
 					toolsFlag = AreToolsEnabled()
 				}
+				// Set whether or not to use tools
+				SetToolsEnabled(toolsFlag)
 
 				// Code execution
 				if codeFlag {
@@ -277,8 +279,13 @@ func processQuery(prompt string, files []*service.FileData) {
 	_, modelInfo := GetEffectiveModel()
 	sys_prompt := GetEffectiveSystemPrompt()
 	maxRecursions := GetMaxRecursions()
-	useTools := toolsFlag
 
+	// tools (Contains web_search tool)
+	useTools := AreToolsEnabled()
+
+	// search engine will be loaded and made available if
+	// either the -s flag is used (searchFlag != "")
+	// or if tools are enabled (useTools is true).
 	var searchEngine map[string]any
 	// If search flag is set, use the effective search engine
 	// If toolsFlag is set, we also need to use the search engine

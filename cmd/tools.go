@@ -73,6 +73,14 @@ func AreToolsEnabled() bool {
 	return enabled
 }
 
+func SetToolsEnabled(enabled bool) error {
+	viper.Set("tools.enabled", enabled)
+	if err := viper.WriteConfig(); err != nil {
+		return fmt.Errorf("failed to save tools configuration: %w", err)
+	}
+	return nil
+}
+
 func SwitchUseTools(s string) error {
 	switch s {
 	case "on":

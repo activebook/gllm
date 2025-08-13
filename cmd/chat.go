@@ -76,6 +76,13 @@ Special commands:
 				service.SetDeepDive(false)
 			}
 
+			if !toolsFlag {
+				// if tools flag are not set, check if they are enabled globally
+				toolsFlag = AreToolsEnabled()
+			}
+			// Set whether or not to use tools
+			SetToolsEnabled(toolsFlag)
+
 			if cmd.Flags().Changed("search") {
 				// Search mode
 				SetEffectSearchEnginelName(searchFlag)
@@ -644,12 +651,11 @@ func (ci *ChatInfo) callLLM(input string) {
 	_, modelInfo := GetEffectiveModel()
 	sys_prompt := GetEffectiveSystemPrompt()
 
-	if !toolsFlag {
-		// if tools flag are not set, check if they are enabled globally
-		toolsFlag = AreToolsEnabled()
-	}
-	useTools := toolsFlag
+	// Check whether to use tools
+	useTools := AreToolsEnabled()
 
+	// If tools are enabled, we will use the search engine
+	// If search flag is set, we will use the search engine, too
 	var searchEngine map[string]any
 	if searchFlag != "" || useTools {
 		_, searchEngine = GetEffectiveSearchEngine()
