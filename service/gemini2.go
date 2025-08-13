@@ -123,7 +123,7 @@ func (ll *LangLogic) GenerateGemini2Stream() error {
 		config.SystemInstruction = &genai.Content{Parts: []*genai.Part{{Text: ll.SystemPrompt}}}
 	}
 	// Tools
-	if IsExecPluginLoaded() {
+	if ll.UseTools {
 		config.Tools = append(config.Tools, ll.getGemini2CommandTool())
 	}
 	// Remember: CodeExecution and GoogleSearch cannot be enabled at the same time

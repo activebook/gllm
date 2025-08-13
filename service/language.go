@@ -7,6 +7,7 @@ import (
 const (
 	// Terminal colors
 	inProgressColor = "\033[90m" // Bright Black
+	inCallingColor  = "\033[36m" // Cyan
 	completeColor   = "\033[32m" // Green
 )
 
@@ -21,6 +22,7 @@ type LangLogic struct {
 	ProcChan      chan<- StreamNotify // Sub Channel to send notifications
 	ProceedChan   <-chan bool         // Sub Channel to receive proceed signal
 	UseSearchTool bool                // Use search tool
+	UseTools      bool                // Use tools
 	UseCodeTool   bool                // Use code tool
 	MaxRecursions int                 // Maximum number of recursions for model calls
 }
@@ -30,7 +32,7 @@ type LangLogic struct {
 // 	CallLanguageModelWithMaxRecursions(prompt, sys_prompt, files, modelInfo, searchEngine, 5)
 // }
 
-func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, modelInfo map[string]any, searchEngine map[string]any, maxRecursions int) {
+func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, modelInfo map[string]any, searchEngine map[string]any, useTools bool, maxRecursions int) {
 	var temperature float32
 	switch temp := modelInfo["temperature"].(type) {
 	case float64:
@@ -86,6 +88,7 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 		ProcChan:      notifyCh,
 		ProceedChan:   proceedCh,
 		UseSearchTool: useSearch,
+		UseTools:      useTools,
 		UseCodeTool:   exeCode,
 		MaxRecursions: maxRecursions,
 	}
@@ -156,7 +159,8 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 			fmt.Print(completeColor + "✓" + resetColor)
 			fmt.Println()
 		case StatusFunctionCalling:
-			fmt.Print(notify.Data) // Print the function call message
+			fmt.Print(resetColor)
+			fmt.Print(inCallingColor + notify.Data + resetColor) // Print the function call message
 			StartSpinner(spinner, "Function Calling...")
 		case StatusFunctionCallingOver:
 			StopSpinner(spinner)

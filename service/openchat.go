@@ -67,18 +67,15 @@ func (ll *LangLogic) GenerateOpenChatStream() error {
 
 	// Create a tool with the function
 	tools := []*model.Tool{}
-	if IsExecPluginLoaded() {
-		//commandTool := ll.getOpenChatCommandTool()
-		//tools = append(tools, commandTool)
-	}
 	if ll.UseSearchTool {
 		searchTool := ll.getOpenChatSearchTool()
 		tools = append(tools, searchTool)
 	}
-
-	// Add file operation tools
-	fileTools := ll.getOpenChatTools()
-	tools = append(tools, fileTools...)
+	if ll.UseTools {
+		// Add embedding operation tools
+		embeddingTools := ll.getOpenChatTools()
+		tools = append(tools, embeddingTools...)
+	}
 
 	chat := &OpenChat{
 		client:        client,

@@ -31,6 +31,7 @@ var (
 	sysPromptFlag string   // gllm "Act as shell" --system-prompt(-S) @shell-assistant
 	templateFlag  string   // gllm --template(-t) @coder
 	searchFlag    string   // gllm --search(-s) "What is the stock price of Tesla right now?"
+	toolsFlag     bool     // gllm --tools(-t) "Move a.txt to folder b"
 	codeFlag      bool     // gllm --code(-C) "print('Hello, World!')"
 	referenceFlag int      // gllm --reference(-r) 3 "What is the stock price of Tesla right now?"
 	convoName     string   // gllm --conversation(-c) "My Conversation" "What is the stock price of Tesla right now?"
@@ -140,6 +141,12 @@ Configure your API keys and preferred models, then start chatting or executing c
 				} else {
 					// Normal mode
 					searchFlag = ""
+				}
+
+				// Tools
+				if !toolsFlag {
+					// if tools flag are not set, check if they are enabled globally
+					toolsFlag = AreToolsEnabled()
 				}
 
 				// Code execution
@@ -267,7 +274,9 @@ func processQuery(prompt string, files []*service.FileData) {
 		_, searchEngine = GetEffectiveSearchEngine()
 		service.SetMaxReferences(referenceFlag)
 	}
-	service.CallLanguageModel(prompt, sys_prompt, files, modelInfo, searchEngine, maxRecursions)
+	useTools := toolsFlag
+
+	service.CallLanguageModel(prompt, sys_prompt, files, modelInfo, searchEngine, useTools, maxRecursions)
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -312,7 +321,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&modelFlag, "model", "m", "", "Specify the language model to use")
 	rootCmd.Flags().StringSliceVarP(&attachments, "attachment", "a", []string{}, "Specify file(s), image(s), url(s) to append to the prompt")
 	rootCmd.Flags().StringVarP(&sysPromptFlag, "system-prompt", "S", "", "Specify a system prompt")
-	rootCmd.Flags().StringVarP(&templateFlag, "template", "t", "", "Specify a template to use")
+	rootCmd.Flags().StringVarP(&templateFlag, "template", "p", "", "Specify a template to use")
 	rootCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
 
 	// The key fix is using NoOptDefVal property which specifically handles the case when a flag is provided without a value.
@@ -321,6 +330,9 @@ func init() {
 	rootCmd.Flags().StringVarP(&convoName, "conversation", "c", "", "Specify a conversation name to track chat session")
 	rootCmd.Flags().Int("max-recursions", 5, "Maximum number of Model calling recursions")
 
+	// Flags for enabling/disabling features
+	// These flags are not persistent, so they only apply to this command
+	rootCmd.Flags().BoolVarP(&toolsFlag, "tools", "t", false, "Enable model to use embedding tools")
 	rootCmd.Flags().BoolVarP(&codeFlag, "code", "C", false, "Enable model to generate and run Python code (only for gemini)")
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
 
