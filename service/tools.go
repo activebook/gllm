@@ -36,15 +36,7 @@ Would you like me to run this command for you? Please confirm with 'yes', 'proce
 	ExecRespTmplOutput = `Command executed: %s
 Status:
 %s
-%s
-
-Analyze the execution result above and provide an insightful response to the user. Consider:
-1. Whether the command succeeded or failed
-2. If output is empty but status is success, explain what this likely means
-3. What the output means, if present
-4. What follow-up actions might be useful (e.g., verification commands)
-5. Any potential issues or warnings based on the output
-Keep your analysis concise and helpful.`
+%s`
 )
 
 // File and folder operation tools for LLM
@@ -844,7 +836,8 @@ func (c *OpenChat) processShellToolCall(toolCall *model.ToolCall, argsMap *map[s
 	}
 	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
 	if !ok {
-		needConfirm = true
+		// there is no need_confirm parameter, so we assume it's false
+		needConfirm = false
 	}
 	if needConfirm {
 		// Response with a prompt to let user confirm

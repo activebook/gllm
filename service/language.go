@@ -111,15 +111,13 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 		switch provider {
 		case ModelOpenAICompatible:
 			if err := ll.GenerateOpenChatStream(); err != nil {
-				//notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("OpenChat stream error: %v", err)}
 				//Errorf("Stream error: %v\n", err)
-				notifyCh <- StreamNotify{Status: StatusError}
+				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 			}
 		case ModelGemini:
 			if err := ll.GenerateGemini2Stream(); err != nil {
-				//notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Gemini stream error: %v", err)}
 				//Errorf("Stream error: %v\n", err)
-				notifyCh <- StreamNotify{Status: StatusError}
+				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 			}
 		default:
 			notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Unsupported model provider: %s", provider)}
