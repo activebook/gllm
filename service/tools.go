@@ -53,9 +53,9 @@ var (
 		"read_file",
 		"write_file",
 		"edit_file",
+		"delete_file",
 		"create_directory",
 		"list_directory",
-		"delete_file",
 		"delete_directory",
 		"move",
 		"search_files",
@@ -83,8 +83,12 @@ func (ll *LangLogic) getOpenChatTools() []*model.Tool {
 	var tools []*model.Tool
 
 	// Shell tool
-	getOpenChatShellTool := ll.getOpenChatShellTool()
-	tools = append(tools, getOpenChatShellTool)
+	shellTool := ll.getOpenChatShellTool()
+	tools = append(tools, shellTool)
+
+	// Search tool
+	webSearchTool := ll.getOpenChatWebSearchTool()
+	tools = append(tools, webSearchTool)
 
 	// Read file tool
 	readFileFunc := model.FunctionDefinition{
@@ -456,7 +460,7 @@ LLM should call with:
 	return &shellTool
 }
 
-func (ll *LangLogic) getOpenChatSearchTool() *model.Tool {
+func (ll *LangLogic) getOpenChatWebSearchTool() *model.Tool {
 	engine := GetSearchEngine()
 	switch engine {
 	case GoogleSearchEngine:
@@ -1045,7 +1049,7 @@ func (c *OpenChat) processShellToolCall(toolCall *model.ToolCall, argsMap *map[s
 	return &toolMessage, nil
 }
 
-func (c *OpenChat) processSearchToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func (c *OpenChat) processWebSearchToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	query, ok := (*argsMap)["query"].(string)
 	if !ok {
 		return nil, fmt.Errorf("query not found in arguments for tool call ID %s", toolCall.ID)

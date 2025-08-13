@@ -68,7 +68,7 @@ func (ll *LangLogic) GenerateOpenChatStream() error {
 	// Create a tool with the function
 	tools := []*model.Tool{}
 	if ll.UseSearchTool {
-		searchTool := ll.getOpenChatSearchTool()
+		searchTool := ll.getOpenChatWebSearchTool()
 		tools = append(tools, searchTool)
 	}
 	if ll.UseTools {
@@ -215,7 +215,6 @@ func (c *OpenChat) process() error {
 				if err != nil {
 					Warnf("Processing tool call: %v\n", err)
 					// Send error info to user but continue processing other tool calls
-					c.proc <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("\n%sWarning:%s Error processing tool call '%s': %v\n", warnColor, resetColor, toolCall.Function.Name, err)}
 					continue
 				}
 				// Add the tool response to the conversation
@@ -398,7 +397,7 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	case "shell":
 		msg, err = c.processShellToolCall(&toolCall, &argsMap)
 	case "web_search":
-		msg, err = c.processSearchToolCall(&toolCall, &argsMap)
+		msg, err = c.processWebSearchToolCall(&toolCall, &argsMap)
 	case "read_file":
 		msg, err = c.processReadFileToolCall(&toolCall, &argsMap)
 	case "write_file":
