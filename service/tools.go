@@ -344,7 +344,7 @@ func (ll *LangLogic) getOpenChatTools() []*model.Tool {
 	// Edit file tool
 	editFileFunc := model.FunctionDefinition{
 		Name:        "edit_file",
-		Description: "Edit specific lines in a file. This tool allows replacing content at specific line numbers.",
+		Description: "Edit specific lines in a file. This tool allows adding, replacing, or deleting content at specific line numbers.",
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -359,16 +359,26 @@ func (ll *LangLogic) getOpenChatTools() []*model.Tool {
 						"properties": map[string]interface{}{
 							"line": map[string]interface{}{
 								"type":        "integer",
-								"description": "The line number to edit (1-indexed).",
+								"description": "The line number to edit (1-indexed). For add operations, this is the position where content will be inserted.",
 							},
 							"content": map[string]interface{}{
 								"type":        "string",
-								"description": "The new content for the line. Empty string to delete the line.",
+								"description": "The new content for the line. Empty string to delete the line (unless operation is specified).",
+							},
+							"operation": map[string]interface{}{
+								"type": "string",
+								"description": "The operation to perform on the specified line (1-indexed):\n" +
+									"- 'add' or '++' to insert content at the given line position (if line is greater than the number of lines, content is appended).\n" +
+									"- 'delete' or '--' to remove the line.\n" +
+									"- 'replace' or '==' to replace the line content.\n" +
+									"If 'operation' is omitted, 'delete' is assumed when 'content' is empty, otherwise 'replace' is used.\n" +
+									"Accepted values: 'add', '++', 'delete', '--', 'replace', '=='.",
+								"enum": []string{"add", "delete", "replace"},
 							},
 						},
-						"required": []string{"line", "content"},
+						"required": []string{"line"},
 					},
-					"description": "Array of edits to apply to the file. Each edit specifies a line number and the new content for that line.",
+					"description": "Array of edits to apply to the file. Each edit specifies a line number and the operation to perform.",
 				},
 				"need_confirm": map[string]interface{}{
 					"type": "boolean",
@@ -1122,8 +1132,11 @@ func (c *OpenChat) processEditFileToolCall(toolCall *model.ToolCall, argsMap *ma
 
 			line, _ := editMap["line"].(float64) // JSON numbers are float64
 			content, _ := editMap["content"].(string)
+			operation, _ := editMap["operation"].(string)
 
-			if content == "" {
+			if operation == "add" {
+				editsDescription.WriteString(fmt.Sprintf("  - Insert at line %d: %s\n", int(line), content))
+			} else if operation == "delete" || content == "" {
 				editsDescription.WriteString(fmt.Sprintf("  - Delete line %d\n", int(line)))
 			} else {
 				editsDescription.WriteString(fmt.Sprintf("  - Replace line %d with: %s\n", int(line), content))
@@ -1139,8 +1152,9 @@ func (c *OpenChat) processEditFileToolCall(toolCall *model.ToolCall, argsMap *ma
 
 	// Convert edits to a structured format
 	type Edit struct {
-		Line    int
-		Content string
+		Line      int
+		Content   string
+		Operation string // "add", "delete", or "replace"
 	}
 
 	var edits []Edit
@@ -1152,15 +1166,40 @@ func (c *OpenChat) processEditFileToolCall(toolCall *model.ToolCall, argsMap *ma
 
 		line, _ := editMap["line"].(float64) // JSON numbers are float64
 		content, _ := editMap["content"].(string)
+		operation, hasOp := editMap["operation"].(string)
+
+		// Determine operation if not explicitly provided
+		if !hasOp {
+			if content == "" {
+				operation = "delete"
+			} else {
+				operation = "replace"
+			}
+		}
 
 		edits = append(edits, Edit{
-			Line:    int(line),
-			Content: content,
+			Line:      int(line),
+			Content:   content,
+			Operation: operation,
 		})
 	}
 
 	// Sort edits by line number in descending order to avoid line number shifts during editing
+	// For add operations, we want to add at the specified line position
+	// For delete/replace operations, we work with existing line positions
 	sort.Slice(edits, func(i, j int) bool {
+		// If both are add operations, sort by line descending
+		if edits[i].Operation == "add" && edits[j].Operation == "add" {
+			return edits[i].Line > edits[j].Line
+		}
+		// If one is add and one isn't, add operations should happen first (higher line numbers)
+		if edits[i].Operation == "add" && edits[j].Operation != "add" {
+			return true
+		}
+		if edits[i].Operation != "add" && edits[j].Operation == "add" {
+			return false
+		}
+		// If neither is add, sort by line descending
 		return edits[i].Line > edits[j].Line
 	})
 
@@ -1181,21 +1220,30 @@ func (c *OpenChat) processEditFileToolCall(toolCall *model.ToolCall, argsMap *ma
 	for _, edit := range edits {
 		lineIndex := edit.Line - 1 // Convert to 0-indexed
 
-		// Check if line number is valid
-		if lineIndex < 0 || lineIndex >= len(lines) {
-			response := fmt.Sprintf("Invalid line number %d. File has %d lines", edit.Line, len(lines))
-			toolMessage.Content = &model.ChatCompletionMessageContent{
-				StringValue: volcengine.String(response),
+		switch edit.Operation {
+		case "add", "++":
+			// Insert new content at the specified line position
+			// This works for inserting at the beginning (line 1), middle, or end(-1 or more than last line)
+			if lineIndex < 0 || lineIndex > len(lines) {
+				lineIndex = len(lines)
 			}
-			return &toolMessage, nil
-		}
+			// Insert the new line at the specified position
+			lines = append(lines[:lineIndex], append([]string{edit.Content}, lines[lineIndex:]...)...)
 
-		if edit.Content == "" {
-			// Delete line
-			lines = append(lines[:lineIndex], lines[lineIndex+1:]...)
-		} else {
-			// Replace line
-			lines[lineIndex] = edit.Content
+		case "delete", "--":
+			// Delete line (only if within range)
+			if lineIndex >= 0 && lineIndex < len(lines) {
+				lines = append(lines[:lineIndex], lines[lineIndex+1:]...)
+			}
+
+		case "replace", "==":
+			// Replace or append line
+			if lineIndex >= 0 && lineIndex < len(lines) {
+				lines[lineIndex] = edit.Content
+			} else if lineIndex == len(lines) {
+				// Append new line at the end
+				lines = append(lines, edit.Content)
+			}
 		}
 	}
 
