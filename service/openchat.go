@@ -407,6 +407,8 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		msg, err = c.processReadFileToolCall(&toolCall, &argsMap)
 	case "write_file":
 		msg, err = c.processWriteFileToolCall(&toolCall, &argsMap)
+	case "edit_file":
+		msg, err = c.processEditFileToolCall(&toolCall, &argsMap)
 	case "create_directory":
 		msg, err = c.processCreateDirectoryToolCall(&toolCall, &argsMap)
 	case "list_directory":

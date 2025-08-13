@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
@@ -15,8 +16,8 @@ import (
 )
 
 var (
-	// ExecRespTmplConfirm is the template for the response to the user before executing a command.
-	ExecRespTmplConfirm = "Based on your request, I've prepared the following command to execute on your system:\n\n" +
+	// ToolRespConfirmShell is the template for the response to the user before executing a command.
+	ToolRespConfirmShell = "Based on your request, I've prepared the following command to execute on your system:\n\n" +
 		"```\n%s\n```\n\n" +
 		"This command will %s\n\n" +
 		`**Check:** 
@@ -27,14 +28,14 @@ Such as:
 Would you like me to run this command for you? Please confirm with 'yes', 'proceed', or provide alternative instructions.
 `
 
-	// ExecRespTmplOutput is the template for the response to the user after executing a command.
-	ExecRespTmplOutput = `Command executed: %s
+	// ToolRespShellOutput is the template for the response to the user after executing a command.
+	ToolRespShellOutput = `shell executed: %s
 Status:
 %s
 %s`
 
-	// ExecRespTmplConfirmFileOp is the template for the response to the user before performing file operations.
-	ExecRespTmplConfirmFileOp = "Based on your request, I'm about to perform the following file operation:\n\n" +
+	// ToolRespConfirmFileOp is the template for the response to the user before performing file operations.
+	ToolRespConfirmFileOp = "Based on your request, I'm about to perform the following file operation:\n\n" +
 		"```\n%s\n```\n\n" +
 		"This operation will %s\n\n" +
 		`**Check:** 
@@ -51,6 +52,7 @@ var (
 		"shell",
 		"read_file",
 		"write_file",
+		"edit_file",
 		"create_directory",
 		"list_directory",
 		"delete_file",
@@ -339,6 +341,51 @@ func (ll *LangLogic) getOpenChatTools() []*model.Tool {
 	}
 	tools = append(tools, &readMultipleFilesTool)
 
+	// Edit file tool
+	editFileFunc := model.FunctionDefinition{
+		Name:        "edit_file",
+		Description: "Edit specific lines in a file. This tool allows replacing content at specific line numbers.",
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"path": map[string]interface{}{
+					"type":        "string",
+					"description": "The path to the file to edit.",
+				},
+				"edits": map[string]interface{}{
+					"type": "array",
+					"items": map[string]interface{}{
+						"type": "object",
+						"properties": map[string]interface{}{
+							"line": map[string]interface{}{
+								"type":        "integer",
+								"description": "The line number to edit (1-indexed).",
+							},
+							"content": map[string]interface{}{
+								"type":        "string",
+								"description": "The new content for the line. Empty string to delete the line.",
+							},
+						},
+						"required": []string{"line", "content"},
+					},
+					"description": "Array of edits to apply to the file. Each edit specifies a line number and the new content for that line.",
+				},
+				"need_confirm": map[string]interface{}{
+					"type": "boolean",
+					"description": "Specifies whether to prompt the user for confirmation before editing the file. " +
+						"This should always be true for safety.",
+					"default": true,
+				},
+			},
+			"required": []string{"path", "edits"},
+		},
+	}
+	editFileTool := model.Tool{
+		Type:     model.ToolTypeFunction,
+		Function: &editFileFunc,
+	}
+	tools = append(tools, &editFileTool)
+
 	return tools
 }
 
@@ -619,7 +666,7 @@ func (c *OpenChat) processDeleteFileToolCall(toolCall *model.ToolCall, argsMap *
 
 	if needConfirm {
 		// Response with a prompt to let user confirm
-		outStr := fmt.Sprintf(ExecRespTmplConfirmFileOp, fmt.Sprintf("delete file %s", path), fmt.Sprintf("delete the file at path: %s", path))
+		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("delete file %s", path), fmt.Sprintf("delete the file at path: %s", path))
 		toolMessage.Content = &model.ChatCompletionMessageContent{
 			StringValue: volcengine.String(outStr),
 		}
@@ -664,7 +711,7 @@ func (c *OpenChat) processDeleteDirectoryToolCall(toolCall *model.ToolCall, args
 
 	if needConfirm {
 		// Response with a prompt to let user confirm
-		outStr := fmt.Sprintf(ExecRespTmplConfirmFileOp, fmt.Sprintf("delete directory %s", path), fmt.Sprintf("delete the directory at path: %s and all its contents", path))
+		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("delete directory %s", path), fmt.Sprintf("delete the directory at path: %s and all its contents", path))
 		toolMessage.Content = &model.ChatCompletionMessageContent{
 			StringValue: volcengine.String(outStr),
 		}
@@ -714,7 +761,7 @@ func (c *OpenChat) processMoveToolCall(toolCall *model.ToolCall, argsMap *map[st
 
 	if needConfirm {
 		// Response with a prompt to let user confirm
-		outStr := fmt.Sprintf(ExecRespTmplConfirmFileOp, fmt.Sprintf("move %s to %s", source, destination), fmt.Sprintf("move the file or directory from %s to %s", source, destination))
+		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("move %s to %s", source, destination), fmt.Sprintf("move the file or directory from %s to %s", source, destination))
 		toolMessage.Content = &model.ChatCompletionMessageContent{
 			StringValue: volcengine.String(outStr),
 		}
@@ -933,7 +980,7 @@ func (c *OpenChat) processShellToolCall(toolCall *model.ToolCall, argsMap *map[s
 		if !ok {
 			return nil, fmt.Errorf("purpose not found in arguments for tool call ID %s", toolCall.ID)
 		}
-		outStr := fmt.Sprintf(ExecRespTmplConfirm, cmdStr, descStr)
+		outStr := fmt.Sprintf(ToolRespConfirmShell, cmdStr, descStr)
 		toolMessage.Content = &model.ChatCompletionMessageContent{
 			StringValue: volcengine.String(outStr),
 		}
@@ -979,7 +1026,7 @@ func (c *OpenChat) processShellToolCall(toolCall *model.ToolCall, argsMap *map[s
 		outputInfo = "Output: <no output>"
 	}
 	// Create a response that prompts the LLM to provide insightful analysis of the command output
-	finalResponse := fmt.Sprintf(ExecRespTmplOutput, cmdStr, errorInfo, outputInfo)
+	finalResponse := fmt.Sprintf(ToolRespShellOutput, cmdStr, errorInfo, outputInfo)
 
 	// Create and return the tool response message
 	toolMessage.Content = &model.ChatCompletionMessageContent{
@@ -1036,4 +1083,138 @@ func (c *OpenChat) processSearchToolCall(toolCall *model.ToolCall, argsMap *map[
 		}, Name: Ptr(""),
 		ToolCallID: toolCall.ID,
 	}, nil
+}
+
+func (c *OpenChat) processEditFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	toolMessage := model.ChatCompletionMessage{
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Name:       Ptr(""),
+	}
+
+	path, ok := (*argsMap)["path"].(string)
+	if !ok {
+		return nil, fmt.Errorf("path not found in arguments")
+	}
+
+	// Check if confirmation is needed
+	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
+	if !ok {
+		// Default to true for safety
+		needConfirm = true
+	}
+
+	// Get the edits to apply
+	editsInterface, ok := (*argsMap)["edits"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("edits not found in arguments or not an array")
+	}
+
+	// If confirmation is needed, ask the user before proceeding
+	if needConfirm {
+		var editsDescription strings.Builder
+		editsDescription.WriteString("The following edits will be applied to the file:\n")
+		for _, editInterface := range editsInterface {
+			editMap, ok := editInterface.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			line, _ := editMap["line"].(float64) // JSON numbers are float64
+			content, _ := editMap["content"].(string)
+
+			if content == "" {
+				editsDescription.WriteString(fmt.Sprintf("  - Delete line %d\n", int(line)))
+			} else {
+				editsDescription.WriteString(fmt.Sprintf("  - Replace line %d with: %s\n", int(line), content))
+			}
+		}
+
+		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("edit file %s", path), editsDescription.String())
+		toolMessage.Content = &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(outStr),
+		}
+		return &toolMessage, nil
+	}
+
+	// Convert edits to a structured format
+	type Edit struct {
+		Line    int
+		Content string
+	}
+
+	var edits []Edit
+	for _, editInterface := range editsInterface {
+		editMap, ok := editInterface.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		line, _ := editMap["line"].(float64) // JSON numbers are float64
+		content, _ := editMap["content"].(string)
+
+		edits = append(edits, Edit{
+			Line:    int(line),
+			Content: content,
+		})
+	}
+
+	// Sort edits by line number in descending order to avoid line number shifts during editing
+	sort.Slice(edits, func(i, j int) bool {
+		return edits[i].Line > edits[j].Line
+	})
+
+	// Read the file
+	content, err := os.ReadFile(path)
+	if err != nil {
+		response := fmt.Sprintf("Error reading file %s: %v", path, err)
+		toolMessage.Content = &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(response),
+		}
+		return &toolMessage, nil
+	}
+
+	// Split content into lines
+	lines := strings.Split(string(content), "\n")
+
+	// Apply edits
+	for _, edit := range edits {
+		lineIndex := edit.Line - 1 // Convert to 0-indexed
+
+		// Check if line number is valid
+		if lineIndex < 0 || lineIndex >= len(lines) {
+			response := fmt.Sprintf("Invalid line number %d. File has %d lines", edit.Line, len(lines))
+			toolMessage.Content = &model.ChatCompletionMessageContent{
+				StringValue: volcengine.String(response),
+			}
+			return &toolMessage, nil
+		}
+
+		if edit.Content == "" {
+			// Delete line
+			lines = append(lines[:lineIndex], lines[lineIndex+1:]...)
+		} else {
+			// Replace line
+			lines[lineIndex] = edit.Content
+		}
+	}
+
+	// Join lines back together
+	newContent := strings.Join(lines, "\n")
+
+	// Write the modified content back to the file
+	err = os.WriteFile(path, []byte(newContent), 0644)
+	if err != nil {
+		response := fmt.Sprintf("Error writing file %s: %v", path, err)
+		toolMessage.Content = &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(response),
+		}
+		return &toolMessage, nil
+	}
+
+	response := fmt.Sprintf("Successfully edited file %s", path)
+	toolMessage.Content = &model.ChatCompletionMessageContent{
+		StringValue: volcengine.String(response),
+	}
+	return &toolMessage, nil
 }

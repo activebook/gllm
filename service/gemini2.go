@@ -300,7 +300,7 @@ func (ll *LangLogic) handleGemini2ToolCall(call *genai.FunctionCall) (*genai.Fun
 		if needConfirm {
 			// Response with a prompt to let user confirm
 			descStr := call.Args["description"].(string)
-			outStr := fmt.Sprintf(ExecRespTmplConfirm, cmdStr, descStr)
+			outStr := fmt.Sprintf(ToolRespConfirmShell, cmdStr, descStr)
 			resp.Response = map[string]any{
 				"output": outStr,
 				"error":  "",
@@ -351,7 +351,7 @@ func (ll *LangLogic) handleGemini2ToolCall(call *genai.FunctionCall) (*genai.Fun
 			outputInfo = "Output: <no output>"
 		}
 		// Create a response that prompts the LLM to provide insightful analysis of the command output
-		finalResponse := fmt.Sprintf(ExecRespTmplOutput, cmdStr, errorInfo, outputInfo)
+		finalResponse := fmt.Sprintf(ToolRespShellOutput, cmdStr, errorInfo, outputInfo)
 
 		// Send the output back as a tool response
 		resp.Response = map[string]any{
