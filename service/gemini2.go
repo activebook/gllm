@@ -99,9 +99,13 @@ func (ll *LangLogic) GenerateGemini2Stream() error {
 		// load embedding Tools
 		config.Tools = append(config.Tools, ll.getGemini2Tools()...)
 		if ll.UseSearchTool {
+			ll.ProcChan <- StreamNotify{Status: StatusStarted}
+			<-ll.ProceedChan
 			Warnf("%s", "Embedding tools are enabled.\n"+
-				"Because embedding tools is not compatible with Google Search tool, so Google Search is unavailable now.\n"+
-				"Please disable embedding tools to use Google Search.\n")
+				"Because embedding tools is not compatible with Google Search tool,"+
+				" so Google Search is unavailable now.\n"+
+				"Please disable embedding tools to use Google Search.")
+			ll.ProcChan <- StreamNotify{Status: StatusProcessing}
 		}
 	} else if ll.UseSearchTool {
 		// only load search tool

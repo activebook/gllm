@@ -13,16 +13,30 @@ import (
 	"google.golang.org/genai"
 )
 
+/*
+A limitation of Gemini is that you can’t use a function call and a built-in tool at the same time. ADK,
+when using Gemini as the underlying LLM, takes advantage of Gemini’s built-in ability to do Google searches,
+and uses function calling to invoke your custom ADK tools.
+So agent tools can come in handy, as you can have a main agent,
+that delegates live searches to a search agent that has the GoogleSearchTool configured,
+and another tool agent that makes use of a custom tool function.
+
+Usually, this happens when you get a mysterious error like this one
+(reported against ADK for Python):
+{'error': {'code': 400, 'message': 'Tool use with function calling is unsupported',
+ 'status': 'INVALID_ARGUMENT'}}.
+This means that you can’t use a built-in tool and function calling at the same time in the same agent.
+*/
+
 // Tool definitions for Gemini 2
 func (ll *LangLogic) getGemini2Tools() []*genai.Tool {
 	var tools []*genai.Tool
 
+	// Add web search tool
+	// tools = append(tools, ll.getGemini2WebSearchTool())
+
 	// Add shell tool
 	tools = append(tools, ll.getGemini2ShellTool())
-
-	// Add web search tool
-	// Function call is not compatible with Google Search tool
-	//tools = append(tools, ll.getGemini2WebSearchTool())
 
 	// Add web fetch tool
 	webFetchTool := &genai.Tool{
