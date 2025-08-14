@@ -14,6 +14,12 @@ const (
 	switchOnColor   = "\033[92m" // Bright Green
 	switchOnlyColor = "\033[41m" // BG Red
 	resetColor      = "\033[0m"
+
+	//cmdOutputColor = "\033[93m" // Light yellow
+	//cmdErrorColor  = "\033[95m" // bright magenta
+
+	cmdOutputColor = "\033[38;5;187m" // Light yellow
+	cmdErrorColor  = "\033[38;5;175m" // bright magenta
 )
 
 func init() {

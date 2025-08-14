@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,7 +37,8 @@ Special commands:
 /search, /s <search_engine> - select a search engine to use
 /reference. /r <num> - change link reference count
 /attach, /a <filename> - Attach a file to the chat session
-/detach, /d <filename> - Detach a file to the chat session`,
+/detach, /d <filename> - Detach a file to the chat session
+!<command> - Execute a shell command directly`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Create an indeterminate progress bar
 		spinner := service.NewSpinner("Processing...")
@@ -253,6 +256,12 @@ func (ci *ChatInfo) handleInput(input string) {
 	// Check if it's a command
 	if strings.HasPrefix(input, "/") {
 		ci.handleCommand(input)
+		return
+	}
+
+	// Check if it's a shell command
+	if strings.HasPrefix(input, "!") {
+		ci.executeShellCommand(input[1:])
 		return
 	}
 
@@ -478,6 +487,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /search, /s \"<engine>\" - Change the search engine")
 	fmt.Println("  /tools, /t \"[on|off]\" - Switch whether to use embedding tools")
 	fmt.Println("  /reference, /r \"<num>\" - Change the search link reference count")
+	fmt.Println("  !<command> - Execute a shell command directly (e.g. !ls -la)")
 }
 
 func (ci *ChatInfo) showHistory(num int, chars int) {
@@ -675,4 +685,38 @@ func (ci *ChatInfo) callLLM(input string) {
 	SetEffectiveSystemPrompt("")
 	// Reset the template
 	SetEffectiveTemplate("")
+}
+
+func (ci *ChatInfo) executeShellCommand(command string) {
+	command = strings.TrimSpace(command)
+	if command == "" {
+		fmt.Println("No command provided")
+		return
+	}
+
+	// Execute the command
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("cmd", "/C", command)
+	} else {
+		cmd = exec.Command("sh", "-c", command)
+	}
+
+	// Capture both stdout and stderr
+	output, err := cmd.CombinedOutput()
+
+	// Display error if command failed
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			fmt.Printf(cmdErrorColor+"Command failed with exit code %d\n"+resetColor, exitError.ExitCode())
+		} else {
+			fmt.Printf(cmdErrorColor+"Command failed: %v\n"+resetColor, err)
+		}
+	}
+
+	// Display the output
+	if len(output) > 0 {
+		fmt.Printf(cmdOutputColor+"%s\n"+resetColor, output)
+	}
+	fmt.Print(resetColor) // Reset color after command output
 }
