@@ -71,8 +71,10 @@ func SwitchUsageMetainfo(s string) error {
 	switch s {
 	case "on":
 		viper.Set("default.usage", "on")
+		fmt.Println("Usage output switched " + switchOnColor + "on" + resetColor)
 	case "off":
 		viper.Set("default.usage", "off")
+		fmt.Println("Usage output switched " + switchOffColor + "off" + resetColor)
 	default:
 	}
 
@@ -82,4 +84,27 @@ func SwitchUsageMetainfo(s string) error {
 		return err
 	}
 	return nil
+}
+
+func GetUsageMetainfoStatus() string {
+	usage := viper.GetString("default.usage")
+	switch usage {
+	case "on":
+		return "on"
+	case "off":
+		return "off"
+	default:
+		return "off"
+	}
+}
+
+func PrintUsageMetainfoStatus() {
+	usage := viper.GetString("default.usage")
+	switch usage {
+	case "on":
+		fmt.Println("Usage output is currently switched " + switchOnColor + "on" + resetColor)
+	case "off":
+		fmt.Println("Usage output is currently switched " + switchOffColor + "off" + resetColor)
+	default:
+	}
 }

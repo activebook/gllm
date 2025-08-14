@@ -36,6 +36,7 @@ Special commands:
 /template, /p <@name|tmpl> - change template
 /search, /s <search_engine> - select a search engine to use
 /reference. /r <num> - change link reference count
+/usage, /u [on|off] - Switch whether to show token usage information
 /attach, /a <filename> - Attach a file to the chat session
 /detach, /d <filename> - Detach a file to the chat session
 !<command> - Execute a shell command directly`,
@@ -326,6 +327,17 @@ func (ci *ChatInfo) setReferences(count string) {
 	fmt.Printf("Reference count set to %d\n", num)
 }
 
+func (ci *ChatInfo) setUsage(usage string) {
+	if len(usage) != 0 {
+		err := SwitchUsageMetainfo(usage)
+		if err != nil {
+			service.Errorf("Error setting usage: %v", err)
+			return
+		}
+	}
+	PrintUsageMetainfoStatus()
+}
+
 func (ci *ChatInfo) addAttachFiles(input string) {
 	// Normalize input by replacing /attach with /a
 	input = strings.ReplaceAll(input, "/attach ", "/a ")
@@ -466,6 +478,7 @@ func (ci *ChatInfo) showInfo() {
 	fmt.Printf("  Template: \n    - %s\n", GetEffectiveTemplate())
 	fmt.Printf("  Search Engine: %s\n", GetEffectSearchEnginelName())
 	fmt.Printf("  Use Tools: %t\n", AreToolsEnabled())
+	fmt.Printf("  Usage Metainfo: %s\n", GetUsageMetainfoStatus())
 	fmt.Printf("  Attachment(s): \n")
 	for _, file := range ci.Files {
 		fmt.Printf("    - [%s]: %s\n", file.Format(), file.Path())
@@ -487,6 +500,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /search, /s \"<engine>\" - Change the search engine")
 	fmt.Println("  /tools, /t \"[on|off]\" - Switch whether to use embedding tools")
 	fmt.Println("  /reference, /r \"<num>\" - Change the search link reference count")
+	fmt.Println("  /usage, /u \"[on|off]\" - Switch whether to show token usage information")
 	fmt.Println("  !<command> - Execute a shell command directly (e.g. !ls -la)")
 }
 
@@ -627,6 +641,13 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		}
 		count := strings.TrimSpace(parts[1])
 		ci.setReferences(count)
+
+	case "/usage", "/u":
+		usage := ""
+		if len(parts) >= 2 {
+			usage = strings.TrimSpace(parts[1])
+		}
+		ci.setUsage(usage)
 
 	case "/attach", "/a":
 		if len(parts) < 2 {
