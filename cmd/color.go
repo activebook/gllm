@@ -17,6 +17,7 @@ var colorCmd = &cobra.Command{
 		// This is where you would implement the logic for your test command
 
 		colors := map[string]string{
+			// Standard Colors
 			"Black":   "\033[30m",
 			"Red":     "\033[31m",
 			"Green":   "\033[32m",
@@ -26,10 +27,26 @@ var colorCmd = &cobra.Command{
 			"Cyan":    "\033[36m",
 			"White":   "\033[37m",
 
+			// Extra Named 256-color Variants
 			"Orange (256)":      "\033[38;5;214m",
 			"Dark Orange (256)": "\033[38;5;208m",
-			"True Orange (RGB)": "\033[38;2;255;165;0m",
+			"Pink (256)":        "\033[38;5;213m",
+			"Violet (256)":      "\033[38;5;177m",
+			"Teal (256)":        "\033[38;5;37m",
+			"Turquoise (256)":   "\033[38;5;80m",
+			"Gold (256)":        "\033[38;5;220m",
+			"Silver (256)":      "\033[38;5;7m",
 
+			// Truecolor RGB Examples
+			"True Orange (RGB)":   "\033[38;2;255;165;0m",
+			"True Pink (RGB)":     "\033[38;2;255;105;180m",
+			"True Purple (RGB)":   "\033[38;2;128;0;128m",
+			"True Teal (RGB)":     "\033[38;2;0;128;128m",
+			"True Lime (RGB)":     "\033[38;2;0;255;0m",
+			"True Sky Blue (RGB)": "\033[38;2;135;206;235m",
+			"True Gray (RGB)":     "\033[38;2;128;128;128m",
+
+			// Bright Variants
 			"Bright Black":   "\033[90m",
 			"Bright Red":     "\033[91m",
 			"Bright Green":   "\033[92m",
@@ -39,6 +56,7 @@ var colorCmd = &cobra.Command{
 			"Bright Cyan":    "\033[96m",
 			"Bright White":   "\033[97m",
 
+			// Background Colors
 			"BG Black":   "\033[40m",
 			"BG Red":     "\033[41m",
 			"BG Green":   "\033[42m",
@@ -48,6 +66,7 @@ var colorCmd = &cobra.Command{
 			"BG Cyan":    "\033[46m",
 			"BG White":   "\033[47m",
 
+			// Bright Backgrounds
 			"Bright BG Black":   "\033[100m",
 			"Bright BG Red":     "\033[101m",
 			"Bright BG Green":   "\033[102m",
@@ -57,7 +76,15 @@ var colorCmd = &cobra.Command{
 			"Bright BG Cyan":    "\033[106m",
 			"Bright BG White":   "\033[107m",
 
-			"Reset": "\033[0m",
+			// Styling / Control
+			"Reset":     "\033[0m",
+			"Bold":      "\033[1m",
+			"Dim":       "\033[2m",
+			"Italic":    "\033[3m",
+			"Underline": "\033[4m",
+			"Blink":     "\033[5m",
+			"Reverse":   "\033[7m",
+			"Hidden":    "\033[8m",
 		}
 
 		fmt.Println("Printing all colors:")

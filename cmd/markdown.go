@@ -31,7 +31,7 @@ func init() {
 
 var markdownCmd = &cobra.Command{
 	Use:   "markdown",
-	Short: "Switch markdown output on/off/only",
+	Short: "Whether to include Markdown formatting in the output",
 	Long: `When Markdown is switched on, the output will include a Markdown-formatted version.
 When Markdown is switched off, the output will not include any Markdown formatting.
 

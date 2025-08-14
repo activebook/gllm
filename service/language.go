@@ -146,6 +146,8 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 			StopSpinner(spinner)
 			// Render the markdown
 			markdownRenderer.RenderMarkdown()
+			// Render the token usage
+			RenderTokenUsage()
 			return // Exit when stream is done
 		case StatusReasoning:
 			StopSpinner(spinner)
