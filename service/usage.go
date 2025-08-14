@@ -19,7 +19,7 @@ const ()
 func GetTokenUsage() string {
 	if TotalTokens > 0 {
 		return fmt.Sprintf(
-			bbColor+
+			bbColor+"\n"+
 				"┌───────────────┬────────────┐\n"+
 				"│ Token Type    │   Count    │\n"+
 				"├───────────────┼────────────┤\n"+
