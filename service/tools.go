@@ -65,7 +65,13 @@ var (
 		"web_fetch",
 		"web_search",
 	}
+
+	skipToolsConfirm = false
 )
+
+func SetSkipToolsConfirm(skip bool) {
+	skipToolsConfirm = skip
+}
 
 func GetAllEmbeddingTools() []string {
 	return embeddingTools
@@ -167,6 +173,12 @@ func (ll *LangLogic) getOpenChatTools() []*model.Tool {
 				"content": map[string]interface{}{
 					"type":        "string",
 					"description": "The content to write to the file.",
+				},
+				"need_confirm": map[string]interface{}{
+					"type": "boolean",
+					"description": "Specifies whether to prompt the user for confirmation before writing to the file. " +
+						"This should always be true for safety.",
+					"default": true,
 				},
 			},
 			"required": []string{"path", "content"},
@@ -633,6 +645,22 @@ func (c *OpenChat) processWriteFileToolCall(toolCall *model.ToolCall, argsMap *m
 		return nil, fmt.Errorf("content not found in arguments")
 	}
 
+	// Check if confirmation is needed
+	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
+	if !ok {
+		// Default to true for safety
+		needConfirm = true
+	}
+
+	if needConfirm && !skipToolsConfirm {
+		// Response with a prompt to let user confirm
+		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("write to file %s", path), fmt.Sprintf("write content to the file at path: %s", path))
+		toolMessage.Content = &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(outStr),
+		}
+		return &toolMessage, nil
+	}
+
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -746,7 +774,7 @@ func (c *OpenChat) processDeleteFileToolCall(toolCall *model.ToolCall, argsMap *
 		needConfirm = true
 	}
 
-	if needConfirm {
+	if needConfirm && !skipToolsConfirm {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("delete file %s", path), fmt.Sprintf("delete the file at path: %s", path))
 		toolMessage.Content = &model.ChatCompletionMessageContent{
@@ -791,7 +819,7 @@ func (c *OpenChat) processDeleteDirectoryToolCall(toolCall *model.ToolCall, args
 		needConfirm = true
 	}
 
-	if needConfirm {
+	if needConfirm && !skipToolsConfirm {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("delete directory %s", path), fmt.Sprintf("delete the directory at path: %s and all its contents", path))
 		toolMessage.Content = &model.ChatCompletionMessageContent{
@@ -841,7 +869,7 @@ func (c *OpenChat) processMoveToolCall(toolCall *model.ToolCall, argsMap *map[st
 		needConfirm = true
 	}
 
-	if needConfirm {
+	if needConfirm && !skipToolsConfirm {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("move %s to %s", source, destination), fmt.Sprintf("move the file or directory from %s to %s", source, destination))
 		toolMessage.Content = &model.ChatCompletionMessageContent{
@@ -1056,7 +1084,7 @@ func (c *OpenChat) processShellToolCall(toolCall *model.ToolCall, argsMap *map[s
 		// there is no need_confirm parameter, so we assume it's false
 		needConfirm = false
 	}
-	if needConfirm {
+	if needConfirm && !skipToolsConfirm {
 		// Response with a prompt to let user confirm
 		descStr, ok := (*argsMap)["purpose"].(string)
 		if !ok {
@@ -1226,7 +1254,7 @@ func (c *OpenChat) processEditFileToolCall(toolCall *model.ToolCall, argsMap *ma
 	}
 
 	// If confirmation is needed, ask the user before proceeding
-	if needConfirm {
+	if needConfirm && !skipToolsConfirm {
 		var editsDescription strings.Builder
 		editsDescription.WriteString("The following edits will be applied to the file:\n")
 		for _, editInterface := range editsInterface {
@@ -1396,7 +1424,7 @@ func (c *OpenChat) processCopyToolCall(toolCall *model.ToolCall, argsMap *map[st
 		needConfirm = true
 	}
 
-	if needConfirm {
+	if needConfirm && !skipToolsConfirm {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("copy %s to %s", source, destination), fmt.Sprintf("copy the file or directory from %s to %s", source, destination))
 		toolMessage.Content = &model.ChatCompletionMessageContent{

@@ -32,7 +32,7 @@ Special commands:
 /history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)
 /markdown, /mark [on|off|only] - Switch whether to render markdown or not
 /system, /S <@name|prompt> - change system prompt
-/tools, /t [on|off] - Switch whether to use embedding tools
+/tools, /t [on|off|skip|confirm] - Switch whether to use embedding tools, skip tools confirmation
 /template, /p <@name|tmpl> - change template
 /search, /s <search_engine> - select a search engine to use
 /reference. /r <num> - change link reference count
@@ -79,6 +79,9 @@ Special commands:
 			} else {
 				service.SetDeepDive(false)
 			}
+
+			// Set whether or not to skip tools confirmation
+			service.SetSkipToolsConfirm(confirmToolsFlag)
 
 			if !toolsFlag {
 				// if tools flag are not set, check if they are enabled globally
@@ -147,6 +150,7 @@ func init() {
 	chatCmd.Flags().Lookup("search").NoOptDefVal = service.GetDefaultSearchEngineName()
 	chatCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
 	chatCmd.Flags().BoolVar(&deepDiveFlag, "deep-dive", false, "Enable deep dive search to fetch all links from search results")
+	chatCmd.Flags().BoolVarP(&confirmToolsFlag, "confirm-tools", "", false, "Skip confirmation for tool operations")
 }
 
 func (ci *ChatInfo) startREPL() {
@@ -498,7 +502,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /template, /p \"<tmpl|name>\" - Change the template")
 	fmt.Println("  /system /S \"<prompt|name>\" - Change the system prompt")
 	fmt.Println("  /search, /s \"<engine>\" - Change the search engine")
-	fmt.Println("  /tools, /t \"[on|off]\" - Switch whether to use embedding tools")
+	fmt.Println("  /tools, /t \"[on|off|skip|confirm]\" - Switch whether to use embedding tools, skip tools confirmation")
 	fmt.Println("  /reference, /r \"<num>\" - Change the search link reference count")
 	fmt.Println("  /usage, /u \"[on|off]\" - Switch whether to show token usage information")
 	fmt.Println("  !<command> - Execute a shell command directly (e.g. !ls -la)")
@@ -554,13 +558,33 @@ func (ci *ChatInfo) setMarkdown(mark string) {
 
 func (ci *ChatInfo) setUseTools(useTools string) {
 	if len(useTools) != 0 {
-		err := SwitchUseTools(useTools)
-		if err != nil {
-			service.Errorf("Error setting useTools: %v", err)
-			return
+		var err error
+		switch useTools {
+		// Set useTools on or off
+		case "on":
+			err = SwitchUseTools(useTools)
+			if err != nil {
+				service.Errorf("Error setting useTools: %v", err)
+				return
+			}
+			ListEmbeddingTools()
+		case "off":
+			err = SwitchUseTools(useTools)
+			if err != nil {
+				service.Errorf("Error setting useTools: %v", err)
+				return
+			}
+			ListEmbeddingTools()
+
+			// Set whether or not to skip tools confirmation
+		case "confirm":
+			service.SetSkipToolsConfirm(false)
+			fmt.Print("Tool operations would need confirmation\n")
+		case "skip":
+			service.SetSkipToolsConfirm(true)
+			fmt.Print("Tool confirmation would skip\n")
 		}
 	}
-	ListEmbeddingTools()
 }
 
 func (ci *ChatInfo) handleCommand(cmd string) {

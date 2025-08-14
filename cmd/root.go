@@ -26,16 +26,17 @@ var (
 	// Global logger instance, configured by setupLogging
 	logger = service.GetLogger()
 
-	modelFlag     string   // gllm "What is Go?" -model(-m) gpt4o
-	attachments   []string // gllm "Summarize this" --attachment(-a) report.txt
-	sysPromptFlag string   // gllm "Act as shell" --system-prompt(-S) @shell-assistant
-	templateFlag  string   // gllm --template(-t) @coder
-	searchFlag    string   // gllm --search(-s) "What is the stock price of Tesla right now?"
-	toolsFlag     bool     // gllm --tools(-t) "Move a.txt to folder b"
-	codeFlag      bool     // gllm --code(-C) "print('Hello, World!')"
-	deepDiveFlag  bool     // gllm --deep-dive "Tell me current tariff war results"
-	referenceFlag int      // gllm --reference(-r) 3 "What is the stock price of Tesla right now?"
-	convoName     string   // gllm --conversation(-c) "My Conversation" "What is the stock price of Tesla right now?"
+	modelFlag        string   // gllm "What is Go?" -model(-m) gpt4o
+	attachments      []string // gllm "Summarize this" --attachment(-a) report.txt
+	sysPromptFlag    string   // gllm "Act as shell" --system-prompt(-S) @shell-assistant
+	templateFlag     string   // gllm --template(-t) @coder
+	searchFlag       string   // gllm --search(-s) "What is the stock price of Tesla right now?"
+	toolsFlag        bool     // gllm --tools(-t) "Move a.txt to folder b"
+	codeFlag         bool     // gllm --code(-C) "print('Hello, World!')"
+	deepDiveFlag     bool     // gllm --deep-dive "Tell me current tariff war results"
+	referenceFlag    int      // gllm --reference(-r) 3 "What is the stock price of Tesla right now?"
+	convoName        string   // gllm --conversation(-c) "My Conversation" "What is the stock price of Tesla right now?"
+	confirmToolsFlag bool     // gllm --confirm-tools "Allow skipping confirmation for tool operations"
 
 	// Global cmd instance, to be used by subcommands
 	rootCmd = &cobra.Command{
@@ -280,6 +281,9 @@ func processQuery(prompt string, files []*service.FileData) {
 	sys_prompt := GetEffectiveSystemPrompt()
 	maxRecursions := GetMaxRecursions()
 
+	// Set whether or not to skip tools confirmation
+	service.SetSkipToolsConfirm(confirmToolsFlag)
+
 	// tools (Contains web_search tool)
 	useTools := AreToolsEnabled()
 
@@ -353,6 +357,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&toolsFlag, "tools", "t", false, "Enable model to use embedding tools")
 	rootCmd.Flags().BoolVarP(&codeFlag, "code", "C", false, "Enable model to generate and run Python code (only for gemini)")
 	rootCmd.Flags().BoolVarP(&deepDiveFlag, "deep-dive", "", false, "Fetch more details from the search (default: off)")
+	rootCmd.Flags().BoolVarP(&confirmToolsFlag, "confirm-tools", "", false, "Skip confirmation for tool operations (default: no)")
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
 
 	// Add more persistent flags here if needed (e.g., --verbose, --log-file)

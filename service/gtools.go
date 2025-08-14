@@ -97,6 +97,12 @@ func (ll *LangLogic) getGemini2Tools() []*genai.Tool {
 						Type:        genai.TypeString,
 						Description: "The content to write to the file.",
 					},
+					"need_confirm": {
+						Type: genai.TypeBoolean,
+						Description: "Specifies whether to prompt the user for confirmation before writing to the file. " +
+							"This should always be true for safety.",
+						Default: true,
+					},
 				},
 				Required: []string{"path", "content"},
 			},
@@ -513,6 +519,23 @@ func (ll *LangLogic) processGemini2WriteFileToolCall(call *genai.FunctionCall) (
 		return nil, fmt.Errorf("content not found in arguments")
 	}
 
+	// Check if confirmation is needed
+	needConfirm, ok := call.Args["need_confirm"].(bool)
+	if !ok {
+		// Default to true for safety
+		needConfirm = true
+	}
+
+	if needConfirm && !skipToolsConfirm {
+		// Response with a prompt to let user confirm
+		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("write to file %s", path), fmt.Sprintf("write content to the file at path: %s", path))
+		resp.Response = map[string]any{
+			"output": outStr,
+			"error":  "",
+		}
+		return &resp, nil
+	}
+
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -630,7 +653,7 @@ func (ll *LangLogic) processGemini2DeleteFileToolCall(call *genai.FunctionCall) 
 		needConfirm = true
 	}
 
-	if needConfirm {
+	if needConfirm && !skipToolsConfirm {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("delete file %s", path), fmt.Sprintf("delete the file at path: %s", path))
 		resp.Response = map[string]any{
@@ -677,7 +700,7 @@ func (ll *LangLogic) processGemini2DeleteDirectoryToolCall(call *genai.FunctionC
 		needConfirm = true
 	}
 
-	if needConfirm {
+	if needConfirm && !skipToolsConfirm {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("delete directory %s", path), fmt.Sprintf("delete the directory at path: %s and all its contents", path))
 		resp.Response = map[string]any{
@@ -729,7 +752,7 @@ func (ll *LangLogic) processGemini2MoveToolCall(call *genai.FunctionCall) (*gena
 		needConfirm = true
 	}
 
-	if needConfirm {
+	if needConfirm && !skipToolsConfirm {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("move %s to %s", source, destination), fmt.Sprintf("move the file or directory from %s to %s", source, destination))
 		resp.Response = map[string]any{
@@ -946,7 +969,7 @@ func (ll *LangLogic) processGemini2ShellToolCall(call *genai.FunctionCall) (*gen
 		// there is no need_confirm parameter, so we assume it's false
 		needConfirm = false
 	}
-	if needConfirm {
+	if needConfirm && !skipToolsConfirm {
 		// Response with a prompt to let user confirm
 		descStr, ok := call.Args["purpose"].(string)
 		if !ok {
@@ -1068,7 +1091,7 @@ func (ll *LangLogic) processGemini2EditFileToolCall(call *genai.FunctionCall) (*
 	}
 
 	// If confirmation is needed, ask the user before proceeding
-	if needConfirm {
+	if needConfirm && !skipToolsConfirm {
 		var editsDescription strings.Builder
 		editsDescription.WriteString("The following edits will be applied to the file:\n")
 		for _, editInterface := range editsInterface {
@@ -1241,7 +1264,7 @@ func (ll *LangLogic) processGemini2CopyToolCall(call *genai.FunctionCall) (*gena
 		needConfirm = true
 	}
 
-	if needConfirm {
+	if needConfirm && !skipToolsConfirm {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("copy %s to %s", source, destination), fmt.Sprintf("copy the file or directory from %s to %s", source, destination))
 		resp.Response = map[string]any{

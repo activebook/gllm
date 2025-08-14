@@ -80,7 +80,7 @@ func SwitchUseTools(s string) error {
 	case "off":
 		viper.Set("tools.enabled", false)
 	default:
-		return fmt.Errorf("invalid option: %s, use 'on' or 'off'", s)
+		return nil
 	}
 
 	// Write the config file
