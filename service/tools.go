@@ -79,6 +79,20 @@ func AvailableEmbeddingTool(toolName string) bool {
 	return false
 }
 
+func formatToolCallArguments(argsMap map[string]interface{}) string {
+	var argsList []string
+	for k, v := range argsMap {
+		switch val := v.(type) {
+		case []interface{}, map[string]interface{}:
+			jsonStr, _ := json.Marshal(val)
+			argsList = append(argsList, fmt.Sprintf("%s=%s", k, string(jsonStr)))
+		default:
+			argsList = append(argsList, fmt.Sprintf("%s=%v", k, v))
+		}
+	}
+	return strings.Join(argsList, ", ")
+}
+
 // Tool definitions for file operations
 func (ll *LangLogic) getOpenChatTools() []*model.Tool {
 	var tools []*model.Tool

@@ -432,17 +432,3 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	<-c.proceed
 	return msg, err
 }
-
-func formatToolCallArguments(argsMap map[string]interface{}) string {
-	var argsList []string
-	for k, v := range argsMap {
-		switch val := v.(type) {
-		case []interface{}, map[string]interface{}:
-			jsonStr, _ := json.Marshal(val)
-			argsList = append(argsList, fmt.Sprintf("%s=%s", k, string(jsonStr)))
-		default:
-			argsList = append(argsList, fmt.Sprintf("%s=%v", k, v))
-		}
-	}
-	return strings.Join(argsList, ", ")
-}
