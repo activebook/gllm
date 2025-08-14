@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/activebook/gllm/service"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -12,17 +11,11 @@ import (
 var toolsCmd = &cobra.Command{
 	Use:   "tools",
 	Short: "Enable/Disable embedding tools",
-	Long: `Check tools that gllm can use.
-
-Tools give gllm the ability to interact with the file system, execute commands, and perform other operations.
-By default, all tools are enabled. You can disable all tools or selectively enable/disable specific tools.`,
-}
-
-var toolsListCmd = &cobra.Command{
-	Use:     "list",
-	Aliases: []string{"ls", "pr"},
-	Short:   "List all available tools",
+	Long: `Tools give gllm the ability to interact with the file system, execute commands, and perform other operations.
+By default, all tools are enabled. You can disable these tools.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(cmd.Long)
+		fmt.Println("-------------------------------------------")
 		ListEmbeddingTools()
 	},
 }
@@ -37,7 +30,7 @@ var toolsOnCmd = &cobra.Command{
 			fmt.Printf("Error writing config: %v\n", err)
 			return
 		}
-		fmt.Printf("All tools %s\n\n", color.New(color.FgRed, color.Bold).Sprint("enabled"))
+		fmt.Printf("All tools %s\n\n", switchOnColor+"enabled"+resetColor)
 		ListEmbeddingTools()
 	},
 }
@@ -52,13 +45,12 @@ var toolsOffCmd = &cobra.Command{
 			fmt.Printf("Error writing config: %v\n", err)
 			return
 		}
-		fmt.Printf("All tools %s\n\n", color.New(color.FgRed, color.Bold).Sprint("disabled"))
+		fmt.Printf("All tools %s\n\n", switchOffColor+"disabled"+resetColor)
 		ListEmbeddingTools()
 	},
 }
 
 func init() {
-	toolsCmd.AddCommand(toolsListCmd)
 	toolsCmd.AddCommand(toolsOnCmd)
 	toolsCmd.AddCommand(toolsOffCmd)
 	rootCmd.AddCommand(toolsCmd)
