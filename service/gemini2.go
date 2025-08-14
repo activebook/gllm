@@ -131,14 +131,16 @@ func (ll *LangLogic) GenerateGemini2Stream() error {
 
 	// Use maxRecursions from LangLogic
 	maxRecursions := ll.MaxRecursions
+	var finalResp *genai.GenerateContentResponse
 
 	for i := 0; i < maxRecursions; i++ {
-		funcCalls, err := ll.processGemini2Stream(ctx, chat, streamParts, &references, &queries)
+		funcCalls, resp, err := ll.processGemini2Stream(ctx, chat, streamParts, &references, &queries)
 		if err != nil {
 			return err
 		}
 		// No furtheer calls
 		if len(*funcCalls) == 0 {
+			finalResp = resp
 			break
 		}
 		// reconstruct the function call
@@ -189,6 +191,14 @@ func (ll *LangLogic) GenerateGemini2Stream() error {
 		ll.ProcChan <- StreamNotify{Status: StatusData, Data: refs}
 	}
 
+	// Record token usage
+	if finalResp != nil && finalResp.UsageMetadata != nil {
+		RecordTokenUsage(int(finalResp.UsageMetadata.PromptTokenCount),
+			int(finalResp.UsageMetadata.CandidatesTokenCount),
+			int(finalResp.UsageMetadata.CachedContentTokenCount),
+			int(finalResp.UsageMetadata.ThoughtsTokenCount))
+	}
+
 	// Save the conversation history
 	convo.History = chat.History(false)
 	err = convo.Save()
@@ -202,7 +212,7 @@ func (ll *LangLogic) GenerateGemini2Stream() error {
 func (ll *LangLogic) processGemini2Stream(ctx context.Context,
 	chat *genai.Chat, parts *[]genai.Part,
 	refs *[]*map[string]interface{},
-	queries *[]string) (*[]*genai.FunctionCall, error) {
+	queries *[]string) (*[]*genai.FunctionCall, *genai.GenerateContentResponse, error) {
 
 	// Stream the response
 	ll.ProcChan <- StreamNotify{Status: StatusProcessing}
@@ -212,10 +222,11 @@ func (ll *LangLogic) processGemini2Stream(ctx context.Context,
 
 	state := stateNormal
 	funcCalls := []*genai.FunctionCall{}
+	var finalResp *genai.GenerateContentResponse
 	for resp, err := range iter {
 		if err != nil {
 			ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}
-			return nil, err
+			return nil, nil, err
 		}
 
 		// Process and send content
@@ -265,8 +276,12 @@ func (ll *LangLogic) processGemini2Stream(ctx context.Context,
 				*queries = append(*queries, candidate.GroundingMetadata.WebSearchQueries...)
 			}
 		}
+
+		// If we have a final response, save it
+		// It has usage metadata
+		finalResp = resp
 	}
-	return &funcCalls, nil
+	return &funcCalls, finalResp, nil
 }
 
 func (ll *LangLogic) processGemini2ToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {

@@ -170,7 +170,10 @@ type OpenChat struct {
 func (c *OpenChat) process() error {
 	convo := GetOpenChatConversation()
 
-	// only allow 5 recursions
+	var finalResp *model.ChatCompletionStreamResponse
+
+	// Recursively process the conversation
+	// Because the model can call tools multiple times
 	i := 0
 	for range c.maxRecursions {
 		i++
@@ -180,10 +183,11 @@ func (c *OpenChat) process() error {
 
 		// Create the request
 		req := model.CreateChatCompletionRequest{
-			Model:       c.model,
-			Temperature: &c.temperature,
-			Messages:    convo.Messages,
-			Tools:       c.tools,
+			Model:         c.model,
+			Temperature:   &c.temperature,
+			Messages:      convo.Messages,
+			Tools:         c.tools,
+			StreamOptions: &model.StreamOptions{IncludeUsage: true},
 			// Thinking: &model.Thinking{
 			// 	Type: model.ThinkingTypeAuto,
 			// },
@@ -200,7 +204,7 @@ func (c *OpenChat) process() error {
 		<-c.proceed // Wait for the main goroutine to tell sub-goroutine to proceed
 
 		// Process the stream and collect tool calls
-		assistantMessage, toolCalls, err := c.processStream(stream)
+		assistantMessage, toolCalls, resp, err := c.processStream(stream)
 		if err != nil {
 			return fmt.Errorf("error processing stream: %v", err)
 		}
@@ -224,6 +228,8 @@ func (c *OpenChat) process() error {
 			// Continue the conversation recursively
 		} else {
 			// No function call and no model content
+			// Get the last response
+			finalResp = resp
 			break
 		}
 	}
@@ -238,6 +244,15 @@ func (c *OpenChat) process() error {
 		refs := "\n\n" + RetrieveReferences(c.references) + "\n"
 		c.proc <- StreamNotify{Status: StatusData, Data: refs}
 	}
+
+	// Record token usage
+	if finalResp != nil && finalResp.Usage != nil {
+		RecordTokenUsage(int(finalResp.Usage.PromptTokens),
+			int(finalResp.Usage.CompletionTokens),
+			int(finalResp.Usage.PromptTokensDetails.CachedTokens),
+			int(finalResp.Usage.CompletionTokensDetails.ReasoningTokens))
+	}
+
 	// No more message
 	// Save the conversation
 	err := convo.Save()
@@ -251,7 +266,7 @@ func (c *OpenChat) process() error {
 }
 
 // processStream processes the stream and collects tool calls
-func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*model.ChatCompletionMessage, *map[string]model.ToolCall, error) {
+func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*model.ChatCompletionMessage, *map[string]model.ToolCall, *model.ChatCompletionStreamResponse, error) {
 	assistantMessage := model.ChatCompletionMessage{
 		Role: model.ChatMessageRoleAssistant,
 		Name: Ptr(""),
@@ -260,6 +275,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 	contentBuffer := strings.Builder{}
 	reasoningBuffer := strings.Builder{}
 	lastCallId := ""
+	var finalResp *model.ChatCompletionStreamResponse
 
 	state := stateNormal
 	for {
@@ -268,8 +284,10 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 			break
 		}
 		if err != nil {
-			return nil, nil, fmt.Errorf("error receiving stream data: %v", err)
+			return nil, nil, nil, fmt.Errorf("error receiving stream data: %v", err)
 		}
+		// Get the final response
+		finalResp = &response
 
 		// Handle regular content
 		if len(response.Choices) > 0 {
@@ -375,7 +393,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 		<-c.proceed
 	}
 
-	return &assistantMessage, &toolCalls, nil
+	return &assistantMessage, &toolCalls, finalResp, nil
 }
 
 // processToolCall processes a single tool call and returns a tool response message

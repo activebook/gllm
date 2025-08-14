@@ -49,13 +49,14 @@ type MarkdownRenderer struct {
 func NewMarkdownRenderer() *MarkdownRenderer {
 	mr := MarkdownRenderer{}
 	mark := viper.GetString("default.markdown")
-	if mark == "on" {
+	switch mark {
+	case "on":
 		mr.keepStreamingContent = true
 		mr.keepMarkdownOnly = false
-	} else if mark == "only" {
+	case "only":
 		mr.keepStreamingContent = false
 		mr.keepMarkdownOnly = true
-	} else {
+	default:
 		mr.keepStreamingContent = false
 		mr.keepMarkdownOnly = false
 	}
@@ -101,10 +102,18 @@ func (mr *MarkdownRenderer) RenderMarkdown() {
 	// Remove citations
 	output = removeCitations(output)
 
+	// Get the token usage
+	usage := GetTokenUsage()
+
 	// Print a separator or message
 	if mr.keepStreamingContent {
 		prefix := "\n\n---\n\n# **MARKDOWN OUTPUT**\n\n---\n\n"
-		output = prefix + output
+		if usage != "" {
+			// append tokens usage to the output
+			output = prefix + output + "\n\n" + usage
+		} else {
+			output = prefix + output
+		}
 	}
 
 	// Render the Markdown using glamour
