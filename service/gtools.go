@@ -312,7 +312,7 @@ func (ll *LangLogic) getGemini2Tools() []*genai.Tool {
 										"- 'delete' or '--' to remove the line.\n" +
 										"- 'replace' or '==' to replace the line content.\n" +
 										"If 'operation' is omitted, 'delete' is assumed when 'content' is empty, otherwise 'replace' is used.\n" +
-										"Accepted values: 'add', '++', 'delete', '--', 'replace', '=='.",
+										"Accepted values: 'add', 'delete', 'replace'.",
 									Enum: []string{"add", "delete", "replace"},
 								},
 							},
@@ -332,6 +332,35 @@ func (ll *LangLogic) getGemini2Tools() []*genai.Tool {
 		}},
 	}
 	tools = append(tools, editFileTool)
+
+	// Add copy file/directory tool
+	copyTool := &genai.Tool{
+		FunctionDeclarations: []*genai.FunctionDeclaration{{
+			Name:        "copy",
+			Description: "Copy a file or directory from one location to another in the filesystem.",
+			Parameters: &genai.Schema{
+				Type: genai.TypeObject,
+				Properties: map[string]*genai.Schema{
+					"source": {
+						Type:        genai.TypeString,
+						Description: "The current path of the file or directory to copy.",
+					},
+					"destination": {
+						Type:        genai.TypeString,
+						Description: "The destination path for the file or directory copy.",
+					},
+					"need_confirm": {
+						Type: genai.TypeBoolean,
+						Description: "Specifies whether to prompt the user for confirmation before copying the file or directory. " +
+							"This should be true for safety if it needs overwrite.",
+						Default: true,
+					},
+				},
+				Required: []string{"source", "destination"},
+			},
+		}},
+	}
+	tools = append(tools, copyTool)
 
 	return tools
 }
@@ -1168,6 +1197,58 @@ func (ll *LangLogic) processGemini2EditFileToolCall(call *genai.FunctionCall) (*
 	}
 
 	response := fmt.Sprintf("Successfully edited file %s", path)
+	resp.Response = map[string]any{
+		"output": response,
+		"error":  "",
+	}
+	return &resp, nil
+}
+
+func (ll *LangLogic) processGemini2CopyToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+	resp := genai.FunctionResponse{
+		ID:   call.ID,
+		Name: call.Name,
+	}
+
+	source, ok := call.Args["source"].(string)
+	if !ok {
+		return nil, fmt.Errorf("source not found in arguments")
+	}
+
+	destination, ok := call.Args["destination"].(string)
+	if !ok {
+		return nil, fmt.Errorf("destination not found in arguments")
+	}
+
+	// Check if confirmation is needed
+	needConfirm, ok := call.Args["need_confirm"].(bool)
+	if !ok {
+		// Default to true for safety
+		needConfirm = true
+	}
+
+	if needConfirm {
+		// Response with a prompt to let user confirm
+		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("copy %s to %s", source, destination), fmt.Sprintf("copy the file or directory from %s to %s", source, destination))
+		resp.Response = map[string]any{
+			"output": outStr,
+			"error":  "",
+		}
+		return &resp, nil
+	}
+
+	// Copy the file or directory
+	err := copyFileOrDir(source, destination)
+	if err != nil {
+		response := fmt.Sprintf("Error copying %s to %s: %v", source, destination, err)
+		resp.Response = map[string]any{
+			"output": response,
+			"error":  err.Error(),
+		}
+		return &resp, nil
+	}
+
+	response := fmt.Sprintf("Successfully copied %s to %s", source, destination)
 	resp.Response = map[string]any{
 		"output": response,
 		"error":  "",

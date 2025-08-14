@@ -311,6 +311,8 @@ func (ll *LangLogic) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Fu
 		resp, err = ll.processGemini2DeleteDirectoryToolCall(call)
 	case "move":
 		resp, err = ll.processGemini2MoveToolCall(call)
+	case "copy":
+		resp, err = ll.processGemini2CopyToolCall(call)
 	case "search_files":
 		resp, err = ll.processGemini2SearchFilesToolCall(call)
 	case "search_text_in_file":

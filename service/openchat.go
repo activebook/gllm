@@ -435,6 +435,8 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		msg, err = c.processDeleteDirectoryToolCall(&toolCall, &argsMap)
 	case "move":
 		msg, err = c.processMoveToolCall(&toolCall, &argsMap)
+	case "copy":
+		msg, err = c.processCopyToolCall(&toolCall, &argsMap)
 	case "search_files":
 		msg, err = c.processSearchFilesToolCall(&toolCall, &argsMap)
 	case "search_text_in_file":

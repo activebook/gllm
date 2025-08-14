@@ -3,6 +3,7 @@
 gllm.yaml
 design.md
 **test/*.*
+**test2/*.*
 *checksums.txt
 
 # Ignore the compiled binary

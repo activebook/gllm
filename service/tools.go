@@ -58,6 +58,7 @@ var (
 		"list_directory",
 		"delete_directory",
 		"move",
+		"copy",
 		"search_files",
 		"search_text_in_file",
 		"read_multiple_files",
@@ -412,7 +413,7 @@ func (ll *LangLogic) getOpenChatTools() []*model.Tool {
 									"- 'delete' or '--' to remove the line.\n" +
 									"- 'replace' or '==' to replace the line content.\n" +
 									"If 'operation' is omitted, 'delete' is assumed when 'content' is empty, otherwise 'replace' is used.\n" +
-									"Accepted values: 'add', '++', 'delete', '--', 'replace', '=='.",
+									"Accepted values: 'add', 'delete', 'replace'.",
 								"enum": []string{"add", "delete", "replace"},
 							},
 						},
@@ -435,6 +436,37 @@ func (ll *LangLogic) getOpenChatTools() []*model.Tool {
 		Function: &editFileFunc,
 	}
 	tools = append(tools, &editFileTool)
+
+	// Copy file/directory tool
+	copyFunc := model.FunctionDefinition{
+		Name:        "copy",
+		Description: "Copy a file or directory from one location to another in the filesystem.",
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"source": map[string]interface{}{
+					"type":        "string",
+					"description": "The current path of the file or directory to copy.",
+				},
+				"destination": map[string]interface{}{
+					"type":        "string",
+					"description": "The destination path for the file or directory copy.",
+				},
+				"need_confirm": map[string]interface{}{
+					"type": "boolean",
+					"description": "Specifies whether to prompt the user for confirmation before copying the file or directory. " +
+						"This should be true for safety if it needs overwrite.",
+					"default": true,
+				},
+			},
+			"required": []string{"source", "destination"},
+		},
+	}
+	copyTool := model.Tool{
+		Type:     model.ToolTypeFunction,
+		Function: &copyFunc,
+	}
+	tools = append(tools, &copyTool)
 
 	return tools
 }
@@ -1338,4 +1370,123 @@ func (c *OpenChat) processEditFileToolCall(toolCall *model.ToolCall, argsMap *ma
 		StringValue: volcengine.String(response),
 	}
 	return &toolMessage, nil
+}
+
+func (c *OpenChat) processCopyToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	toolMessage := model.ChatCompletionMessage{
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Name:       Ptr(""),
+	}
+
+	source, ok := (*argsMap)["source"].(string)
+	if !ok {
+		return nil, fmt.Errorf("source not found in arguments")
+	}
+
+	destination, ok := (*argsMap)["destination"].(string)
+	if !ok {
+		return nil, fmt.Errorf("destination not found in arguments")
+	}
+
+	// Check if confirmation is needed
+	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
+	if !ok {
+		// Default to true for safety
+		needConfirm = true
+	}
+
+	if needConfirm {
+		// Response with a prompt to let user confirm
+		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("copy %s to %s", source, destination), fmt.Sprintf("copy the file or directory from %s to %s", source, destination))
+		toolMessage.Content = &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(outStr),
+		}
+		return &toolMessage, nil
+	}
+
+	// Copy the file or directory
+	err := copyFileOrDir(source, destination)
+	if err != nil {
+		response := fmt.Sprintf("Error copying %s to %s: %v", source, destination, err)
+		toolMessage.Content = &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(response),
+		}
+		return &toolMessage, nil
+	}
+
+	response := fmt.Sprintf("Successfully copied %s to %s", source, destination)
+	toolMessage.Content = &model.ChatCompletionMessageContent{
+		StringValue: volcengine.String(response),
+	}
+	return &toolMessage, nil
+}
+
+// Helper function to copy files or directories
+func copyFileOrDir(src, dst string) error {
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	if srcInfo.IsDir() {
+		return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+
+			// Calculate the destination path
+			relPath, err := filepath.Rel(src, path)
+			if err != nil {
+				return err
+			}
+			dstPath := filepath.Join(dst, relPath)
+
+			if info.IsDir() {
+				// Create directory
+				return os.MkdirAll(dstPath, info.Mode())
+			} else {
+				// Copy file
+				return copyFile(path, dstPath)
+			}
+		})
+	} else {
+		// Copy single file
+		return copyFile(src, dst)
+	}
+}
+
+// Helper function to copy a single file
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	// Create destination directory if it doesn't exist
+	dstDir := filepath.Dir(dst)
+	if err := os.MkdirAll(dstDir, 0755); err != nil {
+		return err
+	}
+
+	destinationFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destinationFile.Close()
+
+	// Copy file contents
+	_, err = sourceFile.Seek(0, 0)
+	if err != nil {
+		return err
+	}
+
+	_, err = destinationFile.Seek(0, 0)
+	if err != nil {
+		return err
+	}
+
+	_, err = destinationFile.ReadFrom(sourceFile)
+	return err
 }
