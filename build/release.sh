@@ -69,8 +69,9 @@ if [ "$1" == "--cleanup" ]; then
   # 2. Get Release ID from tag using GitHub API
   echo "Fetching release ID for tag $VERSION..."
   API_URL="https://api.github.com/repos/$OWNER/$REPO/releases/tags/$VERSION"
-  # Use python to parse json, as it is more robust than grep/sed and is a standard utility.
-  RELEASE_ID=$(curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "$API_URL" | python3 -c "import sys, json; data = json.load(sys.stdin); print(data.get('id', ''))")
+  # Use a grep/sed pipeline to parse the release ID. This is less robust than a dedicated
+  # JSON parser but avoids a dependency on python or jq.
+  RELEASE_ID=$(curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "$API_URL" | grep -o '"id": *[0-9]*' | head -n 1 | sed 's/"id": *//')
 
   if [ -z "$RELEASE_ID" ]; then
     echo "Warning: Could not find a GitHub release matching tag '$VERSION'. It may have already been deleted."
@@ -109,7 +110,7 @@ fi
 echo "Starting pre-flight checks..."
 
 # 1. Check for required commands
-for cmd in git goreleaser curl python; do
+for cmd in git goreleaser curl; do
   if ! command -v "$cmd" &> /dev/null; then
     echo "Error: Required command '$cmd' is not installed or not in your PATH."
     exit 1
