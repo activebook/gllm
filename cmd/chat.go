@@ -584,6 +584,8 @@ func (ci *ChatInfo) setUseTools(useTools string) {
 			service.SetSkipToolsConfirm(true)
 			fmt.Print("Tool confirmation would skip\n")
 		}
+	} else {
+		ListEmbeddingTools()
 	}
 }
 
