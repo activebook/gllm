@@ -15,13 +15,6 @@ import (
 	"github.com/volcengine/volcengine-go-sdk/volcengine"
 )
 
-type streamState int
-
-const (
-	stateNormal streamState = iota
-	stateReasoning
-)
-
 func (ll *LangLogic) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessageContentPart {
 
 	var part *model.ChatCompletionMessageContentPart
@@ -84,10 +77,12 @@ func (ll *LangLogic) GenerateOpenChatStream() error {
 		model:         ll.ModelName,
 		temperature:   ll.Temperature,
 		tools:         tools,
-		proc:          ll.ProcChan,
+		notify:        ll.NotifyChan,
+		data:          ll.DataChan,
 		proceed:       ll.ProceedChan,
 		references:    make([]*map[string]interface{}, 0, 1),
 		maxRecursions: ll.MaxRecursions, // Use configured value from LangLogic
+		status:        &ll.Status,
 	}
 
 	// 2. Prepare the Messages for Chat Completion
@@ -133,14 +128,15 @@ func (ll *LangLogic) GenerateOpenChatStream() error {
 	}
 
 	// Signal that streaming has started
-	ll.ProcChan <- StreamNotify{Status: StatusStarted}
-	<-ll.ProceedChan // Wait for the main goroutine to tell sub-goroutine to proceed
+	// Wait for the main goroutine to tell sub-goroutine to proceed
+	ll.Status.ChangeTo(ll.NotifyChan, StreamNotify{Status: StatusStarted}, ll.ProceedChan)
 
 	// Load previous messages if any
 	convo := GetOpenChatConversation()
 	err := convo.Load()
 	if err != nil {
-		ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}
+		// Notify error and return
+		ll.Status.ChangeTo(ll.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}, nil)
 		return err
 	}
 	convo.PushMessages(messages) // Add new messages to the conversation
@@ -160,11 +156,13 @@ type OpenChat struct {
 	model         string
 	temperature   float32
 	tools         []*model.Tool
-	proc          chan<- StreamNotify       // Sub Channel to send notifications
+	notify        chan<- StreamNotify       // Sub Channel to send notifications
+	data          chan<- StreamData         // Sub Channel to send data
 	proceed       <-chan bool               // Main Channel to receive proceed signal
 	maxRecursions int                       // Maximum number of recursions for model calls
 	queries       []string                  // List of queries to be sent to the AI assistant
 	references    []*map[string]interface{} // keep track of the references
+	status        *StatusStack              // Stack to manage streaming status
 }
 
 func (c *OpenChat) process() error {
@@ -178,8 +176,7 @@ func (c *OpenChat) process() error {
 	for range c.maxRecursions {
 		i++
 		//Debugf("Processing conversation at times: %d\n", i)
-
-		c.proc <- StreamNotify{Status: StatusProcessing}
+		c.status.ChangeTo(c.notify, StreamNotify{Status: StatusProcessing}, nil)
 
 		// Create the request
 		req := model.CreateChatCompletionRequest{
@@ -200,8 +197,8 @@ func (c *OpenChat) process() error {
 		}
 		defer stream.Close()
 
-		c.proc <- StreamNotify{Status: StatusStarted}
-		<-c.proceed // Wait for the main goroutine to tell sub-goroutine to proceed
+		// Wait for the main goroutine to tell sub-goroutine to proceed
+		c.status.ChangeTo(c.notify, StreamNotify{Status: StatusStarted}, c.proceed)
 
 		// Process the stream and collect tool calls
 		assistantMessage, toolCalls, resp, err := c.processStream(stream)
@@ -237,12 +234,12 @@ func (c *OpenChat) process() error {
 	// Add queries to the output if any
 	if len(c.queries) > 0 {
 		q := "\n\n" + RetrieveQueries(c.queries)
-		c.proc <- StreamNotify{Status: StatusData, Data: q}
+		c.data <- StreamData{Text: q, Type: DataTypeNoraml}
 	}
 	// Add references to the output if any
 	if len(c.references) > 0 {
 		refs := "\n\n" + RetrieveReferences(c.references) + "\n"
-		c.proc <- StreamNotify{Status: StatusData, Data: refs}
+		c.data <- StreamData{Text: refs, Type: DataTypeNoraml}
 	}
 
 	// Record token usage
@@ -257,11 +254,11 @@ func (c *OpenChat) process() error {
 	// Save the conversation
 	err := convo.Save()
 	if err != nil {
-		errMsg := fmt.Sprintf("Failed to save conversation: %v", err)
-		c.proc <- StreamNotify{Status: StatusError, Data: errMsg}
 		return fmt.Errorf("failed to save conversation: %v", err)
 	}
-	c.proc <- StreamNotify{Status: StatusFinished}
+
+	// Notify that the stream is finished
+	c.status.ChangeTo(c.notify, StreamNotify{Status: StatusFinished}, nil)
 	return nil
 }
 
@@ -277,7 +274,6 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 	lastCallId := ""
 	var finalResp *model.ChatCompletionStreamResponse
 
-	state := stateNormal
 	for {
 		response, err := stream.Recv()
 		if err == io.EOF {
@@ -294,20 +290,19 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 			delta := (response.Choices[0].Delta)
 
 			// State transitions
-			switch state {
-			case stateNormal:
-				if HasContent(delta.ReasoningContent) {
-					c.proc <- StreamNotify{Status: StatusReasoning, Data: ""}
-					state = stateReasoning
-				}
-			case stateReasoning:
+			switch c.status.Peek() {
+			case StatusReasoning:
 				// If reasoning content is empty, switch back to normal state
 				// This is to handle the case where reasoning content is empty but we already have content
 				// Aka, the model is done with reasoning content and starting to output normal content
 				if delta.ReasoningContent == nil ||
 					(*delta.ReasoningContent == "" && delta.Content != "") {
-					c.proc <- StreamNotify{Status: StatusReasoningOver, Data: ""}
-					state = stateNormal
+					c.status.ChangeTo(c.notify, StreamNotify{Status: StatusReasoningOver}, nil)
+				}
+			default:
+				// If reasoning content is not empty, switch to reasoning state
+				if HasContent(delta.ReasoningContent) {
+					c.status.ChangeTo(c.notify, StreamNotify{Status: StatusReasoning}, nil)
 				}
 			}
 
@@ -315,11 +310,11 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 				// For reasoning model
 				text := *delta.ReasoningContent
 				reasoningBuffer.WriteString(text)
-				c.proc <- StreamNotify{Status: StatusReasoningData, Data: text}
+				c.data <- StreamData{Text: text, Type: DataTypeReasoning}
 			} else if delta.Content != "" {
 				text := delta.Content
 				contentBuffer.WriteString(text)
-				c.proc <- StreamNotify{Status: StatusData, Data: text}
+				c.data <- StreamData{Text: text, Type: DataTypeNoraml}
 			}
 
 			// Handle tool calls in the stream
@@ -349,7 +344,6 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 							toolCalls[id] = tc
 						} else {
 							// Prepare to receive tool call arguments
-							c.proc <- StreamNotify{Status: StatusProcessing}
 							toolCalls[id] = model.ToolCall{
 								ID:   id,
 								Type: model.ToolTypeFunction,
@@ -388,9 +382,6 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 			assistantToolCalls = append(assistantToolCalls, &tc)
 		}
 		assistantMessage.ToolCalls = assistantToolCalls
-		// Function is ready to call
-		c.proc <- StreamNotify{Status: StatusStarted}
-		<-c.proceed
 	}
 
 	return &assistantMessage, &toolCalls, finalResp, nil
@@ -405,10 +396,7 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	}
 
 	// Call function
-	c.proc <- StreamNotify{
-		Status: StatusFunctionCalling,
-		Data:   fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, formatToolCallArguments(argsMap)),
-	}
+	c.status.ChangeTo(c.notify, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, formatToolCallArguments(argsMap))}, nil)
 
 	var msg *model.ChatCompletionMessage
 	var err error
@@ -448,7 +436,6 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		err = fmt.Errorf("unknown function name: %s", toolCall.Function.Name)
 	}
 	// Function call is done
-	c.proc <- StreamNotify{Status: StatusFunctionCallingOver}
-	<-c.proceed
+	c.status.ChangeTo(c.notify, StreamNotify{Status: StatusFunctionCallingOver}, c.proceed)
 	return msg, err
 }
