@@ -96,12 +96,12 @@ else
 fi
 
 # --- Confirmation Step ---
-echo "\n--------------------------------------------------"
+echo "--------------------------------------------------"
 echo "🚀 Ready to release version: $VERSION"
 echo "--------------------------------------------------"
 echo "Changelog to be included in the tag:"
 echo -e "$CHANGELOG"
-echo "--------------------------------------------------\n"
+echo "--------------------------------------------------"
 
 if [ "$DRY_RUN" = true ]; then
   echo "[DRY RUN] Would create tag '$VERSION'."
