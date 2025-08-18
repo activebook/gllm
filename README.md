@@ -16,6 +16,8 @@
 - **Check out history and context**: In chat mode or multi-turn chat, easily view the full context.
 - **Configuration Management**: Customize model behavior and settings.  
 - **Command Agent Mode**: Let LLMs plan and execute commands with your confirmation.
+- **More Integrated Tools**: Let LLMs plan and use more integrated tools.
+- **Track Token Usage**: Track token usage meta info.  
 - **Version Control**: Easily track and update your setup.  
 
 ---
@@ -286,6 +288,8 @@ This project includes various features to enhance usability and efficiency. Belo
 | **Code Execution** *(Gemini only)*: Execute Python code directly | ![Code Execution Screenshot](screenshots/code.png) |
 | **Markdown Output**: Generate clean, readable Markdown | ![Markdown Screenshot](screenshots/markdown.png) |
 | **One-Shot Agent**: Run task in one shot | ![One-Shot Screenshot](screenshots/oneshot.png) |
+| **Tools-Use Agent**: Use more integrated tools | ![Tools-Use Screenshot](screenshots/tools.png) |
+| **Tokens Usage**: Track tokens usage metainfo | ![Tokens-Usage Screenshot](screenshots/tokens.png) |
 
 ---
 
