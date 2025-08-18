@@ -19,6 +19,45 @@ const ()
 func GetTokenUsage() string {
 	if TotalTokens > 0 {
 		return fmt.Sprintf(
+			"\n"+bbColor+
+				"┌───────────────┐\n"+
+				"│"+resetColor+"  Token Usage"+resetColor+bbColor+"  │"+"\n"+
+				"├───────────────┴───────────────────────────────────────────────────────────────────┐\n"+
+				"│"+resetColor+" Input: %s%6d%s "+bbColor+"│"+resetColor+" Output: %s%6d%s "+bbColor+"│"+resetColor+" Cached: %s%6d%s "+bbColor+"│"+resetColor+" Thought: %s%6d%s "+bbColor+"│"+resetColor+" Total: %s%6d%s "+bbColor+"│"+resetColor+"\n"+bbColor+
+				"└───────────────────────────────────────────────────────────────────────────────────┘"+
+				resetColor,
+			cyanColor, InputTokens, resetColor,
+			cyanColor, OutputTokens, resetColor,
+			cyanColor, CachedTokens, resetColor,
+			cyanColor, ThoughtTokens, resetColor,
+			cyanColor, TotalTokens, resetColor,
+		)
+	}
+	return ""
+}
+
+func GetTokenUsageTip() string {
+	if TotalTokens > 0 {
+		return fmt.Sprintf(
+			bbColor+"\n"+
+				"┌───────────────────────────────────────────────────────────────────────────────────┐\n"+
+				"│"+resetColor+cyanColor+" Token Usage"+resetColor+bbColor+"                                                                 │\n"+
+				"│"+resetColor+" Input: %s%6d%s "+bbColor+"│"+resetColor+" Output: %s%6d%s "+bbColor+"│"+resetColor+" Cached: %s%6d%s "+bbColor+"│"+resetColor+" Thought: %s%6d%s "+bbColor+"│"+resetColor+" Total: %s%6d%s "+bbColor+"│"+resetColor+"\n"+bbColor+
+				"└───────────────────────────────────────────────────────────────────────────────────┘"+
+				resetColor,
+			cyanColor, InputTokens, resetColor,
+			cyanColor, OutputTokens, resetColor,
+			cyanColor, CachedTokens, resetColor,
+			cyanColor, ThoughtTokens, resetColor,
+			cyanColor, TotalTokens, resetColor,
+		)
+	}
+	return ""
+}
+
+func GetTokenUsageBox() string {
+	if TotalTokens > 0 {
+		return fmt.Sprintf(
 			bbColor+"\n"+
 				"┌───────────────┬────────────┐\n"+
 				"│ Token Type    │   Count    │\n"+
