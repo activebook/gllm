@@ -10,11 +10,53 @@
 # 5. Prompt for final confirmation, showing the changelog.
 # 6. Create and push a git tag.
 # 7. Run goreleaser to publish the release.
+#
+# It also includes two helper modes:
+# --cleanup: Generates commands to recover from a failed release.
+# --dry-run: Runs all checks without making any changes.
 
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
-# --- Initial Setup and Argument Parsing ---
+# --- Configuration ---
+# Determine the absolute path of the project root, assuming the script is in a subdirectory (e.g., /build)
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+PROJECT_ROOT=$(dirname "$SCRIPT_DIR")
+
+# The Go file containing the version string, now using an absolute path.
+VERSION_FILE="$PROJECT_ROOT/cmd/version.go"
+
+# --- Mode Selection ---
+
+# Cleanup Mode
+if [ "$1" == "--cleanup" ]; then
+  VERSION=$(grep 'const version' "$VERSION_FILE" | sed -E 's/.*"([^"]+)".*/\1/')
+  if [ -z "$VERSION" ]; then
+    echo "Error: Could not find version in $VERSION_FILE"
+    exit 1
+  fi
+
+  echo "--------------------------------------------------"
+  echo "🧹 Cleanup Helper for version: $VERSION"
+  echo "--------------------------------------------------"
+  echo "If a release failed, run these commands to reset:"
+
+  if command -v gh &> /dev/null; then
+    echo "\n# 1. Delete the release and tag from GitHub (recommended):"
+    echo "gh release delete $VERSION --cleanup-tag"
+  else
+    echo "\n# 1. Delete the release draft from the GitHub UI."
+    echo "# 2. Delete the remote tag:"
+    echo "git push --delete origin $VERSION"
+  fi
+
+  echo "\n# 3. Delete the local tag:"
+  echo "git tag -d $VERSION"
+  echo "--------------------------------------------------"
+  exit 0
+fi
+
+# --- Initial Setup for Release ---
 DRY_RUN=false
 if [ "$1" == "--dry-run" ]; then
   DRY_RUN=true
@@ -26,13 +68,6 @@ if [ -f "$(dirname "$0")/.env" ]; then
   source "$(dirname "$0")/.env"
 fi
 
-# --- Configuration ---
-# Determine the absolute path of the project root, assuming the script is in a subdirectory (e.g., /build)
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-PROJECT_ROOT=$(dirname "$SCRIPT_DIR")
-
-# The Go file containing the version string, now using an absolute path.
-VERSION_FILE="$PROJECT_ROOT/cmd/version.go"
 
 # --- Pre-flight Checks ---
 echo "Starting pre-flight checks..."
