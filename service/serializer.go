@@ -346,7 +346,7 @@ func DisplayOpenAIConversationLog(data []byte, msgCount int, msgLength int) {
 			// Output the reasoning content if it exists
 			if msg.ReasonContent != "" {
 				fmt.Printf("\n    %sThinking ↓%s", completeColor, ResetColor)
-				fmt.Printf("\n    %s%s%s", inProgressColor, TruncateString(msg.ReasonContent, msgLength), ResetColor)
+				fmt.Printf("\n    %s%s%s", inReasoningColor, TruncateString(msg.ReasonContent, msgLength), ResetColor)
 				fmt.Printf("\n    %s✓%s\n", completeColor, ResetColor)
 				fmt.Printf("    ")
 			}

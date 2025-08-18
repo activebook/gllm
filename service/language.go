@@ -6,9 +6,9 @@ import (
 
 const (
 	// Terminal colors
-	inProgressColor = "\033[90m" // Bright Black
-	inCallingColor  = "\033[36m" // Cyan
-	completeColor   = "\033[32m" // Green
+	inReasoningColor = "\033[90m" // Bright Black
+	inCallingColor   = "\033[36m" // Cyan
+	completeColor    = "\033[32m" // Green
 )
 
 type LangLogic struct {
@@ -25,6 +25,7 @@ type LangLogic struct {
 	UseTools      bool                // Use tools
 	UseCodeTool   bool                // Use code tool
 	MaxRecursions int                 // Maximum number of recursions for model calls
+	Status        StatusStack         // Stack to manage streaming status
 }
 
 // func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, modelInfo map[string]any, searchEngine map[string]any) {
@@ -137,7 +138,7 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 			markdownRenderer.RenderString("%s", notify.Data)
 		case StatusReasoningData:
 			// Reasoning data don't need to be saved to markdown buffer
-			fmt.Print(notify.Data) // Print the streamed text
+			fmt.Print(inReasoningColor + notify.Data) // Print the streamed text
 		case StatusError:
 			StopSpinner(spinner)
 			Errorf("Stream error: %v\n", notify.Data)
@@ -152,11 +153,11 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 		case StatusReasoning:
 			StopSpinner(spinner)
 			// Start with in-progress color
-			fmt.Println(completeColor + "Thinking ↓" + inProgressColor)
+			fmt.Println(completeColor + "Thinking ↓")
 		case StatusReasoningOver:
 			// Switch to complete color at the end
 			fmt.Print(resetColor)
-			fmt.Print(completeColor + "✓" + resetColor)
+			fmt.Printf(completeColor + "✓" + resetColor)
 			fmt.Println()
 		case StatusFunctionCalling:
 			fmt.Print(resetColor)

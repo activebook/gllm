@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"google.golang.org/genai"
 )
@@ -47,7 +48,7 @@ func (ll *LangLogic) GenerateGemini2Stream() error {
 		Backend: genai.BackendGeminiAPI,
 	})
 	if err != nil {
-		ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create client: %v", err)}
+		ll.Status.ChangeTo(ll.ProcChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create client: %v", err)}, nil)
 		return err
 	}
 
@@ -67,7 +68,7 @@ func (ll *LangLogic) GenerateGemini2Stream() error {
 	convo := GetGemini2Conversation()
 	err = convo.Load()
 	if err != nil {
-		ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}
+		ll.Status.ChangeTo(ll.ProcChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}, nil)
 		return err
 	}
 
@@ -99,13 +100,11 @@ func (ll *LangLogic) GenerateGemini2Stream() error {
 		// load embedding Tools
 		config.Tools = append(config.Tools, ll.getGemini2Tools()...)
 		if ll.UseSearchTool {
-			ll.ProcChan <- StreamNotify{Status: StatusStarted}
-			<-ll.ProceedChan
+			ll.Status.ChangeTo(ll.ProcChan, StreamNotify{Status: StatusStarted}, ll.ProceedChan)
 			Warnf("%s", "Embedding tools are enabled.\n"+
 				"Because embedding tools is not compatible with Google Search tool,"+
 				" so Google Search is unavailable now.\n"+
 				"Please disable embedding tools to use Google Search.")
-			ll.ProcChan <- StreamNotify{Status: StatusProcessing}
 		}
 	} else if ll.UseSearchTool {
 		// only load search tool
@@ -120,13 +119,13 @@ func (ll *LangLogic) GenerateGemini2Stream() error {
 	// Create a chat session
 	chat, err := client.Chats.Create(ctx, ll.ModelName, &config, convo.History)
 	if err != nil {
-		ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create chat: %v", err)}
+		ll.Status.ChangeTo(ll.ProcChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create chat: %v", err)}, nil)
 		return err
 	}
 
 	// Signal that streaming has started
-	ll.ProcChan <- StreamNotify{Status: StatusStarted}
-	<-ll.ProceedChan // Wait for the main goroutine to tell sub-goroutine to proceed
+	// Wait for the main goroutine to tell sub-goroutine to proceed
+	ll.Status.ChangeTo(ll.ProcChan, StreamNotify{Status: StatusProcessing}, nil)
 
 	// Stream the responses
 	references := make([]*map[string]interface{}, 0, 1)
@@ -187,12 +186,12 @@ func (ll *LangLogic) GenerateGemini2Stream() error {
 	// Add queries to the output if any
 	if len(queries) > 0 {
 		q := "\n\n" + RetrieveQueries(queries)
-		ll.ProcChan <- StreamNotify{Status: StatusData, Data: q}
+		ll.Status.ChangeTo(ll.ProcChan, StreamNotify{Status: StatusData, Data: q}, nil)
 	}
 	// Add references to the output if any
 	if len(references) > 0 {
 		refs := "\n\n" + RetrieveReferences(references) + "\n"
-		ll.ProcChan <- StreamNotify{Status: StatusData, Data: refs}
+		ll.Status.ChangeTo(ll.ProcChan, StreamNotify{Status: StatusData, Data: refs}, nil)
 	}
 
 	// Record token usage
@@ -209,7 +208,8 @@ func (ll *LangLogic) GenerateGemini2Stream() error {
 	if err != nil {
 		return fmt.Errorf("failed to save conversation: %v", err)
 	}
-	ll.ProcChan <- StreamNotify{Status: StatusFinished}
+	// Signal that streaming is finished
+	ll.Status.ChangeTo(ll.ProcChan, StreamNotify{Status: StatusFinished}, nil)
 	return err
 }
 
@@ -219,17 +219,16 @@ func (ll *LangLogic) processGemini2Stream(ctx context.Context,
 	queries *[]string) (*[]*genai.FunctionCall, *genai.GenerateContentResponse, error) {
 
 	// Stream the response
-	ll.ProcChan <- StreamNotify{Status: StatusProcessing}
+	ll.Status.ChangeTo(ll.ProcChan, StreamNotify{Status: StatusProcessing}, nil)
 	iter := chat.SendMessageStream(ctx, *parts...)
-	ll.ProcChan <- StreamNotify{Status: StatusStarted}
-	<-ll.ProceedChan // Wait for the main goroutine to tell sub-goroutine to proceed
+	// Wait for the main goroutine to tell sub-goroutine to proceed
+	ll.Status.ChangeTo(ll.ProcChan, StreamNotify{Status: StatusStarted}, ll.ProceedChan)
 
-	state := stateNormal
 	funcCalls := []*genai.FunctionCall{}
 	var finalResp *genai.GenerateContentResponse
 	for resp, err := range iter {
 		if err != nil {
-			ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}
+			ll.Status.ChangeTo(ll.ProcChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}, nil)
 			return nil, nil, err
 		}
 
@@ -254,23 +253,25 @@ func (ll *LangLogic) processGemini2Stream(ctx context.Context,
 				}
 
 				// State transitions
-				switch state {
-				case stateNormal:
-					if part.Thought {
-						ll.ProcChan <- StreamNotify{Status: StatusReasoning, Data: ""}
-						state = stateReasoning
-					}
-				case stateReasoning:
+				status := ll.Status.Peek()
+				switch status {
+				case StatusReasoning:
 					if !part.Thought {
-						ll.ProcChan <- StreamNotify{Status: StatusReasoningOver, Data: ""}
-						state = stateNormal
+						ll.Status.ChangeTo(ll.ProcChan, StreamNotify{Status: StatusReasoningOver}, nil)
+					}
+				default:
+					if part.Thought {
+						ll.Status.ChangeTo(ll.ProcChan, StreamNotify{Status: StatusReasoning}, nil)
 					}
 				}
+
 				// Actual text data
 				if part.Thought && part.Text != "" {
-					ll.ProcChan <- StreamNotify{Status: StatusReasoningData, Data: part.Text}
+					// Reasoning data
+					ll.Status.ChangeTo(ll.ProcChan, StreamNotify{Status: StatusReasoningData, Data: strings.TrimSpace(part.Text)}, nil)
 				} else if part.Text != "" {
-					ll.ProcChan <- StreamNotify{Status: StatusData, Data: part.Text}
+					// Normal text data
+					ll.Status.ChangeTo(ll.ProcChan, StreamNotify{Status: StatusData, Data: strings.TrimSpace(part.Text)}, nil)
 				}
 			}
 
@@ -291,10 +292,7 @@ func (ll *LangLogic) processGemini2Stream(ctx context.Context,
 func (ll *LangLogic) processGemini2ToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 
 	// Call function
-	ll.ProcChan <- StreamNotify{
-		Status: StatusFunctionCalling,
-		Data:   fmt.Sprintf("%s(%s)\n", call.Name, formatToolCallArguments(call.Args)),
-	}
+	ll.Status.ChangeTo(ll.ProcChan, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", call.Name, formatToolCallArguments(call.Args))}, nil)
 
 	var resp *genai.FunctionResponse
 	var err error
@@ -340,8 +338,7 @@ func (ll *LangLogic) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Fu
 	}
 
 	// Function call is done
-	ll.ProcChan <- StreamNotify{Status: StatusFunctionCallingOver}
-	<-ll.ProceedChan
+	ll.Status.ChangeTo(ll.ProcChan, StreamNotify{Status: StatusFunctionCallingOver}, ll.ProceedChan)
 	return resp, err
 }
 
