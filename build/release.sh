@@ -51,15 +51,40 @@ if [ "$1" == "--cleanup" ]; then
 
   echo "Confirmation accepted. Proceeding with deletion..."
 
-  # Use gh if available for atomic deletion of release and remote tag
-  if command -v gh &> /dev/null; then
-    echo "Using 'gh' to delete release and remote tag from GitHub..."
-    gh release delete "$VERSION" --cleanup-tag --yes || echo "Warning: 'gh release delete' failed. The release or tag may not have existed on GitHub."
-  else
-    echo "Warning: 'gh' CLI not found. Deleting remote tag only."
-    echo "You must manually delete the release draft on the GitHub website."
-    git push --delete origin "$VERSION" || echo "Warning: Failed to delete remote tag. It may not have existed."
+  # --- GitHub API Deletion ---
+  echo "Attempting to delete via GitHub API..."
+
+  # 1. Get Owner/Repo from git remote URL
+  REMOTE_URL=$(git config --get remote.origin.url)
+  REPO_INFO=$(echo "$REMOTE_URL" | sed -n -E 's/.*github.com[:/]([^/]+)\/(.*)\.git/\1 \2/p')
+  OWNER=$(echo "$REPO_INFO" | cut -d' ' -f1)
+  REPO=$(echo "$REPO_INFO" | cut -d' ' -f2)
+
+  if [ -z "$OWNER" ] || [ -z "$REPO" ]; then
+    echo "Error: Could not parse repository owner and name from git remote 'origin'."
+    exit 1
   fi
+  echo "Found repository: $OWNER/$REPO"
+
+  # 2. Get Release ID from tag using GitHub API
+  echo "Fetching release ID for tag $VERSION..."
+  API_URL="https://api.github.com/repos/$OWNER/$REPO/releases/tags/$VERSION"
+  # Use python to parse json, as it is more robust than grep/sed and is a standard utility.
+  RELEASE_ID=$(curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "$API_URL" | python3 -c "import sys, json; data = json.load(sys.stdin); print(data.get('id', ''))")
+
+  if [ -z "$RELEASE_ID" ]; then
+    echo "Warning: Could not find a GitHub release matching tag '$VERSION'. It may have already been deleted."
+  else
+    # 3. Delete the Release via API
+    echo "Deleting GitHub release with ID: $RELEASE_ID"
+    DELETE_URL="https://api.github.com/repos/$OWNER/$REPO/releases/$RELEASE_ID"
+    curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" "$DELETE_URL"
+    echo "GitHub release deleted."
+  fi
+
+  # 4. Delete Git Tags locally and remotely
+  echo "Deleting remote git tag..."
+  git push --delete origin "$VERSION" || echo "Warning: Failed to delete remote tag. It may not have existed."
 
   echo "Deleting local tag..."
   git tag -d "$VERSION" || echo "Warning: Failed to delete local tag. It may not have existed."
@@ -84,7 +109,7 @@ fi
 echo "Starting pre-flight checks..."
 
 # 1. Check for required commands
-for cmd in git goreleaser; do
+for cmd in git goreleaser curl python; do
   if ! command -v "$cmd" &> /dev/null; then
     echo "Error: Required command '$cmd' is not installed or not in your PATH."
     exit 1
