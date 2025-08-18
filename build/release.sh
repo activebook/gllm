@@ -12,7 +12,7 @@
 # 7. Run goreleaser to publish the release.
 #
 # It also includes two helper modes:
-# --cleanup: Generates commands to recover from a failed release.
+# --cleanup: Interactively deletes a release to recover from a failure.
 # --dry-run: Runs all checks without making any changes.
 
 # Exit immediately if a command exits with a non-zero status.
@@ -37,22 +37,34 @@ if [ "$1" == "--cleanup" ]; then
   fi
 
   echo "--------------------------------------------------"
-  echo "🧹 Cleanup Helper for version: $VERSION"
+  echo "🔥 Automated Cleanup for version: $VERSION"
   echo "--------------------------------------------------"
-  echo "If a release failed, run these commands to reset:"
+  echo "WARNING: This will permanently delete the release and tag"
+  echo "         from both GitHub and your local repository."
+  echo "--------------------------------------------------"
 
-  if command -v gh &> /dev/null; then
-    echo "\n# 1. Delete the release and tag from GitHub (recommended):"
-    echo "gh release delete $VERSION --cleanup-tag"
-  else
-    echo "\n# 1. Delete the release draft from the GitHub UI."
-    echo "# 2. Delete the remote tag:"
-    echo "git push --delete origin $VERSION"
+  read -p "To confirm, please type the version ('$VERSION'): " CONFIRMATION
+  if [ "$CONFIRMATION" != "$VERSION" ]; then
+    echo "Confirmation failed. Cleanup cancelled."
+    exit 1
   fi
 
-  echo "\n# 3. Delete the local tag:"
-  echo "git tag -d $VERSION"
-  echo "--------------------------------------------------"
+  echo "Confirmation accepted. Proceeding with deletion..."
+
+  # Use gh if available for atomic deletion of release and remote tag
+  if command -v gh &> /dev/null; then
+    echo "Using 'gh' to delete release and remote tag from GitHub..."
+    gh release delete "$VERSION" --cleanup-tag --yes || echo "Warning: 'gh release delete' failed. The release or tag may not have existed on GitHub."
+  else
+    echo "Warning: 'gh' CLI not found. Deleting remote tag only."
+    echo "You must manually delete the release draft on the GitHub website."
+    git push --delete origin "$VERSION" || echo "Warning: Failed to delete remote tag. It may not have existed."
+  fi
+
+  echo "Deleting local tag..."
+  git tag -d "$VERSION" || echo "Warning: Failed to delete local tag. It may not have existed."
+
+  echo "✅ Cleanup for version $VERSION complete."
   exit 0
 fi
 
@@ -67,7 +79,6 @@ fi
 if [ -f "$(dirname "$0")/.env" ]; then
   source "$(dirname "$0")/.env"
 fi
-
 
 # --- Pre-flight Checks ---
 echo "Starting pre-flight checks..."
@@ -131,12 +142,12 @@ else
 fi
 
 # --- Confirmation Step ---
-echo "--------------------------------------------------"
+echo "\n--------------------------------------------------"
 echo "🚀 Ready to release version: $VERSION"
 echo "--------------------------------------------------"
 echo "Changelog to be included in the tag:"
 echo -e "$CHANGELOG"
-echo "--------------------------------------------------"
+echo "--------------------------------------------------\n"
 
 if [ "$DRY_RUN" = true ]; then
   echo "[DRY RUN] Would create tag '$VERSION'."
