@@ -45,3 +45,6 @@ gllm.7z
 *.log
 # Added by goreleaser init:
 dist/
+
+# Local environment variables
+build/.env
