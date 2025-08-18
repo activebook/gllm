@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,11 +32,14 @@ Special commands:
 /history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)
 /markdown, /mark [on|off|only] - Switch whether to render markdown or not
 /system, /S <@name|prompt> - change system prompt
-/template, /t <@name|tmpl> - change template
+/tools, /t [on|off|skip|confirm] - Switch whether to use embedding tools, skip tools confirmation
+/template, /p <@name|tmpl> - change template
 /search, /s <search_engine> - select a search engine to use
 /reference. /r <num> - change link reference count
+/usage, /u [on|off] - Switch whether to show token usage information
 /attach, /a <filename> - Attach a file to the chat session
-/detach, /d <filename> - Detach a file to the chat session`,
+/detach, /d <filename> - Detach a file to the chat session
+!<command> - Execute a shell command directly`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Create an indeterminate progress bar
 		spinner := service.NewSpinner("Processing...")
@@ -67,6 +72,23 @@ Special commands:
 					fmt.Println("Using default system prompt instead")
 				}
 			}
+
+			// Deep dive
+			if deepDiveFlag {
+				service.SetDeepDive(deepDiveFlag)
+			} else {
+				service.SetDeepDive(false)
+			}
+
+			// Set whether or not to skip tools confirmation
+			service.SetSkipToolsConfirm(confirmToolsFlag)
+
+			if !toolsFlag {
+				// if tools flag are not set, check if they are enabled globally
+				toolsFlag = AreToolsEnabled()
+			}
+			// Set whether or not to use tools
+			SetToolsEnabled(toolsFlag)
 
 			if cmd.Flags().Changed("search") {
 				// Search mode
@@ -120,12 +142,15 @@ func init() {
 	// Imagine like using web llm ui, you can attach file to the chat session and turn search on and off
 	chatCmd.Flags().StringVarP(&modelFlag, "model", "m", "", "Model to use for the chat session")
 	chatCmd.Flags().StringVarP(&sysPromptFlag, "system", "S", "", "System prompt to use for the chat session")
-	chatCmd.Flags().StringVarP(&templateFlag, "template", "t", "", "Template to use for the chat session")
+	chatCmd.Flags().StringVarP(&templateFlag, "template", "p", "", "Template to use for the chat session")
 	chatCmd.Flags().StringSliceVarP(&attachments, "attachment", "a", []string{}, "Specify file(s) or image(s) to append to the chat sessioin")
 	chatCmd.Flags().StringVarP(&convoName, "conversation", "c", GenerateChatFilename(), "Name for this chat session")
 	chatCmd.Flags().StringVarP(&searchFlag, "search", "s", service.GetDefaultSearchEngineName(), "Search engine for the chat session")
+	chatCmd.Flags().BoolVarP(&toolsFlag, "tools", "t", true, "Enable or disable tools for the chat session")
 	chatCmd.Flags().Lookup("search").NoOptDefVal = service.GetDefaultSearchEngineName()
 	chatCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
+	chatCmd.Flags().BoolVar(&deepDiveFlag, "deep-dive", false, "Enable deep dive search to fetch all links from search results")
+	chatCmd.Flags().BoolVarP(&confirmToolsFlag, "confirm-tools", "", false, "Skip confirmation for tool operations")
 }
 
 func (ci *ChatInfo) startREPL() {
@@ -239,6 +264,12 @@ func (ci *ChatInfo) handleInput(input string) {
 		return
 	}
 
+	// Check if it's a shell command
+	if strings.HasPrefix(input, "!") {
+		ci.executeShellCommand(input[1:])
+		return
+	}
+
 	// Process as normal LLM query...
 	ci.callLLM(input)
 }
@@ -298,6 +329,17 @@ func (ci *ChatInfo) setReferences(count string) {
 	}
 	service.SetMaxReferences(num)
 	fmt.Printf("Reference count set to %d\n", num)
+}
+
+func (ci *ChatInfo) setUsage(usage string) {
+	if len(usage) != 0 {
+		err := SwitchUsageMetainfo(usage)
+		if err != nil {
+			service.Errorf("Error setting usage: %v", err)
+			return
+		}
+	}
+	PrintUsageMetainfoStatus()
 }
 
 func (ci *ChatInfo) addAttachFiles(input string) {
@@ -439,6 +481,8 @@ func (ci *ChatInfo) showInfo() {
 	fmt.Printf("  System Prompt: \n    - %s\n", GetEffectiveSystemPrompt())
 	fmt.Printf("  Template: \n    - %s\n", GetEffectiveTemplate())
 	fmt.Printf("  Search Engine: %s\n", GetEffectSearchEnginelName())
+	fmt.Printf("  Use Tools: %t\n", AreToolsEnabled())
+	fmt.Printf("  Usage Metainfo: %s\n", GetUsageMetainfoStatus())
 	fmt.Printf("  Attachment(s): \n")
 	for _, file := range ci.Files {
 		fmt.Printf("    - [%s]: %s\n", file.Format(), file.Path())
@@ -455,10 +499,13 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /markdown, /mark [on|off|only] - Switch whether to render markdown or not")
 	fmt.Println("  /attach, /a <filename> - Attach a file to the conversation")
 	fmt.Println("  /detach, /d <filename|all> - Detach a file from the conversation")
-	fmt.Println("  /template, /t \"<tmpl|name>\" - Change the template")
+	fmt.Println("  /template, /p \"<tmpl|name>\" - Change the template")
 	fmt.Println("  /system /S \"<prompt|name>\" - Change the system prompt")
 	fmt.Println("  /search, /s \"<engine>\" - Change the search engine")
+	fmt.Println("  /tools, /t \"[on|off|skip|confirm]\" - Switch whether to use embedding tools, skip tools confirmation")
 	fmt.Println("  /reference, /r \"<num>\" - Change the search link reference count")
+	fmt.Println("  /usage, /u \"[on|off]\" - Switch whether to show token usage information")
+	fmt.Println("  !<command> - Execute a shell command directly (e.g. !ls -la)")
 }
 
 func (ci *ChatInfo) showHistory(num int, chars int) {
@@ -497,12 +544,46 @@ func (ci *ChatInfo) setMarkdown(mark string) {
 		SwitchMarkdown(mark)
 	}
 	marked := GetMarkdownSwitch()
-	if marked == "on" {
+	switch marked {
+	case "on":
 		fmt.Println("Makedown output switched " + switchOnColor + "on" + resetColor)
-	} else if marked == "only" {
+	case "only":
 		fmt.Println("Makedown output switched " + switchOnlyColor + "only" + resetColor)
-	} else {
+	case "off":
 		fmt.Println("Makedown output switched " + switchOffColor + "off" + resetColor)
+	default:
+		fmt.Println("Makedown output switched " + switchOffColor + "off" + resetColor)
+	}
+}
+
+func (ci *ChatInfo) setUseTools(useTools string) {
+	if len(useTools) != 0 {
+		var err error
+		switch useTools {
+		// Set useTools on or off
+		case "on":
+			err = SwitchUseTools(useTools)
+			if err != nil {
+				service.Errorf("Error setting useTools: %v", err)
+				return
+			}
+			ListEmbeddingTools()
+		case "off":
+			err = SwitchUseTools(useTools)
+			if err != nil {
+				service.Errorf("Error setting useTools: %v", err)
+				return
+			}
+			ListEmbeddingTools()
+
+			// Set whether or not to skip tools confirmation
+		case "confirm":
+			service.SetSkipToolsConfirm(false)
+			fmt.Print("Tool operations would need confirmation\n")
+		case "skip":
+			service.SetSkipToolsConfirm(true)
+			fmt.Print("Tool confirmation would skip\n")
+		}
 	}
 }
 
@@ -546,7 +627,7 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	case "/clear", "/reset":
 		ci.clearContext()
 
-	case "/template", "/t":
+	case "/template", "/p":
 		if len(parts) < 2 {
 			fmt.Println("Please specify a template name")
 			return
@@ -570,6 +651,13 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		engine := strings.TrimSpace(parts[1])
 		ci.setSearchEngine(engine)
 
+	case "/tools", "/t":
+		useTools := ""
+		if len(parts) >= 2 {
+			useTools = strings.TrimSpace(parts[1])
+		}
+		ci.setUseTools(useTools)
+
 	case "/reference", "/r":
 		if len(parts) < 2 {
 			fmt.Println("Please specify a number")
@@ -577,6 +665,13 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		}
 		count := strings.TrimSpace(parts[1])
 		ci.setReferences(count)
+
+	case "/usage", "/u":
+		usage := ""
+		if len(parts) >= 2 {
+			usage = strings.TrimSpace(parts[1])
+		}
+		ci.setUsage(usage)
 
 	case "/attach", "/a":
 		if len(parts) < 2 {
@@ -610,11 +705,18 @@ func (ci *ChatInfo) callLLM(input string) {
 	appendText(&finalPrompt, input)
 	_, modelInfo := GetEffectiveModel()
 	sys_prompt := GetEffectiveSystemPrompt()
+
+	// Check whether to use tools
+	useTools := AreToolsEnabled()
+
+	// If tools are enabled, we will use the search engine
+	// If search flag is set, we will use the search engine, too
 	var searchEngine map[string]any
-	if searchFlag != "" {
+	if searchFlag != "" || useTools {
 		_, searchEngine = GetEffectiveSearchEngine()
 	}
-	service.CallLanguageModel(finalPrompt.String(), sys_prompt, ci.Files, modelInfo, searchEngine, ci.maxRecursions)
+
+	service.CallLanguageModel(finalPrompt.String(), sys_prompt, ci.Files, modelInfo, searchEngine, useTools, ci.maxRecursions)
 
 	// We must reset the files after processing
 	// We shouldn't pass the files to the next call each time
@@ -628,4 +730,38 @@ func (ci *ChatInfo) callLLM(input string) {
 	SetEffectiveSystemPrompt("")
 	// Reset the template
 	SetEffectiveTemplate("")
+}
+
+func (ci *ChatInfo) executeShellCommand(command string) {
+	command = strings.TrimSpace(command)
+	if command == "" {
+		fmt.Println("No command provided")
+		return
+	}
+
+	// Execute the command
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("cmd", "/C", command)
+	} else {
+		cmd = exec.Command("sh", "-c", command)
+	}
+
+	// Capture both stdout and stderr
+	output, err := cmd.CombinedOutput()
+
+	// Display error if command failed
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			fmt.Printf(cmdErrorColor+"Command failed with exit code %d\n"+resetColor, exitError.ExitCode())
+		} else {
+			fmt.Printf(cmdErrorColor+"Command failed: %v\n"+resetColor, err)
+		}
+	}
+
+	// Display the output
+	if len(output) > 0 {
+		fmt.Printf(cmdOutputColor+"%s\n"+resetColor, output)
+	}
+	fmt.Print(resetColor) // Reset color after command output
 }

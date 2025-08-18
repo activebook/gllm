@@ -3,15 +3,9 @@ package service
 import (
 	"context"
 	"fmt"
-	"os/exec"
-	"runtime"
 
 	"google.golang.org/genai"
 )
-
-func (ll *LangLogic) GenerateGemini2Stream() error {
-	return ll.gemini2Stream()
-}
 
 func (ll *LangLogic) getGemini2FilePart(file *FileData) genai.Part {
 
@@ -45,37 +39,7 @@ func (ll *LangLogic) getGemini2FilePart(file *FileData) genai.Part {
 	}
 }
 
-func (ll *LangLogic) getGemini2CommandTool() *genai.Tool {
-	// All use the same search tool
-	tool := &genai.Tool{
-		FunctionDeclarations: []*genai.FunctionDeclaration{{
-			Name:        "execute_command",
-			Description: "Execute system commands on the user's device with confirmation.",
-			Parameters: &genai.Schema{
-				Type: genai.TypeObject,
-				Properties: map[string]*genai.Schema{
-					"command": {
-						Type:        genai.TypeString,
-						Description: "The command to be executed on the user's system.",
-					},
-					"description": {
-						Type:        genai.TypeString,
-						Description: "Explanation of what this command will do.",
-					},
-					"need_confirm": {
-						Type:        genai.TypeBoolean,
-						Description: "Whether this command requires explicit user confirmation before execution.",
-						Default:     true,
-					},
-				},
-				Required: []string{"command", "description", "need_confirm"},
-			},
-		}},
-	}
-	return tool
-}
-
-func (ll *LangLogic) gemini2Stream() error {
+func (ll *LangLogic) GenerateGemini2Stream() error {
 	// Setup the Gemini client
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
@@ -126,16 +90,31 @@ func (ll *LangLogic) gemini2Stream() error {
 	if ll.SystemPrompt != "" {
 		config.SystemInstruction = &genai.Content{Parts: []*genai.Part{{Text: ll.SystemPrompt}}}
 	}
-	// Tools
-	if IsExecPluginLoaded() {
-		config.Tools = append(config.Tools, ll.getGemini2CommandTool())
-	}
-	// Remember: CodeExecution and GoogleSearch cannot be enabled at the same time
-	if ll.UseSearchTool {
-		config.Tools = append(config.Tools, &genai.Tool{GoogleSearch: &genai.GoogleSearch{}})
-	}
-	if ll.UseCodeTool && !ll.UseSearchTool {
-		config.Tools = append(config.Tools, &genai.Tool{CodeExecution: &genai.ToolCodeExecution{}})
+
+	// - If UseTools is true, enable the embedding tools.
+	// - Else if UseSearchTool is true, enable Google Search.
+	// - Else if UseCodeTool is true, enable code execution.
+	// CodeExecution and GoogleSearch cannot be enabled simultaneously.
+	if ll.UseTools {
+		// load embedding Tools
+		config.Tools = append(config.Tools, ll.getGemini2Tools()...)
+		if ll.UseSearchTool {
+			ll.ProcChan <- StreamNotify{Status: StatusStarted}
+			<-ll.ProceedChan
+			Warnf("%s", "Embedding tools are enabled.\n"+
+				"Because embedding tools is not compatible with Google Search tool,"+
+				" so Google Search is unavailable now.\n"+
+				"Please disable embedding tools to use Google Search.")
+			ll.ProcChan <- StreamNotify{Status: StatusProcessing}
+		}
+	} else if ll.UseSearchTool {
+		// only load search tool
+		// **Remember: google doesn't support web_search tool plus function call
+		// Function call is not compatible with Google Search tool
+		config.Tools = append(config.Tools, ll.getGemini2WebSearchTool())
+	} else if ll.UseCodeTool {
+		// Remember: CodeExecution and GoogleSearch cannot be enabled at the same time
+		config.Tools = append(config.Tools, ll.getGemini2CodeExecTool())
 	}
 
 	// Create a chat session
@@ -156,14 +135,16 @@ func (ll *LangLogic) gemini2Stream() error {
 
 	// Use maxRecursions from LangLogic
 	maxRecursions := ll.MaxRecursions
+	var finalResp *genai.GenerateContentResponse
 
 	for i := 0; i < maxRecursions; i++ {
-		funcCalls, err := ll.processGemini2Stream(ctx, chat, streamParts, &references, &queries)
+		funcCalls, resp, err := ll.processGemini2Stream(ctx, chat, streamParts, &references, &queries)
 		if err != nil {
 			return err
 		}
 		// No furtheer calls
 		if len(*funcCalls) == 0 {
+			finalResp = resp
 			break
 		}
 		// reconstruct the function call
@@ -184,13 +165,18 @@ func (ll *LangLogic) gemini2Stream() error {
 
 		streamParts = &[]genai.Part{}
 		for _, funcCall := range *funcCalls {
-			// Add function call to the output
-			ll.ProcChan <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("Function call: %v\n", funcCall.Name)}
+
+			// Skip if not our expected function
+			// Because some model made up function name
+			if funcCall.Name != "" && !AvailableEmbeddingTool(funcCall.Name) {
+				continue
+			}
 			// Handle tool call
-			funcResp, err := ll.handleGemini2ToolCall(funcCall)
+			funcResp, err := ll.processGemini2ToolCall(funcCall)
 			if err != nil {
-				ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Function call error: %v", err)}
-				return err
+				Warnf("Processing tool call: %v\n", err)
+				// Send error info to user but continue processing other tool calls
+				continue
 			}
 			// Send function response back through the chat session
 			respPart := genai.Part{FunctionResponse: funcResp}
@@ -209,6 +195,14 @@ func (ll *LangLogic) gemini2Stream() error {
 		ll.ProcChan <- StreamNotify{Status: StatusData, Data: refs}
 	}
 
+	// Record token usage
+	if finalResp != nil && finalResp.UsageMetadata != nil {
+		RecordTokenUsage(int(finalResp.UsageMetadata.PromptTokenCount),
+			int(finalResp.UsageMetadata.CandidatesTokenCount),
+			int(finalResp.UsageMetadata.CachedContentTokenCount),
+			int(finalResp.UsageMetadata.ThoughtsTokenCount))
+	}
+
 	// Save the conversation history
 	convo.History = chat.History(false)
 	err = convo.Save()
@@ -222,7 +216,7 @@ func (ll *LangLogic) gemini2Stream() error {
 func (ll *LangLogic) processGemini2Stream(ctx context.Context,
 	chat *genai.Chat, parts *[]genai.Part,
 	refs *[]*map[string]interface{},
-	queries *[]string) (*[]*genai.FunctionCall, error) {
+	queries *[]string) (*[]*genai.FunctionCall, *genai.GenerateContentResponse, error) {
 
 	// Stream the response
 	ll.ProcChan <- StreamNotify{Status: StatusProcessing}
@@ -232,10 +226,11 @@ func (ll *LangLogic) processGemini2Stream(ctx context.Context,
 
 	state := stateNormal
 	funcCalls := []*genai.FunctionCall{}
+	var finalResp *genai.GenerateContentResponse
 	for resp, err := range iter {
 		if err != nil {
 			ll.ProcChan <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}
-			return nil, err
+			return nil, nil, err
 		}
 
 		// Process and send content
@@ -285,86 +280,69 @@ func (ll *LangLogic) processGemini2Stream(ctx context.Context,
 				*queries = append(*queries, candidate.GroundingMetadata.WebSearchQueries...)
 			}
 		}
+
+		// If we have a final response, save it
+		// It has usage metadata
+		finalResp = resp
 	}
-	return &funcCalls, nil
+	return &funcCalls, finalResp, nil
 }
 
-func (ll *LangLogic) handleGemini2ToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
+func (ll *LangLogic) processGemini2ToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+
+	// Call function
+	ll.ProcChan <- StreamNotify{
+		Status: StatusFunctionCalling,
+		Data:   fmt.Sprintf("%s(%s)\n", call.Name, formatToolCallArguments(call.Args)),
 	}
-	// Check if the model requested a tool call
-	if call.Name == "execute_command" {
-		cmdStr := call.Args["command"].(string)
-		needConfirm, ok := call.Args["need_confirm"].(bool)
-		if !ok {
-			needConfirm = true
-		}
-		if needConfirm {
-			// Response with a prompt to let user confirm
-			descStr := call.Args["description"].(string)
-			outStr := fmt.Sprintf(ExecRespTmplConfirm, cmdStr, descStr)
-			resp.Response = map[string]any{
-				"output": outStr,
-				"error":  "",
-			}
-			return &resp, nil
-		}
-		// Log that we're executing the command
-		ll.ProcChan <- StreamNotify{Status: StatusData, Data: fmt.Sprintf("%s\n", cmdStr)}
-		var errStr string
 
-		// Do the real command
-		ll.ProcChan <- StreamNotify{Status: StatusFunctionCalling, Data: ""}
-		var out []byte
-		var err error
-		if runtime.GOOS == "windows" {
-			out, err = exec.Command("cmd", "/C", cmdStr).CombinedOutput()
-		} else {
-			out, err = exec.Command("sh", "-c", cmdStr).CombinedOutput()
-		}
-		ll.ProcChan <- StreamNotify{Status: StatusFunctionCallingOver, Data: ""}
-		<-ll.ProceedChan
-
-		if err != nil {
-			var exitCode int
-			if exitError, ok := err.(*exec.ExitError); ok {
-				exitCode = exitError.ExitCode()
-			}
-			errStr = fmt.Sprintf("Command failed with exit code %d: %v", exitCode, err)
-		}
-
-		// Output the result
-		outStr := string(out)
-		if outStr != "" {
-			outStr = outStr + "\n"
-			ll.ProcChan <- StreamNotify{Status: StatusData, Data: outStr}
-		}
-
-		// Format error info if present
-		errorInfo := ""
-		if errStr != "" {
-			errorInfo = fmt.Sprintf("Error: %s", errStr)
-		}
-		// Format output info
-		outputInfo := ""
-		if outStr != "" {
-			outputInfo = fmt.Sprintf("Output:\n%s", outStr)
-		} else {
-			outputInfo = "Output: <no output>"
-		}
-		// Create a response that prompts the LLM to provide insightful analysis of the command output
-		finalResponse := fmt.Sprintf(ExecRespTmplOutput, cmdStr, errorInfo, outputInfo)
-
-		// Send the output back as a tool response
-		resp.Response = map[string]any{
-			"output": finalResponse,
-			"error":  errStr,
-		}
-		return &resp, nil
+	var resp *genai.FunctionResponse
+	var err error
+	switch call.Name {
+	case "shell":
+		resp, err = ll.processGemini2ShellToolCall(call)
+	case "read_file":
+		resp, err = ll.processGemini2ReadFileToolCall(call)
+	case "write_file":
+		resp, err = ll.processGemini2WriteFileToolCall(call)
+	case "create_directory":
+		resp, err = ll.processGemini2CreateDirectoryToolCall(call)
+	case "list_directory":
+		resp, err = ll.processGemini2ListDirectoryToolCall(call)
+	case "delete_file":
+		resp, err = ll.processGemini2DeleteFileToolCall(call)
+	case "delete_directory":
+		resp, err = ll.processGemini2DeleteDirectoryToolCall(call)
+	case "move":
+		resp, err = ll.processGemini2MoveToolCall(call)
+	case "copy":
+		resp, err = ll.processGemini2CopyToolCall(call)
+	case "search_files":
+		resp, err = ll.processGemini2SearchFilesToolCall(call)
+	case "search_text_in_file":
+		resp, err = ll.processGemini2SearchTextInFileToolCall(call)
+	case "read_multiple_files":
+		resp, err = ll.processGemini2ReadMultipleFilesToolCall(call)
+	case "web_fetch":
+		resp, err = ll.processGemini2WebFetchToolCall(call)
+	case "edit_file":
+		resp, err = ll.processGemini2EditFileToolCall(call)
+	default:
+		// For web_search and other Google Search/CodeExecution tools that don't need special processing
+		resp, err = &genai.FunctionResponse{
+			ID:   call.ID,
+			Name: call.Name,
+			Response: map[string]any{
+				"content": nil,
+				"error":   fmt.Sprintf("unknown tool call: %v", call.Name),
+			},
+		}, nil
 	}
-	return nil, fmt.Errorf("unknown tool call: %v", call.Name)
+
+	// Function call is done
+	ll.ProcChan <- StreamNotify{Status: StatusFunctionCallingOver}
+	<-ll.ProceedChan
+	return resp, err
 }
 
 func appendReferences(metadata *genai.GroundingMetadata, refs *[]*map[string]interface{}) {

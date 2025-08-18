@@ -7,6 +7,7 @@ import (
 const (
 	// Terminal colors
 	inProgressColor = "\033[90m" // Bright Black
+	inCallingColor  = "\033[36m" // Cyan
 	completeColor   = "\033[32m" // Green
 )
 
@@ -21,6 +22,7 @@ type LangLogic struct {
 	ProcChan      chan<- StreamNotify // Sub Channel to send notifications
 	ProceedChan   <-chan bool         // Sub Channel to receive proceed signal
 	UseSearchTool bool                // Use search tool
+	UseTools      bool                // Use tools
 	UseCodeTool   bool                // Use code tool
 	MaxRecursions int                 // Maximum number of recursions for model calls
 }
@@ -30,7 +32,7 @@ type LangLogic struct {
 // 	CallLanguageModelWithMaxRecursions(prompt, sys_prompt, files, modelInfo, searchEngine, 5)
 // }
 
-func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, modelInfo map[string]any, searchEngine map[string]any, maxRecursions int) {
+func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, modelInfo map[string]any, searchEngine map[string]any, useTools bool, maxRecursions int) {
 	var temperature float32
 	switch temp := modelInfo["temperature"].(type) {
 	case float64:
@@ -86,6 +88,7 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 		ProcChan:      notifyCh,
 		ProceedChan:   proceedCh,
 		UseSearchTool: useSearch,
+		UseTools:      useTools,
 		UseCodeTool:   exeCode,
 		MaxRecursions: maxRecursions,
 	}
@@ -108,15 +111,13 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 		switch provider {
 		case ModelOpenAICompatible:
 			if err := ll.GenerateOpenChatStream(); err != nil {
-				//notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("OpenChat stream error: %v", err)}
 				//Errorf("Stream error: %v\n", err)
-				notifyCh <- StreamNotify{Status: StatusError}
+				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 			}
 		case ModelGemini:
 			if err := ll.GenerateGemini2Stream(); err != nil {
-				//notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Gemini stream error: %v", err)}
 				//Errorf("Stream error: %v\n", err)
-				notifyCh <- StreamNotify{Status: StatusError}
+				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 			}
 		default:
 			notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Unsupported model provider: %s", provider)}
@@ -145,6 +146,8 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 			StopSpinner(spinner)
 			// Render the markdown
 			markdownRenderer.RenderMarkdown()
+			// Render the token usage
+			RenderTokenUsage()
 			return // Exit when stream is done
 		case StatusReasoning:
 			StopSpinner(spinner)
@@ -155,12 +158,11 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 			fmt.Print(resetColor)
 			fmt.Print(completeColor + "✓" + resetColor)
 			fmt.Println()
-		case StatusSearching:
-			StartSpinner(spinner, "Searching...")
-		case StatusSearchingOver:
-			StopSpinner(spinner)
-			proceedCh <- true
 		case StatusFunctionCalling:
+			fmt.Print(resetColor)
+			fmt.Println()
+			fmt.Print(inCallingColor + notify.Data + resetColor) // Print the function call message
+			fmt.Println()
 			StartSpinner(spinner, "Function Calling...")
 		case StatusFunctionCallingOver:
 			StopSpinner(spinner)

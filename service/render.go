@@ -49,13 +49,14 @@ type MarkdownRenderer struct {
 func NewMarkdownRenderer() *MarkdownRenderer {
 	mr := MarkdownRenderer{}
 	mark := viper.GetString("default.markdown")
-	if mark == "on" {
+	switch mark {
+	case "on":
 		mr.keepStreamingContent = true
 		mr.keepMarkdownOnly = false
-	} else if mark == "only" {
+	case "only":
 		mr.keepStreamingContent = false
 		mr.keepMarkdownOnly = true
-	} else {
+	default:
 		mr.keepStreamingContent = false
 		mr.keepMarkdownOnly = false
 	}
@@ -90,6 +91,9 @@ func (mr *MarkdownRenderer) RenderString(format string, args ...interface{}) {
 // RenderMarkdown clears the streaming output and re-renders the entire Markdown
 func (mr *MarkdownRenderer) RenderMarkdown() {
 	if !mr.keepStreamingContent && !mr.keepMarkdownOnly {
+		// When markdown is off, we need to ensure the output ends with a newline
+		// to prevent the shell from displaying % at the end
+		fmt.Println()
 		return
 	}
 
@@ -121,6 +125,12 @@ func (mr *MarkdownRenderer) RenderMarkdown() {
 
 	// Print the rendered Markdown
 	fmt.Print(out)
+
+	// Ensure output ends with a newline to prevent shell from displaying %
+	// the % character in shells like zsh when output doesn't end with newline
+	if !strings.HasSuffix(out, "\n") {
+		fmt.Println()
+	}
 
 	// Reset the buffer and line count
 	mr.buffer.Reset()

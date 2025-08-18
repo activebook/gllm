@@ -26,14 +26,17 @@ var (
 	// Global logger instance, configured by setupLogging
 	logger = service.GetLogger()
 
-	modelFlag     string   // gllm "What is Go?" -model(-m) gpt4o
-	attachments   []string // gllm "Summarize this" --attachment(-a) report.txt
-	sysPromptFlag string   // gllm "Act as shell" --system-prompt(-S) @shell-assistant
-	templateFlag  string   // gllm --template(-t) @coder
-	searchFlag    string   // gllm --search(-s) "What is the stock price of Tesla right now?"
-	codeFlag      bool     // gllm --code(-C) "print('Hello, World!')"
-	referenceFlag int      // gllm --reference(-r) 3 "What is the stock price of Tesla right now?"
-	convoName     string   // gllm --conversation(-c) "My Conversation" "What is the stock price of Tesla right now?"
+	modelFlag        string   // gllm "What is Go?" -model(-m) gpt4o
+	attachments      []string // gllm "Summarize this" --attachment(-a) report.txt
+	sysPromptFlag    string   // gllm "Act as shell" --system-prompt(-S) @shell-assistant
+	templateFlag     string   // gllm --template(-t) @coder
+	searchFlag       string   // gllm --search(-s) "What is the stock price of Tesla right now?"
+	toolsFlag        bool     // gllm --tools(-t) "Move a.txt to folder b"
+	codeFlag         bool     // gllm --code(-C) "print('Hello, World!')"
+	deepDiveFlag     bool     // gllm --deep-dive "Tell me current tariff war results"
+	referenceFlag    int      // gllm --reference(-r) 3 "What is the stock price of Tesla right now?"
+	convoName        string   // gllm --conversation(-c) "My Conversation" "What is the stock price of Tesla right now?"
+	confirmToolsFlag bool     // gllm --confirm-tools "Allow skipping confirmation for tool operations"
 
 	// Global cmd instance, to be used by subcommands
 	rootCmd = &cobra.Command{
@@ -142,11 +145,26 @@ Configure your API keys and preferred models, then start chatting or executing c
 					searchFlag = ""
 				}
 
+				// Tools
+				if !toolsFlag {
+					// if tools flag are not set, check if they are enabled globally
+					toolsFlag = AreToolsEnabled()
+				}
+				// Set whether or not to use tools
+				SetToolsEnabled(toolsFlag)
+
 				// Code execution
 				if codeFlag {
 					service.EnableCodeExecution()
 				} else {
 					service.DisableCodeExecution()
+				}
+
+				// Deep dive
+				if deepDiveFlag {
+					service.SetDeepDive(deepDiveFlag)
+				} else {
+					service.SetDeepDive(false)
 				}
 
 				// Check if -c/--conversation was used without a value
@@ -262,12 +280,25 @@ func processQuery(prompt string, files []*service.FileData) {
 	_, modelInfo := GetEffectiveModel()
 	sys_prompt := GetEffectiveSystemPrompt()
 	maxRecursions := GetMaxRecursions()
+
+	// Set whether or not to skip tools confirmation
+	service.SetSkipToolsConfirm(confirmToolsFlag)
+
+	// tools (Contains web_search tool)
+	useTools := AreToolsEnabled()
+
+	// search engine will be loaded and made available if
+	// either the -s flag is used (searchFlag != "")
+	// or if tools are enabled (useTools is true).
 	var searchEngine map[string]any
-	if searchFlag != "" {
+	// If search flag is set, use the effective search engine
+	// If toolsFlag is set, we also need to use the search engine
+	if searchFlag != "" || useTools {
 		_, searchEngine = GetEffectiveSearchEngine()
 		service.SetMaxReferences(referenceFlag)
 	}
-	service.CallLanguageModel(prompt, sys_prompt, files, modelInfo, searchEngine, maxRecursions)
+
+	service.CallLanguageModel(prompt, sys_prompt, files, modelInfo, searchEngine, useTools, maxRecursions)
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -312,7 +343,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&modelFlag, "model", "m", "", "Specify the language model to use")
 	rootCmd.Flags().StringSliceVarP(&attachments, "attachment", "a", []string{}, "Specify file(s), image(s), url(s) to append to the prompt")
 	rootCmd.Flags().StringVarP(&sysPromptFlag, "system-prompt", "S", "", "Specify a system prompt")
-	rootCmd.Flags().StringVarP(&templateFlag, "template", "t", "", "Specify a template to use")
+	rootCmd.Flags().StringVarP(&templateFlag, "template", "p", "", "Specify a template to use")
 	rootCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
 
 	// The key fix is using NoOptDefVal property which specifically handles the case when a flag is provided without a value.
@@ -321,7 +352,12 @@ func init() {
 	rootCmd.Flags().StringVarP(&convoName, "conversation", "c", "", "Specify a conversation name to track chat session")
 	rootCmd.Flags().Int("max-recursions", 5, "Maximum number of Model calling recursions")
 
+	// Flags for enabling/disabling features
+	// These flags are not persistent, so they only apply to this command
+	rootCmd.Flags().BoolVarP(&toolsFlag, "tools", "t", false, "Enable model to use embedding tools")
 	rootCmd.Flags().BoolVarP(&codeFlag, "code", "C", false, "Enable model to generate and run Python code (only for gemini)")
+	rootCmd.Flags().BoolVarP(&deepDiveFlag, "deep-dive", "", false, "Fetch more details from the search (default: off)")
+	rootCmd.Flags().BoolVarP(&confirmToolsFlag, "confirm-tools", "", false, "Skip confirmation for tool operations (default: no)")
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
 
 	// Add more persistent flags here if needed (e.g., --verbose, --log-file)

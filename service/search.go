@@ -45,6 +45,13 @@ var (
 	searchCxKey   string
 	searchEngine  string
 	maxReferences int
+	// deepDive is a flag to indicate whether to perform a deep dive search
+	// If true, it will fetch all links from the search results
+	// If false, it will only fetch the first 3 links to keep it simple and token efficiency
+	// The top 3 results are ranked highly for a reason; they are generally the most authoritative and relevant pages for a given query.
+	deepDive bool = false // Whether to perform a deep dive search
+
+	_maxLinks int = 3 // Maximum number of links to fetch in a single search
 )
 
 const TavilyUrl = "https://api.tavily.com/search"
@@ -80,6 +87,10 @@ func GetSearchEngine() string {
 
 func SetMaxReferences(max int) {
 	maxReferences = max
+}
+
+func SetDeepDive(dive bool) {
+	deepDive = dive
 }
 
 func TavilySearch(query string) (map[string]any, error) {
@@ -159,8 +170,19 @@ func tavilyFormatResponse(tavilyResp *TavilyResponse) (map[string]any, error) {
 
 	// Collect all links
 	links := make([]string, 0, len(tavilyResp.Results))
-	for _, result := range tavilyResp.Results {
-		links = append(links, result.URL)
+	if deepDive {
+		// --deep-dive is true, use all links
+		for _, result := range tavilyResp.Results {
+			links = append(links, result.URL)
+		}
+	} else {
+		// Default behavior, take top 3
+		for i, result := range tavilyResp.Results {
+			if i >= _maxLinks {
+				break // Stop after the top 3
+			}
+			links = append(links, result.URL)
+		}
 	}
 
 	// Fetch contents for all links
@@ -179,8 +201,13 @@ func tavilyFormatResponse(tavilyResp *TavilyResponse) (map[string]any, error) {
 			"link":        r.URL,
 			"displayLink": displayLink,
 			"snippet":     r.Content,
-			"content":     contents[i], // Attach fetched content here
 		}
+		
+		// Safely add content if it exists
+		if i < len(contents) {
+			resultMap["content"] = contents[i]
+		}
+		
 		results = append(results, resultMap)
 	}
 
@@ -209,8 +236,19 @@ func GoogleSearch(query string) (map[string]any, error) {
 
 	// Collect all links
 	links := make([]string, 0, len(resp.Items))
-	for _, result := range resp.Items {
-		links = append(links, result.Link)
+	if deepDive {
+		// --deep-dive is true, use all links
+		for _, result := range resp.Items {
+			links = append(links, result.Link)
+		}
+	} else {
+		// Default behavior, take top 3
+		for i, result := range resp.Items {
+			if i >= _maxLinks {
+				break // Stop after the top 3
+			}
+			links = append(links, result.Link)
+		}
 	}
 
 	// Fetch contents for all links
@@ -224,8 +262,13 @@ func GoogleSearch(query string) (map[string]any, error) {
 			"link":        result.Link,
 			"displayLink": result.DisplayLink,
 			"snippet":     result.Snippet,
-			"content":     contents[i], // Attach fetched content here
 		}
+		
+		// Safely add content if it exists
+		if i < len(contents) {
+			resultMap["content"] = contents[i]
+		}
+		
 		results = append(results, resultMap)
 	}
 

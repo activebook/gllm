@@ -140,16 +140,17 @@ var configPrintCmd = &cobra.Command{
 		w.Flush()
 
 		// Plugins section
-		printSection("Plugins")
-		plugins := GetLoadedPlugins()
-		fmt.Fprintln(w, headerColor(" Plugin ")+"\t"+headerColor(" Loaded "))
-		fmt.Fprintln(w, headerColor("-------")+"\t"+headerColor("----------"))
-		for name, loaded := range plugins {
-			loadedStr := highlightColor("Yes")
-			if !loaded {
-				loadedStr = color.New(color.FgRed, color.Bold).Sprint("No")
-			}
-			fmt.Fprintf(w, "%s\t%s\n", keyColor(name), loadedStr)
+		printSection("Tools")
+		fmt.Fprintln(w, headerColor(" Tool ")+"\t"+headerColor(" Enabled "))
+		fmt.Fprintln(w, headerColor("------")+"\t"+headerColor("----------"))
+
+		toolsEnabled := AreToolsEnabled()
+		toolsStatus := highlightColor("Yes")
+		if !toolsEnabled {
+			toolsStatus = color.New(color.FgRed, color.Bold).Sprint("No")
+		}
+		for _, tool := range service.GetAllEmbeddingTools() {
+			fmt.Fprintf(w, "%s\t%s\n", keyColor(tool), toolsStatus)
 		}
 		w.Flush()
 
