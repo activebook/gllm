@@ -168,12 +168,12 @@ else
 fi
 
 # --- Confirmation Step ---
-echo "\n--------------------------------------------------"
+echo "--------------------------------------------------"
 echo "🚀 Ready to release version: $VERSION"
 echo "--------------------------------------------------"
 echo "Changelog to be included in the tag:"
 echo -e "$CHANGELOG"
-echo "--------------------------------------------------\n"
+echo "--------------------------------------------------"
 
 if [ "$DRY_RUN" = true ]; then
   echo "[DRY RUN] Would create tag '$VERSION'."
@@ -201,4 +201,4 @@ git push origin "$VERSION"
 echo "Running GoReleaser..."
 goreleaser release --clean
 
-echo "\n✅ Release process completed successfully for version $VERSION."
+echo "✅ Release process completed successfully for version $VERSION."
