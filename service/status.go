@@ -10,12 +10,10 @@ const (
 	StatusStarted                          // 2
 	StatusFinished                         // 3
 	StatusError                            // 4
-	StatusData                             // 5
-	StatusReasoning                        // 6
-	StatusReasoningData                    // 7
-	StatusReasoningOver                    // 8
-	StatusFunctionCalling                  // 9
-	StatusFunctionCallingOver              // 10
+	StatusReasoning                        // 5
+	StatusReasoningOver                    // 6
+	StatusFunctionCalling                  // 7
+	StatusFunctionCallingOver              // 8
 )
 
 type StreamNotify struct {
@@ -108,10 +106,6 @@ func (s *StatusStack) ChangeTo(
 		for s.IsTop(StatusFunctionCalling) {
 			s.Pop() // Remove the function calling status
 		}
-	case StatusData:
-		// Do nothing, just let the data be sent
-	case StatusReasoningData:
-		// Do nothing, just let the data be sent
 	default:
 		// For other statuses, we just push the new status
 		// This allows us to keep track of the current status stack
