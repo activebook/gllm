@@ -18,6 +18,7 @@
 - **Command Agent Mode**: Let LLMs plan and execute commands with your confirmation.
 - **More Integrated Tools**: Let LLMs plan and use more integrated tools.
 - **Track Token Usage**: Track token usage meta info.  
+- **Import/Export Configuration**: Import/Export custermized configuration file.
 - **Version Control**: Easily track and update your setup.  
 
 ---
