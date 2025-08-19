@@ -1,6 +1,7 @@
 # Specific
 .qodo
 gllm.yaml
+gllm-config.yaml
 design.md
 **test/*.*
 **test2/*.*

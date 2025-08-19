@@ -59,6 +59,92 @@ var configPathCmd = &cobra.Command{
 	},
 }
 
+// configExportCmd represents the config export command
+var configExportCmd = &cobra.Command{
+	Use:   "export [file]",
+	Short: "Export configuration to a file",
+	Long: `Export current configuration to a file.
+
+If no file is specified, the configuration will be exported to 'gllm-config.yaml' 
+in the current directory.`,
+	Args: cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		var exportFile string
+		
+		if len(args) == 0 {
+			exportFile = "gllm-config.yaml"
+		} else {
+			exportFile = args[0]
+		}
+		
+		// Get all configuration settings
+		configMap := viper.AllSettings()
+		
+		// Create a new viper instance for export
+		exportViper := viper.New()
+		for key, value := range configMap {
+			exportViper.Set(key, value)
+		}
+		
+		// Set the export file
+		exportViper.SetConfigFile(exportFile)
+		
+		// Write the configuration to the file
+		if err := exportViper.WriteConfigAs(exportFile); err != nil {
+			service.Errorf("Error exporting configuration: %s\n", err)
+			return
+		}
+		
+		fmt.Printf("Configuration exported successfully to: %s\n", exportFile)
+	},
+}
+
+// configImportCmd represents the config import command
+var configImportCmd = &cobra.Command{
+	Use:   "import [file]",
+	Short: "Import configuration from a file",
+	Long: `Import configuration from a file.
+
+This will merge the imported configuration with the current configuration,
+with the imported values taking precedence.`,
+	Args: cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		importFile := args[0]
+		
+		// Check if file exists
+		if _, err := os.Stat(importFile); os.IsNotExist(err) {
+			service.Errorf("Configuration file does not exist: %s\n", importFile)
+			return
+		}
+		
+		// Create a new viper instance for import
+		importViper := viper.New()
+		importViper.SetConfigFile(importFile)
+		
+		// Read the configuration file
+		if err := importViper.ReadInConfig(); err != nil {
+			service.Errorf("Error reading configuration file: %s\n", err)
+			return
+		}
+		
+		// Get all settings from the import file
+		importedSettings := importViper.AllSettings()
+		
+		// Merge imported settings with current configuration
+		for key, value := range importedSettings {
+			viper.Set(key, value)
+		}
+		
+		// Save the merged configuration
+		if err := writeConfig(); err != nil {
+			service.Errorf("Error saving configuration: %s\n", err)
+			return
+		}
+		
+		fmt.Printf("Configuration imported successfully from: %s\n", importFile)
+	},
+}
+
 // configModelCmd represents the config model command (stub for now)
 var configPrintCmd = &cobra.Command{
 	Use:     "print",
@@ -206,6 +292,8 @@ func init() {
 	configCmd.AddCommand(configPrintCmd)
 	configCmd.AddCommand(configSetCmd) // Register the config set command
 	configCmd.AddCommand(configMaxRecursionsCmd)
+	configCmd.AddCommand(configExportCmd) // Register the config export command
+	configCmd.AddCommand(configImportCmd) // Register the config import command
 
 	// Add flags for other prompt commands if needed in the future
 }
