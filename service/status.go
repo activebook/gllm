@@ -72,11 +72,6 @@ func (s *StatusStack) ChangeTo(
 	notify StreamNotify,
 	proceed <-chan bool) { // Sub Channel to receive proceed signal
 
-	// If a proc channel is provided, send the notification
-	if proc != nil {
-		proc <- notify
-	}
-
 	// Update the status stack based on the new status
 	switch notify.Status {
 	case StatusStarted:
@@ -110,6 +105,11 @@ func (s *StatusStack) ChangeTo(
 		// For other statuses, we just push the new status
 		// This allows us to keep track of the current status stack
 		s.Push(notify.Status)
+	}
+
+	// If a proc channel is provided, send the notification
+	if proc != nil {
+		proc <- notify
 	}
 
 	// If a proceed channel is provided, wait for the signal to proceed

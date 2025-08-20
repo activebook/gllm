@@ -112,6 +112,10 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 	dataCh := make(chan StreamData, 10)     // Buffer to prevent blocking(used for streamed text data)
 	proceedCh := make(chan bool)            // For main -> sub communication
 
+	// active channels used in select (can be set to nil to disable)
+	activeNotifyCh := notifyCh
+	activeDataCh := dataCh
+
 	tu := TokenUsage{RenderUsage: renderUsage}
 	std := NewStdRenderer()
 	markdown := NewMarkdownRenderer(renderMarkdown)
@@ -181,7 +185,11 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 		select {
 
 		// Handle streamed text data
-		case data := <-dataCh:
+		case data := <-activeDataCh:
+
+			// disable notify channel while processing data
+			activeNotifyCh = nil
+
 			switch data.Type {
 			case DataTypeNormal:
 				// Render the streamed text and save to markdown buffer
@@ -198,12 +206,21 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 				// Handle other data types if needed
 			}
 
+			// Re-enable notify channel
+			activeNotifyCh = notifyCh
+
 		// Handle status notifications
-		case notify := <-notifyCh:
+		// Remember in order to process status notifications,
+		// we need to proceedCh to confirm
+		case notify := <-activeNotifyCh:
+
+			// disable data channel while processing notify
+			activeDataCh = nil
 
 			switch notify.Status {
 			case StatusProcessing:
 				StartSpinner(spinner, "Processing...")
+				proceedCh <- true
 			case StatusStarted:
 				StopSpinner(spinner)
 				proceedCh <- true
@@ -222,21 +239,27 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 				StopSpinner(spinner)
 				// Start with in-progress color
 				fmt.Println(completeColor + "Thinking ↓")
+				proceedCh <- true
 			case StatusReasoningOver:
 				// Switch to complete color at the end
 				fmt.Print(resetColor)
 				fmt.Printf(completeColor + "✓" + resetColor)
 				fmt.Println()
+				proceedCh <- true
 			case StatusFunctionCalling:
 				fmt.Print(resetColor)
 				fmt.Println()
 				fmt.Print(inCallingColor + notify.Data + resetColor) // Print the function call message
 				fmt.Println()
 				StartSpinner(spinner, "Function Calling...")
+				proceedCh <- true
 			case StatusFunctionCallingOver:
 				StopSpinner(spinner)
 				proceedCh <- true
 			}
+
+			// Re-enable data channel
+			activeDataCh = dataCh
 		}
 	}
 

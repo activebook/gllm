@@ -173,7 +173,7 @@ func (c *OpenChat) process(ag *Agent) error {
 	for range ag.MaxRecursions {
 		i++
 		//Debugf("Processing conversation at times: %d\n", i)
-		c.status.ChangeTo(c.notify, StreamNotify{Status: StatusProcessing}, nil)
+		c.status.ChangeTo(c.notify, StreamNotify{Status: StatusProcessing}, c.proceed)
 
 		// Create the request
 		req := model.CreateChatCompletionRequest{
@@ -297,12 +297,12 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 				// Aka, the model is done with reasoning content and starting to output normal content
 				if delta.ReasoningContent == nil ||
 					(*delta.ReasoningContent == "" && delta.Content != "") {
-					c.status.ChangeTo(c.notify, StreamNotify{Status: StatusReasoningOver}, nil)
+					c.status.ChangeTo(c.notify, StreamNotify{Status: StatusReasoningOver}, c.proceed)
 				}
 			default:
 				// If reasoning content is not empty, switch to reasoning state
 				if HasContent(delta.ReasoningContent) {
-					c.status.ChangeTo(c.notify, StreamNotify{Status: StatusReasoning}, nil)
+					c.status.ChangeTo(c.notify, StreamNotify{Status: StatusReasoning}, c.proceed)
 				}
 			}
 
@@ -396,7 +396,7 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	}
 
 	// Call function
-	c.status.ChangeTo(c.notify, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, formatToolCallArguments(argsMap))}, nil)
+	c.status.ChangeTo(c.notify, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, formatToolCallArguments(argsMap))}, c.proceed)
 
 	var msg *model.ChatCompletionMessage
 	var err error

@@ -124,7 +124,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 
 	// Signal that streaming has started
 	// Wait for the main goroutine to tell sub-goroutine to proceed
-	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusProcessing}, nil)
+	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusProcessing}, ag.ProceedChan)
 
 	// Stream the responses
 	references := make([]map[string]interface{}, 0, 1)
@@ -223,7 +223,7 @@ func (ag *Agent) processGemini2Stream(ctx context.Context,
 	queries *[]string) (*[]*genai.FunctionCall, *genai.GenerateContentResponse, error) {
 
 	// Stream the response
-	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusProcessing}, nil)
+	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusProcessing}, ag.ProceedChan)
 	iter := chat.SendMessageStream(ctx, *parts...)
 	// Wait for the main goroutine to tell sub-goroutine to proceed
 	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
@@ -260,11 +260,11 @@ func (ag *Agent) processGemini2Stream(ctx context.Context,
 				switch ag.Status.Peek() {
 				case StatusReasoning:
 					if !part.Thought {
-						ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusReasoningOver}, nil)
+						ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusReasoningOver}, ag.ProceedChan)
 					}
 				default:
 					if part.Thought {
-						ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusReasoning}, nil)
+						ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusReasoning}, ag.ProceedChan)
 					}
 				}
 
@@ -295,7 +295,7 @@ func (ag *Agent) processGemini2Stream(ctx context.Context,
 func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 
 	// Call function
-	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", call.Name, formatToolCallArguments(call.Args))}, nil)
+	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", call.Name, formatToolCallArguments(call.Args))}, ag.ProceedChan)
 
 	var resp *genai.FunctionResponse
 	var err error
