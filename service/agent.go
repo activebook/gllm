@@ -206,8 +206,12 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 				// Handle other data types if needed
 			}
 
-			// Re-enable notify channel
-			activeNotifyCh = notifyCh
+			// check the number of buffered elements currently in data channel.
+			if len(activeDataCh) == 0 {
+				// If there are no more data, we can proceed
+				// Re-enable notify channel
+				activeNotifyCh = notifyCh
+			}
 
 		// Handle status notifications
 		// Remember in order to process status notifications,
