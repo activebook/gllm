@@ -207,6 +207,8 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 			}
 
 			// check the number of buffered elements currently in data channel.
+			// If there are more data, we can't proceed with notify channel
+			// Because data is continuously being processed, aka consequent data
 			if len(activeDataCh) == 0 {
 				// If there are no more data, we can proceed
 				// Re-enable notify channel
@@ -264,6 +266,14 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 
 			// Re-enable data channel
 			activeDataCh = dataCh
+
+			// Without an explicit default clause in a select statement,
+			// the select will block until at least one of its case statements can proceed.
+			// This can lead to a costly loop, which would spin the CPU
+			// So don't add explicit default clause here
+
+			//default:
+			// Dont' do it!!!
 		}
 	}
 
