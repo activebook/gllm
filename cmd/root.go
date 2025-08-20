@@ -402,7 +402,6 @@ func initConfig() {
 	// Set default log settings in Viper *before* reading the config
 	// This ensures these keys exist even if not in the file
 	viper.SetDefault("log.level", "info")
-	viper.SetDefault("max_recursions", 5) // Default max recursions value
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
