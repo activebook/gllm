@@ -85,7 +85,7 @@ var modelListCmd = &cobra.Command{
 		highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
 		keyColor := color.New(color.FgMagenta, color.Bold).SprintFunc()
 		modelsMap := viper.GetStringMap("models")
-		defaultModel := viper.GetString("default.model")
+		defaultModel := viper.GetString("agent.model")
 
 		if len(modelsMap) == 0 {
 			fmt.Println("No model defined yet. Use 'gllm model add'.")
@@ -175,9 +175,9 @@ gllm model add --name gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --t
 		viper.Set("models", modelsMap)
 
 		// Set default model if none exists
-		defaultModel := viper.GetString("default.model")
+		defaultModel := viper.GetString("agent.model")
 		if defaultModel == "" {
-			viper.Set("default.model", encodedName)
+			viper.Set("agent.model", encodedName)
 		}
 
 		// Write the config file
@@ -314,10 +314,10 @@ gllm model remove gpt4 --force`,
 		viper.Set("models", modelsMap)
 
 		// Check if the removed model was the default
-		defaultPrompt := viper.GetString("default.model")
+		defaultPrompt := viper.GetString("agent.model")
 		if encodedName == defaultPrompt {
-			viper.Set("default.model", "") // Clear the default
-			fmt.Printf("Note: Removed model '%s' was the default. Default model cleared.\n", name)
+			viper.Set("agent.model", "") // Clear the default
+			fmt.Printf("Note: Removed model '%s' was the agent. Default model cleared.\n", name)
 		}
 
 		// Write the config file
@@ -362,8 +362,8 @@ gllm model clear --force`,
 		viper.Set("models", modelsMap)
 
 		// Clear default model if set
-		if viper.IsSet("default.model") {
-			viper.Set("default.model", "")
+		if viper.IsSet("agent.model") {
+			viper.Set("agent.model", "")
 		}
 
 		// Write config file
@@ -391,7 +391,7 @@ var modelDefaultCmd = &cobra.Command{
 			return fmt.Errorf("model named '%s' not found. Cannot set as default", name)
 		}
 
-		viper.Set("default.model", encodedName)
+		viper.Set("agent.model", encodedName)
 
 		// Write the config file
 		if err := writeConfig(); err != nil {
@@ -442,7 +442,7 @@ func SetEffectiveModel(name string) error {
 		return fmt.Errorf("model named '%s' not found", name)
 	}
 
-	viper.Set("default.model", encodedName)
+	viper.Set("agent.model", encodedName)
 	if err := writeConfig(); err != nil {
 		return fmt.Errorf("failed to update configuration: %w", err)
 	}
@@ -450,13 +450,13 @@ func SetEffectiveModel(name string) error {
 }
 
 func GetEffectModelName() string {
-	defaultName := viper.GetString("default.model")
+	defaultName := viper.GetString("agent.model")
 	return decodeModelName(defaultName)
 }
 
 // GetEffectiveModel returns the configuration for the model to use
 func GetEffectiveModel() (name string, details map[string]any) {
-	defaultName := viper.GetString("default.model")
+	defaultName := viper.GetString("agent.model")
 	modelsMap := viper.GetStringMap("models")
 
 	// 1. Try to use default model

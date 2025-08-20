@@ -41,6 +41,9 @@ type Agent struct {
 	UseTools      bool                // Use tools
 	UseCodeTool   bool                // Use code tool
 	MaxRecursions int                 // Maximum number of recursions for model calls
+	TokenUsage    TokenUsage          // Token usage metainfo
+	Std           *StdRenderer        // Standard renderer
+	Markdown      *MarkdownRenderer   // Markdown renderer
 	Status        StatusStack         // Stack to manage streaming status
 }
 
@@ -81,7 +84,8 @@ func constructSearchEngine(searchEngine *map[string]any) *SearchEngine {
 	return &se
 }
 
-func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo map[string]any, searchEngine map[string]any, useTools bool, maxRecursions int) {
+func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo map[string]any, searchEngine map[string]any,
+	useTools bool, maxRecursions int, renderUsage bool, renderMarkdown bool) {
 	var temperature float32
 	switch temp := modelInfo["temperature"].(type) {
 	case float64:
@@ -108,8 +112,11 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 	dataCh := make(chan StreamData, 10)     // Buffer to prevent blocking(used for streamed text data)
 	proceedCh := make(chan bool)            // For main -> sub communication
 
-	markdownRenderer := NewMarkdownRenderer()
-	ll := Agent{
+	tu := TokenUsage{RenderUsage: renderUsage}
+	std := NewStdRenderer()
+	markdown := NewMarkdownRenderer(renderMarkdown)
+
+	ag := Agent{
 		ApiKey:        modelInfo["key"].(string),
 		EndPoint:      modelInfo["endpoint"].(string),
 		ModelName:     modelInfo["model"].(string),
@@ -125,11 +132,14 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 		UseTools:      useTools,
 		UseCodeTool:   exeCode,
 		MaxRecursions: maxRecursions,
+		TokenUsage:    tu,
+		Std:           std,
+		Markdown:      markdown,
 		Status:        StatusStack{},
 	}
 
 	// Check if the endpoint is compatible with OpenAI
-	provider := DetectModelProvider(ll.EndPoint)
+	provider := DetectModelProvider(ag.EndPoint)
 
 	spinner := NewSpinner("Processing...")
 
@@ -145,12 +155,12 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 
 		switch provider {
 		case ModelOpenAICompatible:
-			if err := ll.GenerateOpenChatStream(); err != nil {
+			if err := ag.GenerateOpenChatStream(); err != nil {
 				//Errorf("Stream error: %v\n", err)
 				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 			}
 		case ModelGemini:
-			if err := ll.GenerateGemini2Stream(); err != nil {
+			if err := ag.GenerateGemini2Stream(); err != nil {
 				//Errorf("Stream error: %v\n", err)
 				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 			}
@@ -175,7 +185,8 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 			switch data.Type {
 			case DataTypeNormal:
 				// Render the streamed text and save to markdown buffer
-				markdownRenderer.RenderString("%s", data.Text)
+				ag.Std.RenderString("%s", data.Text)
+				ag.Markdown.RenderString("%s", data.Text)
 			case DataTypeReasoning:
 				// Reasoning data don't need to be saved to markdown buffer
 				fmt.Print(inReasoningColor + data.Text) // Print the streamed text
@@ -203,9 +214,9 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 			case StatusFinished:
 				StopSpinner(spinner)
 				// Render the markdown
-				markdownRenderer.RenderMarkdown()
+				ag.Markdown.RenderMarkdown()
 				// Render the token usage
-				RenderTokenUsage()
+				ag.TokenUsage.RenderTokenUsage()
 				return // Exit when stream is done
 			case StatusReasoning:
 				StopSpinner(spinner)

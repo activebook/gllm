@@ -29,14 +29,14 @@ This means that you can’t use a built-in tool and function calling at the same
 */
 
 // Tool definitions for Gemini 2
-func (ll *Agent) getGemini2Tools() []*genai.Tool {
+func (ag *Agent) getGemini2Tools() []*genai.Tool {
 	var tools []*genai.Tool
 
 	// Add web search tool
 	// tools = append(tools, ll.getGemini2WebSearchTool())
 
 	// Add shell tool
-	tools = append(tools, ll.getGemini2ShellTool())
+	tools = append(tools, ag.getGemini2ShellTool())
 
 	// Add web fetch tool
 	webFetchTool := &genai.Tool{
@@ -385,7 +385,7 @@ func (ll *Agent) getGemini2Tools() []*genai.Tool {
 	return tools
 }
 
-func (ll *Agent) getGemini2ShellTool() *genai.Tool {
+func (ag *Agent) getGemini2ShellTool() *genai.Tool {
 	tool := &genai.Tool{
 		FunctionDeclarations: []*genai.FunctionDeclaration{{
 			Name: "shell",
@@ -438,13 +438,13 @@ LLM should call with:
 	return tool
 }
 
-func (ll *Agent) getGemini2WebSearchTool() *genai.Tool {
+func (ag *Agent) getGemini2WebSearchTool() *genai.Tool {
 	// return google embedding search tool
 	tool := &genai.Tool{GoogleSearch: &genai.GoogleSearch{}}
 	return tool
 }
 
-func (ll *Agent) getGemini2CodeExecTool() *genai.Tool {
+func (ag *Agent) getGemini2CodeExecTool() *genai.Tool {
 	// return google embedding search tool
 	tool := &genai.Tool{CodeExecution: &genai.ToolCodeExecution{}}
 	return tool
@@ -452,7 +452,7 @@ func (ll *Agent) getGemini2CodeExecTool() *genai.Tool {
 
 // Tool implementation functions for Gemini 2
 
-func (ll *Agent) processGemini2ReadFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ag *Agent) processGemini2ReadFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -503,7 +503,7 @@ func (ll *Agent) processGemini2ReadFileToolCall(call *genai.FunctionCall) (*gena
 	return &resp, nil
 }
 
-func (ll *Agent) processGemini2WriteFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ag *Agent) processGemini2WriteFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -566,7 +566,7 @@ func (ll *Agent) processGemini2WriteFileToolCall(call *genai.FunctionCall) (*gen
 	return &resp, nil
 }
 
-func (ll *Agent) processGemini2CreateDirectoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ag *Agent) processGemini2CreateDirectoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -596,7 +596,7 @@ func (ll *Agent) processGemini2CreateDirectoryToolCall(call *genai.FunctionCall)
 	return &resp, nil
 }
 
-func (ll *Agent) processGemini2ListDirectoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ag *Agent) processGemini2ListDirectoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -635,7 +635,7 @@ func (ll *Agent) processGemini2ListDirectoryToolCall(call *genai.FunctionCall) (
 	return &resp, nil
 }
 
-func (ll *Agent) processGemini2DeleteFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ag *Agent) processGemini2DeleteFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -682,7 +682,7 @@ func (ll *Agent) processGemini2DeleteFileToolCall(call *genai.FunctionCall) (*ge
 	return &resp, nil
 }
 
-func (ll *Agent) processGemini2DeleteDirectoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ag *Agent) processGemini2DeleteDirectoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -729,7 +729,7 @@ func (ll *Agent) processGemini2DeleteDirectoryToolCall(call *genai.FunctionCall)
 	return &resp, nil
 }
 
-func (ll *Agent) processGemini2MoveToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ag *Agent) processGemini2MoveToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -781,7 +781,7 @@ func (ll *Agent) processGemini2MoveToolCall(call *genai.FunctionCall) (*genai.Fu
 	return &resp, nil
 }
 
-func (ll *Agent) processGemini2SearchFilesToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ag *Agent) processGemini2SearchFilesToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -826,7 +826,7 @@ func (ll *Agent) processGemini2SearchFilesToolCall(call *genai.FunctionCall) (*g
 	return &resp, nil
 }
 
-func (ll *Agent) processGemini2SearchTextInFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ag *Agent) processGemini2SearchTextInFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -893,7 +893,7 @@ func (ll *Agent) processGemini2SearchTextInFileToolCall(call *genai.FunctionCall
 	return &resp, nil
 }
 
-func (ll *Agent) processGemini2ReadMultipleFilesToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ag *Agent) processGemini2ReadMultipleFilesToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -954,7 +954,7 @@ func (ll *Agent) processGemini2ReadMultipleFilesToolCall(call *genai.FunctionCal
 	return &resp, nil
 }
 
-func (ll *Agent) processGemini2ShellToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ag *Agent) processGemini2ShellToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -1032,7 +1032,7 @@ func (ll *Agent) processGemini2ShellToolCall(call *genai.FunctionCall) (*genai.F
 	return &resp, nil
 }
 
-func (ll *Agent) processGemini2WebFetchToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ag *Agent) processGemini2WebFetchToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -1066,7 +1066,7 @@ func (ll *Agent) processGemini2WebFetchToolCall(call *genai.FunctionCall) (*gena
 	return &resp, nil
 }
 
-func (ll *Agent) processGemini2EditFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ag *Agent) processGemini2EditFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -1241,7 +1241,7 @@ func (ll *Agent) processGemini2EditFileToolCall(call *genai.FunctionCall) (*gena
 	return &resp, nil
 }
 
-func (ll *Agent) processGemini2CopyToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ag *Agent) processGemini2CopyToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,

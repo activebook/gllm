@@ -160,7 +160,7 @@ var searchListCmd = &cobra.Command{
 
 		// Update the list command to show default status
 		// In the listCmd.Run function, add:
-		defaultEngine := viper.GetString("default.search")
+		defaultEngine := viper.GetString("agent.search")
 		fmt.Println()
 		if defaultEngine != "" {
 			fmt.Printf("Default search engine:%s\n", defaultEngine)
@@ -180,7 +180,7 @@ var searchDefaultCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		// Display current default if no arguments provided
 		if len(args) == 0 {
-			current := viper.GetString("default.search")
+			current := viper.GetString("agent.search")
 			if current == "" {
 				fmt.Println("No default search engine set. Available options: google, tavily, bing, none")
 			} else {
@@ -203,7 +203,7 @@ var searchDefaultCmd = &cobra.Command{
 			return
 		}
 
-		viper.Set("default.search", engine)
+		viper.Set("agent.search", engine)
 		if err := viper.WriteConfig(); err != nil {
 			service.Errorf("Error saving configuration: %s\n", err)
 			return
@@ -272,20 +272,20 @@ func maskAPIKey(key string) string {
 }
 
 func GetEffectSearchEnginelName() string {
-	defaultName := viper.GetString("default.search")
+	defaultName := viper.GetString("agent.search")
 	return defaultName
 }
 
 func SetEffectSearchEnginelName(name string) bool {
 	switch name {
 	case service.GoogleSearchEngine:
-		viper.Set("default.search", "google")
+		viper.Set("agent.search", "google")
 	case service.TavilySearchEngine:
-		viper.Set("default.search", "tavily")
+		viper.Set("agent.search", "tavily")
 	case service.BingSearchEngine:
-		viper.Set("default.search", "bing")
+		viper.Set("agent.search", "bing")
 	case service.NoneSearchEngine:
-		viper.Set("default.search", "none")
+		viper.Set("agent.search", "none")
 	default:
 		service.Warnf("Error: '%s' is not a valid search engine. Options: google, tavily, bing, none", name)
 		return false
@@ -323,7 +323,7 @@ func GetAllSearchEngines() map[string]string {
 }
 
 func GetEffectiveSearchEngine() (name string, info map[string]any) {
-	defaultName := viper.GetString("default.search")
+	defaultName := viper.GetString("agent.search")
 	enginesMap := viper.GetStringMap("search_engines")
 	if defaultName != "" {
 		if engineConfig, ok := enginesMap[defaultName]; ok {

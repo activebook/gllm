@@ -2,22 +2,21 @@ package service
 
 import (
 	"fmt"
-
-	"github.com/spf13/viper"
 )
 
-var (
+type TokenUsage struct {
 	InputTokens   int
 	OutputTokens  int
 	CachedTokens  int
 	ThoughtTokens int
 	TotalTokens   int
-)
+	RenderUsage   bool
+}
 
 const ()
 
-func GetTokenUsage() string {
-	if TotalTokens > 0 {
+func (tu *TokenUsage) getTokenUsage() string {
+	if tu.TotalTokens > 0 {
 		return fmt.Sprintf(
 			"\n"+bbColor+
 				"┌───────────────┐\n"+
@@ -26,18 +25,18 @@ func GetTokenUsage() string {
 				"│"+resetColor+" Input: %s%6d%s "+bbColor+"│"+resetColor+" Output: %s%6d%s "+bbColor+"│"+resetColor+" Cached: %s%6d%s "+bbColor+"│"+resetColor+" Thought: %s%6d%s "+bbColor+"│"+resetColor+" Total: %s%6d%s "+bbColor+"│"+resetColor+"\n"+bbColor+
 				"└───────────────────────────────────────────────────────────────────────────────────┘"+
 				resetColor,
-			cyanColor, InputTokens, resetColor,
-			cyanColor, OutputTokens, resetColor,
-			cyanColor, CachedTokens, resetColor,
-			cyanColor, ThoughtTokens, resetColor,
-			cyanColor, TotalTokens, resetColor,
+			cyanColor, tu.InputTokens, resetColor,
+			cyanColor, tu.OutputTokens, resetColor,
+			cyanColor, tu.CachedTokens, resetColor,
+			cyanColor, tu.ThoughtTokens, resetColor,
+			cyanColor, tu.TotalTokens, resetColor,
 		)
 	}
 	return ""
 }
 
-func GetTokenUsageTip() string {
-	if TotalTokens > 0 {
+func (tu *TokenUsage) getTokenUsageTip() string {
+	if tu.TotalTokens > 0 {
 		return fmt.Sprintf(
 			bbColor+"\n"+
 				"┌───────────────────────────────────────────────────────────────────────────────────┐\n"+
@@ -45,18 +44,18 @@ func GetTokenUsageTip() string {
 				"│"+resetColor+" Input: %s%6d%s "+bbColor+"│"+resetColor+" Output: %s%6d%s "+bbColor+"│"+resetColor+" Cached: %s%6d%s "+bbColor+"│"+resetColor+" Thought: %s%6d%s "+bbColor+"│"+resetColor+" Total: %s%6d%s "+bbColor+"│"+resetColor+"\n"+bbColor+
 				"└───────────────────────────────────────────────────────────────────────────────────┘"+
 				resetColor,
-			cyanColor, InputTokens, resetColor,
-			cyanColor, OutputTokens, resetColor,
-			cyanColor, CachedTokens, resetColor,
-			cyanColor, ThoughtTokens, resetColor,
-			cyanColor, TotalTokens, resetColor,
+			cyanColor, tu.InputTokens, resetColor,
+			cyanColor, tu.OutputTokens, resetColor,
+			cyanColor, tu.CachedTokens, resetColor,
+			cyanColor, tu.ThoughtTokens, resetColor,
+			cyanColor, tu.TotalTokens, resetColor,
 		)
 	}
 	return ""
 }
 
-func GetTokenUsageBox() string {
-	if TotalTokens > 0 {
+func (tu *TokenUsage) getTokenUsageBox() string {
+	if tu.TotalTokens > 0 {
 		return fmt.Sprintf(
 			bbColor+"\n"+
 				"┌───────────────┬────────────┐\n"+
@@ -70,40 +69,28 @@ func GetTokenUsageBox() string {
 				"│ Total         │ %s%10d%s"+bbColor+" │\n"+
 				"└───────────────┴────────────┘"+
 				resetColor,
-			cyanColor, InputTokens, resetColor,
-			cyanColor, OutputTokens, resetColor,
-			cyanColor, CachedTokens, resetColor,
-			cyanColor, ThoughtTokens, resetColor,
-			cyanColor, TotalTokens, resetColor,
+			cyanColor, tu.InputTokens, resetColor,
+			cyanColor, tu.OutputTokens, resetColor,
+			cyanColor, tu.CachedTokens, resetColor,
+			cyanColor, tu.ThoughtTokens, resetColor,
+			cyanColor, tu.TotalTokens, resetColor,
 		)
 	}
 	return ""
 }
 
-func RenderTokenUsage() {
-	if IncludeUsageMetainfo() {
+func (tu *TokenUsage) RenderTokenUsage() {
+	if tu.RenderUsage {
 		// Get the token usage
-		usage := GetTokenUsage()
+		usage := tu.getTokenUsage()
 		fmt.Println(usage)
 	}
 }
 
-func RecordTokenUsage(input, output, cached, thought int) {
-	InputTokens = input
-	OutputTokens = output
-	CachedTokens = cached
-	ThoughtTokens = thought
-	TotalTokens = InputTokens + OutputTokens + CachedTokens + ThoughtTokens
-}
-
-func IncludeUsageMetainfo() bool {
-	usage := viper.GetString("default.usage")
-	switch usage {
-	case "on":
-		return true
-	case "off":
-		return false
-	default:
-		return false
-	}
+func (tu *TokenUsage) RecordTokenUsage(input, output, cached, thought int) {
+	tu.InputTokens = input
+	tu.OutputTokens = output
+	tu.CachedTokens = cached
+	tu.ThoughtTokens = thought
+	tu.TotalTokens = tu.InputTokens + tu.OutputTokens + tu.CachedTokens + tu.ThoughtTokens
 }

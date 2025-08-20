@@ -268,9 +268,9 @@ func (ci *ChatInfo) handleInput(input string) {
 
 func (ci *ChatInfo) clearContext() {
 	// Reset all settings
-	viper.Set("default.system_prompt", "")
-	viper.Set("default.template", "")
-	viper.Set("default.search", "")
+	viper.Set("agent.system_prompt", "")
+	viper.Set("agent.template", "")
+	viper.Set("agent.search", "")
 	err := viper.WriteConfig()
 	if err != nil {
 		service.Errorf("Error clearing context: %v\n", err)
@@ -712,7 +712,12 @@ func (ci *ChatInfo) callLLM(input string) {
 		searchEngine["references"] = referenceFlag // Add references flag to search engine settings
 	}
 
-	service.CallAgent(finalPrompt.String(), sys_prompt, ci.Files, modelInfo, searchEngine, useTools, ci.maxRecursions)
+	// Include usage metainfo
+	includeUsage := IncludeUsageMetainfo()
+	// Include markdown
+	includeMarkdown := IncludeMarkdown()
+
+	service.CallAgent(finalPrompt.String(), sys_prompt, ci.Files, modelInfo, searchEngine, useTools, ci.maxRecursions, includeUsage, includeMarkdown)
 
 	// We must reset the files after processing
 	// We shouldn't pass the files to the next call each time

@@ -15,7 +15,7 @@ import (
 	"github.com/volcengine/volcengine-go-sdk/volcengine"
 )
 
-func (ll *Agent) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessageContentPart {
+func (ag *Agent) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessageContentPart {
 
 	var part *model.ChatCompletionMessageContentPart
 	format := file.Format()
@@ -47,43 +47,41 @@ func (ll *Agent) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessag
 	return part
 }
 
-func (ll *Agent) GenerateOpenChatStream() error {
+func (ag *Agent) GenerateOpenChatStream() error {
 
 	// 1. Initialize the Client
 	ctx := context.Background()
 	// Create a client config with custom base URL
 	client := arkruntime.NewClientWithApiKey(
-		ll.ApiKey,
+		ag.ApiKey,
 		arkruntime.WithTimeout(30*time.Minute),
-		arkruntime.WithBaseUrl(ll.EndPoint),
+		arkruntime.WithBaseUrl(ag.EndPoint),
 	)
 
 	// Create a tool with the function
 	tools := []*model.Tool{}
-	if ll.UseTools {
+	if ag.UseTools {
 		// Add embedding operation tools, which includes the web_search tool
-		embeddingTools := ll.getOpenChatTools()
+		embeddingTools := ag.getOpenChatTools()
 		tools = append(tools, embeddingTools...)
-	} else if ll.UseSearchTool {
+	} else if ag.UseSearchTool {
 		// Only add the search tool if general tools are not enabled,
 		// but the search flag is explicitly set.
-		searchTool := ll.getOpenChatWebSearchTool()
+		searchTool := ag.getOpenChatWebSearchTool()
 		tools = append(tools, searchTool)
 	}
 
 	chat := &OpenChat{
-		client:        client,
-		ctx:           &ctx,
-		model:         ll.ModelName,
-		temperature:   ll.Temperature,
-		tools:         tools,
-		notify:        ll.NotifyChan,
-		data:          ll.DataChan,
-		proceed:       ll.ProceedChan,
-		search:        &ll.SearchEngine,
-		references:    make([]map[string]interface{}, 0), // Updated to match new field type
-		maxRecursions: ll.MaxRecursions,                  // Use configured value from LangLogic
-		status:        &ll.Status,
+		client:     client,
+		ctx:        &ctx,
+		tools:      tools,
+		notify:     ag.NotifyChan,
+		data:       ag.DataChan,
+		proceed:    ag.ProceedChan,
+		search:     &ag.SearchEngine,
+		queries:    make([]string, 0),
+		references: make([]map[string]interface{}, 0), // Updated to match new field type
+		status:     &ag.Status,
 	}
 
 	// 2. Prepare the Messages for Chat Completion
@@ -91,11 +89,11 @@ func (ll *Agent) GenerateOpenChatStream() error {
 	messages := make([]*model.ChatCompletionMessage, 0, 2)
 
 	// Only add system message if not empty
-	if ll.SystemPrompt != "" {
+	if ag.SystemPrompt != "" {
 		messages = append(messages, &model.ChatCompletionMessage{
 			Role: model.ChatMessageRoleSystem,
 			Content: &model.ChatCompletionMessageContent{
-				StringValue: volcengine.String(ll.SystemPrompt),
+				StringValue: volcengine.String(ag.SystemPrompt),
 			}, Name: Ptr(""),
 		})
 	}
@@ -105,21 +103,21 @@ func (ll *Agent) GenerateOpenChatStream() error {
 	userMessage = &model.ChatCompletionMessage{
 		Role: model.ChatMessageRoleUser,
 		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(ll.UserPrompt),
+			StringValue: volcengine.String(ag.UserPrompt),
 		}, Name: Ptr(""),
 	}
 	messages = append(messages, userMessage)
 	// Add image parts if available
-	if len(ll.Files) > 0 {
+	if len(ag.Files) > 0 {
 		userMessage = &model.ChatCompletionMessage{
 			Role:    model.ChatMessageRoleUser,
 			Content: &model.ChatCompletionMessageContent{ListValue: []*model.ChatCompletionMessageContentPart{}},
 			Name:    Ptr(""),
 		}
 		// Add all files
-		for _, file := range ll.Files {
+		for _, file := range ag.Files {
 			if file != nil {
-				part := ll.getOpenChatFilePart(file)
+				part := ag.getOpenChatFilePart(file)
 				if part != nil {
 					userMessage.Content.ListValue = append(userMessage.Content.ListValue, part)
 				}
@@ -130,20 +128,20 @@ func (ll *Agent) GenerateOpenChatStream() error {
 
 	// Signal that streaming has started
 	// Wait for the main goroutine to tell sub-goroutine to proceed
-	ll.Status.ChangeTo(ll.NotifyChan, StreamNotify{Status: StatusStarted}, ll.ProceedChan)
+	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
 
 	// Load previous messages if any
 	convo := GetOpenChatConversation()
 	err := convo.Load()
 	if err != nil {
 		// Notify error and return
-		ll.Status.ChangeTo(ll.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}, nil)
+		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}, nil)
 		return err
 	}
 	convo.PushMessages(messages) // Add new messages to the conversation
 
 	// Process the chat with recursive tool call handling
-	err = chat.process()
+	err = chat.process(ag)
 	if err != nil {
 		return fmt.Errorf("error processing chat: %v", err)
 	}
@@ -152,22 +150,19 @@ func (ll *Agent) GenerateOpenChatStream() error {
 
 // Conversation manages the state of an ongoing conversation with an AI assistant
 type OpenChat struct {
-	client        *arkruntime.Client
-	ctx           *context.Context
-	model         string
-	temperature   float32
-	tools         []*model.Tool
-	notify        chan<- StreamNotify      // Sub Channel to send notifications
-	data          chan<- StreamData        // Sub Channel to send data
-	proceed       <-chan bool              // Main Channel to receive proceed signal
-	maxRecursions int                      // Maximum number of recursions for model calls
-	search        *SearchEngine            // Search engine
-	queries       []string                 // List of queries to be sent to the AI assistant
-	references    []map[string]interface{} // keep track of the references
-	status        *StatusStack             // Stack to manage streaming status
+	client     *arkruntime.Client
+	ctx        *context.Context
+	tools      []*model.Tool
+	notify     chan<- StreamNotify      // Sub Channel to send notifications
+	data       chan<- StreamData        // Sub Channel to send data
+	proceed    <-chan bool              // Main Channel to receive proceed signal
+	search     *SearchEngine            // Search engine
+	queries    []string                 // List of queries to be sent to the AI assistant
+	references []map[string]interface{} // keep track of the references
+	status     *StatusStack             // Stack to manage streaming status
 }
 
-func (c *OpenChat) process() error {
+func (c *OpenChat) process(ag *Agent) error {
 	convo := GetOpenChatConversation()
 
 	var finalResp *model.ChatCompletionStreamResponse
@@ -175,15 +170,15 @@ func (c *OpenChat) process() error {
 	// Recursively process the conversation
 	// Because the model can call tools multiple times
 	i := 0
-	for range c.maxRecursions {
+	for range ag.MaxRecursions {
 		i++
 		//Debugf("Processing conversation at times: %d\n", i)
 		c.status.ChangeTo(c.notify, StreamNotify{Status: StatusProcessing}, nil)
 
 		// Create the request
 		req := model.CreateChatCompletionRequest{
-			Model:         c.model,
-			Temperature:   &c.temperature,
+			Model:         ag.ModelName,
+			Temperature:   &ag.Temperature,
 			Messages:      convo.Messages,
 			Tools:         c.tools,
 			StreamOptions: &model.StreamOptions{IncludeUsage: true},
@@ -235,23 +230,18 @@ func (c *OpenChat) process() error {
 
 	// Add queries to the output if any
 	if len(c.queries) > 0 {
-		q := "\n\n" + c.search.RetrieveQueries(c.queries)
+		q := "\n\n" + ag.SearchEngine.RetrieveQueries(c.queries)
 		c.data <- StreamData{Text: q, Type: DataTypeNormal}
 	}
 	// Add references to the output if any
 	if len(c.references) > 0 {
-		// Create a slice of pointers to match the function signature
-		// refPtrs := make([]*map[string]interface{}, len(c.references))
-		// for i, ref := range c.references {
-		// 	refPtrs[i] = &ref
-		// }
-		refs := "\n\n" + c.search.RetrieveReferences(c.references) + "\n"
+		refs := "\n\n" + ag.SearchEngine.RetrieveReferences(c.references) + "\n"
 		c.data <- StreamData{Text: refs, Type: DataTypeNormal}
 	}
 
 	// Record token usage
 	if finalResp != nil && finalResp.Usage != nil {
-		RecordTokenUsage(int(finalResp.Usage.PromptTokens),
+		ag.TokenUsage.RecordTokenUsage(int(finalResp.Usage.PromptTokens),
 			int(finalResp.Usage.CompletionTokens),
 			int(finalResp.Usage.PromptTokensDetails.CachedTokens),
 			int(finalResp.Usage.CompletionTokensDetails.ReasoningTokens))
