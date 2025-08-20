@@ -8,7 +8,7 @@ import (
 	"google.golang.org/genai"
 )
 
-func (ll *LangLogic) getGemini2FilePart(file *FileData) genai.Part {
+func (ll *Agent) getGemini2FilePart(file *FileData) genai.Part {
 
 	mimeType := file.Format()
 	data := file.Data()
@@ -40,7 +40,7 @@ func (ll *LangLogic) getGemini2FilePart(file *FileData) genai.Part {
 	}
 }
 
-func (ll *LangLogic) GenerateGemini2Stream() error {
+func (ll *Agent) GenerateGemini2Stream() error {
 	// Setup the Gemini client
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
@@ -128,7 +128,7 @@ func (ll *LangLogic) GenerateGemini2Stream() error {
 	ll.Status.ChangeTo(ll.NotifyChan, StreamNotify{Status: StatusProcessing}, nil)
 
 	// Stream the responses
-	references := make([]*map[string]interface{}, 0, 1)
+	references := make([]map[string]interface{}, 0, 1)
 	queries := make([]string, 0, 1)
 	streamParts := &parts
 
@@ -185,13 +185,14 @@ func (ll *LangLogic) GenerateGemini2Stream() error {
 
 	// Add queries to the output if any
 	if len(queries) > 0 {
-		q := "\n\n" + RetrieveQueries(queries)
-		ll.DataChan <- StreamData{Text: q, Type: DataTypeNoraml}
+		q := "\n\n" + ll.SearchEngine.RetrieveQueries(queries)
+		ll.DataChan <- StreamData{Text: q, Type: DataTypeNormal}
 	}
+
 	// Add references to the output if any
 	if len(references) > 0 {
-		refs := "\n\n" + RetrieveReferences(references) + "\n"
-		ll.DataChan <- StreamData{Text: refs, Type: DataTypeNoraml}
+		refs := "\n\n" + ll.SearchEngine.RetrieveReferences(references) + "\n"
+		ll.DataChan <- StreamData{Text: refs, Type: DataTypeNormal}
 	}
 
 	// Record token usage
@@ -208,14 +209,18 @@ func (ll *LangLogic) GenerateGemini2Stream() error {
 	if err != nil {
 		return fmt.Errorf("failed to save conversation: %v", err)
 	}
+
+	// Flush all data to the channel
+	ll.DataChan <- StreamData{Type: DataTypeFinished}
+	<-ll.ProceedChan
 	// Signal that streaming is finished
 	ll.Status.ChangeTo(ll.NotifyChan, StreamNotify{Status: StatusFinished}, nil)
 	return err
 }
 
-func (ll *LangLogic) processGemini2Stream(ctx context.Context,
+func (ll *Agent) processGemini2Stream(ctx context.Context,
 	chat *genai.Chat, parts *[]genai.Part,
-	refs *[]*map[string]interface{},
+	refs *[]map[string]interface{},
 	queries *[]string) (*[]*genai.FunctionCall, *genai.GenerateContentResponse, error) {
 
 	// Stream the response
@@ -270,7 +275,7 @@ func (ll *LangLogic) processGemini2Stream(ctx context.Context,
 					ll.DataChan <- StreamData{Text: strings.TrimSpace(part.Text), Type: DataTypeReasoning}
 				} else if part.Text != "" {
 					// Normal text data
-					ll.DataChan <- StreamData{Text: strings.TrimSpace(part.Text), Type: DataTypeNoraml}
+					ll.DataChan <- StreamData{Text: strings.TrimSpace(part.Text), Type: DataTypeNormal}
 				}
 			}
 
@@ -288,50 +293,42 @@ func (ll *LangLogic) processGemini2Stream(ctx context.Context,
 	return &funcCalls, finalResp, nil
 }
 
-func (ll *LangLogic) processGemini2ToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ll *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 
 	// Call function
 	ll.Status.ChangeTo(ll.NotifyChan, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", call.Name, formatToolCallArguments(call.Args))}, nil)
 
 	var resp *genai.FunctionResponse
 	var err error
-	switch call.Name {
-	case "shell":
-		resp, err = ll.processGemini2ShellToolCall(call)
-	case "read_file":
-		resp, err = ll.processGemini2ReadFileToolCall(call)
-	case "write_file":
-		resp, err = ll.processGemini2WriteFileToolCall(call)
-	case "create_directory":
-		resp, err = ll.processGemini2CreateDirectoryToolCall(call)
-	case "list_directory":
-		resp, err = ll.processGemini2ListDirectoryToolCall(call)
-	case "delete_file":
-		resp, err = ll.processGemini2DeleteFileToolCall(call)
-	case "delete_directory":
-		resp, err = ll.processGemini2DeleteDirectoryToolCall(call)
-	case "move":
-		resp, err = ll.processGemini2MoveToolCall(call)
-	case "copy":
-		resp, err = ll.processGemini2CopyToolCall(call)
-	case "search_files":
-		resp, err = ll.processGemini2SearchFilesToolCall(call)
-	case "search_text_in_file":
-		resp, err = ll.processGemini2SearchTextInFileToolCall(call)
-	case "read_multiple_files":
-		resp, err = ll.processGemini2ReadMultipleFilesToolCall(call)
-	case "web_fetch":
-		resp, err = ll.processGemini2WebFetchToolCall(call)
-	case "edit_file":
-		resp, err = ll.processGemini2EditFileToolCall(call)
-	default:
+
+	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
+	toolHandlers := map[string]func(*genai.FunctionCall) (*genai.FunctionResponse, error){
+		"shell":               ll.processGemini2ShellToolCall,
+		"read_file":           ll.processGemini2ReadFileToolCall,
+		"write_file":          ll.processGemini2WriteFileToolCall,
+		"create_directory":    ll.processGemini2CreateDirectoryToolCall,
+		"list_directory":      ll.processGemini2ListDirectoryToolCall,
+		"delete_file":         ll.processGemini2DeleteFileToolCall,
+		"delete_directory":    ll.processGemini2DeleteDirectoryToolCall,
+		"move":                ll.processGemini2MoveToolCall,
+		"copy":                ll.processGemini2CopyToolCall,
+		"search_files":        ll.processGemini2SearchFilesToolCall,
+		"search_text_in_file": ll.processGemini2SearchTextInFileToolCall,
+		"read_multiple_files": ll.processGemini2ReadMultipleFilesToolCall,
+		"web_fetch":           ll.processGemini2WebFetchToolCall,
+		"edit_file":           ll.processGemini2EditFileToolCall,
+	}
+
+	if handler, ok := toolHandlers[call.Name]; ok {
+		resp, err = handler(call)
+	} else {
 		// For web_search and other Google Search/CodeExecution tools that don't need special processing
 		resp, err = &genai.FunctionResponse{
 			ID:   call.ID,
 			Name: call.Name,
 			Response: map[string]any{
 				"content": nil,
-				"error":   fmt.Sprintf("unknown tool call: %v", call.Name),
+				"error":   fmt.Sprintf("unknown or built-in tool call: %v", call.Name),
 			},
 		}, nil
 	}
@@ -341,18 +338,28 @@ func (ll *LangLogic) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Fu
 	return resp, err
 }
 
-func appendReferences(metadata *genai.GroundingMetadata, refs *[]*map[string]interface{}) {
+func appendReferences(metadata *genai.GroundingMetadata, refs *[]map[string]interface{}) {
+	// Process grounding metadata to extract references
+	// Check if we have grounding chunks
 	if len(metadata.GroundingChunks) > 0 {
 		// Build a single map with a "results" key as expected by RetrieveReferences
 		results := make([]any, 0, len(metadata.GroundingChunks))
 		for _, chunk := range metadata.GroundingChunks {
-			results = append(results, map[string]any{
-				"title":       chunk.Web.Title,
-				"link":        chunk.Web.URI,
-				"displayLink": chunk.Web.Title,
-			})
+			// Check if the web chunk exists before accessing its fields
+			if chunk.Web != nil {
+				// Use URI as the displayLink since that's what users typically see
+				results = append(results, map[string]any{
+					"title":       chunk.Web.Title,
+					"link":        chunk.Web.URI,
+					"displayLink": chunk.Web.Title,
+				})
+			}
 		}
-		// Track references
-		*refs = append(*refs, &map[string]any{"results": results})
+
+		// Only append if we have valid results
+		if len(results) > 0 {
+			// Track references
+			*refs = append(*refs, map[string]any{"results": results})
+		}
 	}
 }

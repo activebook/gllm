@@ -160,13 +160,6 @@ Configure your API keys and preferred models, then start chatting or executing c
 					service.DisableCodeExecution()
 				}
 
-				// Deep dive
-				if deepDiveFlag {
-					service.SetDeepDive(deepDiveFlag)
-				} else {
-					service.SetDeepDive(false)
-				}
-
 				// Check if -c/--conversation was used without a value
 				if cmd.Flags().Changed("conversation") {
 					// Flag was used without a value, use a default name
@@ -295,10 +288,11 @@ func processQuery(prompt string, files []*service.FileData) {
 	// If toolsFlag is set, we also need to use the search engine
 	if searchFlag != "" || useTools {
 		_, searchEngine = GetEffectiveSearchEngine()
-		service.SetMaxReferences(referenceFlag)
+		searchEngine["deep_dive"] = deepDiveFlag   // Add deep dive flag to search engine settings
+		searchEngine["references"] = referenceFlag // Add references flag to search engine settings
 	}
 
-	service.CallLanguageModel(prompt, sys_prompt, files, modelInfo, searchEngine, useTools, maxRecursions)
+	service.CallAgent(prompt, sys_prompt, files, modelInfo, searchEngine, useTools, maxRecursions)
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -402,7 +396,6 @@ func initConfig() {
 	// Set default log settings in Viper *before* reading the config
 	// This ensures these keys exist even if not in the file
 	viper.SetDefault("log.level", "info")
-	viper.SetDefault("max_recursions", 5) // Default max recursions value
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {

@@ -247,7 +247,7 @@ var configPrintCmd = &cobra.Command{
 		fmt.Printf("\n%s: %v\n", keyColor("Markdown Format"), mark)
 
 		// Display max recursions value
-		maxRecursions := viper.GetInt("max_recursions")
+		maxRecursions := viper.GetInt("default.max_recursions")
 		if maxRecursions <= 0 {
 			maxRecursions = 5 // Default value
 		}
@@ -311,12 +311,12 @@ If a value is provided, it sets the new maximum recursions value.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
 			// No argument provided - show current value
-			maxRecursions := viper.GetInt("max_recursions")
+			maxRecursions := viper.GetInt("default.max_recursions")
 			if maxRecursions <= 0 {
 				maxRecursions = 5 // Default value
 			}
 			// Set the new value in viper
-			viper.Set("max_recursions", maxRecursions)
+			viper.Set("default.max_recursions", maxRecursions)
 
 			// Save the configuration to file
 			err := viper.WriteConfig()
@@ -341,7 +341,7 @@ If a value is provided, it sets the new maximum recursions value.`,
 			}
 
 			// Set the new value in viper
-			viper.Set("max_recursions", maxRecursions)
+			viper.Set("default.max_recursions", maxRecursions)
 
 			// Save the configuration to file
 			err = viper.WriteConfig()
@@ -381,7 +381,7 @@ var configSetCmd = &cobra.Command{
 				service.Errorf("Invalid value for max_recursions: %d (must be positive)\n", num)
 				return
 			}
-			viper.Set("max_recursions", num)
+			viper.Set("default.max_recursions", num)
 		default:
 			service.Errorf("Unknown configuration key: %s\n", key)
 			return
@@ -398,7 +398,7 @@ var configSetCmd = &cobra.Command{
 }
 
 func GetMaxRecursions() int {
-	maxRecursions := viper.GetInt("max_recursions")
+	maxRecursions := viper.GetInt("default.max_recursions")
 	if maxRecursions <= 0 {
 		maxRecursions = 5 // Default value
 	}

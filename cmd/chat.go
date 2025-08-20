@@ -73,13 +73,6 @@ Special commands:
 				}
 			}
 
-			// Deep dive
-			if deepDiveFlag {
-				service.SetDeepDive(deepDiveFlag)
-			} else {
-				service.SetDeepDive(false)
-			}
-
 			// Set whether or not to skip tools confirmation
 			service.SetSkipToolsConfirm(confirmToolsFlag)
 
@@ -97,7 +90,6 @@ Special commands:
 				// Normal mode
 				searchFlag = ""
 			}
-			service.SetMaxReferences(referenceFlag)
 
 			// Always save a conversation file regardless of the flag
 			if !cmd.Flags().Changed("conversation") {
@@ -327,7 +319,7 @@ func (ci *ChatInfo) setReferences(count string) {
 		fmt.Println("Invalid number")
 		return
 	}
-	service.SetMaxReferences(num)
+	referenceFlag = num
 	fmt.Printf("Reference count set to %d\n", num)
 }
 
@@ -716,9 +708,11 @@ func (ci *ChatInfo) callLLM(input string) {
 	var searchEngine map[string]any
 	if searchFlag != "" || useTools {
 		_, searchEngine = GetEffectiveSearchEngine()
+		searchEngine["deep_dive"] = deepDiveFlag   // Add deep dive flag to search engine settings
+		searchEngine["references"] = referenceFlag // Add references flag to search engine settings
 	}
 
-	service.CallLanguageModel(finalPrompt.String(), sys_prompt, ci.Files, modelInfo, searchEngine, useTools, ci.maxRecursions)
+	service.CallAgent(finalPrompt.String(), sys_prompt, ci.Files, modelInfo, searchEngine, useTools, ci.maxRecursions)
 
 	// We must reset the files after processing
 	// We shouldn't pass the files to the next call each time

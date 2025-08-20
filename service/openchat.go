@@ -15,7 +15,7 @@ import (
 	"github.com/volcengine/volcengine-go-sdk/volcengine"
 )
 
-func (ll *LangLogic) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessageContentPart {
+func (ll *Agent) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessageContentPart {
 
 	var part *model.ChatCompletionMessageContentPart
 	format := file.Format()
@@ -47,7 +47,7 @@ func (ll *LangLogic) getOpenChatFilePart(file *FileData) *model.ChatCompletionMe
 	return part
 }
 
-func (ll *LangLogic) GenerateOpenChatStream() error {
+func (ll *Agent) GenerateOpenChatStream() error {
 
 	// 1. Initialize the Client
 	ctx := context.Background()
@@ -80,8 +80,9 @@ func (ll *LangLogic) GenerateOpenChatStream() error {
 		notify:        ll.NotifyChan,
 		data:          ll.DataChan,
 		proceed:       ll.ProceedChan,
-		references:    make([]*map[string]interface{}, 0, 1),
-		maxRecursions: ll.MaxRecursions, // Use configured value from LangLogic
+		search:        &ll.SearchEngine,
+		references:    make([]map[string]interface{}, 0), // Updated to match new field type
+		maxRecursions: ll.MaxRecursions,                  // Use configured value from LangLogic
 		status:        &ll.Status,
 	}
 
@@ -156,13 +157,14 @@ type OpenChat struct {
 	model         string
 	temperature   float32
 	tools         []*model.Tool
-	notify        chan<- StreamNotify       // Sub Channel to send notifications
-	data          chan<- StreamData         // Sub Channel to send data
-	proceed       <-chan bool               // Main Channel to receive proceed signal
-	maxRecursions int                       // Maximum number of recursions for model calls
-	queries       []string                  // List of queries to be sent to the AI assistant
-	references    []*map[string]interface{} // keep track of the references
-	status        *StatusStack              // Stack to manage streaming status
+	notify        chan<- StreamNotify      // Sub Channel to send notifications
+	data          chan<- StreamData        // Sub Channel to send data
+	proceed       <-chan bool              // Main Channel to receive proceed signal
+	maxRecursions int                      // Maximum number of recursions for model calls
+	search        *SearchEngine            // Search engine
+	queries       []string                 // List of queries to be sent to the AI assistant
+	references    []map[string]interface{} // keep track of the references
+	status        *StatusStack             // Stack to manage streaming status
 }
 
 func (c *OpenChat) process() error {
@@ -233,13 +235,18 @@ func (c *OpenChat) process() error {
 
 	// Add queries to the output if any
 	if len(c.queries) > 0 {
-		q := "\n\n" + RetrieveQueries(c.queries)
-		c.data <- StreamData{Text: q, Type: DataTypeNoraml}
+		q := "\n\n" + c.search.RetrieveQueries(c.queries)
+		c.data <- StreamData{Text: q, Type: DataTypeNormal}
 	}
 	// Add references to the output if any
 	if len(c.references) > 0 {
-		refs := "\n\n" + RetrieveReferences(c.references) + "\n"
-		c.data <- StreamData{Text: refs, Type: DataTypeNoraml}
+		// Create a slice of pointers to match the function signature
+		// refPtrs := make([]*map[string]interface{}, len(c.references))
+		// for i, ref := range c.references {
+		// 	refPtrs[i] = &ref
+		// }
+		refs := "\n\n" + c.search.RetrieveReferences(c.references) + "\n"
+		c.data <- StreamData{Text: refs, Type: DataTypeNormal}
 	}
 
 	// Record token usage
@@ -257,6 +264,9 @@ func (c *OpenChat) process() error {
 		return fmt.Errorf("failed to save conversation: %v", err)
 	}
 
+	// Flush all data to the channel
+	c.data <- StreamData{Type: DataTypeFinished}
+	<-c.proceed
 	// Notify that the stream is finished
 	c.status.ChangeTo(c.notify, StreamNotify{Status: StatusFinished}, nil)
 	return nil
@@ -314,7 +324,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 			} else if delta.Content != "" {
 				text := delta.Content
 				contentBuffer.WriteString(text)
-				c.data <- StreamData{Text: text, Type: DataTypeNoraml}
+				c.data <- StreamData{Text: text, Type: DataTypeNormal}
 			}
 
 			// Handle tool calls in the stream
@@ -400,41 +410,33 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 
 	var msg *model.ChatCompletionMessage
 	var err error
-	switch toolCall.Function.Name {
-	case "shell":
-		msg, err = c.processShellToolCall(&toolCall, &argsMap)
-	case "web_fetch":
-		msg, err = c.processWebFetchToolCall(&toolCall, &argsMap)
-	case "web_search":
-		msg, err = c.processWebSearchToolCall(&toolCall, &argsMap)
-	case "read_file":
-		msg, err = c.processReadFileToolCall(&toolCall, &argsMap)
-	case "write_file":
-		msg, err = c.processWriteFileToolCall(&toolCall, &argsMap)
-	case "edit_file":
-		msg, err = c.processEditFileToolCall(&toolCall, &argsMap)
-	case "create_directory":
-		msg, err = c.processCreateDirectoryToolCall(&toolCall, &argsMap)
-	case "list_directory":
-		msg, err = c.processListDirectoryToolCall(&toolCall, &argsMap)
-	case "delete_file":
-		msg, err = c.processDeleteFileToolCall(&toolCall, &argsMap)
-	case "delete_directory":
-		msg, err = c.processDeleteDirectoryToolCall(&toolCall, &argsMap)
-	case "move":
-		msg, err = c.processMoveToolCall(&toolCall, &argsMap)
-	case "copy":
-		msg, err = c.processCopyToolCall(&toolCall, &argsMap)
-	case "search_files":
-		msg, err = c.processSearchFilesToolCall(&toolCall, &argsMap)
-	case "search_text_in_file":
-		msg, err = c.processSearchTextInFileToolCall(&toolCall, &argsMap)
-	case "read_multiple_files":
-		msg, err = c.processReadMultipleFilesToolCall(&toolCall, &argsMap)
-	default:
+
+	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
+	toolHandlers := map[string]func(*model.ToolCall, *map[string]interface{}) (*model.ChatCompletionMessage, error){
+		"shell":               c.processShellToolCall,
+		"web_fetch":           c.processWebFetchToolCall,
+		"web_search":          c.processWebSearchToolCall,
+		"read_file":           c.processReadFileToolCall,
+		"write_file":          c.processWriteFileToolCall,
+		"edit_file":           c.processEditFileToolCall,
+		"create_directory":    c.processCreateDirectoryToolCall,
+		"list_directory":      c.processListDirectoryToolCall,
+		"delete_file":         c.processDeleteFileToolCall,
+		"delete_directory":    c.processDeleteDirectoryToolCall,
+		"move":                c.processMoveToolCall,
+		"copy":                c.processCopyToolCall,
+		"search_files":        c.processSearchFilesToolCall,
+		"search_text_in_file": c.processSearchTextInFileToolCall,
+		"read_multiple_files": c.processReadMultipleFilesToolCall,
+	}
+
+	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {
+		msg, err = handler(&toolCall, &argsMap)
+	} else {
 		msg = nil
 		err = fmt.Errorf("unknown function name: %s", toolCall.Function.Name)
 	}
+
 	// Function call is done
 	c.status.ChangeTo(c.notify, StreamNotify{Status: StatusFunctionCallingOver}, c.proceed)
 	return msg, err

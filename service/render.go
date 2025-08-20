@@ -103,7 +103,7 @@ func (mr *MarkdownRenderer) RenderMarkdown() {
 		return
 	}
 	// Remove citations
-	output = removeCitations(output)
+	//output = removeCitations(output)
 
 	// Print a separator or message
 	if mr.keepStreamingContent {
