@@ -400,41 +400,33 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 
 	var msg *model.ChatCompletionMessage
 	var err error
-	switch toolCall.Function.Name {
-	case "shell":
-		msg, err = c.processShellToolCall(&toolCall, &argsMap)
-	case "web_fetch":
-		msg, err = c.processWebFetchToolCall(&toolCall, &argsMap)
-	case "web_search":
-		msg, err = c.processWebSearchToolCall(&toolCall, &argsMap)
-	case "read_file":
-		msg, err = c.processReadFileToolCall(&toolCall, &argsMap)
-	case "write_file":
-		msg, err = c.processWriteFileToolCall(&toolCall, &argsMap)
-	case "edit_file":
-		msg, err = c.processEditFileToolCall(&toolCall, &argsMap)
-	case "create_directory":
-		msg, err = c.processCreateDirectoryToolCall(&toolCall, &argsMap)
-	case "list_directory":
-		msg, err = c.processListDirectoryToolCall(&toolCall, &argsMap)
-	case "delete_file":
-		msg, err = c.processDeleteFileToolCall(&toolCall, &argsMap)
-	case "delete_directory":
-		msg, err = c.processDeleteDirectoryToolCall(&toolCall, &argsMap)
-	case "move":
-		msg, err = c.processMoveToolCall(&toolCall, &argsMap)
-	case "copy":
-		msg, err = c.processCopyToolCall(&toolCall, &argsMap)
-	case "search_files":
-		msg, err = c.processSearchFilesToolCall(&toolCall, &argsMap)
-	case "search_text_in_file":
-		msg, err = c.processSearchTextInFileToolCall(&toolCall, &argsMap)
-	case "read_multiple_files":
-		msg, err = c.processReadMultipleFilesToolCall(&toolCall, &argsMap)
-	default:
+	
+	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
+	toolHandlers := map[string]func(*model.ToolCall, *map[string]interface{}) (*model.ChatCompletionMessage, error){
+		"shell":               c.processShellToolCall,
+		"web_fetch":           c.processWebFetchToolCall,
+		"web_search":          c.processWebSearchToolCall,
+		"read_file":           c.processReadFileToolCall,
+		"write_file":          c.processWriteFileToolCall,
+		"edit_file":           c.processEditFileToolCall,
+		"create_directory":    c.processCreateDirectoryToolCall,
+		"list_directory":      c.processListDirectoryToolCall,
+		"delete_file":         c.processDeleteFileToolCall,
+		"delete_directory":    c.processDeleteDirectoryToolCall,
+		"move":                c.processMoveToolCall,
+		"copy":                c.processCopyToolCall,
+		"search_files":        c.processSearchFilesToolCall,
+		"search_text_in_file": c.processSearchTextInFileToolCall,
+		"read_multiple_files": c.processReadMultipleFilesToolCall,
+	}
+
+	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {
+		msg, err = handler(&toolCall, &argsMap)
+	} else {
 		msg = nil
 		err = fmt.Errorf("unknown function name: %s", toolCall.Function.Name)
 	}
+	
 	// Function call is done
 	c.status.ChangeTo(c.notify, StreamNotify{Status: StatusFunctionCallingOver}, c.proceed)
 	return msg, err

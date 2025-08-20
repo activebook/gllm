@@ -295,43 +295,35 @@ func (ll *LangLogic) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Fu
 
 	var resp *genai.FunctionResponse
 	var err error
-	switch call.Name {
-	case "shell":
-		resp, err = ll.processGemini2ShellToolCall(call)
-	case "read_file":
-		resp, err = ll.processGemini2ReadFileToolCall(call)
-	case "write_file":
-		resp, err = ll.processGemini2WriteFileToolCall(call)
-	case "create_directory":
-		resp, err = ll.processGemini2CreateDirectoryToolCall(call)
-	case "list_directory":
-		resp, err = ll.processGemini2ListDirectoryToolCall(call)
-	case "delete_file":
-		resp, err = ll.processGemini2DeleteFileToolCall(call)
-	case "delete_directory":
-		resp, err = ll.processGemini2DeleteDirectoryToolCall(call)
-	case "move":
-		resp, err = ll.processGemini2MoveToolCall(call)
-	case "copy":
-		resp, err = ll.processGemini2CopyToolCall(call)
-	case "search_files":
-		resp, err = ll.processGemini2SearchFilesToolCall(call)
-	case "search_text_in_file":
-		resp, err = ll.processGemini2SearchTextInFileToolCall(call)
-	case "read_multiple_files":
-		resp, err = ll.processGemini2ReadMultipleFilesToolCall(call)
-	case "web_fetch":
-		resp, err = ll.processGemini2WebFetchToolCall(call)
-	case "edit_file":
-		resp, err = ll.processGemini2EditFileToolCall(call)
-	default:
+
+	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
+	toolHandlers := map[string]func(*genai.FunctionCall) (*genai.FunctionResponse, error){
+		"shell":               ll.processGemini2ShellToolCall,
+		"read_file":           ll.processGemini2ReadFileToolCall,
+		"write_file":          ll.processGemini2WriteFileToolCall,
+		"create_directory":    ll.processGemini2CreateDirectoryToolCall,
+		"list_directory":      ll.processGemini2ListDirectoryToolCall,
+		"delete_file":         ll.processGemini2DeleteFileToolCall,
+		"delete_directory":    ll.processGemini2DeleteDirectoryToolCall,
+		"move":                ll.processGemini2MoveToolCall,
+		"copy":                ll.processGemini2CopyToolCall,
+		"search_files":        ll.processGemini2SearchFilesToolCall,
+		"search_text_in_file": ll.processGemini2SearchTextInFileToolCall,
+		"read_multiple_files": ll.processGemini2ReadMultipleFilesToolCall,
+		"web_fetch":           ll.processGemini2WebFetchToolCall,
+		"edit_file":           ll.processGemini2EditFileToolCall,
+	}
+
+	if handler, ok := toolHandlers[call.Name]; ok {
+		resp, err = handler(call)
+	} else {
 		// For web_search and other Google Search/CodeExecution tools that don't need special processing
 		resp, err = &genai.FunctionResponse{
 			ID:   call.ID,
 			Name: call.Name,
 			Response: map[string]any{
 				"content": nil,
-				"error":   fmt.Sprintf("unknown tool call: %v", call.Name),
+				"error":   fmt.Sprintf("unknown or built-in tool call: %v", call.Name),
 			},
 		}, nil
 	}
