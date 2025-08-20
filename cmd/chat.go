@@ -718,7 +718,7 @@ func (ci *ChatInfo) callLLM(input string) {
 		_, searchEngine = GetEffectiveSearchEngine()
 	}
 
-	service.CallLanguageModel(finalPrompt.String(), sys_prompt, ci.Files, modelInfo, searchEngine, useTools, ci.maxRecursions)
+	service.CallAgent(finalPrompt.String(), sys_prompt, ci.Files, modelInfo, searchEngine, useTools, ci.maxRecursions)
 
 	// We must reset the files after processing
 	// We shouldn't pass the files to the next call each time

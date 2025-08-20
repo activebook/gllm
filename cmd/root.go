@@ -298,7 +298,7 @@ func processQuery(prompt string, files []*service.FileData) {
 		service.SetMaxReferences(referenceFlag)
 	}
 
-	service.CallLanguageModel(prompt, sys_prompt, files, modelInfo, searchEngine, useTools, maxRecursions)
+	service.CallAgent(prompt, sys_prompt, files, modelInfo, searchEngine, useTools, maxRecursions)
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

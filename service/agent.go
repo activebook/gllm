@@ -24,7 +24,7 @@ type StreamData struct {
 	Type StreamDataType
 }
 
-type LangLogic struct {
+type Agent struct {
 	ApiKey        string
 	EndPoint      string
 	ModelName     string
@@ -35,6 +35,7 @@ type LangLogic struct {
 	NotifyChan    chan<- StreamNotify // Sub Channel to send notifications
 	DataChan      chan<- StreamData   // Sub Channel to receive streamed text data
 	ProceedChan   <-chan bool         // Sub Channel to receive proceed signal
+	SearchEngine  string              // Search engine name
 	UseSearchTool bool                // Use search tool
 	UseTools      bool                // Use tools
 	UseCodeTool   bool                // Use code tool
@@ -42,12 +43,7 @@ type LangLogic struct {
 	Status        StatusStack         // Stack to manage streaming status
 }
 
-// func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, modelInfo map[string]any, searchEngine map[string]any) {
-// 	// Use default value of 5 for maxRecursions
-// 	CallLanguageModelWithMaxRecursions(prompt, sys_prompt, files, modelInfo, searchEngine, 5)
-// }
-
-func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, modelInfo map[string]any, searchEngine map[string]any, useTools bool, maxRecursions int) {
+func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo map[string]any, searchEngine map[string]any, useTools bool, maxRecursions int) {
 	var temperature float32
 	switch temp := modelInfo["temperature"].(type) {
 	case float64:
@@ -93,7 +89,7 @@ func CallLanguageModel(prompt string, sys_prompt string, files []*FileData, mode
 	proceedCh := make(chan bool)            // For main -> sub communication
 
 	markdownRenderer := NewMarkdownRenderer()
-	ll := LangLogic{
+	ll := Agent{
 		ApiKey:        modelInfo["key"].(string),
 		EndPoint:      modelInfo["endpoint"].(string),
 		ModelName:     modelInfo["model"].(string),

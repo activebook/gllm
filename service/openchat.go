@@ -15,7 +15,7 @@ import (
 	"github.com/volcengine/volcengine-go-sdk/volcengine"
 )
 
-func (ll *LangLogic) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessageContentPart {
+func (ll *Agent) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessageContentPart {
 
 	var part *model.ChatCompletionMessageContentPart
 	format := file.Format()
@@ -47,7 +47,7 @@ func (ll *LangLogic) getOpenChatFilePart(file *FileData) *model.ChatCompletionMe
 	return part
 }
 
-func (ll *LangLogic) GenerateOpenChatStream() error {
+func (ll *Agent) GenerateOpenChatStream() error {
 
 	// 1. Initialize the Client
 	ctx := context.Background()
@@ -400,7 +400,7 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 
 	var msg *model.ChatCompletionMessage
 	var err error
-	
+
 	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
 	toolHandlers := map[string]func(*model.ToolCall, *map[string]interface{}) (*model.ChatCompletionMessage, error){
 		"shell":               c.processShellToolCall,
@@ -426,7 +426,7 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		msg = nil
 		err = fmt.Errorf("unknown function name: %s", toolCall.Function.Name)
 	}
-	
+
 	// Function call is done
 	c.status.ChangeTo(c.notify, StreamNotify{Status: StatusFunctionCallingOver}, c.proceed)
 	return msg, err

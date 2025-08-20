@@ -8,7 +8,7 @@ import (
 	"google.golang.org/genai"
 )
 
-func (ll *LangLogic) getGemini2FilePart(file *FileData) genai.Part {
+func (ll *Agent) getGemini2FilePart(file *FileData) genai.Part {
 
 	mimeType := file.Format()
 	data := file.Data()
@@ -40,7 +40,7 @@ func (ll *LangLogic) getGemini2FilePart(file *FileData) genai.Part {
 	}
 }
 
-func (ll *LangLogic) GenerateGemini2Stream() error {
+func (ll *Agent) GenerateGemini2Stream() error {
 	// Setup the Gemini client
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
@@ -213,7 +213,7 @@ func (ll *LangLogic) GenerateGemini2Stream() error {
 	return err
 }
 
-func (ll *LangLogic) processGemini2Stream(ctx context.Context,
+func (ll *Agent) processGemini2Stream(ctx context.Context,
 	chat *genai.Chat, parts *[]genai.Part,
 	refs *[]*map[string]interface{},
 	queries *[]string) (*[]*genai.FunctionCall, *genai.GenerateContentResponse, error) {
@@ -288,7 +288,7 @@ func (ll *LangLogic) processGemini2Stream(ctx context.Context,
 	return &funcCalls, finalResp, nil
 }
 
-func (ll *LangLogic) processGemini2ToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ll *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 
 	// Call function
 	ll.Status.ChangeTo(ll.NotifyChan, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", call.Name, formatToolCallArguments(call.Args))}, nil)

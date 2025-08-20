@@ -101,7 +101,7 @@ func formatToolCallArguments(argsMap map[string]interface{}) string {
 }
 
 // Tool definitions for file operations
-func (ll *LangLogic) getOpenChatTools() []*model.Tool {
+func (ll *Agent) getOpenChatTools() []*model.Tool {
 	var tools []*model.Tool
 
 	// Shell tool
@@ -483,7 +483,7 @@ func (ll *LangLogic) getOpenChatTools() []*model.Tool {
 	return tools
 }
 
-func (ll *LangLogic) getOpenChatShellTool() *model.Tool {
+func (ll *Agent) getOpenChatShellTool() *model.Tool {
 	shellFunc := model.FunctionDefinition{
 		Name: "shell",
 		Description: `Executes a shell command on the user's local machine.
@@ -540,7 +540,7 @@ LLM should call with:
 	return &shellTool
 }
 
-func (ll *LangLogic) getOpenChatWebSearchTool() *model.Tool {
+func (ll *Agent) getOpenChatWebSearchTool() *model.Tool {
 	engine := GetSearchEngine()
 	switch engine {
 	case GoogleSearchEngine:
