@@ -160,13 +160,6 @@ Configure your API keys and preferred models, then start chatting or executing c
 					service.DisableCodeExecution()
 				}
 
-				// Deep dive
-				if deepDiveFlag {
-					service.SetDeepDive(deepDiveFlag)
-				} else {
-					service.SetDeepDive(false)
-				}
-
 				// Check if -c/--conversation was used without a value
 				if cmd.Flags().Changed("conversation") {
 					// Flag was used without a value, use a default name
@@ -295,7 +288,8 @@ func processQuery(prompt string, files []*service.FileData) {
 	// If toolsFlag is set, we also need to use the search engine
 	if searchFlag != "" || useTools {
 		_, searchEngine = GetEffectiveSearchEngine()
-		service.SetMaxReferences(referenceFlag)
+		searchEngine["deep_dive"] = deepDiveFlag   // Add deep dive flag to search engine settings
+		searchEngine["references"] = referenceFlag // Add references flag to search engine settings
 	}
 
 	service.CallAgent(prompt, sys_prompt, files, modelInfo, searchEngine, useTools, maxRecursions)

@@ -128,7 +128,7 @@ func (ll *Agent) GenerateGemini2Stream() error {
 	ll.Status.ChangeTo(ll.NotifyChan, StreamNotify{Status: StatusProcessing}, nil)
 
 	// Stream the responses
-	references := make([]*map[string]interface{}, 0, 1)
+	references := make([]map[string]interface{}, 0, 1)
 	queries := make([]string, 0, 1)
 	streamParts := &parts
 
@@ -185,13 +185,14 @@ func (ll *Agent) GenerateGemini2Stream() error {
 
 	// Add queries to the output if any
 	if len(queries) > 0 {
-		q := "\n\n" + RetrieveQueries(queries)
-		ll.DataChan <- StreamData{Text: q, Type: DataTypeNoraml}
+		q := "\n\n" + ll.SearchEngine.RetrieveQueries(queries)
+		ll.DataChan <- StreamData{Text: q, Type: DataTypeNormal}
 	}
+
 	// Add references to the output if any
 	if len(references) > 0 {
-		refs := "\n\n" + RetrieveReferences(references) + "\n"
-		ll.DataChan <- StreamData{Text: refs, Type: DataTypeNoraml}
+		refs := "\n\n" + ll.SearchEngine.RetrieveReferences(references) + "\n"
+		ll.DataChan <- StreamData{Text: refs, Type: DataTypeNormal}
 	}
 
 	// Record token usage
@@ -208,6 +209,10 @@ func (ll *Agent) GenerateGemini2Stream() error {
 	if err != nil {
 		return fmt.Errorf("failed to save conversation: %v", err)
 	}
+
+	// Flush all data to the channel
+	ll.DataChan <- StreamData{Type: DataTypeFinished}
+	<-ll.ProceedChan
 	// Signal that streaming is finished
 	ll.Status.ChangeTo(ll.NotifyChan, StreamNotify{Status: StatusFinished}, nil)
 	return err
@@ -215,7 +220,7 @@ func (ll *Agent) GenerateGemini2Stream() error {
 
 func (ll *Agent) processGemini2Stream(ctx context.Context,
 	chat *genai.Chat, parts *[]genai.Part,
-	refs *[]*map[string]interface{},
+	refs *[]map[string]interface{},
 	queries *[]string) (*[]*genai.FunctionCall, *genai.GenerateContentResponse, error) {
 
 	// Stream the response
@@ -270,7 +275,7 @@ func (ll *Agent) processGemini2Stream(ctx context.Context,
 					ll.DataChan <- StreamData{Text: strings.TrimSpace(part.Text), Type: DataTypeReasoning}
 				} else if part.Text != "" {
 					// Normal text data
-					ll.DataChan <- StreamData{Text: strings.TrimSpace(part.Text), Type: DataTypeNoraml}
+					ll.DataChan <- StreamData{Text: strings.TrimSpace(part.Text), Type: DataTypeNormal}
 				}
 			}
 
@@ -333,18 +338,28 @@ func (ll *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Functi
 	return resp, err
 }
 
-func appendReferences(metadata *genai.GroundingMetadata, refs *[]*map[string]interface{}) {
+func appendReferences(metadata *genai.GroundingMetadata, refs *[]map[string]interface{}) {
+	// Process grounding metadata to extract references
+	// Check if we have grounding chunks
 	if len(metadata.GroundingChunks) > 0 {
 		// Build a single map with a "results" key as expected by RetrieveReferences
 		results := make([]any, 0, len(metadata.GroundingChunks))
 		for _, chunk := range metadata.GroundingChunks {
-			results = append(results, map[string]any{
-				"title":       chunk.Web.Title,
-				"link":        chunk.Web.URI,
-				"displayLink": chunk.Web.Title,
-			})
+			// Check if the web chunk exists before accessing its fields
+			if chunk.Web != nil {
+				// Use URI as the displayLink since that's what users typically see
+				results = append(results, map[string]any{
+					"title":       chunk.Web.Title,
+					"link":        chunk.Web.URI,
+					"displayLink": chunk.Web.Title,
+				})
+			}
 		}
-		// Track references
-		*refs = append(*refs, &map[string]any{"results": results})
+
+		// Only append if we have valid results
+		if len(results) > 0 {
+			// Track references
+			*refs = append(*refs, map[string]any{"results": results})
+		}
 	}
 }

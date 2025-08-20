@@ -15,8 +15,9 @@ type StreamDataType int
 
 const (
 	DataTypeUnknown   StreamDataType = iota
-	DataTypeNoraml                   // 1
+	DataTypeNormal                   // 1
 	DataTypeReasoning                // 2
+	DataTypeFinished                 // 3
 )
 
 type StreamData struct {
@@ -35,12 +36,49 @@ type Agent struct {
 	NotifyChan    chan<- StreamNotify // Sub Channel to send notifications
 	DataChan      chan<- StreamData   // Sub Channel to receive streamed text data
 	ProceedChan   <-chan bool         // Sub Channel to receive proceed signal
-	SearchEngine  string              // Search engine name
+	SearchEngine  SearchEngine        // Search engine name
 	UseSearchTool bool                // Use search tool
 	UseTools      bool                // Use tools
 	UseCodeTool   bool                // Use code tool
 	MaxRecursions int                 // Maximum number of recursions for model calls
 	Status        StatusStack         // Stack to manage streaming status
+}
+
+func constructSearchEngine(searchEngine *map[string]any) *SearchEngine {
+	se := SearchEngine{}
+	se.UseSearch = false
+	if searchEngine != nil {
+		se.UseSearch = true
+		if name, ok := (*searchEngine)["name"]; ok {
+			se.Name = name.(string)
+		} else {
+			se.UseSearch = false
+			se.Name = ""
+		}
+		if keyValue, ok := (*searchEngine)["key"]; ok {
+			se.ApiKey = keyValue.(string)
+		} else {
+			se.UseSearch = false
+			se.ApiKey = ""
+		}
+		if cxValue, ok := (*searchEngine)["cx"]; ok {
+			se.CxKey = cxValue.(string)
+		} else {
+			se.CxKey = ""
+		}
+		if deepDive, ok := (*searchEngine)["deep_dive"]; ok {
+			se.DeepDive = deepDive.(bool)
+		} else {
+			se.DeepDive = false
+		}
+		if references, ok := (*searchEngine)["references"]; ok {
+			se.MaxReferences = references.(int)
+		} else {
+			se.MaxReferences = 5
+		}
+	}
+
+	return &se
 }
 
 func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo map[string]any, searchEngine map[string]any, useTools bool, maxRecursions int) {
@@ -60,25 +98,7 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 	}
 
 	// Set up search engine settings
-	useSearch := false
-	if searchEngine != nil {
-		useSearch = true
-		if name, ok := searchEngine["name"]; ok {
-			SetSearchEngine(name.(string))
-		} else {
-			SetSearchEngine("")
-		}
-		if keyValue, ok := searchEngine["key"]; ok {
-			SetSearchApiKey(keyValue.(string))
-		} else {
-			SetSearchApiKey("")
-		}
-		if cxValue, ok := searchEngine["cx"]; ok {
-			SetSearchCxKey(cxValue.(string))
-		} else {
-			SetSearchCxKey("")
-		}
-	}
+	se := constructSearchEngine(&searchEngine)
 
 	// Set up code tool settings
 	exeCode := IsCodeExecutionEnabled()
@@ -100,7 +120,8 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 		NotifyChan:    notifyCh,
 		DataChan:      dataCh,
 		ProceedChan:   proceedCh,
-		UseSearchTool: useSearch,
+		SearchEngine:  *se,
+		UseSearchTool: se.UseSearch,
 		UseTools:      useTools,
 		UseCodeTool:   exeCode,
 		MaxRecursions: maxRecursions,
@@ -143,8 +164,28 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 	defer close(proceedCh)
 
 	// Process notifications in the main thread
+	// listen on multiple channels in Go, it listens to them simultaneously.
+	// If both data channel and notification channel have something to be read at the same time,
+	// it is indeed possible for either one to be selected.
 	for {
 		select {
+
+		// Handle streamed text data
+		case data := <-dataCh:
+			switch data.Type {
+			case DataTypeNormal:
+				// Render the streamed text and save to markdown buffer
+				markdownRenderer.RenderString("%s", data.Text)
+			case DataTypeReasoning:
+				// Reasoning data don't need to be saved to markdown buffer
+				fmt.Print(inReasoningColor + data.Text) // Print the streamed text
+			case DataTypeFinished:
+				// Wait all data to be processed(flush)
+				// This is important, otherwise notify will be processed before data finished
+				proceedCh <- true
+			default:
+				// Handle other data types if needed
+			}
 
 		// Handle status notifications
 		case notify := <-notifyCh:
@@ -185,21 +226,6 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 				StopSpinner(spinner)
 				proceedCh <- true
 			}
-
-		// Handle streamed text data
-		case data := <-dataCh:
-			switch data.Type {
-			case DataTypeNoraml:
-				// Render the streamed text and save to markdown buffer
-				markdownRenderer.RenderString("%s", data.Text)
-			case DataTypeReasoning:
-				// Reasoning data don't need to be saved to markdown buffer
-				fmt.Print(inReasoningColor + data.Text) // Print the streamed text
-			default:
-				// Handle other data types if needed
-			}
-		case <-proceedCh:
-
 		}
 	}
 

@@ -541,19 +541,6 @@ LLM should call with:
 }
 
 func (ll *Agent) getOpenChatWebSearchTool() *model.Tool {
-	engine := GetSearchEngine()
-	switch engine {
-	case GoogleSearchEngine:
-		// Use Google Search Engine
-	case BingSearchEngine:
-		// Use Bing Search Engine
-	case TavilySearchEngine:
-		// Use Tavily Search Engine
-	case NoneSearchEngine:
-		// Use None Search Engine
-	default:
-	}
-
 	searchFunc := model.FunctionDefinition{
 		Name:        "web_search",
 		Description: "Retrieve the most relevant and up-to-date information from the web.",
@@ -1185,22 +1172,22 @@ func (c *OpenChat) processWebSearchToolCall(toolCall *model.ToolCall, argsMap *m
 	}
 
 	// Call the search function
-	engine := GetSearchEngine()
+	engine := c.search.Name
 	var data map[string]any
 	var err error
 	switch engine {
 	case GoogleSearchEngine:
 		// Use Google Search Engine
-		data, err = GoogleSearch(query)
+		data, err = c.search.GoogleSearch(query)
 	case BingSearchEngine:
 		// Use Bing Search Engine
-		data, err = BingSearch(query)
+		data, err = c.search.BingSearch(query)
 	case TavilySearchEngine:
 		// Use Tavily Search Engine
-		data, err = TavilySearch(query)
+		data, err = c.search.TavilySearch(query)
 	case NoneSearchEngine:
 		// Use None Search Engine
-		data, err = NoneSearch(query)
+		data, err = c.search.NoneSearch(query)
 	default:
 		err = fmt.Errorf("unknown search engine: %s", engine)
 	}
@@ -1210,7 +1197,7 @@ func (c *OpenChat) processWebSearchToolCall(toolCall *model.ToolCall, argsMap *m
 	}
 	// keep the search results for references
 	c.queries = append(c.queries, query)
-	c.references = append(c.references, &data)
+	c.references = append(c.references, data)
 
 	// Convert search results to JSON string
 	resultsJSON, err := json.Marshal(data)

@@ -41,24 +41,31 @@ type TavilyError struct {
 }
 
 var (
-	searchApiKey  string
-	searchCxKey   string
-	searchEngine  string
-	maxReferences int
+	_maxLinks int = 3 // Maximum number of links to fetch in a single search
+)
+
+const (
+	TavilyUrl          = "https://api.tavily.com/search"
+	GoogleSearchEngine = "google"
+	BingSearchEngine   = "bing"
+	TavilySearchEngine = "tavily"
+	NoneSearchEngine   = "none"
+)
+
+type SearchEngine struct {
+	UseSearch     bool
+	Name          string
+	ApiKey        string
+	CxKey         string
+	MaxReferences int
+
 	// deepDive is a flag to indicate whether to perform a deep dive search
 	// If true, it will fetch all links from the search results
 	// If false, it will only fetch the first 3 links to keep it simple and token efficiency
 	// The top 3 results are ranked highly for a reason; they are generally the most authoritative and relevant pages for a given query.
-	deepDive bool = false // Whether to perform a deep dive search
-
-	_maxLinks int = 3 // Maximum number of links to fetch in a single search
-)
-
-const TavilyUrl = "https://api.tavily.com/search"
-const GoogleSearchEngine = "google"
-const BingSearchEngine = "bing"
-const TavilySearchEngine = "tavily"
-const NoneSearchEngine = "none"
+	// Whether to perform a deep dive search
+	DeepDive bool
+}
 
 func GetDefaultSearchEngineName() string {
 	return GoogleSearchEngine
@@ -69,31 +76,7 @@ func GetNoneSearchEngineName() string {
 	return NoneSearchEngine
 }
 
-func SetSearchApiKey(key string) {
-	searchApiKey = key
-}
-
-func SetSearchCxKey(key string) {
-	searchCxKey = key
-}
-
-func SetSearchEngine(e string) {
-	searchEngine = e
-}
-
-func GetSearchEngine() string {
-	return searchEngine
-}
-
-func SetMaxReferences(max int) {
-	maxReferences = max
-}
-
-func SetDeepDive(dive bool) {
-	deepDive = dive
-}
-
-func TavilySearch(query string) (map[string]any, error) {
+func (s *SearchEngine) TavilySearch(query string) (map[string]any, error) {
 
 	// Format the JSON payload, inserting the query variable
 	payload := fmt.Sprintf(`{
@@ -120,7 +103,7 @@ func TavilySearch(query string) (map[string]any, error) {
 	}
 
 	// Insert the token into the header
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", searchApiKey))
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", s.ApiKey))
 	req.Header.Add("Content-Type", "application/json")
 
 	// Execute the request
@@ -152,7 +135,7 @@ func TavilySearch(query string) (map[string]any, error) {
 		return nil, fmt.Errorf("[Tavily]Error parsing JSON: %v", err)
 	}
 
-	formatted, err := tavilyFormatResponse(&tavilyResp)
+	formatted, err := s.tavilyFormatResponse(&tavilyResp)
 	if err != nil {
 		Errorf("[Tavily]Error formatting response: %v", err)
 		return nil, fmt.Errorf("[Tavily]Error formatting response: %v", err)
@@ -161,7 +144,7 @@ func TavilySearch(query string) (map[string]any, error) {
 }
 
 // formatResponse converts a TavilyResponse into the desired response format.
-func tavilyFormatResponse(tavilyResp *TavilyResponse) (map[string]any, error) {
+func (s *SearchEngine) tavilyFormatResponse(tavilyResp *TavilyResponse) (map[string]any, error) {
 	results := make([]any, 0, len(tavilyResp.Results))
 	info := map[string]any{
 		"answer": tavilyResp.Answer,
@@ -170,7 +153,7 @@ func tavilyFormatResponse(tavilyResp *TavilyResponse) (map[string]any, error) {
 
 	// Collect all links
 	links := make([]string, 0, len(tavilyResp.Results))
-	if deepDive {
+	if s.DeepDive {
 		// --deep-dive is true, use all links
 		for _, result := range tavilyResp.Results {
 			links = append(links, result.URL)
@@ -202,12 +185,12 @@ func tavilyFormatResponse(tavilyResp *TavilyResponse) (map[string]any, error) {
 			"displayLink": displayLink,
 			"snippet":     r.Content,
 		}
-		
+
 		// Safely add content if it exists
 		if i < len(contents) {
 			resultMap["content"] = contents[i]
 		}
-		
+
 		results = append(results, resultMap)
 	}
 
@@ -219,16 +202,16 @@ func tavilyFormatResponse(tavilyResp *TavilyResponse) (map[string]any, error) {
 }
 
 // Alternative approach with explicit conversions for protocol buffer compatibility
-func GoogleSearch(query string) (map[string]any, error) {
+func (s *SearchEngine) GoogleSearch(query string) (map[string]any, error) {
 	// Create results using only types known to work with proto conversion
 	ctx := context.Background() // Required for NewService
-	svc, err := customsearch.NewService(ctx, option.WithAPIKey(searchApiKey))
+	svc, err := customsearch.NewService(ctx, option.WithAPIKey(s.ApiKey))
 	if err != nil {
 		Errorf("[Google]Error creating service: %v", err)
 		return nil, fmt.Errorf("[Google]Error creating service: %v", err)
 	}
 
-	resp, err := svc.Cse.List().Safe("off").Num(10).Cx(searchCxKey).Q(query).Do()
+	resp, err := svc.Cse.List().Safe("off").Num(10).Cx(s.CxKey).Q(query).Do()
 	if err != nil {
 		Errorf("[Google]Error making API call: %v", err)
 		return nil, fmt.Errorf("[Google]Error making API call: %v", err)
@@ -236,7 +219,7 @@ func GoogleSearch(query string) (map[string]any, error) {
 
 	// Collect all links
 	links := make([]string, 0, len(resp.Items))
-	if deepDive {
+	if s.DeepDive {
 		// --deep-dive is true, use all links
 		for _, result := range resp.Items {
 			links = append(links, result.Link)
@@ -263,12 +246,12 @@ func GoogleSearch(query string) (map[string]any, error) {
 			"displayLink": result.DisplayLink,
 			"snippet":     result.Snippet,
 		}
-		
+
 		// Safely add content if it exists
 		if i < len(contents) {
 			resultMap["content"] = contents[i]
 		}
-		
+
 		results = append(results, resultMap)
 	}
 
@@ -280,12 +263,12 @@ func GoogleSearch(query string) (map[string]any, error) {
 }
 
 // --- Simulation of Bing Search ---
-func BingSearch(query string) (map[string]any, error) {
+func (s *SearchEngine) BingSearch(query string) (map[string]any, error) {
 	// Call SerpAPI Search API
-	return SerpAPISearch(query, "bing")
+	return s.SerpAPISearch(query, "bing")
 }
 
-func SerpAPISearch(query string, engine string) (map[string]any, error) {
+func (s *SearchEngine) SerpAPISearch(query string, engine string) (map[string]any, error) {
 	// Placeholder
 	return map[string]any{}, nil
 	/*
@@ -327,7 +310,7 @@ func SerpAPISearch(query string, engine string) (map[string]any, error) {
 }
 
 // formatSerpAPIResponse formats the SerpAPI response into a standardized structure
-func formatSerpAPIResponse(organic_results interface{}) (map[string]any, error) {
+func (s *SearchEngine) formatSerpAPIResponse(organic_results interface{}) (map[string]any, error) {
 	result := make(map[string]any)
 
 	// Extract organic search results
@@ -356,7 +339,7 @@ func formatSerpAPIResponse(organic_results interface{}) (map[string]any, error) 
 	return result, nil
 }
 
-func NoneSearch(query string) (map[string]any, error) {
+func (s *SearchEngine) NoneSearch(query string) (map[string]any, error) {
 	return map[string]any{
 		"query":                    query,
 		"results":                  []map[string]string{},
@@ -364,7 +347,7 @@ func NoneSearch(query string) (map[string]any, error) {
 	}, nil
 }
 
-func RetrieveQueries(queries []string) string {
+func (s *SearchEngine) RetrieveQueries(queries []string) string {
 	qs := "### 🔍 Queries:"
 	for _, query := range queries {
 		qs += "\n`" + query + "`"
@@ -372,7 +355,7 @@ func RetrieveQueries(queries []string) string {
 	return qs
 }
 
-func RetrieveReferences(references []*map[string]any) string {
+func (s *SearchEngine) RetrieveReferences(references []map[string]any) string {
 	if len(references) == 0 {
 		return ""
 	}
@@ -383,7 +366,7 @@ func RetrieveReferences(references []*map[string]any) string {
 		if ref == nil {
 			continue
 		}
-		if results, ok := (*ref)["results"].([]any); ok {
+		if results, ok := ref["results"].([]any); ok {
 			for _, result := range results {
 				if linkMap, ok := result.(map[string]any); ok {
 					link, hasLink := linkMap["link"].(string)
@@ -395,7 +378,7 @@ func RetrieveReferences(references []*map[string]any) string {
 					}
 					if hasLink && link != "" {
 						total++
-						if index < maxReferences {
+						if index < s.MaxReferences {
 							index++
 							// Markdown: 1. **[Title](URL)**
 							//           Source: [Source](URL)
@@ -415,9 +398,9 @@ func RetrieveReferences(references []*map[string]any) string {
 			}
 		}
 	}
-	if total > maxReferences {
+	if total > s.MaxReferences {
 		sb.WriteString("\n")
-		sb.WriteString(fmt.Sprintf("> **...and %d more references. Use the `-r` flag to view more.**\n", total-maxReferences))
+		sb.WriteString(fmt.Sprintf("> **...and %d more references. Use the `-r` flag to view more.**\n", total-s.MaxReferences))
 	}
 	return sb.String()
 }

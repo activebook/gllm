@@ -80,8 +80,9 @@ func (ll *Agent) GenerateOpenChatStream() error {
 		notify:        ll.NotifyChan,
 		data:          ll.DataChan,
 		proceed:       ll.ProceedChan,
-		references:    make([]*map[string]interface{}, 0, 1),
-		maxRecursions: ll.MaxRecursions, // Use configured value from LangLogic
+		search:        &ll.SearchEngine,
+		references:    make([]map[string]interface{}, 0), // Updated to match new field type
+		maxRecursions: ll.MaxRecursions,                  // Use configured value from LangLogic
 		status:        &ll.Status,
 	}
 
@@ -156,13 +157,14 @@ type OpenChat struct {
 	model         string
 	temperature   float32
 	tools         []*model.Tool
-	notify        chan<- StreamNotify       // Sub Channel to send notifications
-	data          chan<- StreamData         // Sub Channel to send data
-	proceed       <-chan bool               // Main Channel to receive proceed signal
-	maxRecursions int                       // Maximum number of recursions for model calls
-	queries       []string                  // List of queries to be sent to the AI assistant
-	references    []*map[string]interface{} // keep track of the references
-	status        *StatusStack              // Stack to manage streaming status
+	notify        chan<- StreamNotify      // Sub Channel to send notifications
+	data          chan<- StreamData        // Sub Channel to send data
+	proceed       <-chan bool              // Main Channel to receive proceed signal
+	maxRecursions int                      // Maximum number of recursions for model calls
+	search        *SearchEngine            // Search engine
+	queries       []string                 // List of queries to be sent to the AI assistant
+	references    []map[string]interface{} // keep track of the references
+	status        *StatusStack             // Stack to manage streaming status
 }
 
 func (c *OpenChat) process() error {
@@ -233,13 +235,18 @@ func (c *OpenChat) process() error {
 
 	// Add queries to the output if any
 	if len(c.queries) > 0 {
-		q := "\n\n" + RetrieveQueries(c.queries)
-		c.data <- StreamData{Text: q, Type: DataTypeNoraml}
+		q := "\n\n" + c.search.RetrieveQueries(c.queries)
+		c.data <- StreamData{Text: q, Type: DataTypeNormal}
 	}
 	// Add references to the output if any
 	if len(c.references) > 0 {
-		refs := "\n\n" + RetrieveReferences(c.references) + "\n"
-		c.data <- StreamData{Text: refs, Type: DataTypeNoraml}
+		// Create a slice of pointers to match the function signature
+		// refPtrs := make([]*map[string]interface{}, len(c.references))
+		// for i, ref := range c.references {
+		// 	refPtrs[i] = &ref
+		// }
+		refs := "\n\n" + c.search.RetrieveReferences(c.references) + "\n"
+		c.data <- StreamData{Text: refs, Type: DataTypeNormal}
 	}
 
 	// Record token usage
@@ -257,6 +264,9 @@ func (c *OpenChat) process() error {
 		return fmt.Errorf("failed to save conversation: %v", err)
 	}
 
+	// Flush all data to the channel
+	c.data <- StreamData{Type: DataTypeFinished}
+	<-c.proceed
 	// Notify that the stream is finished
 	c.status.ChangeTo(c.notify, StreamNotify{Status: StatusFinished}, nil)
 	return nil
@@ -314,7 +324,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 			} else if delta.Content != "" {
 				text := delta.Content
 				contentBuffer.WriteString(text)
-				c.data <- StreamData{Text: text, Type: DataTypeNoraml}
+				c.data <- StreamData{Text: text, Type: DataTypeNormal}
 			}
 
 			// Handle tool calls in the stream
