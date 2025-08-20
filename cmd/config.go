@@ -70,31 +70,31 @@ in the current directory.`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		var exportFile string
-		
+
 		if len(args) == 0 {
 			exportFile = "gllm-config.yaml"
 		} else {
 			exportFile = args[0]
 		}
-		
+
 		// Get all configuration settings
 		configMap := viper.AllSettings()
-		
+
 		// Create a new viper instance for export
 		exportViper := viper.New()
 		for key, value := range configMap {
 			exportViper.Set(key, value)
 		}
-		
+
 		// Set the export file
 		exportViper.SetConfigFile(exportFile)
-		
+
 		// Write the configuration to the file
 		if err := exportViper.WriteConfigAs(exportFile); err != nil {
 			service.Errorf("Error exporting configuration: %s\n", err)
 			return
 		}
-		
+
 		fmt.Printf("Configuration exported successfully to: %s\n", exportFile)
 	},
 }
@@ -110,37 +110,37 @@ with the imported values taking precedence.`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		importFile := args[0]
-		
+
 		// Check if file exists
 		if _, err := os.Stat(importFile); os.IsNotExist(err) {
 			service.Errorf("Configuration file does not exist: %s\n", importFile)
 			return
 		}
-		
+
 		// Create a new viper instance for import
 		importViper := viper.New()
 		importViper.SetConfigFile(importFile)
-		
+
 		// Read the configuration file
 		if err := importViper.ReadInConfig(); err != nil {
 			service.Errorf("Error reading configuration file: %s\n", err)
 			return
 		}
-		
+
 		// Get all settings from the import file
 		importedSettings := importViper.AllSettings()
-		
+
 		// Merge imported settings with current configuration
 		for key, value := range importedSettings {
 			viper.Set(key, value)
 		}
-		
+
 		// Save the merged configuration
 		if err := writeConfig(); err != nil {
 			service.Errorf("Error saving configuration: %s\n", err)
 			return
 		}
-		
+
 		fmt.Printf("Configuration imported successfully from: %s\n", importFile)
 	},
 }
@@ -247,7 +247,7 @@ var configPrintCmd = &cobra.Command{
 		fmt.Printf("\n%s: %v\n", keyColor("Markdown Format"), mark)
 
 		// Display max recursions value
-		maxRecursions := viper.GetInt("default.max_recursions")
+		maxRecursions := viper.GetInt("agent.max_recursions")
 		if maxRecursions <= 0 {
 			maxRecursions = 5 // Default value
 		}
@@ -311,12 +311,12 @@ If a value is provided, it sets the new maximum recursions value.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
 			// No argument provided - show current value
-			maxRecursions := viper.GetInt("default.max_recursions")
+			maxRecursions := viper.GetInt("agent.max_recursions")
 			if maxRecursions <= 0 {
 				maxRecursions = 5 // Default value
 			}
 			// Set the new value in viper
-			viper.Set("default.max_recursions", maxRecursions)
+			viper.Set("agent.max_recursions", maxRecursions)
 
 			// Save the configuration to file
 			err := viper.WriteConfig()
@@ -341,7 +341,7 @@ If a value is provided, it sets the new maximum recursions value.`,
 			}
 
 			// Set the new value in viper
-			viper.Set("default.max_recursions", maxRecursions)
+			viper.Set("agent.max_recursions", maxRecursions)
 
 			// Save the configuration to file
 			err = viper.WriteConfig()
@@ -381,7 +381,7 @@ var configSetCmd = &cobra.Command{
 				service.Errorf("Invalid value for max_recursions: %d (must be positive)\n", num)
 				return
 			}
-			viper.Set("default.max_recursions", num)
+			viper.Set("agent.max_recursions", num)
 		default:
 			service.Errorf("Unknown configuration key: %s\n", key)
 			return
@@ -398,7 +398,7 @@ var configSetCmd = &cobra.Command{
 }
 
 func GetMaxRecursions() int {
-	maxRecursions := viper.GetInt("default.max_recursions")
+	maxRecursions := viper.GetInt("agent.max_recursions")
 	if maxRecursions <= 0 {
 		maxRecursions = 5 // Default value
 	}

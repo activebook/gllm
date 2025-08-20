@@ -292,7 +292,12 @@ func processQuery(prompt string, files []*service.FileData) {
 		searchEngine["references"] = referenceFlag // Add references flag to search engine settings
 	}
 
-	service.CallAgent(prompt, sys_prompt, files, modelInfo, searchEngine, useTools, maxRecursions)
+	// Include usage metainfo
+	includeUsage := IncludeUsageMetainfo()
+	// Include markdown
+	includeMarkdown := IncludeMarkdown()
+
+	service.CallAgent(prompt, sys_prompt, files, modelInfo, searchEngine, useTools, maxRecursions, includeUsage, includeMarkdown)
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

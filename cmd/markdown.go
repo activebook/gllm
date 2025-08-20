@@ -40,7 +40,7 @@ When Markdown is switched off, the output will not include any Markdown formatti
 		fmt.Println(cmd.Long)
 		fmt.Println("-------------------------------------------")
 		fmt.Print("Markdown output is currently switched: ")
-		mark := viper.GetString("default.markdown")
+		mark := viper.GetString("agent.markdown")
 		switch mark {
 		case "on":
 			fmt.Println(switchOnColor + "on" + resetColor)
@@ -58,7 +58,7 @@ var markdownOnCmd = &cobra.Command{
 	Use:   "on",
 	Short: "Switch markdown output on",
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("default.markdown", "on")
+		viper.Set("agent.markdown", "on")
 
 		// Write the config file
 		if err := writeConfig(); err != nil {
@@ -74,7 +74,7 @@ var markdownOffCmd = &cobra.Command{
 	Use:   "off",
 	Short: "Switch markdown output off",
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("default.markdown", "off")
+		viper.Set("agent.markdown", "off")
 
 		// Write the config file
 		if err := writeConfig(); err != nil {
@@ -91,7 +91,7 @@ var markdownOnlyCmd = &cobra.Command{
 	Short: "Switch markdown output to only",
 	Long:  `If set Markdown 'only', then only keep the Markdown-formatted content.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("default.markdown", "only")
+		viper.Set("agent.markdown", "only")
 
 		// Write the config file
 		if err := writeConfig(); err != nil {
@@ -105,11 +105,11 @@ var markdownOnlyCmd = &cobra.Command{
 
 func SwitchMarkdown(s string) error {
 	if s == "on" {
-		viper.Set("default.markdown", "on")
+		viper.Set("agent.markdown", "on")
 	} else if s == "only" {
-		viper.Set("default.markdown", "only")
+		viper.Set("agent.markdown", "only")
 	} else {
-		viper.Set("default.markdown", "off")
+		viper.Set("agent.markdown", "off")
 	}
 
 	// Write the config file
@@ -121,6 +121,16 @@ func SwitchMarkdown(s string) error {
 }
 
 func GetMarkdownSwitch() string {
-	mark := viper.GetString("default.markdown")
+	mark := viper.GetString("agent.markdown")
 	return mark
+}
+
+func IncludeMarkdown() bool {
+	mark := viper.GetString("agent.markdown")
+	return mark == "on"
+}
+
+func IncludeMarkdownOnly() bool {
+	mark := viper.GetString("agent.markdown")
+	return mark == "only"
 }

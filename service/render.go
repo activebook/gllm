@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/glamour"
-	"github.com/spf13/viper"
 )
 
 // removeCitations removes citation references from text, including:
@@ -40,26 +39,15 @@ func removeCitations(text string) string {
 }
 
 type MarkdownRenderer struct {
-	buffer               strings.Builder
-	keepStreamingContent bool // keep streaming output
-	keepMarkdownOnly     bool // only markdown
+	buffer           strings.Builder
+	keepMarkdown     bool // keep streaming output
+	keepMarkdownOnly bool // only markdown
 }
 
 // NewMarkdownRenderer creates a new instance of MarkdownRenderer
-func NewMarkdownRenderer() *MarkdownRenderer {
+func NewMarkdownRenderer(keep bool) *MarkdownRenderer {
 	mr := MarkdownRenderer{}
-	mark := viper.GetString("default.markdown")
-	switch mark {
-	case "on":
-		mr.keepStreamingContent = true
-		mr.keepMarkdownOnly = false
-	case "only":
-		mr.keepStreamingContent = false
-		mr.keepMarkdownOnly = true
-	default:
-		mr.keepStreamingContent = false
-		mr.keepMarkdownOnly = false
-	}
+	mr.keepMarkdown = keep
 	(&mr).StartStreaming()
 	return &mr
 }
@@ -80,17 +68,15 @@ func (mr *MarkdownRenderer) StopStreaming() {
 
 // RenderString streams output incrementally and tracks the number of lines
 func (mr *MarkdownRenderer) RenderString(format string, args ...interface{}) {
-	if mr.keepStreamingContent || mr.keepMarkdownOnly {
+	if mr.keepMarkdown || mr.keepMarkdownOnly {
 		output := fmt.Sprintf(format, args...)
 		mr.buffer.WriteString(output) // Write to the buffer
 	}
-	// Print the output to the console
-	fmt.Printf(format, args...)
 }
 
 // RenderMarkdown clears the streaming output and re-renders the entire Markdown
 func (mr *MarkdownRenderer) RenderMarkdown() {
-	if !mr.keepStreamingContent && !mr.keepMarkdownOnly {
+	if !mr.keepMarkdown && !mr.keepMarkdownOnly {
 		// When markdown is off, we need to ensure the output ends with a newline
 		// to prevent the shell from displaying % at the end
 		fmt.Println()
@@ -102,11 +88,13 @@ func (mr *MarkdownRenderer) RenderMarkdown() {
 	if len(output) == 0 {
 		return
 	}
+
 	// Remove citations
+	// Only gemini has citations
 	//output = removeCitations(output)
 
 	// Print a separator or message
-	if mr.keepStreamingContent {
+	if mr.keepMarkdown {
 		prefix := "\n\n---\n\n# **MARKDOWN OUTPUT**\n\n---\n\n"
 		output = prefix + output
 	}
@@ -134,4 +122,16 @@ func (mr *MarkdownRenderer) RenderMarkdown() {
 
 	// Reset the buffer and line count
 	mr.buffer.Reset()
+}
+
+type StdRenderer struct {
+}
+
+func NewStdRenderer() *StdRenderer {
+	return &StdRenderer{}
+}
+
+func (r *StdRenderer) RenderString(format string, args ...interface{}) {
+	// Print the output to the console
+	fmt.Printf(format, args...)
 }

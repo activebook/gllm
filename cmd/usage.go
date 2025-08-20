@@ -23,7 +23,7 @@ When Usage is switched off, the output will not include any token usage metainfo
 		fmt.Println(cmd.Long)
 		fmt.Println("-------------------------------------------")
 		fmt.Print("Usage output is currently switched: ")
-		usage := viper.GetString("default.usage")
+		usage := viper.GetString("agent.usage")
 		switch usage {
 		case "on":
 			fmt.Println(switchOnColor + "on" + resetColor)
@@ -39,7 +39,7 @@ var usageOnCmd = &cobra.Command{
 	Use:   "on",
 	Short: "Switch usage output on",
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("default.usage", "on")
+		viper.Set("agent.usage", "on")
 
 		// Write the config file
 		if err := writeConfig(); err != nil {
@@ -55,7 +55,7 @@ var usageOffCmd = &cobra.Command{
 	Use:   "off",
 	Short: "Switch usage output off",
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("default.usage", "off")
+		viper.Set("agent.usage", "off")
 
 		// Write the config file
 		if err := writeConfig(); err != nil {
@@ -70,10 +70,10 @@ var usageOffCmd = &cobra.Command{
 func SwitchUsageMetainfo(s string) error {
 	switch s {
 	case "on":
-		viper.Set("default.usage", "on")
+		viper.Set("agent.usage", "on")
 		fmt.Println("Usage output switched " + switchOnColor + "on" + resetColor)
 	case "off":
-		viper.Set("default.usage", "off")
+		viper.Set("agent.usage", "off")
 		fmt.Println("Usage output switched " + switchOffColor + "off" + resetColor)
 	default:
 	}
@@ -87,7 +87,7 @@ func SwitchUsageMetainfo(s string) error {
 }
 
 func GetUsageMetainfoStatus() string {
-	usage := viper.GetString("default.usage")
+	usage := viper.GetString("agent.usage")
 	switch usage {
 	case "on":
 		return "on"
@@ -99,12 +99,24 @@ func GetUsageMetainfoStatus() string {
 }
 
 func PrintUsageMetainfoStatus() {
-	usage := viper.GetString("default.usage")
+	usage := viper.GetString("agent.usage")
 	switch usage {
 	case "on":
 		fmt.Println("Usage output is currently switched " + switchOnColor + "on" + resetColor)
 	case "off":
 		fmt.Println("Usage output is currently switched " + switchOffColor + "off" + resetColor)
 	default:
+	}
+}
+
+func IncludeUsageMetainfo() bool {
+	usage := viper.GetString("agent.usage")
+	switch usage {
+	case "on":
+		return true
+	case "off":
+		return false
+	default:
+		return false
 	}
 }

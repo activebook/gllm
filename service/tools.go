@@ -101,15 +101,15 @@ func formatToolCallArguments(argsMap map[string]interface{}) string {
 }
 
 // Tool definitions for file operations
-func (ll *Agent) getOpenChatTools() []*model.Tool {
+func (ag *Agent) getOpenChatTools() []*model.Tool {
 	var tools []*model.Tool
 
 	// Shell tool
-	shellTool := ll.getOpenChatShellTool()
+	shellTool := ag.getOpenChatShellTool()
 	tools = append(tools, shellTool)
 
 	// Web search tool
-	webSearchTool := ll.getOpenChatWebSearchTool()
+	webSearchTool := ag.getOpenChatWebSearchTool()
 	tools = append(tools, webSearchTool)
 
 	// Web fetch tool
@@ -483,7 +483,7 @@ func (ll *Agent) getOpenChatTools() []*model.Tool {
 	return tools
 }
 
-func (ll *Agent) getOpenChatShellTool() *model.Tool {
+func (ag *Agent) getOpenChatShellTool() *model.Tool {
 	shellFunc := model.FunctionDefinition{
 		Name: "shell",
 		Description: `Executes a shell command on the user's local machine.
@@ -540,7 +540,7 @@ LLM should call with:
 	return &shellTool
 }
 
-func (ll *Agent) getOpenChatWebSearchTool() *model.Tool {
+func (ag *Agent) getOpenChatWebSearchTool() *model.Tool {
 	searchFunc := model.FunctionDefinition{
 		Name:        "web_search",
 		Description: "Retrieve the most relevant and up-to-date information from the web.",
