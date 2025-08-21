@@ -205,7 +205,8 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		ag.TokenUsage.RecordTokenUsage(int(finalResp.UsageMetadata.PromptTokenCount),
 			int(finalResp.UsageMetadata.CandidatesTokenCount),
 			int(finalResp.UsageMetadata.CachedContentTokenCount),
-			int(finalResp.UsageMetadata.ThoughtsTokenCount))
+			int(finalResp.UsageMetadata.ThoughtsTokenCount),
+			int(finalResp.UsageMetadata.TotalTokenCount))
 	}
 
 	// Save the conversation history

@@ -246,7 +246,8 @@ func (c *OpenChat) process(ag *Agent) error {
 		ag.TokenUsage.RecordTokenUsage(int(finalResp.Usage.PromptTokens),
 			int(finalResp.Usage.CompletionTokens),
 			int(finalResp.Usage.PromptTokensDetails.CachedTokens),
-			int(finalResp.Usage.CompletionTokensDetails.ReasoningTokens))
+			int(finalResp.Usage.CompletionTokensDetails.ReasoningTokens),
+			int(finalResp.Usage.TotalTokens))
 	}
 
 	// No more message
