@@ -26,26 +26,27 @@ type StreamData struct {
 }
 
 type Agent struct {
-	ApiKey        string
-	EndPoint      string
-	ModelName     string
-	SystemPrompt  string
-	UserPrompt    string
-	Temperature   float32
-	Files         []*FileData         // Attachment files
-	NotifyChan    chan<- StreamNotify // Sub Channel to send notifications
-	DataChan      chan<- StreamData   // Sub Channel to receive streamed text data
-	ProceedChan   <-chan bool         // Sub Channel to receive proceed signal
-	SearchEngine  SearchEngine        // Search engine name
-	ToolsUse      ToolsUse            // Use tools
-	UseCodeTool   bool                // Use code tool
-	MaxRecursions int                 // Maximum number of recursions for model calls
-	Markdown      *Markdown           // Markdown renderer
-	TokenUsage    *TokenUsage         // Token usage metainfo
-	Std           *StdRenderer        // Standard renderer
-	OutputFile    *FileRenderer       // File renderer
-	Status        StatusStack         // Stack to manage streaming status
-	Indicator     *Indicator          // Indicator Spinner
+	ApiKey          string
+	EndPoint        string
+	ModelName       string
+	SystemPrompt    string
+	UserPrompt      string
+	Temperature     float32
+	Files           []*FileData         // Attachment files
+	NotifyChan      chan<- StreamNotify // Sub Channel to send notifications
+	DataChan        chan<- StreamData   // Sub Channel to receive streamed text data
+	ProceedChan     <-chan bool         // Sub Channel to receive proceed signal
+	SearchEngine    SearchEngine        // Search engine name
+	ToolsUse        ToolsUse            // Use tools
+	UseCodeTool     bool                // Use code tool
+	MaxRecursions   int                 // Maximum number of recursions for model calls
+	Markdown        *Markdown           // Markdown renderer
+	TokenUsage      *TokenUsage         // Token usage metainfo
+	Std             *StdRenderer        // Standard renderer
+	OutputFile      *FileRenderer       // File renderer
+	Status          StatusStack         // Stack to manage streaming status
+	Indicator       *Indicator          // Indicator Spinner
+	LastWrittenData string              // Last written data
 }
 
 func constructSearchEngine(searchEngine *map[string]any) *SearchEngine {
@@ -328,6 +329,7 @@ WriteText writes the given text to the Agent's Std, Markdown, and OutputFile wri
 func (ag *Agent) WriteText(text string) {
 	if ag.Std != nil {
 		ag.Std.Writef("%s", text)
+		ag.LastWrittenData = text
 	}
 	if ag.Markdown != nil {
 		ag.Markdown.Writef("%s", text)
@@ -404,7 +406,9 @@ func (ag *Agent) WriteEnd() {
 	// the % character in shells like zsh when output doesn't end with newline
 	//if ag.Std != nil && ag.Markdown == nil && ag.TokenUsage == nil {
 	if ag.Std != nil {
-		ag.Std.Writeln()
+		if !EndWithNewline(ag.LastWrittenData) {
+			ag.Std.Writeln()
+		}
 	}
 }
 
