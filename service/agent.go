@@ -37,8 +37,7 @@ type Agent struct {
 	DataChan      chan<- StreamData   // Sub Channel to receive streamed text data
 	ProceedChan   <-chan bool         // Sub Channel to receive proceed signal
 	SearchEngine  SearchEngine        // Search engine name
-	UseSearchTool bool                // Use search tool
-	UseTools      bool                // Use tools
+	ToolsUse      ToolsUse            // Use tools
 	UseCodeTool   bool                // Use code tool
 	MaxRecursions int                 // Maximum number of recursions for model calls
 	TokenUsage    TokenUsage          // Token usage metainfo
@@ -85,7 +84,7 @@ func constructSearchEngine(searchEngine *map[string]any) *SearchEngine {
 }
 
 func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo map[string]any, searchEngine map[string]any,
-	useTools bool, maxRecursions int, renderUsage bool, renderMarkdown bool) {
+	useTools bool, skipToolsConfirm bool, maxRecursions int, renderUsage bool, renderMarkdown bool) {
 	var temperature float32
 	switch temp := modelInfo["temperature"].(type) {
 	case float64:
@@ -103,6 +102,7 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 
 	// Set up search engine settings
 	se := constructSearchEngine(&searchEngine)
+	toolsUse := ToolsUse{Enable: useTools, AutoApprove: skipToolsConfirm}
 
 	// Set up code tool settings
 	exeCode := IsCodeExecutionEnabled()
@@ -132,8 +132,7 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 		DataChan:      dataCh,
 		ProceedChan:   proceedCh,
 		SearchEngine:  *se,
-		UseSearchTool: se.UseSearch,
-		UseTools:      useTools,
+		ToolsUse:      toolsUse,
 		UseCodeTool:   exeCode,
 		MaxRecursions: maxRecursions,
 		TokenUsage:    tu,

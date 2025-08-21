@@ -274,9 +274,6 @@ func processQuery(prompt string, files []*service.FileData) {
 	sys_prompt := GetEffectiveSystemPrompt()
 	maxRecursions := GetMaxRecursions()
 
-	// Set whether or not to skip tools confirmation
-	service.SetSkipToolsConfirm(confirmToolsFlag)
-
 	// tools (Contains web_search tool)
 	useTools := AreToolsEnabled()
 
@@ -297,7 +294,7 @@ func processQuery(prompt string, files []*service.FileData) {
 	// Include markdown
 	includeMarkdown := IncludeMarkdown()
 
-	service.CallAgent(prompt, sys_prompt, files, modelInfo, searchEngine, useTools, maxRecursions, includeUsage, includeMarkdown)
+	service.CallAgent(prompt, sys_prompt, files, modelInfo, searchEngine, useTools, confirmToolsFlag, maxRecursions, includeUsage, includeMarkdown)
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
