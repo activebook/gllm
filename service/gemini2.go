@@ -116,7 +116,12 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		config.Tools = append(config.Tools, ag.getGemini2CodeExecTool())
 	}
 
-	// Create a chat session
+	// Create a chat session - this is the important part
+	// Within the chat session(multi-turn conversation)
+	// we still need to sent the entire history to the model
+	// but it won't consume tokens, because it was cached in local and remote server
+	// so gemini model would fast load the cached history KV
+	// it will only consume tokens on new input
 	chat, err := client.Chats.Create(ctx, ag.ModelName, &config, convo.History)
 	if err != nil {
 		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create chat: %v", err)}, nil)
