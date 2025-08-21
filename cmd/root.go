@@ -93,7 +93,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 			}
 
 			// Create an indeterminate progress bar
-			spinner := service.NewSpinner("Processing...")
+			indicator := service.NewIndicator("Processing...")
 
 			var files []*service.FileData
 			// Start a goroutine for your actual LLM work
@@ -179,7 +179,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 			}()
 			// Update the spinner until work is done
 			<-done
-			service.StopSpinner(spinner)
+			indicator.Stop()
 
 			// Call your LLM service here
 			processQuery(prompt, files)
@@ -294,7 +294,21 @@ func processQuery(prompt string, files []*service.FileData) {
 	// Include markdown
 	includeMarkdown := IncludeMarkdown()
 
-	service.CallAgent(prompt, sys_prompt, files, modelInfo, searchEngine, useTools, confirmToolsFlag, maxRecursions, includeUsage, includeMarkdown)
+	op := service.AgentOptions{
+		Prompt:           prompt,
+		SysPrompt:        sys_prompt,
+		Files:            files,
+		ModelInfo:        &modelInfo,
+		SearchEngine:     &searchEngine,
+		MaxRecursions:    maxRecursions,
+		UseTools:         useTools,
+		SkipToolsConfirm: confirmToolsFlag,
+		AppendUsage:      includeUsage,
+		AppendMarkdown:   includeMarkdown,
+		OutputFile:       "",
+		QuietMode:        false,
+	}
+	service.CallAgent(&op)
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

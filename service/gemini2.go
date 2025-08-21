@@ -100,10 +100,11 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		config.Tools = append(config.Tools, ag.getGemini2Tools()...)
 		if ag.SearchEngine.UseSearch {
 			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
-			Warnf("%s", "Embedding tools are enabled.\n"+
-				"Because embedding tools is not compatible with Google Search tool,"+
-				" so Google Search is unavailable now.\n"+
-				"Please disable embedding tools to use Google Search.")
+			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn,
+				Data: fmt.Sprint("Embedding tools are enabled.\n" +
+					"Because embedding tools is not compatible with Google Search tool," +
+					" so Google Search is unavailable now.\n" +
+					"Please disable embedding tools if want to use Google Search.")}, nil)
 		}
 	} else if ag.SearchEngine.UseSearch {
 		// only load search tool
@@ -172,7 +173,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 			// Handle tool call
 			funcResp, err := ag.processGemini2ToolCall(funcCall)
 			if err != nil {
-				Warnf("Processing tool call: %v\n", err)
+				ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
 				// Send error info to user but continue processing other tool calls
 				continue
 			}
@@ -195,7 +196,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	}
 
 	// Record token usage
-	if finalResp != nil && finalResp.UsageMetadata != nil {
+	if finalResp != nil && finalResp.UsageMetadata != nil && ag.TokenUsage != nil {
 		ag.TokenUsage.RecordTokenUsage(int(finalResp.UsageMetadata.PromptTokenCount),
 			int(finalResp.UsageMetadata.CandidatesTokenCount),
 			int(finalResp.UsageMetadata.CachedContentTokenCount),

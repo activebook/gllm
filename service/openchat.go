@@ -214,7 +214,7 @@ func (c *OpenChat) process(ag *Agent) error {
 			for _, toolCall := range *toolCalls {
 				toolMessage, err := c.processToolCall(toolCall)
 				if err != nil {
-					Warnf("Processing tool call: %v\n", err)
+					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
 					// Send error info to user but continue processing other tool calls
 					continue
 				}
@@ -242,7 +242,7 @@ func (c *OpenChat) process(ag *Agent) error {
 	}
 
 	// Record token usage
-	if finalResp != nil && finalResp.Usage != nil {
+	if finalResp != nil && finalResp.Usage != nil && ag.TokenUsage != nil {
 		ag.TokenUsage.RecordTokenUsage(int(finalResp.Usage.PromptTokens),
 			int(finalResp.Usage.CompletionTokens),
 			int(finalResp.Usage.PromptTokensDetails.CachedTokens),
