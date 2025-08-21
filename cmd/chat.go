@@ -122,6 +122,10 @@ Special commands:
 
 var ()
 
+const (
+	_gllmChatPrompt = "\033[96mgllm>\033[0m "
+)
+
 func init() {
 	rootCmd.AddCommand(chatCmd)
 
@@ -150,7 +154,7 @@ func (ci *ChatInfo) startREPL() {
 	ci.showHelp()
 	fmt.Println()
 
-	rl, err := readline.New("gllm> ")
+	rl, err := readline.New(_gllmChatPrompt)
 	if err != nil {
 		fmt.Printf("Error initializing readline: %v\n", err)
 		return
@@ -161,7 +165,7 @@ func (ci *ChatInfo) startREPL() {
 	multilineMode := false
 
 	for {
-		prompt := "gllm> "
+		prompt := _gllmChatPrompt
 		if multilineMode {
 			prompt = "... "
 		}
