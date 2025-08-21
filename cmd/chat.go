@@ -73,9 +73,6 @@ Special commands:
 				}
 			}
 
-			// Set whether or not to skip tools confirmation
-			service.SetSkipToolsConfirm(confirmToolsFlag)
-
 			if !toolsFlag {
 				// if tools flag are not set, check if they are enabled globally
 				toolsFlag = AreToolsEnabled()
@@ -570,10 +567,10 @@ func (ci *ChatInfo) setUseTools(useTools string) {
 
 			// Set whether or not to skip tools confirmation
 		case "confirm":
-			service.SetSkipToolsConfirm(false)
+			confirmToolsFlag = false
 			fmt.Print("Tool operations would need confirmation\n")
 		case "skip":
-			service.SetSkipToolsConfirm(true)
+			confirmToolsFlag = true
 			fmt.Print("Tool confirmation would skip\n")
 		}
 	} else {
@@ -717,7 +714,7 @@ func (ci *ChatInfo) callLLM(input string) {
 	// Include markdown
 	includeMarkdown := IncludeMarkdown()
 
-	service.CallAgent(finalPrompt.String(), sys_prompt, ci.Files, modelInfo, searchEngine, useTools, ci.maxRecursions, includeUsage, includeMarkdown)
+	service.CallAgent(finalPrompt.String(), sys_prompt, ci.Files, modelInfo, searchEngine, useTools, confirmToolsFlag, ci.maxRecursions, includeUsage, includeMarkdown)
 
 	// We must reset the files after processing
 	// We shouldn't pass the files to the next call each time

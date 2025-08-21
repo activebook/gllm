@@ -33,7 +33,7 @@ func (ag *Agent) getGemini2Tools() []*genai.Tool {
 	var tools []*genai.Tool
 
 	// Add web search tool
-	// tools = append(tools, ll.getGemini2WebSearchTool())
+	// tools = append(tools, ag.getGemini2WebSearchTool())
 
 	// Add shell tool
 	tools = append(tools, ag.getGemini2ShellTool())
@@ -526,7 +526,7 @@ func (ag *Agent) processGemini2WriteFileToolCall(call *genai.FunctionCall) (*gen
 		needConfirm = true
 	}
 
-	if needConfirm && !skipToolsConfirm {
+	if needConfirm && !ag.ToolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("write to file %s", path), fmt.Sprintf("write content to the file at path: %s", path))
 		resp.Response = map[string]any{
@@ -653,7 +653,7 @@ func (ag *Agent) processGemini2DeleteFileToolCall(call *genai.FunctionCall) (*ge
 		needConfirm = true
 	}
 
-	if needConfirm && !skipToolsConfirm {
+	if needConfirm && !ag.ToolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("delete file %s", path), fmt.Sprintf("delete the file at path: %s", path))
 		resp.Response = map[string]any{
@@ -700,7 +700,7 @@ func (ag *Agent) processGemini2DeleteDirectoryToolCall(call *genai.FunctionCall)
 		needConfirm = true
 	}
 
-	if needConfirm && !skipToolsConfirm {
+	if needConfirm && !ag.ToolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("delete directory %s", path), fmt.Sprintf("delete the directory at path: %s and all its contents", path))
 		resp.Response = map[string]any{
@@ -752,7 +752,7 @@ func (ag *Agent) processGemini2MoveToolCall(call *genai.FunctionCall) (*genai.Fu
 		needConfirm = true
 	}
 
-	if needConfirm && !skipToolsConfirm {
+	if needConfirm && !ag.ToolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("move %s to %s", source, destination), fmt.Sprintf("move the file or directory from %s to %s", source, destination))
 		resp.Response = map[string]any{
@@ -969,7 +969,7 @@ func (ag *Agent) processGemini2ShellToolCall(call *genai.FunctionCall) (*genai.F
 		// there is no need_confirm parameter, so we assume it's false
 		needConfirm = false
 	}
-	if needConfirm && !skipToolsConfirm {
+	if needConfirm && !ag.ToolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
 		descStr, ok := call.Args["purpose"].(string)
 		if !ok {
@@ -1091,7 +1091,7 @@ func (ag *Agent) processGemini2EditFileToolCall(call *genai.FunctionCall) (*gena
 	}
 
 	// If confirmation is needed, ask the user before proceeding
-	if needConfirm && !skipToolsConfirm {
+	if needConfirm && !ag.ToolsUse.AutoApprove {
 		var editsDescription strings.Builder
 		editsDescription.WriteString("The following edits will be applied to the file:\n")
 		for _, editInterface := range editsInterface {
@@ -1264,7 +1264,7 @@ func (ag *Agent) processGemini2CopyToolCall(call *genai.FunctionCall) (*genai.Fu
 		needConfirm = true
 	}
 
-	if needConfirm && !skipToolsConfirm {
+	if needConfirm && !ag.ToolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("copy %s to %s", source, destination), fmt.Sprintf("copy the file or directory from %s to %s", source, destination))
 		resp.Response = map[string]any{

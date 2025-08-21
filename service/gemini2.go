@@ -95,17 +95,17 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	// - Else if UseSearchTool is true, enable Google Search.
 	// - Else if UseCodeTool is true, enable code execution.
 	// CodeExecution and GoogleSearch cannot be enabled simultaneously.
-	if ag.UseTools {
+	if ag.ToolsUse.Enable {
 		// load embedding Tools
 		config.Tools = append(config.Tools, ag.getGemini2Tools()...)
-		if ag.UseSearchTool {
+		if ag.SearchEngine.UseSearch {
 			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
 			Warnf("%s", "Embedding tools are enabled.\n"+
 				"Because embedding tools is not compatible with Google Search tool,"+
 				" so Google Search is unavailable now.\n"+
 				"Please disable embedding tools to use Google Search.")
 		}
-	} else if ag.UseSearchTool {
+	} else if ag.SearchEngine.UseSearch {
 		// only load search tool
 		// **Remember: google doesn't support web_search tool plus function call
 		// Function call is not compatible with Google Search tool

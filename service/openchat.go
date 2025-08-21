@@ -60,11 +60,11 @@ func (ag *Agent) GenerateOpenChatStream() error {
 
 	// Create a tool with the function
 	tools := []*model.Tool{}
-	if ag.UseTools {
+	if ag.ToolsUse.Enable {
 		// Add embedding operation tools, which includes the web_search tool
 		embeddingTools := ag.getOpenChatTools()
 		tools = append(tools, embeddingTools...)
-	} else if ag.UseSearchTool {
+	} else if ag.SearchEngine.UseSearch {
 		// Only add the search tool if general tools are not enabled,
 		// but the search flag is explicitly set.
 		searchTool := ag.getOpenChatWebSearchTool()
@@ -79,6 +79,7 @@ func (ag *Agent) GenerateOpenChatStream() error {
 		data:       ag.DataChan,
 		proceed:    ag.ProceedChan,
 		search:     &ag.SearchEngine,
+		toolsUse:   &ag.ToolsUse,
 		queries:    make([]string, 0),
 		references: make([]map[string]interface{}, 0), // Updated to match new field type
 		status:     &ag.Status,
@@ -157,6 +158,7 @@ type OpenChat struct {
 	data       chan<- StreamData        // Sub Channel to send data
 	proceed    <-chan bool              // Main Channel to receive proceed signal
 	search     *SearchEngine            // Search engine
+	toolsUse   *ToolsUse                // Use tools
 	queries    []string                 // List of queries to be sent to the AI assistant
 	references []map[string]interface{} // keep track of the references
 	status     *StatusStack             // Stack to manage streaming status
