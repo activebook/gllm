@@ -83,4 +83,9 @@ func Contains(list []string, item string) bool {
 func HasContent(s *string) bool {
 	return s != nil && *s != ""
 }
+
+func EndWithNewline(s string) bool {
+	return strings.HasSuffix(s, "\n")
+}
+
 func Ptr[T any](t T) *T { return &t }

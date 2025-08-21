@@ -10,10 +10,19 @@ type TokenUsage struct {
 	CachedTokens  int
 	ThoughtTokens int
 	TotalTokens   int
-	RenderUsage   bool
 }
 
 const ()
+
+func NewTokenUsage() *TokenUsage {
+	return &TokenUsage{
+		InputTokens:   0,
+		OutputTokens:  0,
+		CachedTokens:  0,
+		ThoughtTokens: 0,
+		TotalTokens:   0,
+	}
+}
 
 func (tu *TokenUsage) getTokenUsage() string {
 	if tu.TotalTokens > 0 {
@@ -79,12 +88,10 @@ func (tu *TokenUsage) getTokenUsageBox() string {
 	return ""
 }
 
-func (tu *TokenUsage) RenderTokenUsage() {
-	if tu.RenderUsage {
-		// Get the token usage
-		usage := tu.getTokenUsage()
-		fmt.Println(usage)
-	}
+func (tu *TokenUsage) Render(render Render) {
+	// Get the token usage
+	usage := tu.getTokenUsage()
+	render.Writeln(usage)
 }
 
 func (tu *TokenUsage) RecordTokenUsage(input, output, cached, thought int) {

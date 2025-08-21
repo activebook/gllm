@@ -26,24 +26,27 @@ type StreamData struct {
 }
 
 type Agent struct {
-	ApiKey        string
-	EndPoint      string
-	ModelName     string
-	SystemPrompt  string
-	UserPrompt    string
-	Temperature   float32
-	Files         []*FileData         // Attachment files
-	NotifyChan    chan<- StreamNotify // Sub Channel to send notifications
-	DataChan      chan<- StreamData   // Sub Channel to receive streamed text data
-	ProceedChan   <-chan bool         // Sub Channel to receive proceed signal
-	SearchEngine  SearchEngine        // Search engine name
-	ToolsUse      ToolsUse            // Use tools
-	UseCodeTool   bool                // Use code tool
-	MaxRecursions int                 // Maximum number of recursions for model calls
-	TokenUsage    TokenUsage          // Token usage metainfo
-	Std           *StdRenderer        // Standard renderer
-	Markdown      *MarkdownRenderer   // Markdown renderer
-	Status        StatusStack         // Stack to manage streaming status
+	ApiKey          string
+	EndPoint        string
+	ModelName       string
+	SystemPrompt    string
+	UserPrompt      string
+	Temperature     float32
+	Files           []*FileData         // Attachment files
+	NotifyChan      chan<- StreamNotify // Sub Channel to send notifications
+	DataChan        chan<- StreamData   // Sub Channel to receive streamed text data
+	ProceedChan     <-chan bool         // Sub Channel to receive proceed signal
+	SearchEngine    SearchEngine        // Search engine name
+	ToolsUse        ToolsUse            // Use tools
+	UseCodeTool     bool                // Use code tool
+	MaxRecursions   int                 // Maximum number of recursions for model calls
+	Markdown        *Markdown           // Markdown renderer
+	TokenUsage      *TokenUsage         // Token usage metainfo
+	Std             *StdRenderer        // Standard renderer
+	OutputFile      *FileRenderer       // File renderer
+	Status          StatusStack         // Stack to manage streaming status
+	Indicator       *Indicator          // Indicator Spinner
+	LastWrittenData string              // Last written data
 }
 
 func constructSearchEngine(searchEngine *map[string]any) *SearchEngine {
@@ -83,10 +86,24 @@ func constructSearchEngine(searchEngine *map[string]any) *SearchEngine {
 	return &se
 }
 
-func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo map[string]any, searchEngine map[string]any,
-	useTools bool, skipToolsConfirm bool, maxRecursions int, renderUsage bool, renderMarkdown bool) {
+type AgentOptions struct {
+	Prompt           string
+	SysPrompt        string
+	Files            []*FileData
+	ModelInfo        *map[string]any
+	SearchEngine     *map[string]any
+	MaxRecursions    int
+	UseTools         bool
+	SkipToolsConfirm bool
+	AppendMarkdown   bool
+	AppendUsage      bool
+	OutputFile       string
+	QuietMode        bool
+}
+
+func CallAgent(op *AgentOptions) {
 	var temperature float32
-	switch temp := modelInfo["temperature"].(type) {
+	switch temp := (*op.ModelInfo)["temperature"].(type) {
 	case float64:
 		temperature = float32(temp)
 	case int:
@@ -101,8 +118,8 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 	}
 
 	// Set up search engine settings
-	se := constructSearchEngine(&searchEngine)
-	toolsUse := ToolsUse{Enable: useTools, AutoApprove: skipToolsConfirm}
+	se := constructSearchEngine(op.SearchEngine)
+	toolsUse := ToolsUse{Enable: op.UseTools, AutoApprove: op.SkipToolsConfirm}
 
 	// Set up code tool settings
 	exeCode := IsCodeExecutionEnabled()
@@ -116,35 +133,63 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 	activeNotifyCh := notifyCh
 	activeDataCh := dataCh
 
-	tu := TokenUsage{RenderUsage: renderUsage}
-	std := NewStdRenderer()
-	markdown := NewMarkdownRenderer(renderMarkdown)
+	// Only create StdRenderer if not in quiet mode
+	var indicator *Indicator
+	var std *StdRenderer
+	if !op.QuietMode {
+		std = NewStdRenderer()
+		indicator = NewIndicator("Processing...")
+	}
+
+	// Need to append markdown
+	var markdown *Markdown
+	if op.AppendMarkdown {
+		markdown = NewMarkdown()
+	}
+
+	// Need to append token usage
+	var tu *TokenUsage
+	if op.AppendUsage {
+		tu = NewTokenUsage()
+	}
+
+	// Need to output a file
+	var fileRenderer *FileRenderer
+	if op.OutputFile != "" {
+		var err error
+		fileRenderer, err = NewFileRenderer(op.OutputFile)
+		if err != nil {
+			Errorf("Failed to create output file %s: %v\n", op.OutputFile, err)
+			return
+		}
+		defer fileRenderer.Close()
+	}
 
 	ag := Agent{
-		ApiKey:        modelInfo["key"].(string),
-		EndPoint:      modelInfo["endpoint"].(string),
-		ModelName:     modelInfo["model"].(string),
-		SystemPrompt:  sys_prompt,
-		UserPrompt:    prompt,
+		ApiKey:        (*op.ModelInfo)["key"].(string),
+		EndPoint:      (*op.ModelInfo)["endpoint"].(string),
+		ModelName:     (*op.ModelInfo)["model"].(string),
+		SystemPrompt:  op.SysPrompt,
+		UserPrompt:    op.Prompt,
 		Temperature:   temperature,
-		Files:         files,
+		Files:         op.Files,
 		NotifyChan:    notifyCh,
 		DataChan:      dataCh,
 		ProceedChan:   proceedCh,
 		SearchEngine:  *se,
 		ToolsUse:      toolsUse,
 		UseCodeTool:   exeCode,
-		MaxRecursions: maxRecursions,
+		MaxRecursions: op.MaxRecursions,
+		Markdown:      markdown,
 		TokenUsage:    tu,
 		Std:           std,
-		Markdown:      markdown,
+		OutputFile:    fileRenderer,
 		Status:        StatusStack{},
+		Indicator:     indicator,
 	}
 
 	// Check if the endpoint is compatible with OpenAI
 	provider := DetectModelProvider(ag.EndPoint)
-
-	spinner := NewSpinner("Processing...")
 
 	// Start the generation in a goroutine
 	go func() {
@@ -192,14 +237,16 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 			switch data.Type {
 			case DataTypeNormal:
 				// Render the streamed text and save to markdown buffer
-				ag.Std.RenderString("%s", data.Text)
-				ag.Markdown.RenderString("%s", data.Text)
+				ag.WriteText(data.Text)
+
 			case DataTypeReasoning:
 				// Reasoning data don't need to be saved to markdown buffer
-				fmt.Print(inReasoningColor + data.Text) // Print the streamed text
+				ag.WriteReasoning(data.Text)
+
 			case DataTypeFinished:
 				// Wait all data to be processed(flush)
 				// This is important, otherwise notify will be processed before data finished
+				ag.WriteEnd()
 				proceedCh <- true
 			default:
 				// Handle other data types if needed
@@ -224,42 +271,41 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 
 			switch notify.Status {
 			case StatusProcessing:
-				StartSpinner(spinner, "Processing...")
+				ag.StartIndicator("Processing...")
 				proceedCh <- true
 			case StatusStarted:
-				StopSpinner(spinner)
+				ag.StopIndicator()
 				proceedCh <- true
+			case StatusWarn:
+				// Just show warning
+				ag.Warn(notify.Data)
 			case StatusError:
-				StopSpinner(spinner)
-				Errorf("Stream error: %v\n", notify.Data)
+				// Error happened, stop
+				ag.StopIndicator()
+				ag.Error(notify.Data)
 				return
 			case StatusFinished:
-				StopSpinner(spinner)
+				ag.StopIndicator()
 				// Render the markdown
-				ag.Markdown.RenderMarkdown()
+				ag.WriteMarkdown()
 				// Render the token usage
-				ag.TokenUsage.RenderTokenUsage()
+				ag.WriteUsage()
 				return // Exit when stream is done
 			case StatusReasoning:
-				StopSpinner(spinner)
-				// Start with in-progress color
-				fmt.Println(completeColor + "Thinking ↓")
+				ag.StopIndicator()
+				// Start with Thinking color
+				ag.StartReasoning()
 				proceedCh <- true
 			case StatusReasoningOver:
-				// Switch to complete color at the end
-				fmt.Print(resetColor)
-				fmt.Printf(completeColor + "✓" + resetColor)
-				fmt.Println()
+				// Complete Thinking color at the end
+				ag.CompleteReasoning()
 				proceedCh <- true
 			case StatusFunctionCalling:
-				fmt.Print(resetColor)
-				fmt.Println()
-				fmt.Print(inCallingColor + notify.Data + resetColor) // Print the function call message
-				fmt.Println()
-				StartSpinner(spinner, "Function Calling...")
+				ag.WriteFunctionCall(notify.Data)
+				ag.StartIndicator("Function Calling...")
 				proceedCh <- true
 			case StatusFunctionCallingOver:
-				StopSpinner(spinner)
+				ag.StopIndicator()
 				proceedCh <- true
 			}
 
@@ -275,5 +321,123 @@ func CallAgent(prompt string, sys_prompt string, files []*FileData, modelInfo ma
 			// Dont' do it!!!
 		}
 	}
+}
 
+/*
+WriteText writes the given text to the Agent's Std, Markdown, and OutputFile writers if they are set.
+*/
+func (ag *Agent) WriteText(text string) {
+	if ag.Std != nil {
+		ag.Std.Writef("%s", text)
+		ag.LastWrittenData = text
+	}
+	if ag.Markdown != nil {
+		ag.Markdown.Writef("%s", text)
+	}
+	if ag.OutputFile != nil {
+		ag.OutputFile.Writef("%s", text)
+	}
+}
+
+/*
+StartReasoning notifies the user and logs to file that the agent has started thinking.
+It writes a status message to both Std and OutputFile if they are available.
+*/
+func (ag *Agent) StartReasoning() {
+	if ag.Std != nil {
+		ag.Std.Writeln(completeColor + "Thinking ↓")
+	}
+	if ag.OutputFile != nil {
+		ag.OutputFile.Writeln("Thinking ↓")
+	}
+}
+
+func (ag *Agent) CompleteReasoning() {
+	if ag.Std != nil {
+		ag.Std.Writeln(resetColor + completeColor + "✓" + resetColor)
+	}
+	if ag.OutputFile != nil {
+		ag.OutputFile.Writeln("✓")
+	}
+}
+
+/*
+WriteReasoning writes the provided reasoning text to both the standard output and an output file, applying specific formatting to each if they are available.
+*/
+func (ag *Agent) WriteReasoning(text string) {
+	if ag.Std != nil {
+		ag.Std.Writef("%s%s", inReasoningColor, text)
+	}
+	if ag.OutputFile != nil {
+		ag.OutputFile.Writef("%s", text)
+	}
+}
+
+func (ag *Agent) WriteMarkdown() {
+	// Render the markdown
+	if ag.Markdown != nil {
+		if ag.Std != nil {
+			ag.Markdown.Render(ag.Std)
+		}
+	}
+}
+
+func (ag *Agent) WriteUsage() {
+	// Render the token usage
+	if ag.TokenUsage != nil {
+		if ag.Std != nil {
+			ag.TokenUsage.Render(ag.Std)
+		}
+	}
+}
+
+func (ag *Agent) WriteFunctionCall(text string) {
+	if ag.Std != nil {
+		ag.Std.Writeln(resetColor)
+		ag.Std.Writeln(inCallingColor + text + resetColor)
+	}
+	if ag.OutputFile != nil {
+		ag.OutputFile.Writef("\n%s\n", text)
+	}
+}
+
+func (ag *Agent) WriteEnd() {
+	// Ensure output ends with a newline to prevent shell from displaying %
+	// the % character in shells like zsh when output doesn't end with newline
+	//if ag.Std != nil && ag.Markdown == nil && ag.TokenUsage == nil {
+	if ag.Std != nil {
+		if !EndWithNewline(ag.LastWrittenData) {
+			ag.Std.Writeln()
+		}
+	}
+}
+
+func (ag *Agent) StartIndicator(text string) {
+	if ag.Indicator != nil {
+		ag.Indicator.Start(text)
+	}
+}
+
+func (ag *Agent) StopIndicator() {
+	if ag.Indicator != nil {
+		ag.Indicator.Stop()
+	}
+}
+
+func (ag *Agent) Error(text string) {
+	if ag.Std != nil {
+		Errorf("Stream error: %v\n", text)
+	}
+	if ag.OutputFile != nil {
+		ag.OutputFile.Writef("\n%s\n", text)
+	}
+}
+
+func (ag *Agent) Warn(text string) {
+	if ag.Std != nil {
+		Warnf("%s", text)
+	}
+	if ag.OutputFile != nil {
+		ag.OutputFile.Writef("\n%s\n", text)
+	}
 }

@@ -42,7 +42,7 @@ Special commands:
 !<command> - Execute a shell command directly`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Create an indeterminate progress bar
-		spinner := service.NewSpinner("Processing...")
+		indicator := service.NewIndicator("Processing...")
 
 		files := []*service.FileData{}
 		// Start a goroutine for your actual LLM work
@@ -110,7 +110,7 @@ Special commands:
 		}()
 		// Update the spinner until work is done
 		<-done
-		service.StopSpinner(spinner)
+		indicator.Stop()
 
 		// Build the ChatInfo object
 		chatInfo := buildChatInfo(files)
@@ -714,7 +714,22 @@ func (ci *ChatInfo) callLLM(input string) {
 	// Include markdown
 	includeMarkdown := IncludeMarkdown()
 
-	service.CallAgent(finalPrompt.String(), sys_prompt, ci.Files, modelInfo, searchEngine, useTools, confirmToolsFlag, ci.maxRecursions, includeUsage, includeMarkdown)
+	op := service.AgentOptions{
+		Prompt:           finalPrompt.String(),
+		SysPrompt:        sys_prompt,
+		Files:            ci.Files,
+		ModelInfo:        &modelInfo,
+		SearchEngine:     &searchEngine,
+		MaxRecursions:    ci.maxRecursions,
+		UseTools:         useTools,
+		SkipToolsConfirm: confirmToolsFlag,
+		AppendUsage:      includeUsage,
+		AppendMarkdown:   includeMarkdown,
+		OutputFile:       "",
+		QuietMode:        false,
+	}
+
+	service.CallAgent(&op)
 
 	// We must reset the files after processing
 	// We shouldn't pass the files to the next call each time
