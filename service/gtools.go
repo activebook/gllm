@@ -33,7 +33,7 @@ func (ag *Agent) getGemini2Tools() []*genai.Tool {
 	var tools []*genai.Tool
 
 	// Add web search tool
-	// tools = append(tools, ll.getGemini2WebSearchTool())
+	// tools = append(tools, ag.getGemini2WebSearchTool())
 
 	// Add shell tool
 	tools = append(tools, ag.getGemini2ShellTool())
