@@ -99,7 +99,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		ThinkingConfig: &genai.ThinkingConfig{
 			// Let model decide how to allocate tokens
 			//ThinkingBudget:  genai.Ptr[int32](8000),
-			IncludeThoughts: true,
+			IncludeThoughts: ag.ThinkMode,
 		},
 		Tools: []*genai.Tool{
 			// Placeholder

@@ -26,31 +26,23 @@ func init() {
 	rootCmd.AddCommand(markdownCmd)
 	markdownCmd.AddCommand(markdownOnCmd)
 	markdownCmd.AddCommand(markdownOffCmd)
-	markdownCmd.AddCommand(markdownOnlyCmd)
 }
 
 var markdownCmd = &cobra.Command{
 	Use:   "markdown",
 	Short: "Whether to include Markdown formatting in the output",
 	Long: `When Markdown is switched on, the output will include a Markdown-formatted version.
-When Markdown is switched off, the output will not include any Markdown formatting.
-
-*Ps. If set Markdown 'only', then only keep the Markdown-formatted content.*`,
+When Markdown is switched off, the output will not include any Markdown formatting.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
 		fmt.Println("-------------------------------------------")
 		fmt.Print("Markdown output is currently switched: ")
-		mark := viper.GetString("agent.markdown")
-		switch mark {
-		case "on":
+		mark := viper.GetBool("agent.markdown")
+		if mark {
 			fmt.Println(switchOnColor + "on" + resetColor)
-		case "only":
-			fmt.Println(switchOnlyColor + "only" + resetColor)
-		case "off":
+		} else {
 			fmt.Println(switchOffColor + "off" + resetColor)
-		default:
-			fmt.Println(switchOffColor + "off" + resetColor)
-		} // switch
+		}
 	},
 }
 
@@ -58,7 +50,7 @@ var markdownOnCmd = &cobra.Command{
 	Use:   "on",
 	Short: "Switch markdown output on",
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("agent.markdown", "on")
+		viper.Set("agent.markdown", true)
 
 		// Write the config file
 		if err := writeConfig(); err != nil {
@@ -74,7 +66,7 @@ var markdownOffCmd = &cobra.Command{
 	Use:   "off",
 	Short: "Switch markdown output off",
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("agent.markdown", "off")
+		viper.Set("agent.markdown", false)
 
 		// Write the config file
 		if err := writeConfig(); err != nil {
@@ -86,51 +78,18 @@ var markdownOffCmd = &cobra.Command{
 	},
 }
 
-var markdownOnlyCmd = &cobra.Command{
-	Use:   "only",
-	Short: "Switch markdown output to only",
-	Long:  `If set Markdown 'only', then only keep the Markdown-formatted content.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("agent.markdown", "only")
-
-		// Write the config file
-		if err := writeConfig(); err != nil {
-			service.Errorf("failed to save markdown format output: %w", err)
-			return
-		}
-
-		fmt.Println("Makedown output switched " + switchOnlyColor + "only" + resetColor)
-	},
-}
-
-func SwitchMarkdown(s string) error {
-	if s == "on" {
-		viper.Set("agent.markdown", "on")
-	} else if s == "only" {
-		viper.Set("agent.markdown", "only")
-	} else {
-		viper.Set("agent.markdown", "off")
+func SwitchMarkdown(s string) {
+	switch s {
+	case "on":
+		markdownOnCmd.Run(markdownCmd, []string{})
+	case "off":
+		markdownOffCmd.Run(markdownCmd, []string{})
+	default:
+		markdownCmd.Run(markdownCmd, []string{})
 	}
-
-	// Write the config file
-	if err := writeConfig(); err != nil {
-		service.Errorf("failed to save markdown format output: %w", err)
-		return err
-	}
-	return nil
-}
-
-func GetMarkdownSwitch() string {
-	mark := viper.GetString("agent.markdown")
-	return mark
 }
 
 func IncludeMarkdown() bool {
-	mark := viper.GetString("agent.markdown")
-	return mark == "on"
-}
-
-func IncludeMarkdownOnly() bool {
-	mark := viper.GetString("agent.markdown")
-	return mark == "only"
+	mark := viper.GetBool("agent.markdown")
+	return mark
 }

@@ -39,6 +39,7 @@ type Agent struct {
 	SearchEngine    SearchEngine        // Search engine name
 	ToolsUse        ToolsUse            // Use tools
 	UseCodeTool     bool                // Use code tool
+	ThinkMode       bool                // Think mode
 	MaxRecursions   int                 // Maximum number of recursions for model calls
 	Markdown        *Markdown           // Markdown renderer
 	TokenUsage      *TokenUsage         // Token usage metainfo
@@ -93,6 +94,7 @@ type AgentOptions struct {
 	ModelInfo        *map[string]any
 	SearchEngine     *map[string]any
 	MaxRecursions    int
+	ThinkMode        bool
 	UseTools         bool
 	SkipToolsConfirm bool
 	AppendMarkdown   bool
@@ -179,6 +181,7 @@ func CallAgent(op *AgentOptions) {
 		SearchEngine:  *se,
 		ToolsUse:      toolsUse,
 		UseCodeTool:   exeCode,
+		ThinkMode:     op.ThinkMode,
 		MaxRecursions: op.MaxRecursions,
 		Markdown:      markdown,
 		TokenUsage:    tu,

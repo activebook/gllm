@@ -171,6 +171,10 @@ func (c *OpenChat) process(ag *Agent) error {
 
 	var finalResp *model.ChatCompletionStreamResponse
 
+	// For some models, there isn't thinking property
+	// So we need to check whether to add it or not
+	thinkProperty := true
+
 	// Recursively process the conversation
 	// Because the model can call tools multiple times
 	i := 0
@@ -179,21 +183,44 @@ func (c *OpenChat) process(ag *Agent) error {
 		//Debugf("Processing conversation at times: %d\n", i)
 		c.status.ChangeTo(c.notify, StreamNotify{Status: StatusProcessing}, c.proceed)
 
-		// Create the request
+		// Set whether to use thinking mode
+		var thinking *model.Thinking
+		if thinkProperty {
+			if ag.ThinkMode {
+				thinking = &model.Thinking{
+					Type: model.ThinkingTypeEnabled,
+				}
+			} else {
+				thinking = &model.Thinking{
+					Type: model.ThinkingTypeDisabled,
+				}
+			}
+		}
+		// Create the request with thinking mode
 		req := model.CreateChatCompletionRequest{
 			Model:         ag.ModelName,
 			Temperature:   &ag.Temperature,
 			Messages:      convo.Messages,
 			Tools:         c.tools,
 			StreamOptions: &model.StreamOptions{IncludeUsage: true},
-			// Thinking: &model.Thinking{
-			// 	Type: model.ThinkingTypeAuto,
-			// },
+			Thinking:      thinking,
 		}
 
 		// Make the streaming request
 		stream, err := c.client.CreateChatCompletionStream(*c.ctx, req)
-		if err != nil {
+
+		// If thinking mode caused an error, try again without thinking mode
+		if err != nil && req.Thinking != nil {
+			// Create request without thinking mode
+			// Because some models don't support the thinking property
+			req.Thinking = nil
+			stream, err = c.client.CreateChatCompletionStream(*c.ctx, req)
+			if err != nil {
+				return fmt.Errorf("stream creation error: %v", err)
+			}
+			// This model cannot add thinking property
+			thinkProperty = false
+		} else if err != nil {
 			return fmt.Errorf("stream creation error: %v", err)
 		}
 		defer stream.Close()

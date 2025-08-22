@@ -37,6 +37,7 @@ var (
 	referenceFlag    int      // gllm --reference(-r) 3 "What is the stock price of Tesla right now?"
 	convoName        string   // gllm --conversation(-c) "My Conversation" "What is the stock price of Tesla right now?"
 	confirmToolsFlag bool     // gllm --confirm-tools "Allow skipping confirmation for tool operations"
+	thinkFlag        bool     // gllm --think(-T) "Enable deep think mode"
 
 	// Global cmd instance, to be used by subcommands
 	rootCmd = &cobra.Command{
@@ -141,6 +142,12 @@ Configure your API keys and preferred models, then start chatting or executing c
 					service.EnableCodeExecution()
 				} else {
 					service.DisableCodeExecution()
+				}
+
+				// Check if think mode is enabled
+				if !thinkFlag {
+					// if think flag is not set, check if it's enabled globally
+					thinkFlag = IsThinkEnabled()
 				}
 
 				// Check if -c/--conversation was used without a value
@@ -284,6 +291,7 @@ func processQuery(prompt string, files []*service.FileData) {
 		ModelInfo:        &modelInfo,
 		SearchEngine:     &searchEngine,
 		MaxRecursions:    maxRecursions,
+		ThinkMode:        thinkFlag,
 		UseTools:         toolsFlag,
 		SkipToolsConfirm: confirmToolsFlag,
 		AppendUsage:      includeUsage,
@@ -350,6 +358,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&codeFlag, "code", "C", false, "Enable model to generate and run Python code (only for gemini)")
 	rootCmd.Flags().BoolVarP(&deepDiveFlag, "deep-dive", "", false, "Fetch more details from the search (default: off)")
 	rootCmd.Flags().BoolVarP(&confirmToolsFlag, "confirm-tools", "", false, "Skip confirmation for tool operations (default: no)")
+	rootCmd.Flags().BoolVarP(&thinkFlag, "think", "T", false, "Enable deep think mode")
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
 
 	// Add more persistent flags here if needed (e.g., --verbose, --log-file)
