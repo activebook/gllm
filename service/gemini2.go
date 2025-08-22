@@ -39,21 +39,14 @@ func (ag *Agent) getGemini2FilePart(file *FileData) genai.Part {
 	}
 }
 
-// func (ag *Agent) InitGemini2Agent() error {
-// 	// Setup the Gemini client
-// 	ctx := context.Background()
-// 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-// 		APIKey:  ag.ApiKey,
-// 		Backend: genai.BackendGeminiAPI,
-// 	})
-// 	if err != nil {
-// 		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create client: %v", err)}, nil)
-// 		return err
-// 	}
-// }
+type Gemini2Agent struct {
+	ctx    context.Context
+	client *genai.Client
+}
 
-func (ag *Agent) GenerateGemini2Stream() error {
+func (ag *Agent) initGemini2Agent() (*Gemini2Agent, error) {
 	// Setup the Gemini client
+	// In multi-turn conversation, this only needs to be done once
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:  ag.ApiKey,
@@ -61,6 +54,19 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	})
 	if err != nil {
 		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create client: %v", err)}, nil)
+		return nil, err
+	}
+	return &Gemini2Agent{
+		ctx:    ctx,
+		client: client,
+	}, nil
+}
+
+func (ag *Agent) GenerateGemini2Stream() error {
+	var err error
+	// Check the setup of Gemini client
+	ga, err := ag.initGemini2Agent()
+	if err != nil {
 		return err
 	}
 
@@ -135,7 +141,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	// but it won't consume tokens, because it was cached in local and remote server
 	// so gemini model would fast load the cached history KV
 	// it will only consume tokens on new input
-	chat, err := client.Chats.Create(ctx, ag.ModelName, &config, convo.History)
+	chat, err := ga.client.Chats.Create(ga.ctx, ag.ModelName, &config, convo.History)
 	if err != nil {
 		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create chat: %v", err)}, nil)
 		return err
@@ -155,7 +161,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	var finalResp *genai.GenerateContentResponse
 
 	for i := 0; i < maxRecursions; i++ {
-		funcCalls, resp, err := ag.processGemini2Stream(ctx, chat, streamParts, &references, &queries)
+		funcCalls, resp, err := ag.processGemini2Stream(ga.ctx, chat, streamParts, &references, &queries)
 		if err != nil {
 			return err
 		}

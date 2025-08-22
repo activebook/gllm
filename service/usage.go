@@ -24,38 +24,19 @@ func NewTokenUsage() *TokenUsage {
 	}
 }
 
-func (tu *TokenUsage) getTokenUsage() string {
-	if tu.TotalTokens > 0 {
-		return fmt.Sprintf(
-			"\n"+bbColor+
-				"┌───────────────┐\n"+
-				"│"+resetColor+"  Token Usage"+resetColor+bbColor+"  │"+"\n"+
-				"├───────────────┴───────────────────────────────────────────────────────────────────┐\n"+
-				"│"+resetColor+" Input: %s%6d%s "+bbColor+"│"+resetColor+" Output: %s%6d%s "+bbColor+"│"+resetColor+" Cached: %s%6d%s "+bbColor+"│"+resetColor+" Thought: %s%6d%s "+bbColor+"│"+resetColor+" Total: %s%6d%s "+bbColor+"│"+resetColor+"\n"+bbColor+
-				"└───────────────────────────────────────────────────────────────────────────────────┘"+
-				resetColor,
-			cyanColor, tu.InputTokens, resetColor,
-			cyanColor, tu.OutputTokens, resetColor,
-			cyanColor, tu.CachedTokens, resetColor,
-			cyanColor, tu.ThoughtTokens, resetColor,
-			cyanColor, tu.TotalTokens, resetColor,
-		)
-	}
-	return ""
-}
-
 func (tu *TokenUsage) getTokenUsageTip() string {
 	if tu.TotalTokens > 0 {
+		cachedPercentage := float64(tu.CachedTokens) / float64(tu.TotalTokens) * 100
 		return fmt.Sprintf(
 			bbColor+"\n"+
-				"┌───────────────────────────────────────────────────────────────────────────────────┐\n"+
-				"│"+resetColor+cyanColor+" Token Usage"+resetColor+bbColor+"                                                                 │\n"+
-				"│"+resetColor+" Input: %s%6d%s "+bbColor+"│"+resetColor+" Output: %s%6d%s "+bbColor+"│"+resetColor+" Cached: %s%6d%s "+bbColor+"│"+resetColor+" Thought: %s%6d%s "+bbColor+"│"+resetColor+" Total: %s%6d%s "+bbColor+"│"+resetColor+"\n"+bbColor+
-				"└───────────────────────────────────────────────────────────────────────────────────┘"+
+				"┌──────────────────────────────────────────────────────────────────────────────────────────┐\n"+
+				"│"+resetColor+cyanColor+" Token Usage"+resetColor+bbColor+"                                                                              │\n"+
+				"│"+resetColor+" Input: %s%6d%s "+bbColor+"│"+resetColor+" Output: %s%6d%s "+bbColor+"│"+resetColor+" Cached: %s%6d %s%s "+bbColor+"│"+resetColor+" Thought: %s%6d%s "+bbColor+"│"+resetColor+" Total: %s%6d%s "+bbColor+"│"+resetColor+"\n"+bbColor+
+				"└──────────────────────────────────────────────────────────────────────────────────────────┘"+
 				resetColor,
 			cyanColor, tu.InputTokens, resetColor,
 			cyanColor, tu.OutputTokens, resetColor,
-			cyanColor, tu.CachedTokens, resetColor,
+			cyanColor, tu.CachedTokens, "("+fmt.Sprintf("%3.1f%%", cachedPercentage)+")", resetColor,
 			cyanColor, tu.ThoughtTokens, resetColor,
 			cyanColor, tu.TotalTokens, resetColor,
 		)
@@ -65,24 +46,28 @@ func (tu *TokenUsage) getTokenUsageTip() string {
 
 func (tu *TokenUsage) getTokenUsageBox() string {
 	if tu.TotalTokens > 0 {
+		cachedPercentage := float64(tu.CachedTokens) / float64(tu.TotalTokens) * 100
 		return fmt.Sprintf(
 			bbColor+"\n"+
 				"┌───────────────┬────────────┐\n"+
-				"│ Token Type    │   Count    │\n"+
+				"│ %sToken Type%s    │   %sCount%s    │\n"+
 				"├───────────────┼────────────┤\n"+
-				"│ Input         │ %s%10d%s"+bbColor+" │\n"+
-				"│ Output        │ %s%10d%s"+bbColor+" │\n"+
-				"│ Cached        │ %s%10d%s"+bbColor+" │\n"+
-				"│ Thought       │ %s%10d%s"+bbColor+" │\n"+
+				"│ %sInput%s         │ %s%10d%s"+bbColor+" │\n"+
+				"│ %sOutput%s        │ %s%10d%s"+bbColor+" │\n"+
+				"│ %sCached%s        │ %s%10d%s"+bbColor+" │\n"+
+				"│               │     %s%s%s"+bbColor+" │\n"+
+				"│ %sThought%s       │ %s%10d%s"+bbColor+" │\n"+
 				"├───────────────┼────────────┤\n"+
-				"│ Total         │ %s%10d%s"+bbColor+" │\n"+
+				"│ %sTotal%s         │ %s%10d%s"+bbColor+" │\n"+
 				"└───────────────┴────────────┘"+
 				resetColor,
-			cyanColor, tu.InputTokens, resetColor,
-			cyanColor, tu.OutputTokens, resetColor,
-			cyanColor, tu.CachedTokens, resetColor,
-			cyanColor, tu.ThoughtTokens, resetColor,
-			cyanColor, tu.TotalTokens, resetColor,
+			resetColor, bbColor, resetColor, bbColor,
+			resetColor, bbColor, cyanColor, tu.InputTokens, resetColor,
+			resetColor, bbColor, cyanColor, tu.OutputTokens, resetColor,
+			resetColor, bbColor, cyanColor, tu.CachedTokens, resetColor,
+			cyanColor, "("+fmt.Sprintf("%3.1f%%", cachedPercentage)+")", resetColor,
+			resetColor, bbColor, cyanColor, tu.ThoughtTokens, resetColor,
+			resetColor, bbColor, cyanColor, tu.TotalTokens, resetColor,
 		)
 	}
 	return ""
@@ -90,7 +75,7 @@ func (tu *TokenUsage) getTokenUsageBox() string {
 
 func (tu *TokenUsage) Render(render Render) {
 	// Get the token usage
-	usage := tu.getTokenUsage()
+	usage := tu.getTokenUsageBox()
 	render.Writeln(usage)
 }
 
