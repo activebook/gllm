@@ -46,7 +46,9 @@ type Gemini2Agent struct {
 
 func (ag *Agent) initGemini2Agent() (*Gemini2Agent, error) {
 	// Setup the Gemini client
-	// In multi-turn conversation, this only needs to be done once
+	// In multi-turn conversation, even though we create it each time
+	// it can still be cached for advanced gemini models such as 2.5 flash/pro
+	// so it's a server side job
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:  ag.ApiKey,
