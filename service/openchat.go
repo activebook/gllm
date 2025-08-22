@@ -248,7 +248,7 @@ func (c *OpenChat) process(ag *Agent) error {
 	}
 	// Add references to the output if any
 	if len(c.references) > 0 {
-		refs := "\n\n" + ag.SearchEngine.RetrieveReferences(c.references) + "\n"
+		refs := "\n\n" + ag.SearchEngine.RetrieveReferences(c.references)
 		c.data <- StreamData{Text: refs, Type: DataTypeNormal}
 	}
 

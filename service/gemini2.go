@@ -209,7 +209,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 
 	// Add references to the output if any
 	if len(references) > 0 {
-		refs := "\n\n" + ag.SearchEngine.RetrieveReferences(references) + "\n"
+		refs := "\n\n" + ag.SearchEngine.RetrieveReferences(references)
 		ag.DataChan <- StreamData{Text: refs, Type: DataTypeNormal}
 	}
 
