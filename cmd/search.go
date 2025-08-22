@@ -16,6 +16,16 @@ var searchCmd = &cobra.Command{
 	Short: "Configure and manage search engines globally",
 	Long: `Configure API keys and settings for various search engines used with gllm.
 You can switch on/off whether to use search engines`,
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(cmd.Long)
+		defaultEngine := viper.GetString("agent.search")
+		fmt.Println()
+		if defaultEngine != "" {
+			fmt.Printf("Current search engine set to %s\n", switchOnColor+defaultEngine+resetColor)
+		} else {
+			fmt.Println("No search engine set.")
+		}
+	},
 }
 
 // searchOnCmd represents the command to turn on a specific search engine
