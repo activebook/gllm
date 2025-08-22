@@ -24,7 +24,7 @@ var toolsOnCmd = &cobra.Command{
 	Use:   "on",
 	Short: "Enable all tools",
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("agent.tools", "on")
+		viper.Set("agent.tools", true)
 		err := viper.WriteConfig()
 		if err != nil {
 			fmt.Printf("Error writing config: %v\n", err)
@@ -39,7 +39,7 @@ var toolsOffCmd = &cobra.Command{
 	Use:   "off",
 	Short: "Disable all tools",
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("agent.tools", "off")
+		viper.Set("agent.tools", false)
 		err := viper.WriteConfig()
 		if err != nil {
 			fmt.Printf("Error writing config: %v\n", err)
@@ -57,41 +57,19 @@ func init() {
 }
 
 func AreToolsEnabled() bool {
-	// By default, tools are enabled
-	enabled := true
-	if viper.IsSet("agent.tools") {
-		enabled = viper.GetString("agent.tools") == "on"
-	}
+	enabled := viper.GetBool("agent.tools")
 	return enabled
 }
 
-func SetToolsEnabled(enabled bool) error {
-	value := "off"
-	if enabled {
-		value = "on"
-	}
-	viper.Set("agent.tools", value)
-	if err := viper.WriteConfig(); err != nil {
-		return fmt.Errorf("failed to save tools configuration: %w", err)
-	}
-	return nil
-}
-
-func SwitchUseTools(s string) error {
+func SwitchUseTools(s string) {
 	switch s {
 	case "on":
-		viper.Set("agent.tools", "on")
+		toolsOnCmd.Run(toolsOnCmd, nil)
 	case "off":
-		viper.Set("agent.tools", "off")
+		toolsOffCmd.Run(toolsOffCmd, nil)
 	default:
-		return nil
+		toolsCmd.Run(toolsCmd, nil)
 	}
-
-	// Write the config file
-	if err := viper.WriteConfig(); err != nil {
-		return fmt.Errorf("failed to save tools configuration: %w", err)
-	}
-	return nil
 }
 
 func ListEmbeddingTools() {

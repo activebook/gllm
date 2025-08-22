@@ -30,7 +30,7 @@ Special commands:
 /clear, /reset - Clear context
 /help - Show available commands
 /history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)
-/markdown, /mark [on|off|only] - Switch whether to render markdown or not
+/markdown, /mark [on|off] - Switch whether to render markdown or not
 /system, /S <@name|prompt> - change system prompt
 /tools, /t [on|off|skip|confirm] - Switch whether to use embedding tools, skip tools confirmation
 /template, /p <@name|tmpl> - change template
@@ -327,11 +327,6 @@ func (ci *ChatInfo) setSearchEngine(engine string) {
 	}
 }
 
-func (ci *ChatInfo) printSearchEngine() {
-	name := GetEffectSearchEngineName()
-	fmt.Printf("Current search engine: %s\n", name)
-}
-
 func (ci *ChatInfo) setReferences(count string) {
 	num, err := strconv.Atoi(count)
 	if err != nil {
@@ -340,17 +335,6 @@ func (ci *ChatInfo) setReferences(count string) {
 	}
 	referenceFlag = num
 	fmt.Printf("Reference count set to %d\n", num)
-}
-
-func (ci *ChatInfo) setUsage(usage string) {
-	if len(usage) != 0 {
-		err := SwitchUsageMetainfo(usage)
-		if err != nil {
-			service.Errorf("Error setting usage: %v", err)
-			return
-		}
-	}
-	PrintUsageMetainfoStatus()
 }
 
 func (ci *ChatInfo) addAttachFiles(input string) {
@@ -510,7 +494,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /help - Show this help message")
 	fmt.Println("  /info - Show current settings and conversation stats")
 	fmt.Println("  /history /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)")
-	fmt.Println("  /markdown, /mark [on|off|only] - Switch whether to render markdown or not")
+	fmt.Println("  /markdown, /mark [on|off] - Switch whether to render markdown or not")
 	fmt.Println("  /attach, /a <filename> - Attach a file to the conversation")
 	fmt.Println("  /detach, /d <filename|all> - Detach a file from the conversation")
 	fmt.Println("  /template, /p \"<tmpl|name>\" - Change the template")
@@ -555,67 +539,40 @@ func (ci *ChatInfo) showHistory(num int, chars int) {
 	}
 }
 
-func (ci *ChatInfo) setMarkdown(mark string) {
-	if len(mark) != 0 {
-		SwitchMarkdown(mark)
-	}
-	marked := GetMarkdownSwitch()
-	switch marked {
-	case "on":
-		fmt.Println("Makedown output switched " + switchOnColor + "on" + resetColor)
-	case "only":
-		fmt.Println("Makedown output switched " + switchOnlyColor + "only" + resetColor)
-	case "off":
-		fmt.Println("Makedown output switched " + switchOffColor + "off" + resetColor)
-	default:
-		fmt.Println("Makedown output switched " + switchOffColor + "off" + resetColor)
-	}
-}
-
 func (ci *ChatInfo) setUseTools(useTools string) {
-	if len(useTools) != 0 {
-		var err error
-		switch useTools {
-		// Set useTools on or off
-		case "on":
-			err = SwitchUseTools(useTools)
-			if err != nil {
-				service.Errorf("Error setting useTools: %v", err)
-				return
-			}
-			ListEmbeddingTools()
-		case "off":
-			err = SwitchUseTools(useTools)
-			if err != nil {
-				service.Errorf("Error setting useTools: %v", err)
-				return
-			}
-			ListEmbeddingTools()
 
-			// Set whether or not to skip tools confirmation
-		case "confirm":
-			confirmToolsFlag = false
-			fmt.Print("Tool operations would need confirmation\n")
-		case "skip":
-			confirmToolsFlag = true
-			fmt.Print("Tool confirmation would skip\n")
-		}
-	} else {
-		ListEmbeddingTools()
+	switch useTools {
+	// Set useTools on or off
+	case "on":
+		SwitchUseTools(useTools)
+	case "off":
+		SwitchUseTools(useTools)
+
+		// Set whether or not to skip tools confirmation
+	case "confirm":
+		confirmToolsFlag = false
+		fmt.Print("Tool operations would need confirmation\n")
+	case "skip":
+		confirmToolsFlag = true
+		fmt.Print("Tool confirmation would skip\n")
+
+	default:
+		toolsCmd.Run(toolsCmd, nil)
 	}
 }
 
 func (ci *ChatInfo) setOutputFile(path string) {
-	if path == "" {
+	switch path {
+	case "":
 		if ci.outputFile == "" {
 			fmt.Println("No output file is currently set")
 		} else {
 			fmt.Printf("Current output file: %s\n", ci.outputFile)
 		}
-	} else if path == "off" {
+	case "off":
 		ci.outputFile = ""
 		fmt.Println("No output file")
-	} else {
+	default:
 		filename := strings.TrimSpace(path)
 		ci.outputFile = filename
 		fmt.Printf("Output file set to: %s\n", filename)
@@ -653,11 +610,11 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 
 	case "/markdown", "/mark":
 		if len(parts) < 2 {
-			ci.setMarkdown("")
+			markdownCmd.Run(markdownCmd, []string{})
 			return
 		}
 		mark := strings.TrimSpace(parts[1])
-		ci.setMarkdown(mark)
+		SwitchMarkdown(mark)
 
 	case "/clear", "/reset":
 		ci.clearContext()
@@ -680,26 +637,27 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 
 	case "/search", "/s":
 		if len(parts) < 2 {
-			fmt.Println("Please specify a search engine.\nOptions: google, tavily, bing, dummy\nOr switch on/off to use search")
-			ci.printSearchEngine()
+			searchCmd.Run(searchCmd, []string{})
 			return
 		}
 		engine := strings.TrimSpace(parts[1])
 		ci.setSearchEngine(engine)
 
 	case "/tools", "/t":
-		useTools := ""
-		if len(parts) >= 2 {
-			useTools = strings.TrimSpace(parts[1])
+		if len(parts) < 2 {
+			toolsCmd.Run(toolsCmd, []string{})
+			return
 		}
-		ci.setUseTools(useTools)
+		tools := strings.TrimSpace(parts[1])
+		ci.setUseTools(tools)
 
 	case "/think", "/T":
 		if len(parts) < 2 {
 			thinkCmd.Run(thinkCmd, []string{})
 			return
 		} else {
-			SwitchThinkMode(parts[1])
+			mode := strings.TrimSpace(parts[1])
+			SwitchThinkMode(mode)
 		}
 
 	case "/reference", "/r":
@@ -711,11 +669,12 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		ci.setReferences(count)
 
 	case "/usage", "/u":
-		usage := ""
-		if len(parts) >= 2 {
-			usage = strings.TrimSpace(parts[1])
+		if len(parts) < 2 {
+			usageCmd.Run(usageCmd, []string{})
+			return
 		}
-		ci.setUsage(usage)
+		usage := strings.TrimSpace(parts[1])
+		SwitchUsageMetainfo(usage)
 
 	case "/attach", "/a":
 		if len(parts) < 2 {

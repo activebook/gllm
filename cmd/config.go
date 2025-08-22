@@ -243,7 +243,7 @@ var configPrintCmd = &cobra.Command{
 		// Default Configuration section
 		printSection("Default Configuration")
 
-		mark := GetMarkdownSwitch()
+		mark := IncludeMarkdown()
 		fmt.Printf("\n%s: %v\n", keyColor("Markdown Format"), mark)
 
 		// Display max recursions value
