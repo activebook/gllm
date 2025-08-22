@@ -323,7 +323,7 @@ func SetEffectSearchEngineName(name string) bool {
 	case service.DummySearchEngine:
 		viper.Set("agent.search", service.DummySearchEngine)
 	default:
-		service.Warnf("Error: '%s' is not a valid search engine. Options: google, tavily, bing, none", name)
+		service.Warnf("Error: '%s' is not a valid search engine. Options: google, tavily, bing, dummy", name)
 		return false
 	}
 	if err := viper.WriteConfig(); err != nil {

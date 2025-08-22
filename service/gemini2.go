@@ -39,21 +39,16 @@ func (ag *Agent) getGemini2FilePart(file *FileData) genai.Part {
 	}
 }
 
-// func (ag *Agent) InitGemini2Agent() error {
-// 	// Setup the Gemini client
-// 	ctx := context.Background()
-// 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-// 		APIKey:  ag.ApiKey,
-// 		Backend: genai.BackendGeminiAPI,
-// 	})
-// 	if err != nil {
-// 		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create client: %v", err)}, nil)
-// 		return err
-// 	}
-// }
+type Gemini2Agent struct {
+	ctx    context.Context
+	client *genai.Client
+}
 
-func (ag *Agent) GenerateGemini2Stream() error {
+func (ag *Agent) initGemini2Agent() (*Gemini2Agent, error) {
 	// Setup the Gemini client
+	// In multi-turn conversation, even though we create it each time
+	// it can still be cached for advanced gemini models such as 2.5 flash/pro
+	// so it's a server side job
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:  ag.ApiKey,
@@ -61,6 +56,19 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	})
 	if err != nil {
 		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create client: %v", err)}, nil)
+		return nil, err
+	}
+	return &Gemini2Agent{
+		ctx:    ctx,
+		client: client,
+	}, nil
+}
+
+func (ag *Agent) GenerateGemini2Stream() error {
+	var err error
+	// Check the setup of Gemini client
+	ga, err := ag.initGemini2Agent()
+	if err != nil {
 		return err
 	}
 
@@ -135,7 +143,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	// but it won't consume tokens, because it was cached in local and remote server
 	// so gemini model would fast load the cached history KV
 	// it will only consume tokens on new input
-	chat, err := client.Chats.Create(ctx, ag.ModelName, &config, convo.History)
+	chat, err := ga.client.Chats.Create(ga.ctx, ag.ModelName, &config, convo.History)
 	if err != nil {
 		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create chat: %v", err)}, nil)
 		return err
@@ -155,7 +163,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	var finalResp *genai.GenerateContentResponse
 
 	for i := 0; i < maxRecursions; i++ {
-		funcCalls, resp, err := ag.processGemini2Stream(ctx, chat, streamParts, &references, &queries)
+		funcCalls, resp, err := ag.processGemini2Stream(ga.ctx, chat, streamParts, &references, &queries)
 		if err != nil {
 			return err
 		}
@@ -167,7 +175,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		// reconstruct the function call
 		// Although i think this is a bug in the gemini2 api
 		// we can safely reconstruct the function call part, because it's a funcCall part
-		lastContent := chat.History(false)[len(chat.History(false))-1]
+		lastContent := chat.History(true)[len(chat.History(true))-1]
 		if lastContent != nil && len(lastContent.Parts) == 0 {
 			// ** If we dont' keep the funcCall Name, the function call part would be disposed in chat history **
 			// I think it's a bug in the gemini2 api
@@ -222,8 +230,8 @@ func (ag *Agent) GenerateGemini2Stream() error {
 			int(finalResp.UsageMetadata.TotalTokenCount))
 	}
 
-	// Save the conversation history
-	convo.History = chat.History(false)
+	// Save the conversation history(curated)
+	convo.History = chat.History(true)
 	err = convo.Save()
 	if err != nil {
 		return fmt.Errorf("failed to save conversation: %v", err)

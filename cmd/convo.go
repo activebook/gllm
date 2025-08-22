@@ -72,39 +72,54 @@ This action cannot be undone.
 Examples:
 gllm convo remove chat_123
 gllm convo remove "chat_*" --force
-gllm convo remove 1 --force`,
+gllm convo remove 1 --force
+gllm convo remove 10-20 --force
+gllm convo remove "2 - 5" --force`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		pattern := args[0]
 		convoDir := service.GetConvoDir()
 		var matches []string
 
-		// Try to parse as index
-		index, err := strconv.Atoi(pattern)
-		if err == nil {
-			convos, err := service.ListSortedConvos(convoDir)
-			if err != nil {
-				fmt.Println(err)
-				return nil
+		// Check if pattern is a range
+		rangePattern := strings.ReplaceAll(pattern, " ", "")
+		rangeParts := strings.Split(rangePattern, "-")
+		if len(rangeParts) == 2 {
+			// Handle range removal
+			start, err1 := strconv.Atoi(rangeParts[0])
+			end, err2 := strconv.Atoi(rangeParts[1])
+			
+			if err1 == nil && err2 == nil {
+				convos, err := service.ListSortedConvos(convoDir)
+				if err != nil {
+					fmt.Println(err)
+					return nil
+				}
+				if len(convos) == 0 {
+					fmt.Println("No conversations found.")
+					return nil
+				}
+				
+				// Validate range
+				if start < 1 || end < 1 || start > len(convos) || end > len(convos) {
+					return fmt.Errorf("range %d-%d out of range (1-%d)", start, end, len(convos))
+				}
+				if start > end {
+					return fmt.Errorf("invalid range: start (%d) cannot be greater than end (%d)", start, end)
+				}
+				
+				// Collect matching files in range
+				for i := start; i <= end; i++ {
+					convoPath := filepath.Join(convoDir, convos[i-1].Name+".json")
+					matches = append(matches, convoPath)
+				}
+			} else {
+				// Not a valid range, treat as regular pattern
+				matches = handleAsPattern(pattern, convoDir)
 			}
-			if len(convos) == 0 {
-				fmt.Println("No conversations found.")
-				return nil
-			}
-			if index < 1 || index > len(convos) {
-				return fmt.Errorf("index %d out of range (1-%d)", index, len(convos))
-			}
-			// Use the resolved file name as the pattern
-			pattern = convos[index-1].Name
-		}
-
-		// Now pattern is either a name or a wildcard
-		convoPathPattern := filepath.Join(convoDir, pattern+".json")
-
-		// Find matching files using the pattern
-		matches, err = filepath.Glob(convoPathPattern)
-		if err != nil {
-			return fmt.Errorf("failed to parse pattern: %v", err)
+		} else {
+			// Regular pattern handling
+			matches = handleAsPattern(pattern, convoDir)
 		}
 
 		if len(matches) == 0 {
@@ -141,6 +156,40 @@ gllm convo remove 1 --force`,
 
 		return nil
 	},
+}
+
+// handleAsPattern handles the pattern as either an index or a file pattern
+func handleAsPattern(pattern string, convoDir string) []string {
+	var matches []string
+	
+	// Try to parse as index
+	index, err := strconv.Atoi(pattern)
+	if err == nil {
+		convos, err := service.ListSortedConvos(convoDir)
+		if err != nil {
+			fmt.Println(err)
+			return matches
+		}
+		if len(convos) == 0 {
+			return matches
+		}
+		if index >= 1 && index <= len(convos) {
+			// Use the resolved file name as the pattern
+			pattern = convos[index-1].Name
+		}
+	}
+
+	// Now pattern is either a name or a wildcard
+	convoPathPattern := filepath.Join(convoDir, pattern+".json")
+
+	// Find matching files using the pattern
+	matches, err = filepath.Glob(convoPathPattern)
+	if err != nil {
+		fmt.Printf("Failed to parse pattern: %v\n", err)
+		return []string{}
+	}
+	
+	return matches
 }
 
 var convoClearCmd = &cobra.Command{
