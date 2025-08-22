@@ -47,6 +47,17 @@ func (ag *Agent) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessag
 	return part
 }
 
+// func (ag *Agent) InitOpenChatAgent() error {
+// 	// 1. Initialize the Client
+// 	ctx := context.Background()
+// 	// Create a client config with custom base URL
+// 	client := arkruntime.NewClientWithApiKey(
+// 		ag.ApiKey,
+// 		arkruntime.WithTimeout(30*time.Minute),
+// 		arkruntime.WithBaseUrl(ag.EndPoint),
+// 	)
+// }
+
 func (ag *Agent) GenerateOpenChatStream() error {
 
 	// 1. Initialize the Client

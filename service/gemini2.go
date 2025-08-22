@@ -39,6 +39,19 @@ func (ag *Agent) getGemini2FilePart(file *FileData) genai.Part {
 	}
 }
 
+// func (ag *Agent) InitGemini2Agent() error {
+// 	// Setup the Gemini client
+// 	ctx := context.Background()
+// 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+// 		APIKey:  ag.ApiKey,
+// 		Backend: genai.BackendGeminiAPI,
+// 	})
+// 	if err != nil {
+// 		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create client: %v", err)}, nil)
+// 		return err
+// 	}
+// }
+
 func (ag *Agent) GenerateGemini2Stream() error {
 	// Setup the Gemini client
 	ctx := context.Background()
