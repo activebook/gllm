@@ -92,13 +92,21 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		return err
 	}
 
-	// Create the model and generate content
 	// Configure Model Parameters
+	thinkingBudgetVal := int32(-1)
+	if ag.ThinkMode {
+		// Turn on dynamic thinking:
+		thinkingBudgetVal = int32(-1)
+	} else {
+		// Turn off thinking:
+		thinkingBudgetVal = int32(0)
+	}
+	// Create the model and generate content
 	config := genai.GenerateContentConfig{
 		Temperature: &ag.Temperature,
 		ThinkingConfig: &genai.ThinkingConfig{
 			// Let model decide how to allocate tokens
-			//ThinkingBudget:  genai.Ptr[int32](8000),
+			ThinkingBudget:  &thinkingBudgetVal,
 			IncludeThoughts: ag.ThinkMode,
 		},
 		Tools: []*genai.Tool{
