@@ -305,13 +305,13 @@ func GetEffectSearchEngineName() string {
 func SetEffectSearchEngineName(name string) bool {
 	switch name {
 	case service.GoogleSearchEngine:
-		viper.Set("agent.search", "google")
+		viper.Set("agent.search", service.GoogleSearchEngine)
 	case service.TavilySearchEngine:
-		viper.Set("agent.search", "tavily")
+		viper.Set("agent.search", service.TavilySearchEngine)
 	case service.BingSearchEngine:
-		viper.Set("agent.search", "bing")
-	case service.NoneSearchEngine:
-		viper.Set("agent.search", "none")
+		viper.Set("agent.search", service.BingSearchEngine)
+	case service.DummySearchEngine:
+		viper.Set("agent.search", service.DummySearchEngine)
 	default:
 		service.Warnf("Error: '%s' is not a valid search engine. Options: google, tavily, bing, none", name)
 		return false
