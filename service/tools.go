@@ -1184,7 +1184,7 @@ func (c *OpenChat) processWebSearchToolCall(toolCall *model.ToolCall, argsMap *m
 	case TavilySearchEngine:
 		// Use Tavily Search Engine
 		data, err = c.search.TavilySearch(query)
-	case NoneSearchEngine:
+	case DummySearchEngine:
 		// Use None Search Engine
 		data, err = c.search.NoneSearch(query)
 	default:

@@ -49,7 +49,7 @@ const (
 	GoogleSearchEngine = "google"
 	BingSearchEngine   = "bing"
 	TavilySearchEngine = "tavily"
-	NoneSearchEngine   = "none"
+	DummySearchEngine  = "dummy"
 )
 
 type SearchEngine struct {
@@ -71,9 +71,9 @@ func GetDefaultSearchEngineName() string {
 	return GoogleSearchEngine
 }
 
-func GetNoneSearchEngineName() string {
+func GetDummySearchEngineName() string {
 	// Using for placeholder
-	return NoneSearchEngine
+	return DummySearchEngine
 }
 
 func (s *SearchEngine) TavilySearch(query string) (map[string]any, error) {

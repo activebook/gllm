@@ -30,7 +30,7 @@ var (
 	attachments      []string // gllm "Summarize this" --attachment(-a) report.txt
 	sysPromptFlag    string   // gllm "Act as shell" --system-prompt(-S) @shell-assistant
 	templateFlag     string   // gllm --template(-t) @coder
-	searchFlag       string   // gllm --search(-s) "What is the stock price of Tesla right now?"
+	searchFlag       bool     // gllm --search(-s) "What is the stock price of Tesla right now?"
 	toolsFlag        bool     // gllm --tools(-t) "Move a.txt to folder b"
 	codeFlag         bool     // gllm --code(-C) "print('Hello, World!')"
 	deepDiveFlag     bool     // gllm --deep-dive "Tell me current tariff war results"
@@ -124,25 +124,10 @@ Configure your API keys and preferred models, then start chatting or executing c
 					}
 				}
 
-				if cmd.Flags().Changed("search") {
-					// Search mode
-					//service.Debugf("Search flag was changed, value is: '%s'", searchFlag)
-					es := GetEffectSearchEnginelName()
-					if es == "" && searchFlag == service.GetNoneSearchEngineName() {
-						// Search mode(just -s flag), but no search engine name provided
-						// Use default (google) search engine
-						searchFlag = service.GetDefaultSearchEngineName()
-						SetEffectSearchEnginelName(searchFlag)
-					} else if searchFlag != service.GetNoneSearchEngineName() {
-						// Set the search engine name
-						SetEffectSearchEnginelName(searchFlag)
-					} else {
-						// There is already a search engine name set
-						// and it's not the none one, so we do nothing
-					}
-				} else {
-					// Normal mode
-					searchFlag = ""
+				// Search
+				if !searchFlag {
+					// if search flag are not set, check if they are enabled globally
+					searchFlag = IsSearchEnabled()
 				}
 
 				// Tools
@@ -150,8 +135,6 @@ Configure your API keys and preferred models, then start chatting or executing c
 					// if tools flag are not set, check if they are enabled globally
 					toolsFlag = AreToolsEnabled()
 				}
-				// Set whether or not to use tools
-				SetToolsEnabled(toolsFlag)
 
 				// Code execution
 				if codeFlag {
@@ -274,19 +257,19 @@ func processQuery(prompt string, files []*service.FileData) {
 	sys_prompt := GetEffectiveSystemPrompt()
 	maxRecursions := GetMaxRecursions()
 
-	// tools (Contains web_search tool)
-	useTools := AreToolsEnabled()
-
 	// search engine will be loaded and made available if
-	// either the -s flag is used (searchFlag != "")
+	// either the -s flag is used (searchFlag is true)
 	// or if tools are enabled (useTools is true).
 	var searchEngine map[string]any
 	// If search flag is set, use the effective search engine
 	// If toolsFlag is set, we also need to use the search engine
-	if searchFlag != "" || useTools {
+	if searchFlag || toolsFlag {
 		_, searchEngine = GetEffectiveSearchEngine()
-		searchEngine["deep_dive"] = deepDiveFlag   // Add deep dive flag to search engine settings
-		searchEngine["references"] = referenceFlag // Add references flag to search engine settings
+		// if global search engine isn't set, and searchFlag is false, then no search engine is available
+		if searchEngine != nil {
+			searchEngine["deep_dive"] = deepDiveFlag   // Add deep dive flag to search engine settings
+			searchEngine["references"] = referenceFlag // Add references flag to search engine settings
+		}
 	}
 
 	// Include usage metainfo
@@ -301,7 +284,7 @@ func processQuery(prompt string, files []*service.FileData) {
 		ModelInfo:        &modelInfo,
 		SearchEngine:     &searchEngine,
 		MaxRecursions:    maxRecursions,
-		UseTools:         useTools,
+		UseTools:         toolsFlag,
 		SkipToolsConfirm: confirmToolsFlag,
 		AppendUsage:      includeUsage,
 		AppendMarkdown:   includeMarkdown,
@@ -357,13 +340,12 @@ func init() {
 	rootCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
 
 	// The key fix is using NoOptDefVal property which specifically handles the case when a flag is provided without a value.
-	rootCmd.Flags().StringVarP(&searchFlag, "search", "s", "", "To query an LLM with a search function")
-	rootCmd.Flags().Lookup("search").NoOptDefVal = service.GetNoneSearchEngineName() // This sets a default when flag is used without value
 	rootCmd.Flags().StringVarP(&convoName, "conversation", "c", "", "Specify a conversation name to track chat session")
 	rootCmd.Flags().Int("max-recursions", 5, "Maximum number of Model calling recursions")
 
 	// Flags for enabling/disabling features
 	// These flags are not persistent, so they only apply to this command
+	rootCmd.Flags().BoolVarP(&searchFlag, "search", "s", false, "To query with a search tool")
 	rootCmd.Flags().BoolVarP(&toolsFlag, "tools", "t", false, "Enable model to use embedding tools")
 	rootCmd.Flags().BoolVarP(&codeFlag, "code", "C", false, "Enable model to generate and run Python code (only for gemini)")
 	rootCmd.Flags().BoolVarP(&deepDiveFlag, "deep-dive", "", false, "Fetch more details from the search (default: off)")

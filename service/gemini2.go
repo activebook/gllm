@@ -39,6 +39,19 @@ func (ag *Agent) getGemini2FilePart(file *FileData) genai.Part {
 	}
 }
 
+// func (ag *Agent) InitGemini2Agent() error {
+// 	// Setup the Gemini client
+// 	ctx := context.Background()
+// 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+// 		APIKey:  ag.ApiKey,
+// 		Backend: genai.BackendGeminiAPI,
+// 	})
+// 	if err != nil {
+// 		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create client: %v", err)}, nil)
+// 		return err
+// 	}
+// }
+
 func (ag *Agent) GenerateGemini2Stream() error {
 	// Setup the Gemini client
 	ctx := context.Background()
@@ -116,7 +129,12 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		config.Tools = append(config.Tools, ag.getGemini2CodeExecTool())
 	}
 
-	// Create a chat session
+	// Create a chat session - this is the important part
+	// Within the chat session(multi-turn conversation)
+	// we still need to sent the entire history to the model
+	// but it won't consume tokens, because it was cached in local and remote server
+	// so gemini model would fast load the cached history KV
+	// it will only consume tokens on new input
 	chat, err := client.Chats.Create(ctx, ag.ModelName, &config, convo.History)
 	if err != nil {
 		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create chat: %v", err)}, nil)
@@ -191,7 +209,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 
 	// Add references to the output if any
 	if len(references) > 0 {
-		refs := "\n\n" + ag.SearchEngine.RetrieveReferences(references) + "\n"
+		refs := "\n\n" + ag.SearchEngine.RetrieveReferences(references)
 		ag.DataChan <- StreamData{Text: refs, Type: DataTypeNormal}
 	}
 
@@ -200,7 +218,8 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		ag.TokenUsage.RecordTokenUsage(int(finalResp.UsageMetadata.PromptTokenCount),
 			int(finalResp.UsageMetadata.CandidatesTokenCount),
 			int(finalResp.UsageMetadata.CachedContentTokenCount),
-			int(finalResp.UsageMetadata.ThoughtsTokenCount))
+			int(finalResp.UsageMetadata.ThoughtsTokenCount),
+			int(finalResp.UsageMetadata.TotalTokenCount))
 	}
 
 	// Save the conversation history

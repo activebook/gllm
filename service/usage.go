@@ -94,10 +94,10 @@ func (tu *TokenUsage) Render(render Render) {
 	render.Writeln(usage)
 }
 
-func (tu *TokenUsage) RecordTokenUsage(input, output, cached, thought int) {
+func (tu *TokenUsage) RecordTokenUsage(input, output, cached, thought, total int) {
 	tu.InputTokens = input
 	tu.OutputTokens = output
 	tu.CachedTokens = cached
 	tu.ThoughtTokens = thought
-	tu.TotalTokens = tu.InputTokens + tu.OutputTokens + tu.CachedTokens + tu.ThoughtTokens
+	tu.TotalTokens = total
 }

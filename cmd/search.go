@@ -13,8 +13,65 @@ import (
 // searchCmd represents the search command
 var searchCmd = &cobra.Command{
 	Use:   "search",
-	Short: "Configure and manage search engines",
-	Long:  `Configure API keys and settings for various search engines used with gllm.`,
+	Short: "Configure and manage search engines globally",
+	Long: `Configure API keys and settings for various search engines used with gllm.
+You can switch on/off whether to use search engines`,
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(cmd.Long)
+		defaultEngine := viper.GetString("agent.search")
+		fmt.Println()
+		if defaultEngine != "" {
+			fmt.Printf("Current search engine set to %s\n", switchOnColor+defaultEngine+resetColor)
+		} else {
+			fmt.Println("No search engine set.")
+		}
+	},
+}
+
+// searchOnCmd represents the command to turn on a specific search engine
+var searchOnCmd = &cobra.Command{
+	Use:   "on",
+	Short: "Turn on a specific search engine",
+	Long: `Turn on a specific search engine to be used.
+Available search engines: google, tavily, bing`,
+	Run: func(cmd *cobra.Command, args []string) {
+		engine := ""
+		// Display current default if no arguments provided
+		if len(args) == 0 {
+			engine = viper.GetString("agent.search")
+			if engine == "" {
+				engine = "google"
+				fmt.Print("No default search engine set.\nUse google as default.\nAvailable options: google, tavily, bing\n\n")
+			} else {
+				fmt.Printf("Search engine turned "+switchOnColor+"on"+resetColor+": %s\n", switchOnColor+engine+resetColor)
+				return
+			}
+		}
+
+		// Set new default
+		if engine == "" {
+			engine = strings.ToLower(args[0])
+		}
+		if engine != "google" && engine != "tavily" && engine != "bing" {
+			service.Errorf("Error: '%s' is not a valid search engine. Options: google, tavily, bing\n", engine)
+			return
+		}
+
+		// Check if the selected engine is configured
+		key := viper.GetString(fmt.Sprintf("search_engines.%s.key", engine))
+		if key == "" {
+			service.Warnf("Warning: %s is not yet configured. Please set API key first.", engine)
+			return
+		}
+
+		viper.Set("agent.search", engine)
+		if err := viper.WriteConfig(); err != nil {
+			service.Errorf("Error saving configuration: %s\n", err)
+			return
+		}
+
+		fmt.Printf("Search engine turned "+switchOnColor+"on"+resetColor+": %s\n", switchOnColor+engine+resetColor)
+	},
 }
 
 // searchGoogleCmd represents the google search command
@@ -158,58 +215,33 @@ var searchListCmd = &cobra.Command{
 			fmt.Println("Use 'gllm search [engine] --key YOUR_KEY' to configure.")
 		}
 
+		fmt.Println("-------------------------")
+
 		// Update the list command to show default status
 		// In the listCmd.Run function, add:
 		defaultEngine := viper.GetString("agent.search")
 		fmt.Println()
 		if defaultEngine != "" {
-			fmt.Printf("Default search engine:%s\n", defaultEngine)
+			fmt.Printf("Current search engine set to %s\n", switchOnColor+defaultEngine+resetColor)
 		} else {
-			fmt.Println("No default search engine set.")
+			fmt.Println("No search engine set.")
 		}
-		fmt.Println("-------------------------")
 	},
 }
 
-// searchDefaultCmd represents the command to set default search engine
-var searchDefaultCmd = &cobra.Command{
-	Use:     "default",
-	Aliases: []string{"def"},
-	Short:   "Set the default search engine",
-	Long:    `Set which search engine to use by default when performing searches(RAG).`,
+// searchOffCmd represents the command to turn off search engine
+var searchOffCmd = &cobra.Command{
+	Use:   "off",
+	Short: "Turn off search engine",
+	Long:  `Turn off search engine, agent would not do any search.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Display current default if no arguments provided
-		if len(args) == 0 {
-			current := viper.GetString("agent.search")
-			if current == "" {
-				fmt.Println("No default search engine set. Available options: google, tavily, bing, none")
-			} else {
-				fmt.Printf("Current default search engine: %s\n", current)
-			}
-			return
-		}
-
-		// Set new default
-		engine := strings.ToLower(args[0])
-		if engine != "google" && engine != "tavily" && engine != "bing" && engine != "none" {
-			service.Errorf("Error: '%s' is not a valid search engine. Options: google, tavily, bing, none\n", engine)
-			return
-		}
-
-		// Check if the selected engine is configured
-		key := viper.GetString(fmt.Sprintf("search_engines.%s.key", engine))
-		if key == "" {
-			service.Warnf("Warning: %s is not yet configured. Please set API key first.", engine)
-			return
-		}
-
-		viper.Set("agent.search", engine)
+		viper.Set("agent.search", "")
 		if err := viper.WriteConfig(); err != nil {
 			service.Errorf("Error saving configuration: %s\n", err)
 			return
 		}
 
-		fmt.Printf("Default search engine set to: %s\n", engine)
+		fmt.Println("Search engine is turned " + switchOffColor + "off" + resetColor)
 	},
 }
 
@@ -271,21 +303,25 @@ func maskAPIKey(key string) string {
 	*/
 }
 
-func GetEffectSearchEnginelName() string {
+func IsSearchEnabled() bool {
+	return GetEffectSearchEngineName() != ""
+}
+
+func GetEffectSearchEngineName() string {
 	defaultName := viper.GetString("agent.search")
 	return defaultName
 }
 
-func SetEffectSearchEnginelName(name string) bool {
+func SetEffectSearchEngineName(name string) bool {
 	switch name {
 	case service.GoogleSearchEngine:
-		viper.Set("agent.search", "google")
+		viper.Set("agent.search", service.GoogleSearchEngine)
 	case service.TavilySearchEngine:
-		viper.Set("agent.search", "tavily")
+		viper.Set("agent.search", service.TavilySearchEngine)
 	case service.BingSearchEngine:
-		viper.Set("agent.search", "bing")
-	case service.NoneSearchEngine:
-		viper.Set("agent.search", "none")
+		viper.Set("agent.search", service.BingSearchEngine)
+	case service.DummySearchEngine:
+		viper.Set("agent.search", service.DummySearchEngine)
 	default:
 		service.Warnf("Error: '%s' is not a valid search engine. Options: google, tavily, bing, none", name)
 		return false
@@ -352,7 +388,8 @@ func init() {
 	searchCmd.AddCommand(searchTavilyCmd)
 	searchCmd.AddCommand(searchBingCmd)
 	searchCmd.AddCommand(searchListCmd)
-	searchCmd.AddCommand(searchDefaultCmd)
+	searchCmd.AddCommand(searchOnCmd)
+	searchCmd.AddCommand(searchOffCmd)
 	searchCmd.AddCommand(searchSaveCmd)
 
 	// Google flags

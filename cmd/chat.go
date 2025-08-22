@@ -73,19 +73,16 @@ Special commands:
 				}
 			}
 
+			// Search
+			if !searchFlag {
+				// if search flag are not set, check if they are enabled globally
+				searchFlag = IsSearchEnabled()
+			}
+
+			// Tools
 			if !toolsFlag {
 				// if tools flag are not set, check if they are enabled globally
 				toolsFlag = AreToolsEnabled()
-			}
-			// Set whether or not to use tools
-			SetToolsEnabled(toolsFlag)
-
-			if cmd.Flags().Changed("search") {
-				// Search mode
-				SetEffectSearchEnginelName(searchFlag)
-			} else {
-				// Normal mode
-				searchFlag = ""
 			}
 
 			// Always save a conversation file regardless of the flag
@@ -122,6 +119,10 @@ Special commands:
 
 var ()
 
+const (
+	_gllmChatPrompt = "\033[96mgllm>\033[0m "
+)
+
 func init() {
 	rootCmd.AddCommand(chatCmd)
 
@@ -134,7 +135,7 @@ func init() {
 	chatCmd.Flags().StringVarP(&templateFlag, "template", "p", "", "Template to use for the chat session")
 	chatCmd.Flags().StringSliceVarP(&attachments, "attachment", "a", []string{}, "Specify file(s) or image(s) to append to the chat sessioin")
 	chatCmd.Flags().StringVarP(&convoName, "conversation", "c", GenerateChatFilename(), "Name for this chat session")
-	chatCmd.Flags().StringVarP(&searchFlag, "search", "s", service.GetDefaultSearchEngineName(), "Search engine for the chat session")
+	chatCmd.Flags().BoolVarP(&searchFlag, "search", "s", false, "Search engine for the chat session")
 	chatCmd.Flags().BoolVarP(&toolsFlag, "tools", "t", true, "Enable or disable tools for the chat session")
 	chatCmd.Flags().Lookup("search").NoOptDefVal = service.GetDefaultSearchEngineName()
 	chatCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
@@ -150,7 +151,7 @@ func (ci *ChatInfo) startREPL() {
 	ci.showHelp()
 	fmt.Println()
 
-	rl, err := readline.New("gllm> ")
+	rl, err := readline.New(_gllmChatPrompt)
 	if err != nil {
 		fmt.Printf("Error initializing readline: %v\n", err)
 		return
@@ -161,7 +162,7 @@ func (ci *ChatInfo) startREPL() {
 	multilineMode := false
 
 	for {
-		prompt := "gllm> "
+		prompt := _gllmChatPrompt
 		if multilineMode {
 			prompt = "... "
 		}
@@ -303,11 +304,15 @@ func (ci *ChatInfo) setSystem(system string) {
 }
 
 func (ci *ChatInfo) setSearchEngine(engine string) {
-	succeed := SetEffectSearchEnginelName(engine)
+	succeed := SetEffectSearchEngineName(engine)
 	if succeed {
-		searchFlag = GetEffectSearchEnginelName()
 		fmt.Printf("Switched to search engine: %s\n", engine)
 	}
+}
+
+func (ci *ChatInfo) printSearchEngine() {
+	name := GetEffectSearchEngineName()
+	fmt.Printf("Current search engine: %s\n", name)
 }
 
 func (ci *ChatInfo) setReferences(count string) {
@@ -469,7 +474,7 @@ func (ci *ChatInfo) showInfo() {
 	fmt.Printf("  Model: %s\n", ci.Model)
 	fmt.Printf("  System Prompt: \n    - %s\n", GetEffectiveSystemPrompt())
 	fmt.Printf("  Template: \n    - %s\n", GetEffectiveTemplate())
-	fmt.Printf("  Search Engine: %s\n", GetEffectSearchEnginelName())
+	fmt.Printf("  Search Engine: %s\n", GetEffectSearchEngineName())
 	fmt.Printf("  Use Tools: %t\n", AreToolsEnabled())
 	fmt.Printf("  Usage Metainfo: %s\n", GetUsageMetainfoStatus())
 	fmt.Printf("  Attachment(s): \n")
@@ -637,6 +642,7 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	case "/search", "/s":
 		if len(parts) < 2 {
 			fmt.Println("Please specify a search engine. Options: google, tavily, bing, none")
+			ci.printSearchEngine()
 			return
 		}
 		engine := strings.TrimSpace(parts[1])
@@ -697,16 +703,15 @@ func (ci *ChatInfo) callLLM(input string) {
 	_, modelInfo := GetEffectiveModel()
 	sys_prompt := GetEffectiveSystemPrompt()
 
-	// Check whether to use tools
-	useTools := AreToolsEnabled()
-
 	// If tools are enabled, we will use the search engine
 	// If search flag is set, we will use the search engine, too
 	var searchEngine map[string]any
-	if searchFlag != "" || useTools {
+	if searchFlag || toolsFlag {
 		_, searchEngine = GetEffectiveSearchEngine()
-		searchEngine["deep_dive"] = deepDiveFlag   // Add deep dive flag to search engine settings
-		searchEngine["references"] = referenceFlag // Add references flag to search engine settings
+		if searchEngine != nil {
+			searchEngine["deep_dive"] = deepDiveFlag   // Add deep dive flag to search engine settings
+			searchEngine["references"] = referenceFlag // Add references flag to search engine settings
+		}
 	}
 
 	// Include usage metainfo
@@ -721,7 +726,7 @@ func (ci *ChatInfo) callLLM(input string) {
 		ModelInfo:        &modelInfo,
 		SearchEngine:     &searchEngine,
 		MaxRecursions:    ci.maxRecursions,
-		UseTools:         useTools,
+		UseTools:         toolsFlag,
 		SkipToolsConfirm: confirmToolsFlag,
 		AppendUsage:      includeUsage,
 		AppendMarkdown:   includeMarkdown,

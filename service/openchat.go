@@ -47,6 +47,17 @@ func (ag *Agent) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessag
 	return part
 }
 
+// func (ag *Agent) InitOpenChatAgent() error {
+// 	// 1. Initialize the Client
+// 	ctx := context.Background()
+// 	// Create a client config with custom base URL
+// 	client := arkruntime.NewClientWithApiKey(
+// 		ag.ApiKey,
+// 		arkruntime.WithTimeout(30*time.Minute),
+// 		arkruntime.WithBaseUrl(ag.EndPoint),
+// 	)
+// }
+
 func (ag *Agent) GenerateOpenChatStream() error {
 
 	// 1. Initialize the Client
@@ -237,7 +248,7 @@ func (c *OpenChat) process(ag *Agent) error {
 	}
 	// Add references to the output if any
 	if len(c.references) > 0 {
-		refs := "\n\n" + ag.SearchEngine.RetrieveReferences(c.references) + "\n"
+		refs := "\n\n" + ag.SearchEngine.RetrieveReferences(c.references)
 		c.data <- StreamData{Text: refs, Type: DataTypeNormal}
 	}
 
@@ -246,7 +257,8 @@ func (c *OpenChat) process(ag *Agent) error {
 		ag.TokenUsage.RecordTokenUsage(int(finalResp.Usage.PromptTokens),
 			int(finalResp.Usage.CompletionTokens),
 			int(finalResp.Usage.PromptTokensDetails.CachedTokens),
-			int(finalResp.Usage.CompletionTokensDetails.ReasoningTokens))
+			int(finalResp.Usage.CompletionTokensDetails.ReasoningTokens),
+			int(finalResp.Usage.TotalTokens))
 	}
 
 	// No more message
