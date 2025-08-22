@@ -34,6 +34,7 @@ Special commands:
 /system, /S <@name|prompt> - change system prompt
 /tools, /t [on|off|skip|confirm] - Switch whether to use embedding tools, skip tools confirmation
 /template, /p <@name|tmpl> - change template
+/think, /T [on|off] - Switch whether to use deep think mode
 /search, /s <search_engine> [on|off] - select a search engine to use, or switch on/off
 /reference. /r <num> - change link reference count
 /usage, /u [on|off] - Switch whether to show token usage information
@@ -84,6 +85,12 @@ Special commands:
 			if !toolsFlag {
 				// if tools flag are not set, check if they are enabled globally
 				toolsFlag = AreToolsEnabled()
+			}
+
+			// Check if think mode is enabled
+			if !thinkFlag {
+				// if think flag is not set, check if it's enabled globally
+				thinkFlag = IsThinkEnabled()
 			}
 
 			// Always save a conversation file regardless of the flag
@@ -138,6 +145,7 @@ func init() {
 	chatCmd.Flags().StringVarP(&convoName, "conversation", "c", GenerateChatFilename(), "Name for this chat session")
 	chatCmd.Flags().BoolVarP(&searchFlag, "search", "s", false, "Search engine for the chat session")
 	chatCmd.Flags().BoolVarP(&toolsFlag, "tools", "t", true, "Enable or disable tools for the chat session")
+	chatCmd.Flags().BoolVarP(&thinkFlag, "think", "T", false, "Enable or disable deep think mode for the chat session")
 	chatCmd.Flags().Lookup("search").NoOptDefVal = service.GetDefaultSearchEngineName()
 	chatCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
 	chatCmd.Flags().BoolVar(&deepDiveFlag, "deep-dive", false, "Enable deep dive search to fetch all links from search results")
@@ -484,6 +492,7 @@ func (ci *ChatInfo) showInfo() {
 	fmt.Printf("  System Prompt: \n    - %s\n", GetEffectiveSystemPrompt())
 	fmt.Printf("  Template: \n    - %s\n", GetEffectiveTemplate())
 	fmt.Printf("  Search Engine: %s\n", GetEffectSearchEngineName())
+	fmt.Printf("  Deep Think: %t\n", IsThinkEnabled())
 	fmt.Printf("  Use Tools: %t\n", AreToolsEnabled())
 	fmt.Printf("  Markdown: %t\n", IncludeMarkdown())
 	fmt.Printf("  Usage Metainfo: %t\n", IncludeUsageMetainfo())
@@ -506,6 +515,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /detach, /d <filename|all> - Detach a file from the conversation")
 	fmt.Println("  /template, /p \"<tmpl|name>\" - Change the template")
 	fmt.Println("  /system /S \"<prompt|name>\" - Change the system prompt")
+	fmt.Println("  /think, /T \"[on|off]\" - Switch whether to use deep think mode")
 	fmt.Println("  /search, /s \"<engine>[on|off]\" - Change the search engine, or switch on/off")
 	fmt.Println("  /tools, /t \"[on|off|skip|confirm]\" - Switch whether to use embedding tools, skip tools confirmation")
 	fmt.Println("  /reference, /r \"<num>\" - Change the search link reference count")
@@ -684,6 +694,14 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		}
 		ci.setUseTools(useTools)
 
+	case "/think", "/T":
+		if len(parts) < 2 {
+			thinkCmd.Run(thinkCmd, []string{})
+			return
+		} else {
+			SwitchThinkMode(parts[1])
+		}
+
 	case "/reference", "/r":
 		if len(parts) < 2 {
 			fmt.Println("Please specify a number")
@@ -754,6 +772,8 @@ func (ci *ChatInfo) callLLM(input string) {
 		}
 	}
 
+	// check if think flag is set
+	thinkFlag = IsThinkEnabled()
 	// Include usage metainfo
 	includeUsage := IncludeUsageMetainfo()
 	// Include markdown
@@ -766,6 +786,7 @@ func (ci *ChatInfo) callLLM(input string) {
 		ModelInfo:        &modelInfo,
 		SearchEngine:     &searchEngine,
 		MaxRecursions:    ci.maxRecursions,
+		ThinkMode:        thinkFlag,
 		UseTools:         toolsFlag,
 		SkipToolsConfirm: confirmToolsFlag,
 		AppendUsage:      includeUsage,

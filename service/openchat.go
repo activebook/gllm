@@ -179,21 +179,41 @@ func (c *OpenChat) process(ag *Agent) error {
 		//Debugf("Processing conversation at times: %d\n", i)
 		c.status.ChangeTo(c.notify, StreamNotify{Status: StatusProcessing}, c.proceed)
 
-		// Create the request
+		// Set whether to use thinking mode
+		var thinking *model.Thinking
+		if ag.ThinkMode {
+			thinking = &model.Thinking{
+				Type: model.ThinkingTypeEnabled,
+			}
+		} else {
+			thinking = &model.Thinking{
+				Type: model.ThinkingTypeDisabled,
+			}
+		}
+
+		// Create the request with thinking mode
 		req := model.CreateChatCompletionRequest{
 			Model:         ag.ModelName,
 			Temperature:   &ag.Temperature,
 			Messages:      convo.Messages,
 			Tools:         c.tools,
 			StreamOptions: &model.StreamOptions{IncludeUsage: true},
-			// Thinking: &model.Thinking{
-			// 	Type: model.ThinkingTypeAuto,
-			// },
+			Thinking:      thinking,
 		}
 
 		// Make the streaming request
 		stream, err := c.client.CreateChatCompletionStream(*c.ctx, req)
-		if err != nil {
+
+		// If thinking mode caused an error, try again without thinking mode
+		if err != nil && req.Thinking != nil {
+			// Create request without thinking mode
+			// Because some models don't support the thinking property
+			req.Thinking = nil
+			stream, err = c.client.CreateChatCompletionStream(*c.ctx, req)
+			if err != nil {
+				return fmt.Errorf("stream creation error: %v", err)
+			}
+		} else if err != nil {
 			return fmt.Errorf("stream creation error: %v", err)
 		}
 		defer stream.Close()
