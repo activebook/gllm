@@ -213,7 +213,7 @@ var configPrintCmd = &cobra.Command{
 		searchEngines := GetAllSearchEngines()
 		fmt.Fprintln(w, headerColor(" Search ")+"\t"+headerColor(" SETTINGS "))
 		fmt.Fprintln(w, headerColor("-------")+"\t"+headerColor("----------"))
-		defaultSearch := GetEffectSearchEnginelName()
+		defaultSearch := GetEffectSearchEngineName()
 		for name, settings := range searchEngines {
 			coloredName := name
 			if name == defaultSearch {

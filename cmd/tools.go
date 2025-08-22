@@ -10,7 +10,7 @@ import (
 
 var toolsCmd = &cobra.Command{
 	Use:   "tools",
-	Short: "Enable/Disable embedding tools",
+	Short: "Enable/Disable embedding tools globally",
 	Long: `Tools give gllm the ability to interact with the file system, execute commands, and perform other operations.
 By default, all tools are enabled. You can disable these tools.`,
 	Run: func(cmd *cobra.Command, args []string) {
