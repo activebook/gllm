@@ -34,11 +34,12 @@ Special commands:
 /system, /S <@name|prompt> - change system prompt
 /tools, /t [on|off|skip|confirm] - Switch whether to use embedding tools, skip tools confirmation
 /template, /p <@name|tmpl> - change template
-/search, /s <search_engine> - select a search engine to use
+/search, /s <search_engine> [on|off] - select a search engine to use, or switch on/off
 /reference. /r <num> - change link reference count
 /usage, /u [on|off] - Switch whether to show token usage information
 /attach, /a <filename> - Attach a file to the chat session
 /detach, /d <filename> - Detach a file to the chat session
+/output, /o <filename> [off] - Save to output file for model responses
 !<command> - Execute a shell command directly`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Create an indeterminate progress bar
@@ -220,6 +221,7 @@ type ChatInfo struct {
 	Conversion    service.ConversationManager
 	QuitFlag      bool
 	maxRecursions int
+	outputFile    string
 }
 
 func buildChatInfo(files []*service.FileData) *ChatInfo {
@@ -304,9 +306,16 @@ func (ci *ChatInfo) setSystem(system string) {
 }
 
 func (ci *ChatInfo) setSearchEngine(engine string) {
-	succeed := SetEffectSearchEngineName(engine)
-	if succeed {
-		fmt.Printf("Switched to search engine: %s\n", engine)
+	switch engine {
+	case "on":
+		searchOnCmd.Run(searchCmd, []string{})
+	case "off":
+		searchOffCmd.Run(searchCmd, []string{})
+	default:
+		succeed := SetEffectSearchEngineName(engine)
+		if succeed {
+			fmt.Printf("Switched to search engine: %s\n", GetEffectSearchEngineName())
+		}
 	}
 }
 
@@ -476,7 +485,9 @@ func (ci *ChatInfo) showInfo() {
 	fmt.Printf("  Template: \n    - %s\n", GetEffectiveTemplate())
 	fmt.Printf("  Search Engine: %s\n", GetEffectSearchEngineName())
 	fmt.Printf("  Use Tools: %t\n", AreToolsEnabled())
-	fmt.Printf("  Usage Metainfo: %s\n", GetUsageMetainfoStatus())
+	fmt.Printf("  Markdown: %t\n", IncludeMarkdown())
+	fmt.Printf("  Usage Metainfo: %t\n", IncludeUsageMetainfo())
+	fmt.Printf("  Output File: %s\n", ci.outputFile)
 	fmt.Printf("  Attachment(s): \n")
 	for _, file := range ci.Files {
 		fmt.Printf("    - [%s]: %s\n", file.Format(), file.Path())
@@ -495,10 +506,11 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /detach, /d <filename|all> - Detach a file from the conversation")
 	fmt.Println("  /template, /p \"<tmpl|name>\" - Change the template")
 	fmt.Println("  /system /S \"<prompt|name>\" - Change the system prompt")
-	fmt.Println("  /search, /s \"<engine>\" - Change the search engine")
+	fmt.Println("  /search, /s \"<engine>[on|off]\" - Change the search engine, or switch on/off")
 	fmt.Println("  /tools, /t \"[on|off|skip|confirm]\" - Switch whether to use embedding tools, skip tools confirmation")
 	fmt.Println("  /reference, /r \"<num>\" - Change the search link reference count")
 	fmt.Println("  /usage, /u \"[on|off]\" - Switch whether to show token usage information")
+	fmt.Println("  /output, /o <filename> [off] - Save to output file for model responses")
 	fmt.Println("  !<command> - Execute a shell command directly (e.g. !ls -la)")
 }
 
@@ -583,6 +595,23 @@ func (ci *ChatInfo) setUseTools(useTools string) {
 	}
 }
 
+func (ci *ChatInfo) setOutputFile(path string) {
+	if path == "" {
+		if ci.outputFile == "" {
+			fmt.Println("No output file is currently set")
+		} else {
+			fmt.Printf("Current output file: %s\n", ci.outputFile)
+		}
+	} else if path == "off" {
+		ci.outputFile = ""
+		fmt.Println("No output file")
+	} else {
+		filename := strings.TrimSpace(path)
+		ci.outputFile = filename
+		fmt.Printf("Output file set to: %s\n", filename)
+	}
+}
+
 func (ci *ChatInfo) handleCommand(cmd string) {
 	// Split the command into parts
 	parts := strings.SplitN(cmd, " ", 3)
@@ -641,7 +670,7 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 
 	case "/search", "/s":
 		if len(parts) < 2 {
-			fmt.Println("Please specify a search engine. Options: google, tavily, bing, none")
+			fmt.Println("Please specify a search engine.\nOptions: google, tavily, bing, dummy\nOr switch on/off to use search")
 			ci.printSearchEngine()
 			return
 		}
@@ -684,6 +713,14 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		}
 		ci.detachFiles(cmd)
 
+	case "/output", "/o":
+		if len(parts) < 2 {
+			ci.setOutputFile("")
+		} else {
+			filename := strings.TrimSpace(parts[1])
+			ci.setOutputFile(filename)
+		}
+
 	case "/info":
 		// Show current model and conversation stats
 		ci.showInfo()
@@ -703,7 +740,10 @@ func (ci *ChatInfo) callLLM(input string) {
 	_, modelInfo := GetEffectiveModel()
 	sys_prompt := GetEffectiveSystemPrompt()
 
+	// must recheck tools flag, because it can be set /tools
+	toolsFlag = AreToolsEnabled()
 	// If tools are enabled, we will use the search engine
+	searchFlag = IsSearchEnabled()
 	// If search flag is set, we will use the search engine, too
 	var searchEngine map[string]any
 	if searchFlag || toolsFlag {
@@ -730,7 +770,7 @@ func (ci *ChatInfo) callLLM(input string) {
 		SkipToolsConfirm: confirmToolsFlag,
 		AppendUsage:      includeUsage,
 		AppendMarkdown:   includeMarkdown,
-		OutputFile:       "",
+		OutputFile:       ci.outputFile,
 		QuietMode:        false,
 	}
 

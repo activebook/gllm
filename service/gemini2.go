@@ -175,7 +175,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		// reconstruct the function call
 		// Although i think this is a bug in the gemini2 api
 		// we can safely reconstruct the function call part, because it's a funcCall part
-		lastContent := chat.History(false)[len(chat.History(false))-1]
+		lastContent := chat.History(true)[len(chat.History(true))-1]
 		if lastContent != nil && len(lastContent.Parts) == 0 {
 			// ** If we dont' keep the funcCall Name, the function call part would be disposed in chat history **
 			// I think it's a bug in the gemini2 api
@@ -230,8 +230,8 @@ func (ag *Agent) GenerateGemini2Stream() error {
 			int(finalResp.UsageMetadata.TotalTokenCount))
 	}
 
-	// Save the conversation history
-	convo.History = chat.History(false)
+	// Save the conversation history(curated)
+	convo.History = chat.History(true)
 	err = convo.Save()
 	if err != nil {
 		return fmt.Errorf("failed to save conversation: %v", err)
