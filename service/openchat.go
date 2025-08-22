@@ -171,6 +171,10 @@ func (c *OpenChat) process(ag *Agent) error {
 
 	var finalResp *model.ChatCompletionStreamResponse
 
+	// For some models, there isn't thinking property
+	// So we need to check whether to add it or not
+	thinkProperty := true
+
 	// Recursively process the conversation
 	// Because the model can call tools multiple times
 	i := 0
@@ -181,16 +185,17 @@ func (c *OpenChat) process(ag *Agent) error {
 
 		// Set whether to use thinking mode
 		var thinking *model.Thinking
-		if ag.ThinkMode {
-			thinking = &model.Thinking{
-				Type: model.ThinkingTypeEnabled,
-			}
-		} else {
-			thinking = &model.Thinking{
-				Type: model.ThinkingTypeDisabled,
+		if thinkProperty {
+			if ag.ThinkMode {
+				thinking = &model.Thinking{
+					Type: model.ThinkingTypeEnabled,
+				}
+			} else {
+				thinking = &model.Thinking{
+					Type: model.ThinkingTypeDisabled,
+				}
 			}
 		}
-
 		// Create the request with thinking mode
 		req := model.CreateChatCompletionRequest{
 			Model:         ag.ModelName,
@@ -213,6 +218,8 @@ func (c *OpenChat) process(ag *Agent) error {
 			if err != nil {
 				return fmt.Errorf("stream creation error: %v", err)
 			}
+			// This model cannot add thinking property
+			thinkProperty = false
 		} else if err != nil {
 			return fmt.Errorf("stream creation error: %v", err)
 		}
