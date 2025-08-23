@@ -12,17 +12,17 @@ var toolsCmd = &cobra.Command{
 	Use:   "tools",
 	Short: "Enable/Disable embedding tools globally",
 	Long: `Tools give gllm the ability to interact with the file system, execute commands, and perform other operations.
-By default, all tools are enabled. You can disable these tools.`,
+Switch on/off to enable/disable all embedding tools`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
 		fmt.Println("-------------------------------------------")
-		ListEmbeddingTools()
+		ListAllTools()
 	},
 }
 
 var toolsOnCmd = &cobra.Command{
 	Use:   "on",
-	Short: "Enable all tools",
+	Short: "Enable all embedding tools",
 	Run: func(cmd *cobra.Command, args []string) {
 		viper.Set("agent.tools", true)
 		err := viper.WriteConfig()
@@ -30,14 +30,14 @@ var toolsOnCmd = &cobra.Command{
 			fmt.Printf("Error writing config: %v\n", err)
 			return
 		}
-		fmt.Printf("All tools %s\n\n", switchOnColor+"enabled"+resetColor)
-		ListEmbeddingTools()
+		fmt.Printf("All embedding tools %s\n\n", switchOnColor+"enabled"+resetColor)
+		ListAllTools()
 	},
 }
 
 var toolsOffCmd = &cobra.Command{
 	Use:   "off",
-	Short: "Disable all tools",
+	Short: "Disable all embedding tools",
 	Run: func(cmd *cobra.Command, args []string) {
 		viper.Set("agent.tools", false)
 		err := viper.WriteConfig()
@@ -45,8 +45,8 @@ var toolsOffCmd = &cobra.Command{
 			fmt.Printf("Error writing config: %v\n", err)
 			return
 		}
-		fmt.Printf("All tools %s\n\n", switchOffColor+"disabled"+resetColor)
-		ListEmbeddingTools()
+		fmt.Printf("All embedding tools %s\n\n", switchOffColor+"disabled"+resetColor)
+		ListAllTools()
 	},
 }
 
@@ -74,7 +74,7 @@ func SwitchUseTools(s string) {
 
 func ListEmbeddingTools() {
 	enabled := AreToolsEnabled()
-	fmt.Println("Available tools:")
+	fmt.Println("Available[✔] embedding tools:")
 	for _, tool := range service.GetAllEmbeddingTools() {
 		if enabled {
 			fmt.Printf("[✔] %s\n", tool)
@@ -82,5 +82,10 @@ func ListEmbeddingTools() {
 			fmt.Printf("[ ] %s\n", tool)
 		}
 	}
-	fmt.Println("\n[✔] Indicates that a tool is enabled.")
+}
+
+func ListAllTools() {
+	ListEmbeddingTools()
+	fmt.Println()
+	ListSearchTools()
 }

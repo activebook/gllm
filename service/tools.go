@@ -63,6 +63,8 @@ var (
 		"search_text_in_file",
 		"read_multiple_files",
 		"web_fetch",
+	}
+	searchTools = []string{
 		"web_search",
 	}
 )
@@ -76,8 +78,21 @@ func GetAllEmbeddingTools() []string {
 	return embeddingTools
 }
 
+func GetAllSearchTools() []string {
+	return searchTools
+}
+
 func AvailableEmbeddingTool(toolName string) bool {
 	for _, tool := range embeddingTools {
+		if tool == toolName {
+			return true
+		}
+	}
+	return false
+}
+
+func AvailableSearchTool(toolName string) bool {
+	for _, tool := range searchTools {
 		if tool == toolName {
 			return true
 		}
@@ -100,16 +115,16 @@ func formatToolCallArguments(argsMap map[string]interface{}) string {
 }
 
 // Tool definitions for file operations
-func (ag *Agent) getOpenChatTools() []*model.Tool {
+func (ag *Agent) getOpenChatEmbeddingTools() []*model.Tool {
 	var tools []*model.Tool
+
+	// Web search tool
+	// webSearchTool := ag.getOpenChatWebSearchTool()
+	// tools = append(tools, webSearchTool)
 
 	// Shell tool
 	shellTool := ag.getOpenChatShellTool()
 	tools = append(tools, shellTool)
-
-	// Web search tool
-	webSearchTool := ag.getOpenChatWebSearchTool()
-	tools = append(tools, webSearchTool)
 
 	// Web fetch tool
 	webFetchFunc := model.FunctionDefinition{

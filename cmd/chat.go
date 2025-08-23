@@ -15,6 +15,8 @@ import (
 	"github.com/chzyer/readline"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/fatih/color"
+	"text/tabwriter"
 )
 
 // chatCmd represents the chat command
@@ -28,9 +30,10 @@ have a continuous conversation with the model.
 Special commands:
 /exit, /quit - Exit the chat session
 /clear, /reset - Clear context
-/help - Show available commands
+/help, /? - Show available commands
+/info, /i - Show current settings
 /history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)
-/markdown, /mark [on|off] - Switch whether to render markdown or not
+/markdown, /m [on|off] - Switch whether to render markdown or not
 /system, /S <@name|prompt> - change system prompt
 /tools, /t [on|off|skip|confirm] - Switch whether to use embedding tools, skip tools confirmation
 /template, /p <@name|tmpl> - change template
@@ -471,30 +474,69 @@ func (ci *ChatInfo) detachFiles(input string) {
 }
 
 func (ci *ChatInfo) showInfo() {
-	fmt.Println("Current settings:")
-	fmt.Printf("  Model: %s\n", ci.Model)
-	fmt.Printf("  System Prompt: \n    - %s\n", GetEffectiveSystemPrompt())
-	fmt.Printf("  Template: \n    - %s\n", GetEffectiveTemplate())
-	fmt.Printf("  Search Engine: %s\n", GetEffectSearchEngineName())
-	fmt.Printf("  Deep Think: %t\n", IsThinkEnabled())
-	fmt.Printf("  Use Tools: %t\n", AreToolsEnabled())
-	fmt.Printf("  Markdown: %t\n", IncludeMarkdown())
-	fmt.Printf("  Usage Metainfo: %t\n", IncludeUsageMetainfo())
-	fmt.Printf("  Output File: %s\n", ci.outputFile)
-	fmt.Printf("  Attachment(s): \n")
-	for _, file := range ci.Files {
-		fmt.Printf("    - [%s]: %s\n", file.Format(), file.Path())
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	
+	sectionColor := color.New(color.FgCyan, color.Bold).SprintFunc()
+	headerColor := color.New(color.FgYellow, color.Bold).SprintFunc()
+	highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
+	keyColor := color.New(color.FgMagenta, color.Bold).SprintFunc()
+	
+	printSection := func(title string) {
+		fmt.Println()
+		fullTitle := fmt.Sprintf("=== %s ===", strings.ToUpper(title))
+		lineWidth := 50
+		padding := (lineWidth - len(fullTitle)) / 2
+		if padding < 0 {
+			padding = 0
+		}
+		fmt.Printf("%s%s\n", strings.Repeat(" ", padding), sectionColor(fullTitle))
+		fmt.Println(color.New(color.FgCyan).Sprint(strings.Repeat("-", lineWidth)))
 	}
+	
+	printSection("CURRENT SETTINGS")
+	
+	// Basic settings
+	fmt.Fprintln(w, headerColor(" SETTING ")+"\t"+headerColor(" VALUE "))
+	fmt.Fprintln(w, headerColor("---------")+"\t"+headerColor("-------"))
+	fmt.Fprintf(w, "%s\t%s\n", keyColor("Model"), highlightColor(ci.Model))
+	fmt.Fprintf(w, "%s\t%s\n", keyColor("Search Engine"), highlightColor(GetEffectSearchEngineName()))
+	fmt.Fprintf(w, "%s\t%t\n", keyColor("Deep Think"), IsThinkEnabled())
+	fmt.Fprintf(w, "%s\t%t\n", keyColor("Embedding Tools"), AreToolsEnabled())
+	fmt.Fprintf(w, "%s\t%t\n", keyColor("Markdown"), IncludeMarkdown())
+	fmt.Fprintf(w, "%s\t%t\n", keyColor("Usage Metainfo"), IncludeUsageMetainfo())
+	fmt.Fprintf(w, "%s\t%s\n", keyColor("Output File"), ci.outputFile)
+	w.Flush()
+	
+	// System prompt
+	printSection("SYSTEM PROMPT")
+	fmt.Printf("%s\n", GetEffectiveSystemPrompt())
+	
+	// Template
+	printSection("TEMPLATE")
+	fmt.Printf("%s\n", GetEffectiveTemplate())
+	
+	// Attachments
+	printSection("ATTACHMENTS")
+	if len(ci.Files) > 0 {
+		fmt.Printf("%s (%d):\n", keyColor("Attachments"), len(ci.Files))
+		for _, file := range ci.Files {
+			fmt.Printf("  - [%s]: %s\n", file.Format(), file.Path())
+		}
+	} else {
+		fmt.Println("Attachments: None")
+	}
+	
+	fmt.Println(color.New(color.FgCyan, color.Bold).Sprint(strings.Repeat("=", 50)))
 }
 
 func (ci *ChatInfo) showHelp() {
 	fmt.Println("Available commands:")
 	fmt.Println("  /exit, /quit - Exit the chat session")
 	fmt.Println("  /clear, /reset - Clear conversation history")
-	fmt.Println("  /help - Show this help message")
-	fmt.Println("  /info - Show current settings and conversation stats")
-	fmt.Println("  /history /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)")
-	fmt.Println("  /markdown, /mark [on|off] - Switch whether to render markdown or not")
+	fmt.Println("  /help, /? - Show this help message")
+	fmt.Println("  /info, /i - Show current settings")
+	fmt.Println("  /history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)")
+	fmt.Println("  /markdown, /m [on|off] - Switch whether to render markdown or not")
 	fmt.Println("  /attach, /a <filename> - Attach a file to the conversation")
 	fmt.Println("  /detach, /d <filename|all> - Detach a file from the conversation")
 	fmt.Println("  /template, /p \"<tmpl|name>\" - Change the template")
@@ -589,7 +631,7 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		fmt.Println("Exiting chat session")
 		return
 
-	case "/help":
+	case "/help", "/?":
 		ci.showHelp()
 
 	case "/history", "/h":
@@ -608,7 +650,7 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		}
 		ci.showHistory(num, chars)
 
-	case "/markdown", "/mark":
+	case "/markdown", "/m":
 		if len(parts) < 2 {
 			markdownCmd.Run(markdownCmd, []string{})
 			return
@@ -698,7 +740,7 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 			ci.setOutputFile(filename)
 		}
 
-	case "/info":
+	case "/info", "/i":
 		// Show current model and conversation stats
 		ci.showInfo()
 
