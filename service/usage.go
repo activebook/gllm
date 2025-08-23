@@ -80,9 +80,9 @@ func (tu *TokenUsage) Render(render Render) {
 }
 
 func (tu *TokenUsage) RecordTokenUsage(input, output, cached, thought, total int) {
-	tu.InputTokens = input
-	tu.OutputTokens = output
-	tu.CachedTokens = cached
-	tu.ThoughtTokens = thought
-	tu.TotalTokens = total
+	tu.InputTokens += input
+	tu.OutputTokens += output
+	tu.CachedTokens += cached
+	tu.ThoughtTokens += thought
+	tu.TotalTokens += total
 }
