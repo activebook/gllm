@@ -255,6 +255,12 @@ func (c *OpenChat) process(ag *Agent) error {
 			// Continue the conversation recursively
 		} else {
 			// No function call and no model content
+			if assistantMessage.Content == nil {
+				// Check whether there is no Content at all
+				// buxfix: it would be null, in some cases the history with null content is not allowed
+				// so we add an empty string. toolcall Content is nil is ok.
+				assistantMessage.Content = &model.ChatCompletionMessageContent{StringValue: Ptr("")}
+			}
 			// Get the last response
 			finalResp = resp
 			break
