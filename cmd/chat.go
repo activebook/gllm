@@ -15,6 +15,8 @@ import (
 	"github.com/chzyer/readline"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/fatih/color"
+	"text/tabwriter"
 )
 
 // chatCmd represents the chat command
@@ -472,25 +474,59 @@ func (ci *ChatInfo) detachFiles(input string) {
 }
 
 func (ci *ChatInfo) showInfo() {
-	fmt.Println("Current settings:")
-	fmt.Printf("  Model: %s\n", ci.Model)
-	fmt.Printf("  System Prompt: \n    - %s\n", GetEffectiveSystemPrompt())
-	fmt.Printf("  Template: \n    - %s\n", GetEffectiveTemplate())
-	fmt.Printf("  Search Engine: %s\n", GetEffectSearchEngineName())
-	fmt.Printf("  Deep Think: %t\n", IsThinkEnabled())
-	fmt.Printf("  Embedding Tools: %t\n", AreToolsEnabled())
-	fmt.Printf("  Markdown: %t\n", IncludeMarkdown())
-	fmt.Printf("  Usage Metainfo: %t\n", IncludeUsageMetainfo())
-	fmt.Printf("  Output File: %s\n", ci.outputFile)
-
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	
+	sectionColor := color.New(color.FgCyan, color.Bold).SprintFunc()
+	headerColor := color.New(color.FgYellow, color.Bold).SprintFunc()
+	highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
+	keyColor := color.New(color.FgMagenta, color.Bold).SprintFunc()
+	
+	printSection := func(title string) {
+		fmt.Println()
+		fullTitle := fmt.Sprintf("=== %s ===", strings.ToUpper(title))
+		lineWidth := 50
+		padding := (lineWidth - len(fullTitle)) / 2
+		if padding < 0 {
+			padding = 0
+		}
+		fmt.Printf("%s%s\n", strings.Repeat(" ", padding), sectionColor(fullTitle))
+		fmt.Println(color.New(color.FgCyan).Sprint(strings.Repeat("-", lineWidth)))
+	}
+	
+	printSection("CURRENT SETTINGS")
+	
+	// Basic settings
+	fmt.Fprintln(w, headerColor(" SETTING ")+"\t"+headerColor(" VALUE "))
+	fmt.Fprintln(w, headerColor("---------")+"\t"+headerColor("-------"))
+	fmt.Fprintf(w, "%s\t%s\n", keyColor("Model"), highlightColor(ci.Model))
+	fmt.Fprintf(w, "%s\t%s\n", keyColor("Search Engine"), highlightColor(GetEffectSearchEngineName()))
+	fmt.Fprintf(w, "%s\t%t\n", keyColor("Deep Think"), IsThinkEnabled())
+	fmt.Fprintf(w, "%s\t%t\n", keyColor("Embedding Tools"), AreToolsEnabled())
+	fmt.Fprintf(w, "%s\t%t\n", keyColor("Markdown"), IncludeMarkdown())
+	fmt.Fprintf(w, "%s\t%t\n", keyColor("Usage Metainfo"), IncludeUsageMetainfo())
+	fmt.Fprintf(w, "%s\t%s\n", keyColor("Output File"), ci.outputFile)
+	w.Flush()
+	
+	// System prompt
+	printSection("SYSTEM PROMPT")
+	fmt.Printf("%s\n", GetEffectiveSystemPrompt())
+	
+	// Template
+	printSection("TEMPLATE")
+	fmt.Printf("%s\n", GetEffectiveTemplate())
+	
+	// Attachments
+	printSection("ATTACHMENTS")
 	if len(ci.Files) > 0 {
-		fmt.Printf("  Attachments (%d):\n", len(ci.Files))
+		fmt.Printf("%s (%d):\n", keyColor("Attachments"), len(ci.Files))
 		for _, file := range ci.Files {
-			fmt.Printf("    - [%s]: %s\n", file.Format(), file.Path())
+			fmt.Printf("  - [%s]: %s\n", file.Format(), file.Path())
 		}
 	} else {
-		fmt.Println("  Attachments: None")
+		fmt.Println("Attachments: None")
 	}
+	
+	fmt.Println(color.New(color.FgCyan, color.Bold).Sprint(strings.Repeat("=", 50)))
 }
 
 func (ci *ChatInfo) showHelp() {
