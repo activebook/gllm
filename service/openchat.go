@@ -171,8 +171,6 @@ type OpenChat struct {
 func (c *OpenChat) process(ag *Agent) error {
 	convo := GetOpenChatConversation()
 
-	var finalResp *model.ChatCompletionStreamResponse
-
 	// For some models, there isn't thinking property
 	// So we need to check whether to add it or not
 	thinkProperty := true
@@ -236,6 +234,10 @@ func (c *OpenChat) process(ag *Agent) error {
 			return fmt.Errorf("error processing stream: %v", err)
 		}
 
+		// Record token usage
+		// The final response contains the token usage metainfo
+		addUpOpenChatTokenUsage(ag, resp)
+
 		// Add the assistant's message to the conversation
 		convo.PushMessage(assistantMessage)
 
@@ -261,8 +263,6 @@ func (c *OpenChat) process(ag *Agent) error {
 				// so we add an empty string. toolcall Content is nil is ok.
 				assistantMessage.Content = &model.ChatCompletionMessageContent{StringValue: Ptr("")}
 			}
-			// Get the last response
-			finalResp = resp
 			break
 		}
 	}
@@ -276,15 +276,6 @@ func (c *OpenChat) process(ag *Agent) error {
 	if len(c.references) > 0 {
 		refs := "\n\n" + ag.SearchEngine.RetrieveReferences(c.references)
 		c.data <- StreamData{Text: refs, Type: DataTypeNormal}
-	}
-
-	// Record token usage
-	if finalResp != nil && finalResp.Usage != nil && ag.TokenUsage != nil {
-		ag.TokenUsage.RecordTokenUsage(int(finalResp.Usage.PromptTokens),
-			int(finalResp.Usage.CompletionTokens),
-			int(finalResp.Usage.PromptTokensDetails.CachedTokens),
-			int(finalResp.Usage.CompletionTokensDetails.ReasoningTokens),
-			int(finalResp.Usage.TotalTokens))
 	}
 
 	// No more message
@@ -470,4 +461,20 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	// Function call is done
 	c.status.ChangeTo(c.notify, StreamNotify{Status: StatusFunctionCallingOver}, c.proceed)
 	return msg, err
+}
+
+// In an agentic workflow with multi-turn interactions:
+// Each turn involves streaming responses from the LLM
+// Each response may contain tool calls that trigger additional processing
+// New responses are generated based on tool call results
+// Each of these interactions consumes tokens that should be tracked
+func addUpOpenChatTokenUsage(ag *Agent, resp *model.ChatCompletionStreamResponse) {
+	//Warnf("addUpTokenUsage - PromptTokenCount: %d, CompletionTokenCount: %d, TotalTokenCount: %d", resp.Usage.PromptTokens, resp.Usage.CompletionTokens, resp.Usage.TotalTokens)
+	if resp != nil && resp.Usage != nil && ag.TokenUsage != nil {
+		ag.TokenUsage.RecordTokenUsage(int(resp.Usage.PromptTokens),
+			int(resp.Usage.CompletionTokens),
+			int(resp.Usage.PromptTokensDetails.CachedTokens),
+			int(resp.Usage.CompletionTokensDetails.ReasoningTokens),
+			int(resp.Usage.TotalTokens))
+	}
 }

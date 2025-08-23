@@ -168,16 +168,18 @@ func (ag *Agent) GenerateGemini2Stream() error {
 
 	// Use maxRecursions from LangLogic
 	maxRecursions := ag.MaxRecursions
-	var finalResp *genai.GenerateContentResponse
 
 	for i := 0; i < maxRecursions; i++ {
 		funcCalls, resp, err := ag.processGemini2Stream(ga.ctx, chat, streamParts, &references, &queries)
 		if err != nil {
 			return err
 		}
+		// Record token usage
+		// The final response contains the token usage metainfo
+		addUpGemini2TokenUsage(ag, resp)
+
 		// No furtheer calls
 		if len(*funcCalls) == 0 {
-			finalResp = resp
 			break
 		}
 		// reconstruct the function call
@@ -227,15 +229,6 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	if len(references) > 0 {
 		refs := "\n\n" + ag.SearchEngine.RetrieveReferences(references)
 		ag.DataChan <- StreamData{Text: refs, Type: DataTypeNormal}
-	}
-
-	// Record token usage
-	if finalResp != nil && finalResp.UsageMetadata != nil && ag.TokenUsage != nil {
-		ag.TokenUsage.RecordTokenUsage(int(finalResp.UsageMetadata.PromptTokenCount),
-			int(finalResp.UsageMetadata.CandidatesTokenCount),
-			int(finalResp.UsageMetadata.CachedContentTokenCount),
-			int(finalResp.UsageMetadata.ThoughtsTokenCount),
-			int(finalResp.UsageMetadata.TotalTokenCount))
 	}
 
 	// Save the conversation history(curated)
@@ -371,6 +364,27 @@ func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Functi
 	// Function call is done
 	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusFunctionCallingOver}, ag.ProceedChan)
 	return resp, err
+}
+
+// In an agentic workflow with multi-turn interactions:
+// Each turn involves streaming responses from the LLM
+// Each response may contain tool calls that trigger additional processing
+// New responses are generated based on tool call results
+// Each of these interactions consumes tokens that should be tracked
+func addUpGemini2TokenUsage(ag *Agent, resp *genai.GenerateContentResponse) {
+	if resp != nil && resp.UsageMetadata != nil && ag.TokenUsage != nil {
+		// Warnf("addUpTokenUsage - PromptTokenCount: %d, CandidatesTokenCount: %d, CachedContentTokenCount: %d, ThoughtsTokenCount: %d, TotalTokenCount: %d",
+		// 	resp.UsageMetadata.PromptTokenCount,
+		// 	resp.UsageMetadata.CandidatesTokenCount,
+		// 	resp.UsageMetadata.CachedContentTokenCount,
+		// 	resp.UsageMetadata.ThoughtsTokenCount,
+		// 	resp.UsageMetadata.TotalTokenCount)
+		ag.TokenUsage.RecordTokenUsage(int(resp.UsageMetadata.PromptTokenCount),
+			int(resp.UsageMetadata.CandidatesTokenCount),
+			int(resp.UsageMetadata.CachedContentTokenCount),
+			int(resp.UsageMetadata.ThoughtsTokenCount),
+			int(resp.UsageMetadata.TotalTokenCount))
+	}
 }
 
 func appendReferences(metadata *genai.GroundingMetadata, refs *[]map[string]interface{}) {

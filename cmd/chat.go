@@ -11,12 +11,13 @@ import (
 	"strings"
 	"sync"
 
+	"text/tabwriter"
+
 	"github.com/activebook/gllm/service"
 	"github.com/chzyer/readline"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/fatih/color"
-	"text/tabwriter"
 )
 
 // chatCmd represents the chat command
@@ -475,12 +476,12 @@ func (ci *ChatInfo) detachFiles(input string) {
 
 func (ci *ChatInfo) showInfo() {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	
+
 	sectionColor := color.New(color.FgCyan, color.Bold).SprintFunc()
 	headerColor := color.New(color.FgYellow, color.Bold).SprintFunc()
 	highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
 	keyColor := color.New(color.FgMagenta, color.Bold).SprintFunc()
-	
+
 	printSection := func(title string) {
 		fmt.Println()
 		fullTitle := fmt.Sprintf("=== %s ===", strings.ToUpper(title))
@@ -492,9 +493,9 @@ func (ci *ChatInfo) showInfo() {
 		fmt.Printf("%s%s\n", strings.Repeat(" ", padding), sectionColor(fullTitle))
 		fmt.Println(color.New(color.FgCyan).Sprint(strings.Repeat("-", lineWidth)))
 	}
-	
+
 	printSection("CURRENT SETTINGS")
-	
+
 	// Basic settings
 	fmt.Fprintln(w, headerColor(" SETTING ")+"\t"+headerColor(" VALUE "))
 	fmt.Fprintln(w, headerColor("---------")+"\t"+headerColor("-------"))
@@ -506,15 +507,15 @@ func (ci *ChatInfo) showInfo() {
 	fmt.Fprintf(w, "%s\t%t\n", keyColor("Usage Metainfo"), IncludeUsageMetainfo())
 	fmt.Fprintf(w, "%s\t%s\n", keyColor("Output File"), ci.outputFile)
 	w.Flush()
-	
+
 	// System prompt
 	printSection("SYSTEM PROMPT")
 	fmt.Printf("%s\n", GetEffectiveSystemPrompt())
-	
+
 	// Template
 	printSection("TEMPLATE")
 	fmt.Printf("%s\n", GetEffectiveTemplate())
-	
+
 	// Attachments
 	printSection("ATTACHMENTS")
 	if len(ci.Files) > 0 {
@@ -525,7 +526,7 @@ func (ci *ChatInfo) showInfo() {
 	} else {
 		fmt.Println("Attachments: None")
 	}
-	
+
 	fmt.Println(color.New(color.FgCyan, color.Bold).Sprint(strings.Repeat("=", 50)))
 }
 
@@ -616,6 +617,12 @@ func (ci *ChatInfo) setOutputFile(path string) {
 		fmt.Println("No output file")
 	default:
 		filename := strings.TrimSpace(path)
+		err := validFilePath(filename, false)
+		if err != nil {
+			service.Warnf("%v", err)
+			return
+		}
+		// If we get here, the file can be created/overwritten
 		ci.outputFile = filename
 		fmt.Printf("Output file set to: %s\n", filename)
 	}
@@ -663,18 +670,21 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 
 	case "/template", "/p":
 		if len(parts) < 2 {
-			fmt.Println("Please specify a template name")
+			templateListCmd.Run(templateListCmd, []string{})
 			return
 		}
-		tmpl := strings.TrimSpace(parts[1])
+		// Join all remaining parts as they might contain spaces
+		tmpl := strings.Join(parts[1:], " ")
+		tmpl = strings.TrimSpace(tmpl)
 		ci.setTemplate(tmpl)
 
 	case "/system", "/S":
 		if len(parts) < 2 {
-			fmt.Println("Please specify a system prompt")
+			systemListCmd.Run(systemListCmd, []string{})
 			return
 		}
-		sysPrompt := strings.TrimSpace(parts[1])
+		sysPrompt := strings.Join(parts[1:], " ")
+		sysPrompt = strings.TrimSpace(sysPrompt)
 		ci.setSystem(sysPrompt)
 
 	case "/search", "/s":
