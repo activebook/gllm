@@ -29,7 +29,7 @@ This means that you can’t use a built-in tool and function calling at the same
 */
 
 // Tool definitions for Gemini 2
-func (ag *Agent) getGemini2Tools() []*genai.Tool {
+func (ag *Agent) getGemini2EmbeddingTools() []*genai.Tool {
 	var tools []*genai.Tool
 
 	// Add web search tool

@@ -15,7 +15,7 @@ var searchCmd = &cobra.Command{
 	Use:   "search",
 	Short: "Configure and manage search engines globally",
 	Long: `Configure API keys and settings for various search engines used with gllm.
-You can switch on/off whether to use search engines`,
+You can switch on/off whether to use search engines.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
 		defaultEngine := viper.GetString("agent.search")
@@ -25,6 +25,8 @@ You can switch on/off whether to use search engines`,
 		} else {
 			fmt.Println("No search engine set.")
 		}
+		fmt.Println()
+		ListSearchTools()
 	},
 }
 
@@ -36,6 +38,7 @@ var searchOnCmd = &cobra.Command{
 Available search engines: google, tavily, bing`,
 	Run: func(cmd *cobra.Command, args []string) {
 		engine := ""
+		isSet := false
 		// Display current default if no arguments provided
 		if len(args) == 0 {
 			engine = viper.GetString("agent.search")
@@ -43,34 +46,37 @@ Available search engines: google, tavily, bing`,
 				engine = "google"
 				fmt.Print("No default search engine set.\nUse google as default.\nAvailable options: google, tavily, bing\n\n")
 			} else {
-				fmt.Printf("Search engine turned "+switchOnColor+"on"+resetColor+": %s\n", switchOnColor+engine+resetColor)
-				return
+				isSet = true
 			}
 		}
 
 		// Set new default
-		if engine == "" {
-			engine = strings.ToLower(args[0])
-		}
-		if engine != "google" && engine != "tavily" && engine != "bing" {
-			service.Errorf("Error: '%s' is not a valid search engine. Options: google, tavily, bing\n", engine)
-			return
-		}
+		if !isSet {
+			if engine == "" {
+				engine = strings.ToLower(args[0])
+			}
+			if engine != "google" && engine != "tavily" && engine != "bing" {
+				service.Errorf("Error: '%s' is not a valid search engine. Options: google, tavily, bing\n", engine)
+				return
+			}
 
-		// Check if the selected engine is configured
-		key := viper.GetString(fmt.Sprintf("search_engines.%s.key", engine))
-		if key == "" {
-			service.Warnf("Warning: %s is not yet configured. Please set API key first.", engine)
-			return
-		}
+			// Check if the selected engine is configured
+			key := viper.GetString(fmt.Sprintf("search_engines.%s.key", engine))
+			if key == "" {
+				service.Warnf("Warning: %s is not yet configured. Please set API key first.", engine)
+				return
+			}
 
-		viper.Set("agent.search", engine)
-		if err := viper.WriteConfig(); err != nil {
-			service.Errorf("Error saving configuration: %s\n", err)
-			return
+			viper.Set("agent.search", engine)
+			if err := viper.WriteConfig(); err != nil {
+				service.Errorf("Error saving configuration: %s\n", err)
+				return
+			}
 		}
 
 		fmt.Printf("Search engine turned "+switchOnColor+"on"+resetColor+": %s\n", switchOnColor+engine+resetColor)
+		fmt.Println()
+		ListSearchTools()
 	},
 }
 
@@ -242,6 +248,8 @@ var searchOffCmd = &cobra.Command{
 		}
 
 		fmt.Println("Search engine is turned " + switchOffColor + "off" + resetColor)
+		fmt.Println()
+		ListSearchTools()
 	},
 }
 
@@ -401,4 +409,16 @@ func init() {
 
 	// Bing flags
 	searchBingCmd.Flags().StringP("key", "k", "", "Bing API key")
+}
+
+func ListSearchTools() {
+	enabled := IsSearchEnabled()
+	fmt.Println("Available[✔] search tools:")
+	for _, tool := range service.GetAllSearchTools() {
+		if enabled {
+			fmt.Printf("[✔] %s\n", tool)
+		} else {
+			fmt.Printf("[ ] %s\n", tool)
+		}
+	}
 }

@@ -64,9 +64,11 @@ func (ag *Agent) GenerateOpenChatStream() error {
 	tools := []*model.Tool{}
 	if ag.ToolsUse.Enable {
 		// Add embedding operation tools, which includes the web_search tool
-		embeddingTools := ag.getOpenChatTools()
+		embeddingTools := ag.getOpenChatEmbeddingTools()
 		tools = append(tools, embeddingTools...)
-	} else if ag.SearchEngine.UseSearch {
+	}
+	// Openchat webtools and embedding tools are compatible
+	if ag.SearchEngine.UseSearch {
 		// Only add the search tool if general tools are not enabled,
 		// but the search flag is explicitly set.
 		searchTool := ag.getOpenChatWebSearchTool()
@@ -357,7 +359,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 
 					// Skip if not our expected function
 					// Because some model made up function name
-					if functionName != "" && !AvailableEmbeddingTool(functionName) {
+					if functionName != "" && !AvailableEmbeddingTool(functionName) && !AvailableSearchTool(functionName) {
 						continue
 					}
 

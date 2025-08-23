@@ -126,7 +126,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	// CodeExecution and GoogleSearch cannot be enabled simultaneously.
 	if ag.ToolsUse.Enable {
 		// load embedding Tools
-		config.Tools = append(config.Tools, ag.getGemini2Tools()...)
+		config.Tools = append(config.Tools, ag.getGemini2EmbeddingTools()...)
 		if ag.SearchEngine.UseSearch {
 			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
 			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn,
@@ -201,7 +201,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 
 			// Skip if not our expected function
 			// Because some model made up function name
-			if funcCall.Name != "" && !AvailableEmbeddingTool(funcCall.Name) {
+			if funcCall.Name != "" && !AvailableEmbeddingTool(funcCall.Name) && !AvailableSearchTool(funcCall.Name) {
 				continue
 			}
 			// Handle tool call

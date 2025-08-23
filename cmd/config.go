@@ -238,6 +238,13 @@ var configPrintCmd = &cobra.Command{
 		for _, tool := range service.GetAllEmbeddingTools() {
 			fmt.Fprintf(w, "%s\t%s\n", keyColor(tool), toolsStatus)
 		}
+		toolsEnabled = IsSearchEnabled()
+		if !toolsEnabled {
+			toolsStatus = color.New(color.FgRed, color.Bold).Sprint("No")
+		}
+		for _, tool := range service.GetAllSearchTools() {
+			fmt.Fprintf(w, "%s\t%s\n", keyColor(tool), toolsStatus)
+		}
 		w.Flush()
 
 		// Default Configuration section
