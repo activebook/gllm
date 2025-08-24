@@ -33,6 +33,7 @@ func init() {
 	workflowAddCmd.Flags().StringP("input", "i", "", "Input directory")
 	workflowAddCmd.Flags().StringP("output", "o", "", "Output directory")
 	workflowAddCmd.Flags().StringP("think", "T", "", "Think mode (on/off)")
+	workflowAddCmd.Flags().StringP("pass", "", "", "Pass through agent")
 
 	workflowAddCmd.MarkFlagRequired("name")
 	workflowAddCmd.MarkFlagRequired("model")
@@ -50,6 +51,7 @@ func init() {
 	workflowSetCmd.Flags().StringP("input", "i", "", "Input directory")
 	workflowSetCmd.Flags().StringP("output", "o", "", "Output directory")
 	workflowSetCmd.Flags().StringP("think", "T", "", "Think mode (on/off)")
+	workflowSetCmd.Flags().StringP("pass", "", "", "Pass through agent")
 }
 
 // configCmd represents the base command when called without any subcommands
@@ -240,6 +242,7 @@ gllm workflow add --name planner --model groq-oss --tools enabled --template pla
 		input, _ := cmd.Flags().GetString("input")
 		output, _ := cmd.Flags().GetString("output")
 		think, _ := cmd.Flags().GetString("think")
+		pass, _ := cmd.Flags().GetString("pass")
 
 		// Validate required fields
 		if output == "" {
@@ -329,6 +332,14 @@ gllm workflow add --name planner --model groq-oss --tools enabled --template pla
 				newAgent["think"] = boolVal
 			} else {
 				newAgent["think"] = think
+			}
+		}
+
+		if pass != "" {
+			if boolVal, err := convertUserInputToBool(pass); err == nil {
+				newAgent["pass"] = boolVal
+			} else {
+				newAgent["pass"] = pass
 			}
 		}
 
@@ -439,6 +450,12 @@ func printAgentDetails(agent map[string]interface{}) {
 		fmt.Printf("  Think: %v\n", think)
 	} else {
 		fmt.Printf("  Think: false\n")
+	}
+
+	if pass, exists := agent["pass"]; exists {
+		fmt.Printf("  Pass Through: %v\n", pass)
+	} else {
+		fmt.Printf("  Pass Through: false\n")
 	}
 }
 
@@ -693,6 +710,16 @@ gllm workflow set planner --model groq-oss --role master`,
 			updated = true
 		}
 
+		// Handle pass flag
+		if pass, err := cmd.Flags().GetString("pass"); err == nil && pass != "" {
+			if boolVal, err := convertUserInputToBool(pass); err == nil {
+				agentMap["pass"] = boolVal
+			} else {
+				agentMap["pass"] = pass
+			}
+			updated = true
+		}
+
 		if !updated {
 			return fmt.Errorf("no properties to update. Please specify at least one property")
 		}
@@ -886,16 +913,18 @@ gllm workflow start`,
 			}
 
 			workflowAgent := service.WorkflowAgent{
-				Name:         getStringValue(agent, "name"),
-				Role:         service.WorkflowAgentType(getStringValue(agent, "role")),
-				Template:     getStringValue(agent, "template"),
-				SystemPrompt: getStringValue(agent, "system"),
-				Tools:        getBoolValue(agent, "tools"),
-				Think:        getBoolValue(agent, "think"),
-				Usage:        getBoolValue(agent, "usage"),
-				Markdown:     getBoolValue(agent, "markdown"),
-				InputDir:     getStringValue(agent, "input"),
-				OutputDir:    getStringValue(agent, "output"),
+				Name:          getStringValue(agent, "name"),
+				Role:          service.WorkflowAgentType(getStringValue(agent, "role")),
+				Template:      getStringValue(agent, "template"),
+				SystemPrompt:  getStringValue(agent, "system"),
+				Tools:         getBoolValue(agent, "tools"),
+				Think:         getBoolValue(agent, "think"),
+				Usage:         getBoolValue(agent, "usage"),
+				Markdown:      getBoolValue(agent, "markdown"),
+				InputDir:      getStringValue(agent, "input"),
+				OutputDir:     getStringValue(agent, "output"),
+				MaxRecursions: GetMaxRecursions(), // default max recursions
+				PassThrough:   getBoolValue(agent, "pass"),
 			}
 
 			// Handle model configuration

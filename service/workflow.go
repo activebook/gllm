@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -32,6 +33,7 @@ type WorkflowAgent struct {
 	OutputDir     string
 	MaxRecursions int
 	OutputFile    string
+	PassThrough   bool // pass through current agent, only for debugging
 }
 
 // WorkflowConfig defines the structure for the entire workflow.
@@ -150,9 +152,22 @@ func runWorkerAgent(agent *WorkflowAgent) error {
 				prompt := buildAgentPrompt(agent, data)
 				// Setup the output file path
 				// Worker output file name: <agent name>_<file name>.md
-				agent.OutputFile = GetFilePath(agent.OutputDir, agent.Name+"_"+file.Name()+".md")
+				fileName := strings.TrimSuffix(file.Name(), filepath.Ext(file.Name()))
+				outputName := agent.Name + "_" + fileName + ".md"
+
+				// Bugfix:
+				// Create a copy of the agent to avoid race condition on OutputFile field
+				// Because each task agent will write to its own output file
+				taskAgent := *agent
+				taskAgent.OutputFile = GetFilePath(agent.OutputDir, outputName)
+
+				// Format the task info
+				taskInfo := fmt.Sprintf("[%s] - %s", agent.Name, fileName)
+				Infof("\t  %s is working...", taskInfo)
+				Infof("\t  output file: %s", taskAgent.OutputFile)
+
 				// Execute worker agent
-				executeAgent(agent, prompt)
+				executeAgent(&taskAgent, prompt)
 				errChan <- nil // Send nil for success
 			}(file)
 		}
@@ -193,8 +208,18 @@ func RunWorkflow(config *WorkflowConfig, prompt string) error {
 		switch agent.Role {
 		case WorkflowAgentTypeMaster:
 			Infof("Agent %s is working...", agentInfo)
+			// Pass through check
+			if agent.PassThrough {
+				Infof("Agent %s is passing through ↓", agentInfo)
+				continue
+			}
 		case WorkflowAgentTypeWorker:
 			Infof("\tAgent %s is working...", agentInfo)
+			// Pass through check
+			if agent.PassThrough {
+				Infof("\tAgent %s is passing through ↓", agentInfo)
+				continue
+			}
 		default:
 			err = fmt.Errorf("Agent %s has no role defined", agent.Name)
 			return err
@@ -234,17 +259,18 @@ func executeAgent(agent *WorkflowAgent, prompt string) {
 	quiet := (agent.Role == WorkflowAgentTypeWorker)
 
 	agentOptions := AgentOptions{
-		Prompt:         prompt,
-		SysPrompt:      agent.SystemPrompt,
-		ModelInfo:      agent.Model,
-		SearchEngine:   agent.Search,
-		MaxRecursions:  agent.MaxRecursions,
-		ThinkMode:      agent.Think,
-		UseTools:       agent.Tools,
-		AppendMarkdown: agent.Markdown,
-		AppendUsage:    agent.Usage,
-		OutputFile:     agent.OutputFile, // Write to file
-		QuietMode:      quiet,            // Worker in quiet mode
+		Prompt:           prompt,
+		SysPrompt:        agent.SystemPrompt,
+		ModelInfo:        agent.Model,
+		SearchEngine:     agent.Search,
+		MaxRecursions:    agent.MaxRecursions,
+		ThinkMode:        agent.Think,
+		UseTools:         agent.Tools,
+		SkipToolsConfirm: true, // Always skip tools confirmation
+		AppendMarkdown:   agent.Markdown,
+		AppendUsage:      agent.Usage,
+		OutputFile:       agent.OutputFile, // Write to file
+		QuietMode:        quiet,            // Worker in quiet mode
 	}
 
 	CallAgent(&agentOptions)
