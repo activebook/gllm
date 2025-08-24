@@ -299,7 +299,11 @@ func processQuery(prompt string, files []*service.FileData) {
 		OutputFile:       "",
 		QuietMode:        false,
 	}
-	service.CallAgent(&op)
+	err := service.CallAgent(&op)
+	if err != nil {
+		service.Errorf("%v", err)
+		return
+	}
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

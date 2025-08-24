@@ -103,7 +103,7 @@ type AgentOptions struct {
 	QuietMode        bool
 }
 
-func CallAgent(op *AgentOptions) {
+func CallAgent(op *AgentOptions) error {
 	var temperature float32
 	switch temp := (*op.ModelInfo)["temperature"].(type) {
 	case float64:
@@ -161,8 +161,8 @@ func CallAgent(op *AgentOptions) {
 		var err error
 		fileRenderer, err = NewFileRenderer(op.OutputFile)
 		if err != nil {
-			Errorf("Failed to create output file %s: %v\n", op.OutputFile, err)
-			return
+			err := fmt.Errorf("failed to create output file %s: %v", op.OutputFile, err)
+			return err
 		}
 		defer fileRenderer.Close()
 	}
@@ -207,12 +207,12 @@ func CallAgent(op *AgentOptions) {
 		switch provider {
 		case ModelOpenAICompatible:
 			if err := ag.GenerateOpenChatStream(); err != nil {
-				//Errorf("Stream error: %v\n", err)
+				// Send error through channel instead of returning
 				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 			}
 		case ModelGemini:
 			if err := ag.GenerateGemini2Stream(); err != nil {
-				//Errorf("Stream error: %v\n", err)
+				// Send error through channel instead of returning
 				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 			}
 		default:
@@ -223,6 +223,9 @@ func CallAgent(op *AgentOptions) {
 	defer close(notifyCh)
 	defer close(dataCh)
 	defer close(proceedCh)
+
+	// Error variable to store any error from the goroutine
+	var processingErr error
 
 	// Process notifications in the main thread
 	// listen on multiple channels in Go, it listens to them simultaneously.
@@ -286,14 +289,17 @@ func CallAgent(op *AgentOptions) {
 				// Error happened, stop
 				ag.StopIndicator()
 				ag.Error(notify.Data)
-				return
+				processingErr = fmt.Errorf("%s", notify.Data)
+				return processingErr
 			case StatusFinished:
 				ag.StopIndicator()
 				// Render the markdown
 				ag.WriteMarkdown()
 				// Render the token usage
 				ag.WriteUsage()
-				return // Exit when stream is done
+				// Return any error that might have occurred
+				// If there wasn't any error, return nil
+				return processingErr
 			case StatusReasoning:
 				ag.StopIndicator()
 				// Start with Thinking color
@@ -428,9 +434,10 @@ func (ag *Agent) StopIndicator() {
 }
 
 func (ag *Agent) Error(text string) {
-	if ag.Std != nil {
-		Errorf("Stream error: %v\n", text)
-	}
+	// ignore stdout, because CallAgent will return the error
+	// if ag.Std != nil {
+	// 	Errorf("Agent: %v\n", text)
+	// }
 	if ag.OutputFile != nil {
 		ag.OutputFile.Writef("\n%s\n", text)
 	}

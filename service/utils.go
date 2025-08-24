@@ -1,10 +1,12 @@
 package service
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // SanitizeTitle replaces spaces with underscores in a given title.
@@ -94,6 +96,13 @@ func HasContent(s *string) bool {
 
 func EndWithNewline(s string) bool {
 	return strings.HasSuffix(s, "\n")
+}
+
+func FormatMinutesSeconds(d time.Duration) string {
+	totalSeconds := int(d.Seconds())
+	minutes := totalSeconds / 60
+	seconds := totalSeconds % 60
+	return fmt.Sprintf("%02dm:%02ds", minutes, seconds)
 }
 
 func Ptr[T any](t T) *T { return &t }
