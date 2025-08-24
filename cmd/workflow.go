@@ -308,7 +308,7 @@ gllm workflow add --name planner --model groq-oss --tools enabled --template pla
 				}
 			}
 		}
-		
+
 		// Handle system prompt - check if it's a reference or plain text
 		if sysPrompt != "" {
 			// If system prompt contains spaces, tabs, or newlines, treat as plain text
@@ -939,7 +939,8 @@ gllm workflow start`,
 
 		// Run the workflow
 		if err := service.RunWorkflow(workflowConfig, prompt); err != nil {
-			return fmt.Errorf("failed to run workflow: %w", err)
+			// don't return err to cmd itself, just print it
+			service.Errorf("%v", err)
 		}
 
 		return nil

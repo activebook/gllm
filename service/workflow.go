@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 type WorkflowAgentType string
@@ -114,8 +115,8 @@ func runMasterAgent(agent *WorkflowAgent, prompt string) error {
 	// Master output file name: <agent name>.md
 	agent.OutputFile = GetFilePath(agent.OutputDir, agent.Name+".md")
 	// Execute master agent
-	executeAgent(agent, finalPrompt)
-	return nil
+	err := executeAgent(agent, finalPrompt)
+	return err
 }
 
 func runWorkerAgent(agent *WorkflowAgent) error {
@@ -167,8 +168,9 @@ func runWorkerAgent(agent *WorkflowAgent) error {
 				Infof("\ttask saved to: %s", taskAgent.OutputFile)
 
 				// Execute worker agent
-				executeAgent(&taskAgent, prompt)
-				errChan <- nil // Send nil for success
+				err = executeAgent(&taskAgent, prompt)
+				// If there wasn't error, send nil for success
+				errChan <- err
 			}(file)
 		}
 	}
@@ -189,6 +191,15 @@ func runWorkerAgent(agent *WorkflowAgent) error {
 	return nil
 }
 
+func measureWorkflowTime() func() {
+	start := time.Now()
+	return func() {
+		elapsed := time.Since(start)
+		formatted := FormatMinutesSeconds(elapsed)
+		Infof("Workflow execution time: %v\n", formatted)
+	}
+}
+
 // RunWorkflow executes the defined workflow.
 func RunWorkflow(config *WorkflowConfig, prompt string) error {
 	var err error
@@ -200,6 +211,10 @@ func RunWorkflow(config *WorkflowConfig, prompt string) error {
 
 	// The initial prompt is passed to the first agent.
 	workflowPrompt := prompt
+
+	// Measure workflow time
+	// use defer, even error occured it still can measure
+	defer measureWorkflowTime()()
 
 	for _, agent := range config.Agents {
 		agentInfo := fmt.Sprintf("[%s (%s)]", agent.Name, agent.Role)
@@ -251,7 +266,7 @@ func RunWorkflow(config *WorkflowConfig, prompt string) error {
 	return nil
 }
 
-func executeAgent(agent *WorkflowAgent, prompt string) {
+func executeAgent(agent *WorkflowAgent, prompt string) error {
 	// Only Master can output to the console, Worker in quiet mode
 	quiet := (agent.Role == WorkflowAgentTypeWorker)
 
@@ -270,5 +285,6 @@ func executeAgent(agent *WorkflowAgent, prompt string) {
 		QuietMode:        quiet,            // Worker in quiet mode
 	}
 
-	CallAgent(&agentOptions)
+	err := CallAgent(&agentOptions)
+	return err
 }

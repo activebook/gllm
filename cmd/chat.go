@@ -806,7 +806,11 @@ func (ci *ChatInfo) callLLM(input string) {
 		QuietMode:        false,
 	}
 
-	service.CallAgent(&op)
+	err := service.CallAgent(&op)
+	if err != nil {
+		service.Errorf("%v", err)
+		return
+	}
 
 	// We must reset the files after processing
 	// We shouldn't pass the files to the next call each time
