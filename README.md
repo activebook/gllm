@@ -19,6 +19,7 @@
 - **More Integrated Tools**: Let LLMs plan and use more integrated tools.
 - **Track Token Usage**: Track token usage meta info.  
 - **Import/Export Configuration**: Import/Export custermized configuration file.
+- **Multi-Agents workflow**: Now you can use multi-agents to build and run a complex workflow.
 - **Version Control**: Easily track and update your setup.  
 
 ---
