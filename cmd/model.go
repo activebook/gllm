@@ -454,6 +454,27 @@ func GetEffectModelName() string {
 	return decodeModelName(defaultName)
 }
 
+func GetModelInfo(name string) (details map[string]any) {
+	encodedName := encodeModelName(name)
+	modelsMap := viper.GetStringMap("models")
+
+	if modelsMap == nil {
+		return nil
+	}
+
+	modelConfig, exists := modelsMap[encodedName]
+	if !exists {
+		return nil
+	}
+
+	// Type assert to get the nested map
+	if configMap, ok := modelConfig.(map[string]interface{}); ok {
+		return configMap
+	}
+
+	return nil
+}
+
 // GetEffectiveModel returns the configuration for the model to use
 func GetEffectiveModel() (name string, details map[string]any) {
 	defaultName := viper.GetString("agent.model")

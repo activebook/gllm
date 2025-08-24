@@ -54,6 +54,14 @@ func GetFilePath(dir string, filename string) string {
 	return filepath.Join(dir, filename)
 }
 
+func GetFileContent(filePath string) (string, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
 // Helper function to truncate strings with ellipsis
 func TruncateString(s string, maxLen int) string {
 	s = strings.TrimSpace(s)

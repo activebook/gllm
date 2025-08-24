@@ -28,7 +28,7 @@ var (
 
 	modelFlag        string   // gllm "What is Go?" -model(-m) gpt4o
 	attachments      []string // gllm "Summarize this" --attachment(-a) report.txt
-	sysPromptFlag    string   // gllm "Act as shell" --system-prompt(-S) @shell-assistant
+	sysPromptFlag    string   // gllm "Act as shell" --system(-S) shell-assistant
 	templateFlag     string   // gllm --template(-t) @coder
 	searchFlag       bool     // gllm --search(-s) "What is the stock price of Tesla right now?"
 	toolsFlag        bool     // gllm --tools(-t) "Move a.txt to folder b"
@@ -68,7 +68,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 			// It won't trigger an error or the help message based on the argument count alone.
 			if len(args) == 0 &&
 				!cmd.Flags().Changed("model") &&
-				!cmd.Flags().Changed("system-prompt") &&
+				!cmd.Flags().Changed("system") &&
 				!cmd.Flags().Changed("template") &&
 				!cmd.Flags().Changed("attachment") &&
 				!cmd.Flags().Changed("version") &&
@@ -343,7 +343,7 @@ func init() {
 	// Define the flags
 	rootCmd.Flags().StringVarP(&modelFlag, "model", "m", "", "Specify the language model to use")
 	rootCmd.Flags().StringSliceVarP(&attachments, "attachment", "a", []string{}, "Specify file(s), image(s), url(s) to append to the prompt")
-	rootCmd.Flags().StringVarP(&sysPromptFlag, "system-prompt", "S", "", "Specify a system prompt")
+	rootCmd.Flags().StringVarP(&sysPromptFlag, "system", "S", "", "Specify a system prompt")
 	rootCmd.Flags().StringVarP(&templateFlag, "template", "p", "", "Specify a template to use")
 	rootCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
 

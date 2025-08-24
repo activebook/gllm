@@ -7,6 +7,8 @@ design.md
 **test/*.*
 **test2/*
 **test2/*.*
+**workflow/*
+**workflow/*.*
 *checksums.txt
 
 # Ignore the compiled binary

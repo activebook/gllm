@@ -366,6 +366,32 @@ func GetAllSearchEngines() map[string]string {
 	return engines
 }
 
+func GetSearchEngineInfo(name string) map[string]any {
+	enginesMap := viper.GetStringMap("search_engines")
+
+	if enginesMap == nil {
+		return nil
+	}
+
+	engineConfig, exists := enginesMap[name]
+	if !exists {
+		return nil
+	}
+
+	// Convert the map[string]interface{} to map[string]any
+	if configMap, ok := engineConfig.(map[string]interface{}); ok {
+		// Create a new map with string keys and any values
+		resultMap := make(map[string]any)
+		for k, v := range configMap {
+			resultMap[k] = v
+		}
+		resultMap["name"] = name
+		return resultMap
+	}
+
+	return nil
+}
+
 func GetEffectiveSearchEngine() (name string, info map[string]any) {
 	defaultName := viper.GetString("agent.search")
 	enginesMap := viper.GetStringMap("search_engines")
