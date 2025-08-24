@@ -9,7 +9,7 @@ import (
 )
 
 // Hardcode the version string here
-const version = "v1.9.14" // <<< Set your desired version
+const version = "v1.10.0" // <<< Set your desired version
 
 func init() {
 	rootCmd.AddCommand(versionCmd)

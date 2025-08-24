@@ -48,6 +48,12 @@ func Infof(format string, args ...interface{}) {
 	}
 }
 
+func Successf(format string, args ...interface{}) {
+	if logger != nil {
+		logger.Infof(completeColor+format+resetColor, args...)
+	}
+}
+
 func Debugf(format string, args ...interface{}) {
 	if logger != nil {
 		logger.Debugf(debugColor+format+resetColor, args...)
