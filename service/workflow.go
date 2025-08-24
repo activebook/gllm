@@ -163,8 +163,8 @@ func runWorkerAgent(agent *WorkflowAgent) error {
 
 				// Format the task info
 				taskInfo := fmt.Sprintf("[%s] - %s", agent.Name, fileName)
-				Infof("\t  %s is working...", taskInfo)
-				Infof("\t  output file: %s", taskAgent.OutputFile)
+				Infof("\t%s is working...", taskInfo)
+				Infof("\ttask saved to: %s", taskAgent.OutputFile)
 
 				// Execute worker agent
 				executeAgent(&taskAgent, prompt)
@@ -208,21 +208,18 @@ func RunWorkflow(config *WorkflowConfig, prompt string) error {
 		switch agent.Role {
 		case WorkflowAgentTypeMaster:
 			Infof("Agent %s is working...", agentInfo)
-			// Pass through check
-			if agent.PassThrough {
-				Infof("Agent %s is passing through ↓", agentInfo)
-				continue
-			}
+
 		case WorkflowAgentTypeWorker:
-			Infof("\tAgent %s is working...", agentInfo)
-			// Pass through check
-			if agent.PassThrough {
-				Infof("\tAgent %s is passing through ↓", agentInfo)
-				continue
-			}
+			Infof("Agent %s is working...", agentInfo)
 		default:
 			err = fmt.Errorf("Agent %s has no role defined", agent.Name)
 			return err
+		}
+
+		// Pass through check
+		if agent.PassThrough {
+			Infof("Agent %s is passing through ↓", agentInfo)
+			continue
 		}
 
 		// Clear the output directory before running the agent

@@ -288,12 +288,48 @@ gllm workflow add --name planner --model groq-oss --tools enabled --template pla
 		}
 		// If search is empty string, we don't add it to the config (meaning no search)
 
+		// Handle template - check if it's a reference or plain text
 		if template != "" {
-			newAgent["template"] = template
+			// If template contains spaces, tabs, or newlines, treat as plain text
+			// Otherwise, treat as a reference to a named template
+			if strings.ContainsAny(template, " \t\n") {
+				// Plain text
+				newAgent["template"] = template
+			} else {
+				// Reference to a named template
+				templates := viper.GetStringMapString("templates")
+				if templateContent, exists := templates[template]; exists {
+					// Valid template reference - store the actual content
+					newAgent["template"] = templateContent
+				} else {
+					// Not found, but store it anyway as the user might have intended plain text
+					// This maintains backward compatibility
+					newAgent["template"] = template
+				}
+			}
 		}
+		
+		// Handle system prompt - check if it's a reference or plain text
 		if sysPrompt != "" {
-			newAgent["system"] = sysPrompt
+			// If system prompt contains spaces, tabs, or newlines, treat as plain text
+			// Otherwise, treat as a reference to a named system prompt
+			if strings.ContainsAny(sysPrompt, " \t\n") {
+				// Plain text
+				newAgent["system"] = sysPrompt
+			} else {
+				// Reference to a named system prompt
+				sysPrompts := viper.GetStringMapString("system_prompts")
+				if sysPromptContent, exists := sysPrompts[sysPrompt]; exists {
+					// Valid system prompt reference - store the actual content
+					newAgent["system"] = sysPromptContent
+				} else {
+					// Not found, but store it anyway as the user might have intended plain text
+					// This maintains backward compatibility
+					newAgent["system"] = sysPrompt
+				}
+			}
 		}
+
 		if usage != "" {
 			if boolVal, err := convertUserInputToBool(usage); err == nil {
 				newAgent["usage"] = boolVal
@@ -366,97 +402,6 @@ gllm workflow add --name planner --model groq-oss --tools enabled --template pla
 
 		return nil
 	},
-}
-
-// printAgentDetails prints the agent details in a formatted way
-func printAgentDetails(agent map[string]interface{}) {
-	if name, exists := agent["name"]; exists {
-		fmt.Printf("  Name: \033[95m%s\033[0m\n", name)
-	}
-
-	if role, exists := agent["role"]; exists {
-		roleStr := role.(string)
-		// Color coding for roles
-		if roleStr == string(service.WorkflowAgentTypeMaster) {
-			// Green for master role
-			fmt.Printf("  Role: \033[32m%s\033[0m\n", role)
-		} else if roleStr == string(service.WorkflowAgentTypeWorker) {
-			// Blue for worker role
-			fmt.Printf("  Role: \033[34m%s\033[0m\n", role)
-		} else {
-			// Default coloring for other roles
-			fmt.Printf("  Role: %s\n", role)
-		}
-	} else {
-		// Default role is master, shown in green
-		fmt.Printf("  Role: \033[32m%s\033[0m (default)\n", service.WorkflowAgentTypeMaster)
-	}
-
-	if model, exists := agent["model"]; exists {
-		fmt.Printf("  Model: %s\n", model)
-	}
-
-	if input, exists := agent["input"]; exists {
-		if inputStr, ok := input.(string); ok {
-			fmt.Printf("  Input: %s\n", inputStr)
-		} else {
-			fmt.Printf("  Input: %s\n", input)
-		}
-	} else {
-		fmt.Printf("  Input: \n")
-	}
-
-	if output, exists := agent["output"]; exists {
-		fmt.Printf("  Output: %s\n", output)
-	}
-
-	if template, exists := agent["template"]; exists {
-		fmt.Printf("  Template: %s\n", template)
-	} else {
-		fmt.Printf("  Template: \n")
-	}
-
-	if system, exists := agent["system"]; exists {
-		fmt.Printf("  System Prompt: %s\n", system)
-	} else {
-		fmt.Printf("  System Prompt: \n")
-	}
-
-	if search, exists := agent["search"]; exists {
-		fmt.Printf("  Search: %s\n", search)
-	} else {
-		fmt.Printf("  Search: \n")
-	}
-
-	if tools, exists := agent["tools"]; exists {
-		fmt.Printf("  Tools: %v\n", tools)
-	} else {
-		fmt.Printf("  Tools: false\n")
-	}
-
-	if usage, exists := agent["usage"]; exists {
-		fmt.Printf("  Usage: %v\n", usage)
-	} else {
-		fmt.Printf("  Usage: false\n")
-	}
-
-	if markdown, exists := agent["markdown"]; exists {
-		fmt.Printf("  Markdown: %v\n", markdown)
-	} else {
-		fmt.Printf("  Markdown: false\n")
-	}
-
-	if think, exists := agent["think"]; exists {
-		fmt.Printf("  Think: %v\n", think)
-	} else {
-		fmt.Printf("  Think: false\n")
-	}
-
-	if pass, exists := agent["pass"]; exists {
-		fmt.Printf("  Pass Through: %v\n", pass)
-	} else {
-		fmt.Printf("  Pass Through: false\n")
-	}
 }
 
 var workflowRemoveCmd = &cobra.Command{
@@ -641,13 +586,47 @@ gllm workflow set planner --model groq-oss --role master`,
 			updated = true
 		}
 
+		// Handle template - check if it's a reference or plain text
 		if template, err := cmd.Flags().GetString("template"); err == nil && template != "" {
-			agentMap["template"] = template
+			// If template contains spaces, tabs, or newlines, treat as plain text
+			// Otherwise, treat as a reference to a named template
+			if strings.ContainsAny(template, " \t\n") {
+				// Plain text
+				agentMap["template"] = template
+			} else {
+				// Reference to a named template
+				templates := viper.GetStringMapString("templates")
+				if templateContent, exists := templates[template]; exists {
+					// Valid template reference - store the actual content
+					agentMap["template"] = templateContent
+				} else {
+					// Not found, but store it anyway as the user might have intended plain text
+					// This maintains backward compatibility
+					agentMap["template"] = template
+				}
+			}
 			updated = true
 		}
 
+		// Handle system prompt - check if it's a reference or plain text
 		if sysPrompt, err := cmd.Flags().GetString("system"); err == nil && sysPrompt != "" {
-			agentMap["system"] = sysPrompt
+			// If system prompt contains spaces, tabs, or newlines, treat as plain text
+			// Otherwise, treat as a reference to a named system prompt
+			if strings.ContainsAny(sysPrompt, " \t\n") {
+				// Plain text
+				agentMap["system"] = sysPrompt
+			} else {
+				// Reference to a named system prompt
+				sysPrompts := viper.GetStringMapString("system_prompts")
+				if sysPromptContent, exists := sysPrompts[sysPrompt]; exists {
+					// Valid system prompt reference - store the actual content
+					agentMap["system"] = sysPromptContent
+				} else {
+					// Not found, but store it anyway as the user might have intended plain text
+					// This maintains backward compatibility
+					agentMap["system"] = sysPrompt
+				}
+			}
 			updated = true
 		}
 
@@ -985,4 +964,95 @@ func getBoolValue(m map[string]interface{}, key string) bool {
 		}
 	}
 	return false
+}
+
+// printAgentDetails prints the agent details in a formatted way
+func printAgentDetails(agent map[string]interface{}) {
+	if name, exists := agent["name"]; exists {
+		fmt.Printf("  Name: \033[95m%s\033[0m\n", name)
+	}
+
+	if role, exists := agent["role"]; exists {
+		roleStr := role.(string)
+		// Color coding for roles
+		if roleStr == string(service.WorkflowAgentTypeMaster) {
+			// Green for master role
+			fmt.Printf("  Role: \033[32m%s\033[0m\n", role)
+		} else if roleStr == string(service.WorkflowAgentTypeWorker) {
+			// Blue for worker role
+			fmt.Printf("  Role: \033[34m%s\033[0m\n", role)
+		} else {
+			// Default coloring for other roles
+			fmt.Printf("  Role: %s\n", role)
+		}
+	} else {
+		// Default role is master, shown in green
+		fmt.Printf("  Role: \033[32m%s\033[0m (default)\n", service.WorkflowAgentTypeMaster)
+	}
+
+	if model, exists := agent["model"]; exists {
+		fmt.Printf("  Model: %s\n", model)
+	}
+
+	if input, exists := agent["input"]; exists {
+		if inputStr, ok := input.(string); ok {
+			fmt.Printf("  Input: %s\n", inputStr)
+		} else {
+			fmt.Printf("  Input: %s\n", input)
+		}
+	} else {
+		fmt.Printf("  Input: \n")
+	}
+
+	if output, exists := agent["output"]; exists {
+		fmt.Printf("  Output: %s\n", output)
+	}
+
+	if template, exists := agent["template"]; exists {
+		fmt.Printf("  Template: %s\n", template)
+	} else {
+		fmt.Printf("  Template: \n")
+	}
+
+	if system, exists := agent["system"]; exists {
+		fmt.Printf("  System Prompt: %s\n", system)
+	} else {
+		fmt.Printf("  System Prompt: \n")
+	}
+
+	if search, exists := agent["search"]; exists {
+		fmt.Printf("  Search: %s\n", search)
+	} else {
+		fmt.Printf("  Search: \n")
+	}
+
+	if tools, exists := agent["tools"]; exists {
+		fmt.Printf("  Tools: %v\n", tools)
+	} else {
+		fmt.Printf("  Tools: false\n")
+	}
+
+	if usage, exists := agent["usage"]; exists {
+		fmt.Printf("  Usage: %v\n", usage)
+	} else {
+		fmt.Printf("  Usage: false\n")
+	}
+
+	if markdown, exists := agent["markdown"]; exists {
+		fmt.Printf("  Markdown: %v\n", markdown)
+	} else {
+		fmt.Printf("  Markdown: false\n")
+	}
+
+	if think, exists := agent["think"]; exists {
+		fmt.Printf("  Think: %v\n", think)
+	} else {
+		fmt.Printf("  Think: false\n")
+	}
+
+	if pass, exists := agent["pass"]; exists {
+		fmt.Printf("  Pass Through: %v\n", pass)
+	} else {
+		fmt.Printf("  Pass Through: false\n")
+	}
 }
