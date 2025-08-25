@@ -203,6 +203,14 @@ echo "Who's the POTUS right now?" | gllm -s # Use std input as search query
 gllm --code "import time\\nstart = time.time()\\nis_prime = lambda n: n > 1 and all(n % d for d in range(2, int(n**0.5) + 1))\\nLIMIT = 100000\\ncount = sum(1 for x in range(LIMIT) if is_prime(x))\\nend = time.time()\\nprint(f'Number of primes less than {LIMIT}: {count}')\\nprint(f'Time taken: {end - start:.2f} seconds')" -m gemini2.5
 ```
 
+### 🔹 New update! & Workflow Agents (Deep Research)
+
+```sh
+gllm workflow list            # list all agents
+gllm workflow add -n planner -o "./planner"      # add a planner agent
+gllm workflow start "who's the sweetheart in 2000-2010s in Britain?"  # Start workflow (deep research)
+```
+
 ### 🔹 Version Information
 
 ```sh
@@ -305,6 +313,21 @@ This project includes various features to enhance usability and efficiency. Belo
 | **Chat History with Reasoning**: Inspect past reasoning steps alongside your chat | ![Reasoning History Screenshot](screenshots/chathistory2.png) |
 | **Command Agent mode**: Utilize the power of command-line agents | ![Command Agent Screenshot](screenshots/commandagent.png) |
 | **Multi-Commands In One-Shot**: Run multiple commands in one shot | ![Multi-Commands Screenshot](screenshots/multicommands.png) |
+
+---
+
+## Workflow Features (Deep Research)
+
+| Feature & Description | Screenshot |
+|----------------------|------------|
+| **Planner**: Design a deep research plan | ![Planner](screenshots/deepresearch_planner.png) |
+| **Dispatcher**: Dispatch subtasks | ![Dispatcher](screenshots/deepresearch_dispatcher.png) |
+| **Workers**: subtask execution, parallelly operate | ![Workers](screenshots/deepresearch_workers.png) |
+| **Summarizer**: Summarize all subtask results, get the final report in details | ![Summarizer](screenshots/deepresearch_summarizer.png) |
+
+Check out more detials in [examples](examples/workflow/) directory.
+
+---
 
 For more details, using `gllm --help` to check.
 
