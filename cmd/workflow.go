@@ -52,6 +52,9 @@ func init() {
 	workflowSetCmd.Flags().StringP("output", "o", "", "Output directory")
 	workflowSetCmd.Flags().StringP("think", "T", "", "Think mode (on/off)")
 	workflowSetCmd.Flags().StringP("pass", "", "", "Pass through agent")
+
+	// Add flags to the start command
+	workflowStartCmd.Flags().BoolP("interactive", "i", false, "Enable interactive mode for workflow execution")
 }
 
 // configCmd represents the base command when called without any subcommands
@@ -280,7 +283,7 @@ gllm workflow add --name planner --model groq-oss --tools enabled --template pla
 			if boolVal, err := convertUserInputToBool(tools); err == nil {
 				newAgent["tools"] = boolVal
 			} else {
-				newAgent["tools"] = tools
+				newAgent["tools"] = false
 			}
 		}
 		if search != "" {
@@ -334,14 +337,14 @@ gllm workflow add --name planner --model groq-oss --tools enabled --template pla
 			if boolVal, err := convertUserInputToBool(usage); err == nil {
 				newAgent["usage"] = boolVal
 			} else {
-				newAgent["usage"] = usage
+				newAgent["usage"] = false
 			}
 		}
 		if markdown != "" {
 			if boolVal, err := convertUserInputToBool(markdown); err == nil {
 				newAgent["markdown"] = boolVal
 			} else {
-				newAgent["markdown"] = markdown
+				newAgent["markdown"] = false
 			}
 		}
 		if role != "" {
@@ -367,7 +370,7 @@ gllm workflow add --name planner --model groq-oss --tools enabled --template pla
 			if boolVal, err := convertUserInputToBool(think); err == nil {
 				newAgent["think"] = boolVal
 			} else {
-				newAgent["think"] = think
+				newAgent["think"] = false
 			}
 		}
 
@@ -375,7 +378,7 @@ gllm workflow add --name planner --model groq-oss --tools enabled --template pla
 			if boolVal, err := convertUserInputToBool(pass); err == nil {
 				newAgent["pass"] = boolVal
 			} else {
-				newAgent["pass"] = pass
+				newAgent["pass"] = false
 			}
 		}
 
@@ -571,7 +574,7 @@ gllm workflow set planner --model groq-oss --role master`,
 			if boolVal, err := convertUserInputToBool(tools); err == nil {
 				agentMap["tools"] = boolVal
 			} else {
-				agentMap["tools"] = tools
+				agentMap["tools"] = false
 			}
 			updated = true
 		}
@@ -634,7 +637,7 @@ gllm workflow set planner --model groq-oss --role master`,
 			if boolVal, err := convertUserInputToBool(usage); err == nil {
 				agentMap["usage"] = boolVal
 			} else {
-				agentMap["usage"] = usage
+				agentMap["usage"] = false
 			}
 			updated = true
 		}
@@ -643,7 +646,7 @@ gllm workflow set planner --model groq-oss --role master`,
 			if boolVal, err := convertUserInputToBool(markdown); err == nil {
 				agentMap["markdown"] = boolVal
 			} else {
-				agentMap["markdown"] = markdown
+				agentMap["markdown"] = false
 			}
 			updated = true
 		}
@@ -684,7 +687,7 @@ gllm workflow set planner --model groq-oss --role master`,
 			if boolVal, err := convertUserInputToBool(think); err == nil {
 				agentMap["think"] = boolVal
 			} else {
-				agentMap["think"] = think
+				agentMap["think"] = false
 			}
 			updated = true
 		}
@@ -694,7 +697,7 @@ gllm workflow set planner --model groq-oss --role master`,
 			if boolVal, err := convertUserInputToBool(pass); err == nil {
 				agentMap["pass"] = boolVal
 			} else {
-				agentMap["pass"] = pass
+				agentMap["pass"] = false
 			}
 			updated = true
 		}
@@ -863,7 +866,7 @@ var workflowStartCmd = &cobra.Command{
 The prompt will be passed to the first agent in the workflow.
 Example:
 gllm workflow start "What are the latest advancements in AI?"
-gllm workflow start`,
+gllm workflow start -i  # Run in interactive mode`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Get existing agents
@@ -882,8 +885,13 @@ gllm workflow start`,
 			return fmt.Errorf("invalid workflow configuration: %w", err)
 		}
 
+		// Check if interactive mode is enabled
+		interactive, _ := cmd.Flags().GetBool("interactive")
+
 		// Convert agents configuration to service.WorkflowConfig
-		workflowConfig := &service.WorkflowConfig{}
+		workflowConfig := &service.WorkflowConfig{
+			InterActiveMode: interactive, // Set the interactive mode flag
+		}
 
 		for _, agentItem := range agentsSlice {
 			agent, ok := agentItem.(map[string]interface{})

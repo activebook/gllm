@@ -1,6 +1,6 @@
 # gllm - Golang Command-Line LLM Companion
 
-`gllm` is a powerful command-line tool designed to interact seamlessly with various Large Language Models (LLMs). Supports features like interactive chat, multi-turn conversations, file attachments, search integration, command agent, and extensive customization.
+`gllm` is a powerful CLI tool designed to interact seamlessly with various Large Language Models (LLMs). Supports features like interactive chat, multi-turn conversations, file attachments, search integration, command agent, multi-agents workflow, deep research, and extensive customization.
 
 ## 🚀 Features  
 
@@ -208,7 +208,9 @@ gllm --code "import time\\nstart = time.time()\\nis_prime = lambda n: n > 1 and 
 ```sh
 gllm workflow list            # list all agents
 gllm workflow add -n planner -o "./planner"      # add a planner agent
+gllm workflow set planner --pass on # enable agent passthrough
 gllm workflow start "who's the sweetheart in 2000-2010s in Britain?"  # Start workflow (deep research)
+gllm workflow start -i | --interactive # interacive mode workflow
 ```
 
 ### 🔹 Version Information
