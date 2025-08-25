@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -39,7 +40,8 @@ type WorkflowAgent struct {
 
 // WorkflowConfig defines the structure for the entire workflow.
 type WorkflowConfig struct {
-	Agents []WorkflowAgent
+	Agents          []WorkflowAgent
+	InterActiveMode bool // Allow user confirm at each agent
 }
 
 func clearupOutputDir(outputDir string) error {
@@ -78,6 +80,94 @@ func buildAgentPrompt(agent *WorkflowAgent, prompt string) string {
 	appendText(&finalPrompt, prompt)
 
 	return finalPrompt.String()
+}
+
+// Terminal colors for workflow confirmation
+const (
+	agentNameColor    = "\033[95m" // Bright Magenta
+	agentRoleColor    = "\033[36m" // Cyan
+	modelColor        = "\033[92m" // Bright Green
+	directoryColor    = "\033[93m" // Yellow
+	promptColor       = "\033[96m" // Cyan
+	booleanTrueColor  = "\033[92m" // Bright Green
+	booleanFalseColor = "\033[90m" // Bright Black
+	workflowResetColor = "\033[0m"  // Reset
+)
+
+// promptUserForConfirmation asks the user to confirm before proceeding with an agent
+func promptUserForConfirmation(agent *WorkflowAgent) bool {
+	fmt.Printf("\n %sAgent:%s %s%s (%s%s%s)\n", agentNameColor, workflowResetColor, agentNameColor, agent.Name, agentRoleColor, agent.Role, workflowResetColor)
+	fmt.Printf("   %sModel:%s %s%v%s\n", modelColor, workflowResetColor, modelColor, (*agent.Model)["model"], workflowResetColor)
+	fmt.Printf("   %sInput directory:%s %s%s%s\n", directoryColor, workflowResetColor, directoryColor, agent.InputDir, workflowResetColor)
+	fmt.Printf("   %sOutput directory:%s %s%s%s\n", directoryColor, workflowResetColor, directoryColor, agent.OutputDir, workflowResetColor)
+	fmt.Printf("   %sSystem prompt:%s %s%s%s\n", promptColor, workflowResetColor, promptColor, agent.SystemPrompt, workflowResetColor)
+	fmt.Printf("   %sTemplate:%s %s%s%s\n", promptColor, workflowResetColor, promptColor, agent.Template, workflowResetColor)
+	
+	// Format search status
+	searchStatus := "false"
+	searchColor := booleanFalseColor
+	if agent.Search != nil {
+		searchStatus = "true"
+		searchColor = booleanTrueColor
+	}
+	fmt.Printf("   %sSearch:%s %s%s%s\n", searchColor, workflowResetColor, searchColor, searchStatus, workflowResetColor)
+	
+	// Format tools status
+	toolsStatus := "false"
+	toolsColor := booleanFalseColor
+	if agent.Tools {
+		toolsStatus = "true"
+		toolsColor = booleanTrueColor
+	}
+	fmt.Printf("   %sTools enabled:%s %s%s%s\n", toolsColor, workflowResetColor, toolsColor, toolsStatus, workflowResetColor)
+	
+	// Format think mode status
+	thinkStatus := "false"
+	thinkColor := booleanFalseColor
+	if agent.Think {
+		thinkStatus = "true"
+		thinkColor = booleanTrueColor
+	}
+	fmt.Printf("   %sThink mode:%s %s%s%s\n", thinkColor, workflowResetColor, thinkColor, thinkStatus, workflowResetColor)
+	
+	// Format usage tracking status
+	usageStatus := "false"
+	usageColor := booleanFalseColor
+	if agent.Usage {
+		usageStatus = "true"
+		usageColor = booleanTrueColor
+	}
+	fmt.Printf("   %sUsage tracking:%s %s%s%s\n", usageColor, workflowResetColor, usageColor, usageStatus, workflowResetColor)
+	
+	// Format markdown output status
+	markdownStatus := "false"
+	markdownColor := booleanFalseColor
+	if agent.Markdown {
+		markdownStatus = "true"
+		markdownColor = booleanTrueColor
+	}
+	fmt.Printf("   %sMarkdown output:%s %s%s%s\n", markdownColor, workflowResetColor, markdownColor, markdownStatus, workflowResetColor)
+	
+	// Format pass through status
+	passThroughStatus := "false"
+	passThroughColor := booleanFalseColor
+	if agent.PassThrough {
+		passThroughStatus = "true"
+		passThroughColor = booleanTrueColor
+	}
+	fmt.Printf("   %sPass through:%s %s%s%s\n", passThroughColor, workflowResetColor, passThroughColor, passThroughStatus, workflowResetColor)
+
+	fmt.Printf("\n%sDo you want to proceed with this agent? (y/N):%s ", agentNameColor, workflowResetColor)
+
+	reader := bufio.NewReader(os.Stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Printf("Error reading input: %v. Skipping agent.\n", err)
+		return false
+	}
+
+	response := strings.ToLower(strings.TrimSpace(input))
+	return response == "y" || response == "yes"
 }
 
 func runMasterAgent(agent *WorkflowAgent, prompt string) error {
@@ -235,6 +325,14 @@ func RunWorkflow(config *WorkflowConfig, prompt string) error {
 		if agent.PassThrough {
 			Infof("Agent %s is passing through ↓", agentInfo)
 			continue
+		}
+
+		// Interactive mode: ask for user confirmation before running the agent
+		if config.InterActiveMode {
+			if !promptUserForConfirmation(&agent) {
+				Infof("Agent %s skipped by user.", agentInfo)
+				continue
+			}
 		}
 
 		// Clear the output directory before running the agent
