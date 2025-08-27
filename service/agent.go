@@ -210,6 +210,11 @@ func CallAgent(op *AgentOptions) error {
 				// Send error through channel instead of returning
 				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 			}
+		case ModelMistral:
+			if err := ag.GenerateOpenAIStream(); err != nil {
+				// Send error through channel instead of returning
+				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
+			}
 		case ModelGemini:
 			if err := ag.GenerateGemini2Stream(); err != nil {
 				// Send error through channel instead of returning

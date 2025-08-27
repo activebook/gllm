@@ -12,6 +12,7 @@ const (
 	ModelGemini           = "gemini"
 	ModelOpenAI           = "openai"
 	ModelOpenAICompatible = "openai-compatible"
+	ModelMistral          = "mistral"
 	ModelUnknown          = "unknown"
 )
 
@@ -107,10 +108,16 @@ type OpenAIImageURL struct {
 }
 
 func DetectModelProvider(endPoint string) string {
-	domains := []string{"googleapis.com", "google.com"}
-	for _, domain := range domains {
+	goo_domains := []string{"googleapis.com", "google.com"}
+	for _, domain := range goo_domains {
 		if strings.Contains(endPoint, domain) {
 			return ModelGemini
+		}
+	}
+	mistral_domains := []string{"mistral.ai", "mistral.com", "codestral", "magistral"}
+	for _, domain := range mistral_domains {
+		if strings.Contains(endPoint, domain) {
+			return ModelMistral
 		}
 	}
 	return ModelOpenAICompatible
