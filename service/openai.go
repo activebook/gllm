@@ -179,17 +179,19 @@ func (c *OpenAI) process(ag *Agent) error {
 
 		// Create the request
 		req := openai.ChatCompletionRequest{
-			Model:         ag.ModelName,
-			Temperature:   ag.Temperature,
-			Messages:      convo.Messages,
-			Tools:         c.tools,
-			StreamOptions: &openai.StreamOptions{IncludeUsage: true},
-			Stream:        true,
+			Model:       ag.ModelName,
+			Temperature: ag.Temperature,
+			Messages:    convo.Messages,
+			Tools:       c.tools,
+			Stream:      true,
 		}
 
 		// Add reasoning effort if think mode is enabled
 		if ag.ThinkMode {
 			req.ReasoningEffort = "high"
+		}
+		if ag.TokenUsage != nil {
+			req.StreamOptions = &openai.StreamOptions{IncludeUsage: true}
 		}
 
 		// Make the streaming request

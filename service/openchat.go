@@ -191,6 +191,7 @@ func (c *OpenChat) process(ag *Agent) error {
 					Type: model.ThinkingTypeEnabled,
 				}
 			} else {
+				// For some models, it must explicitly tell it not to use thinking mode
 				thinking = &model.Thinking{
 					Type: model.ThinkingTypeDisabled,
 				}
@@ -198,12 +199,16 @@ func (c *OpenChat) process(ag *Agent) error {
 		}
 		// Create the request with thinking mode
 		req := model.CreateChatCompletionRequest{
-			Model:         ag.ModelName,
-			Temperature:   &ag.Temperature,
-			Messages:      convo.Messages,
-			Tools:         c.tools,
-			StreamOptions: &model.StreamOptions{IncludeUsage: true},
-			Thinking:      thinking,
+			Model:       ag.ModelName,
+			Temperature: &ag.Temperature,
+			Messages:    convo.Messages,
+			Tools:       c.tools,
+			Thinking:    thinking,
+		}
+
+		// Include token usage if tracking is enabled
+		if ag.TokenUsage != nil {
+			req.StreamOptions = &model.StreamOptions{IncludeUsage: true}
 		}
 
 		// Make the streaming request
