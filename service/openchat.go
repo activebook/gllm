@@ -75,10 +75,8 @@ func (ag *Agent) GenerateOpenChatStream() error {
 		tools = append(tools, searchTool)
 	}
 
-	chat := &OpenChat{
-		client:     client,
-		ctx:        &ctx,
-		tools:      tools,
+	op := OpenProcessor{
+		ctx:        ctx,
 		notify:     ag.NotifyChan,
 		data:       ag.DataChan,
 		proceed:    ag.ProceedChan,
@@ -87,6 +85,11 @@ func (ag *Agent) GenerateOpenChatStream() error {
 		queries:    make([]string, 0),
 		references: make([]map[string]interface{}, 0), // Updated to match new field type
 		status:     &ag.Status,
+	}
+	chat := &OpenChat{
+		client: client,
+		tools:  tools,
+		op:     &op,
 	}
 
 	// 2. Prepare the Messages for Chat Completion
@@ -155,17 +158,9 @@ func (ag *Agent) GenerateOpenChatStream() error {
 
 // Conversation manages the state of an ongoing conversation with an AI assistant
 type OpenChat struct {
-	client     *arkruntime.Client
-	ctx        *context.Context
-	tools      []*model.Tool
-	notify     chan<- StreamNotify      // Sub Channel to send notifications
-	data       chan<- StreamData        // Sub Channel to send data
-	proceed    <-chan bool              // Main Channel to receive proceed signal
-	search     *SearchEngine            // Search engine
-	toolsUse   *ToolsUse                // Use tools
-	queries    []string                 // List of queries to be sent to the AI assistant
-	references []map[string]interface{} // keep track of the references
-	status     *StatusStack             // Stack to manage streaming status
+	client *arkruntime.Client
+	tools  []*model.Tool
+	op     *OpenProcessor
 }
 
 func (c *OpenChat) process(ag *Agent) error {
@@ -181,7 +176,7 @@ func (c *OpenChat) process(ag *Agent) error {
 	for range ag.MaxRecursions {
 		i++
 		//Debugf("Processing conversation at times: %d\n", i)
-		c.status.ChangeTo(c.notify, StreamNotify{Status: StatusProcessing}, c.proceed)
+		c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusProcessing}, c.op.proceed)
 
 		// Set whether to use thinking mode
 		var thinking *model.Thinking
@@ -212,14 +207,14 @@ func (c *OpenChat) process(ag *Agent) error {
 		}
 
 		// Make the streaming request
-		stream, err := c.client.CreateChatCompletionStream(*c.ctx, req)
+		stream, err := c.client.CreateChatCompletionStream(c.op.ctx, req)
 
 		// If thinking mode caused an error, try again without thinking mode
 		if err != nil && req.Thinking != nil {
 			// Create request without thinking mode
 			// Because some models don't support the thinking property
 			req.Thinking = nil
-			stream, err = c.client.CreateChatCompletionStream(*c.ctx, req)
+			stream, err = c.client.CreateChatCompletionStream(c.op.ctx, req)
 			if err != nil {
 				return fmt.Errorf("stream creation error: %v", err)
 			}
@@ -231,7 +226,7 @@ func (c *OpenChat) process(ag *Agent) error {
 		defer stream.Close()
 
 		// Wait for the main goroutine to tell sub-goroutine to proceed
-		c.status.ChangeTo(c.notify, StreamNotify{Status: StatusStarted}, c.proceed)
+		c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusStarted}, c.op.proceed)
 
 		// Process the stream and collect tool calls
 		assistantMessage, toolCalls, resp, err := c.processStream(stream)
@@ -241,7 +236,7 @@ func (c *OpenChat) process(ag *Agent) error {
 
 		// Record token usage
 		// The final response contains the token usage metainfo
-		addUpOpenChatTokenUsage(ag, resp)
+		ag.addUpOpenChatTokenUsage(resp)
 
 		// Add the assistant's message to the conversation
 		convo.PushMessage(assistantMessage)
@@ -273,14 +268,14 @@ func (c *OpenChat) process(ag *Agent) error {
 	}
 
 	// Add queries to the output if any
-	if len(c.queries) > 0 {
-		q := "\n\n" + ag.SearchEngine.RetrieveQueries(c.queries)
-		c.data <- StreamData{Text: q, Type: DataTypeNormal}
+	if len(c.op.queries) > 0 {
+		q := "\n\n" + ag.SearchEngine.RetrieveQueries(c.op.queries)
+		c.op.data <- StreamData{Text: q, Type: DataTypeNormal}
 	}
 	// Add references to the output if any
-	if len(c.references) > 0 {
-		refs := "\n\n" + ag.SearchEngine.RetrieveReferences(c.references)
-		c.data <- StreamData{Text: refs, Type: DataTypeNormal}
+	if len(c.op.references) > 0 {
+		refs := "\n\n" + ag.SearchEngine.RetrieveReferences(c.op.references)
+		c.op.data <- StreamData{Text: refs, Type: DataTypeNormal}
 	}
 
 	// No more message
@@ -291,10 +286,10 @@ func (c *OpenChat) process(ag *Agent) error {
 	}
 
 	// Flush all data to the channel
-	c.data <- StreamData{Type: DataTypeFinished}
-	<-c.proceed
+	c.op.data <- StreamData{Type: DataTypeFinished}
+	<-c.op.proceed
 	// Notify that the stream is finished
-	c.status.ChangeTo(c.notify, StreamNotify{Status: StatusFinished}, nil)
+	c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusFinished}, nil)
 	return nil
 }
 
@@ -326,19 +321,19 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 			delta := (response.Choices[0].Delta)
 
 			// State transitions
-			switch c.status.Peek() {
+			switch c.op.status.Peek() {
 			case StatusReasoning:
 				// If reasoning content is empty, switch back to normal state
 				// This is to handle the case where reasoning content is empty but we already have content
 				// Aka, the model is done with reasoning content and starting to output normal content
 				if delta.ReasoningContent == nil ||
 					(*delta.ReasoningContent == "" && delta.Content != "") {
-					c.status.ChangeTo(c.notify, StreamNotify{Status: StatusReasoningOver}, c.proceed)
+					c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusReasoningOver}, c.op.proceed)
 				}
 			default:
 				// If reasoning content is not empty, switch to reasoning state
 				if HasContent(delta.ReasoningContent) {
-					c.status.ChangeTo(c.notify, StreamNotify{Status: StatusReasoning}, c.proceed)
+					c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusReasoning}, c.op.proceed)
 				}
 			}
 
@@ -346,11 +341,11 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 				// For reasoning model
 				text := *delta.ReasoningContent
 				reasoningBuffer.WriteString(text)
-				c.data <- StreamData{Text: text, Type: DataTypeReasoning}
+				c.op.data <- StreamData{Text: text, Type: DataTypeReasoning}
 			} else if delta.Content != "" {
 				text := delta.Content
 				contentBuffer.WriteString(text)
-				c.data <- StreamData{Text: text, Type: DataTypeNormal}
+				c.op.data <- StreamData{Text: text, Type: DataTypeNormal}
 			}
 
 			// Handle tool calls in the stream
@@ -432,28 +427,28 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	}
 
 	// Call function
-	c.status.ChangeTo(c.notify, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, formatToolCallArguments(argsMap))}, c.proceed)
+	c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, formatToolCallArguments(argsMap))}, c.op.proceed)
 
 	var msg *model.ChatCompletionMessage
 	var err error
 
 	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
 	toolHandlers := map[string]func(*model.ToolCall, *map[string]interface{}) (*model.ChatCompletionMessage, error){
-		"shell":               c.processShellToolCall,
-		"web_fetch":           c.processWebFetchToolCall,
-		"web_search":          c.processWebSearchToolCall,
-		"read_file":           c.processReadFileToolCall,
-		"write_file":          c.processWriteFileToolCall,
-		"edit_file":           c.processEditFileToolCall,
-		"create_directory":    c.processCreateDirectoryToolCall,
-		"list_directory":      c.processListDirectoryToolCall,
-		"delete_file":         c.processDeleteFileToolCall,
-		"delete_directory":    c.processDeleteDirectoryToolCall,
-		"move":                c.processMoveToolCall,
-		"copy":                c.processCopyToolCall,
-		"search_files":        c.processSearchFilesToolCall,
-		"search_text_in_file": c.processSearchTextInFileToolCall,
-		"read_multiple_files": c.processReadMultipleFilesToolCall,
+		"shell":               c.op.processShellToolCall,
+		"web_fetch":           c.op.processWebFetchToolCall,
+		"web_search":          c.op.processWebSearchToolCall,
+		"read_file":           c.op.processReadFileToolCall,
+		"write_file":          c.op.processWriteFileToolCall,
+		"edit_file":           c.op.processEditFileToolCall,
+		"create_directory":    c.op.processCreateDirectoryToolCall,
+		"list_directory":      c.op.processListDirectoryToolCall,
+		"delete_file":         c.op.processDeleteFileToolCall,
+		"delete_directory":    c.op.processDeleteDirectoryToolCall,
+		"move":                c.op.processMoveToolCall,
+		"copy":                c.op.processCopyToolCall,
+		"search_files":        c.op.processSearchFilesToolCall,
+		"search_text_in_file": c.op.processSearchTextInFileToolCall,
+		"read_multiple_files": c.op.processReadMultipleFilesToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {
@@ -464,7 +459,7 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	}
 
 	// Function call is done
-	c.status.ChangeTo(c.notify, StreamNotify{Status: StatusFunctionCallingOver}, c.proceed)
+	c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusFunctionCallingOver}, c.op.proceed)
 	return msg, err
 }
 
@@ -473,7 +468,7 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 // Each response may contain tool calls that trigger additional processing
 // New responses are generated based on tool call results
 // Each of these interactions consumes tokens that should be tracked
-func addUpOpenChatTokenUsage(ag *Agent, resp *model.ChatCompletionStreamResponse) {
+func (ag *Agent) addUpOpenChatTokenUsage(resp *model.ChatCompletionStreamResponse) {
 	//Warnf("addUpTokenUsage - PromptTokenCount: %d, CompletionTokenCount: %d, TotalTokenCount: %d", resp.Usage.PromptTokens, resp.Usage.CompletionTokens, resp.Usage.TotalTokens)
 	if resp != nil && resp.Usage != nil && ag.TokenUsage != nil {
 		ag.TokenUsage.RecordTokenUsage(int(resp.Usage.PromptTokens),

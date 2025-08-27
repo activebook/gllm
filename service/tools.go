@@ -579,7 +579,7 @@ func (ag *Agent) getOpenChatWebSearchTool() *model.Tool {
 
 // Tool implementation functions
 
-func (c *OpenChat) processReadFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func (op *OpenProcessor) processReadFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
@@ -629,7 +629,7 @@ func (c *OpenChat) processReadFileToolCall(toolCall *model.ToolCall, argsMap *ma
 	return &toolMessage, nil
 }
 
-func (c *OpenChat) processWriteFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func (op *OpenProcessor) processWriteFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
@@ -653,7 +653,7 @@ func (c *OpenChat) processWriteFileToolCall(toolCall *model.ToolCall, argsMap *m
 		needConfirm = true
 	}
 
-	if needConfirm && !c.toolsUse.AutoApprove {
+	if needConfirm && !op.toolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("write to file %s", path), fmt.Sprintf("write content to the file at path: %s", path))
 		toolMessage.Content = &model.ChatCompletionMessageContent{
@@ -689,7 +689,7 @@ func (c *OpenChat) processWriteFileToolCall(toolCall *model.ToolCall, argsMap *m
 	return &toolMessage, nil
 }
 
-func (c *OpenChat) processCreateDirectoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func (op *OpenProcessor) processCreateDirectoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
@@ -718,7 +718,7 @@ func (c *OpenChat) processCreateDirectoryToolCall(toolCall *model.ToolCall, args
 	return &toolMessage, nil
 }
 
-func (c *OpenChat) processListDirectoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func (op *OpenProcessor) processListDirectoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
@@ -756,7 +756,7 @@ func (c *OpenChat) processListDirectoryToolCall(toolCall *model.ToolCall, argsMa
 	return &toolMessage, nil
 }
 
-func (c *OpenChat) processDeleteFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func (op *OpenProcessor) processDeleteFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
@@ -775,7 +775,7 @@ func (c *OpenChat) processDeleteFileToolCall(toolCall *model.ToolCall, argsMap *
 		needConfirm = true
 	}
 
-	if needConfirm && !c.toolsUse.AutoApprove {
+	if needConfirm && !op.toolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("delete file %s", path), fmt.Sprintf("delete the file at path: %s", path))
 		toolMessage.Content = &model.ChatCompletionMessageContent{
@@ -801,7 +801,7 @@ func (c *OpenChat) processDeleteFileToolCall(toolCall *model.ToolCall, argsMap *
 	return &toolMessage, nil
 }
 
-func (c *OpenChat) processDeleteDirectoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func (op *OpenProcessor) processDeleteDirectoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
@@ -820,7 +820,7 @@ func (c *OpenChat) processDeleteDirectoryToolCall(toolCall *model.ToolCall, args
 		needConfirm = true
 	}
 
-	if needConfirm && !c.toolsUse.AutoApprove {
+	if needConfirm && !op.toolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("delete directory %s", path), fmt.Sprintf("delete the directory at path: %s and all its contents", path))
 		toolMessage.Content = &model.ChatCompletionMessageContent{
@@ -846,7 +846,7 @@ func (c *OpenChat) processDeleteDirectoryToolCall(toolCall *model.ToolCall, args
 	return &toolMessage, nil
 }
 
-func (c *OpenChat) processMoveToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func (op *OpenProcessor) processMoveToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
@@ -870,7 +870,7 @@ func (c *OpenChat) processMoveToolCall(toolCall *model.ToolCall, argsMap *map[st
 		needConfirm = true
 	}
 
-	if needConfirm && !c.toolsUse.AutoApprove {
+	if needConfirm && !op.toolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("move %s to %s", source, destination), fmt.Sprintf("move the file or directory from %s to %s", source, destination))
 		toolMessage.Content = &model.ChatCompletionMessageContent{
@@ -896,7 +896,7 @@ func (c *OpenChat) processMoveToolCall(toolCall *model.ToolCall, argsMap *map[st
 	return &toolMessage, nil
 }
 
-func (c *OpenChat) processSearchFilesToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func (op *OpenProcessor) processSearchFilesToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
@@ -940,7 +940,7 @@ func (c *OpenChat) processSearchFilesToolCall(toolCall *model.ToolCall, argsMap 
 	return &toolMessage, nil
 }
 
-func (c *OpenChat) processSearchTextInFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func (op *OpenProcessor) processSearchTextInFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
@@ -1005,7 +1005,7 @@ func (c *OpenChat) processSearchTextInFileToolCall(toolCall *model.ToolCall, arg
 	return &toolMessage, nil
 }
 
-func (c *OpenChat) processReadMultipleFilesToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func (op *OpenProcessor) processReadMultipleFilesToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
@@ -1066,7 +1066,7 @@ func (c *OpenChat) processReadMultipleFilesToolCall(toolCall *model.ToolCall, ar
 	return &toolMessage, nil
 }
 
-func (c *OpenChat) processShellToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func (op *OpenProcessor) processShellToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	// Create a tool message
 	// Tool Message's Content wouldn't be serialized in the response
 	// That's not a problem, because each time, the tool result could be different!
@@ -1085,7 +1085,7 @@ func (c *OpenChat) processShellToolCall(toolCall *model.ToolCall, argsMap *map[s
 		// there is no need_confirm parameter, so we assume it's false
 		needConfirm = false
 	}
-	if needConfirm && !c.toolsUse.AutoApprove {
+	if needConfirm && !op.toolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
 		descStr, ok := (*argsMap)["purpose"].(string)
 		if !ok {
@@ -1146,7 +1146,7 @@ func (c *OpenChat) processShellToolCall(toolCall *model.ToolCall, argsMap *map[s
 	return &toolMessage, nil
 }
 
-func (c *OpenChat) processWebFetchToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func (op *OpenProcessor) processWebFetchToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
@@ -1179,29 +1179,29 @@ func (c *OpenChat) processWebFetchToolCall(toolCall *model.ToolCall, argsMap *ma
 	return &toolMessage, nil
 }
 
-func (c *OpenChat) processWebSearchToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func (op *OpenProcessor) processWebSearchToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	query, ok := (*argsMap)["query"].(string)
 	if !ok {
 		return nil, fmt.Errorf("query not found in arguments for tool call ID %s", toolCall.ID)
 	}
 
 	// Call the search function
-	engine := c.search.Name
+	engine := op.search.Name
 	var data map[string]any
 	var err error
 	switch engine {
 	case GoogleSearchEngine:
 		// Use Google Search Engine
-		data, err = c.search.GoogleSearch(query)
+		data, err = op.search.GoogleSearch(query)
 	case BingSearchEngine:
 		// Use Bing Search Engine
-		data, err = c.search.BingSearch(query)
+		data, err = op.search.BingSearch(query)
 	case TavilySearchEngine:
 		// Use Tavily Search Engine
-		data, err = c.search.TavilySearch(query)
+		data, err = op.search.TavilySearch(query)
 	case DummySearchEngine:
 		// Use None Search Engine
-		data, err = c.search.NoneSearch(query)
+		data, err = op.search.NoneSearch(query)
 	default:
 		err = fmt.Errorf("unknown search engine: %s", engine)
 	}
@@ -1210,8 +1210,8 @@ func (c *OpenChat) processWebSearchToolCall(toolCall *model.ToolCall, argsMap *m
 		return nil, fmt.Errorf("error performing search for query '%s': %v", query, err)
 	}
 	// keep the search results for references
-	c.queries = append(c.queries, query)
-	c.references = append(c.references, data)
+	op.queries = append(op.queries, query)
+	op.references = append(op.references, data)
 
 	// Convert search results to JSON string
 	resultsJSON, err := json.Marshal(data)
@@ -1229,7 +1229,7 @@ func (c *OpenChat) processWebSearchToolCall(toolCall *model.ToolCall, argsMap *m
 	}, nil
 }
 
-func (c *OpenChat) processEditFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func (op *OpenProcessor) processEditFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
@@ -1255,7 +1255,7 @@ func (c *OpenChat) processEditFileToolCall(toolCall *model.ToolCall, argsMap *ma
 	}
 
 	// If confirmation is needed, ask the user before proceeding
-	if needConfirm && !c.toolsUse.AutoApprove {
+	if needConfirm && !op.toolsUse.AutoApprove {
 		var editsDescription strings.Builder
 		editsDescription.WriteString("The following edits will be applied to the file:\n")
 		for _, editInterface := range editsInterface {
@@ -1401,7 +1401,7 @@ func (c *OpenChat) processEditFileToolCall(toolCall *model.ToolCall, argsMap *ma
 	return &toolMessage, nil
 }
 
-func (c *OpenChat) processCopyToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func (op *OpenProcessor) processCopyToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
@@ -1425,7 +1425,7 @@ func (c *OpenChat) processCopyToolCall(toolCall *model.ToolCall, argsMap *map[st
 		needConfirm = true
 	}
 
-	if needConfirm && !c.toolsUse.AutoApprove {
+	if needConfirm && !op.toolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("copy %s to %s", source, destination), fmt.Sprintf("copy the file or directory from %s to %s", source, destination))
 		toolMessage.Content = &model.ChatCompletionMessageContent{

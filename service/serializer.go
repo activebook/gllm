@@ -7,15 +7,6 @@ import (
 	"strings"
 )
 
-const (
-	// Model types
-	ModelGemini           = "gemini"
-	ModelOpenAI           = "openai"
-	ModelOpenAICompatible = "openai-compatible"
-	ModelMistral          = "mistral"
-	ModelUnknown          = "unknown"
-)
-
 var (
 	// RoleColors for message roles
 	RoleColors = map[string]string{
@@ -105,22 +96,6 @@ type OpenAIContentItem struct {
 
 type OpenAIImageURL struct {
 	Url string `json:"url"` // Can be data URL or HTTP URL
-}
-
-func DetectModelProvider(endPoint string) string {
-	goo_domains := []string{"googleapis.com", "google.com"}
-	for _, domain := range goo_domains {
-		if strings.Contains(endPoint, domain) {
-			return ModelGemini
-		}
-	}
-	mistral_domains := []string{"mistral.ai", "mistral.com", "codestral", "magistral"}
-	for _, domain := range mistral_domains {
-		if strings.Contains(endPoint, domain) {
-			return ModelMistral
-		}
-	}
-	return ModelOpenAICompatible
 }
 
 // Detects the conversation provider based on message format

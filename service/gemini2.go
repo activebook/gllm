@@ -176,7 +176,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		}
 		// Record token usage
 		// The final response contains the token usage metainfo
-		addUpGemini2TokenUsage(ag, resp)
+		ag.addUpGemini2TokenUsage(resp)
 
 		// No furtheer calls
 		if len(*funcCalls) == 0 {
@@ -371,7 +371,7 @@ func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Functi
 // Each response may contain tool calls that trigger additional processing
 // New responses are generated based on tool call results
 // Each of these interactions consumes tokens that should be tracked
-func addUpGemini2TokenUsage(ag *Agent, resp *genai.GenerateContentResponse) {
+func (ag *Agent) addUpGemini2TokenUsage(resp *genai.GenerateContentResponse) {
 	if resp != nil && resp.UsageMetadata != nil && ag.TokenUsage != nil {
 		// Warnf("addUpTokenUsage - PromptTokenCount: %d, CandidatesTokenCount: %d, CachedContentTokenCount: %d, ThoughtsTokenCount: %d, TotalTokenCount: %d",
 		// 	resp.UsageMetadata.PromptTokenCount,
