@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -713,6 +714,22 @@ func getOpenWebSearchTool() *OpenTool {
 	}
 
 	return &searchTool
+}
+
+// OpenProcessor is the main processor for OpenAI-like models
+// For tools implementation
+// - It manages the context, notifications, data streaming, and tool usage
+// - It handles queries and references, and maintains the status stack
+type OpenProcessor struct {
+	ctx        context.Context
+	notify     chan<- StreamNotify      // Sub Channel to send notifications
+	data       chan<- StreamData        // Sub Channel to send data
+	proceed    <-chan bool              // Main Channel to receive proceed signal
+	search     *SearchEngine            // Search engine
+	toolsUse   *ToolsUse                // Use tools
+	queries    []string                 // List of queries to be sent to the AI assistant
+	references []map[string]interface{} // keep track of the references
+	status     *StatusStack             // Stack to manage streaming status
 }
 
 // OpenAI tool implementations (wrapper functions)
