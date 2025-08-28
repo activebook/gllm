@@ -331,12 +331,19 @@ func (c *OpenAIConversation) Load() error {
 	}
 
 	// Parse messages
-	var messages []openai.ChatCompletionMessage
-	if err := json.Unmarshal(data, &messages); err != nil {
+
+	if err := json.Unmarshal(data, &c.Messages); err != nil {
 		// If there's an error unmarshaling, it might be an old format
 		return fmt.Errorf("failed to parse conversation file: %v", err)
 	}
-	c.Messages = messages
+
+	if len(c.Messages) > 0 {
+		msg := c.Messages[0]
+		if msg.Content == "" {
+			return fmt.Errorf("invalid conversation format: isn't a compatible format. '%s'", c.Path)
+		}
+	}
+
 	return nil
 }
 
