@@ -72,7 +72,8 @@ Configure your API keys and preferred models, then start chatting or executing c
 				!cmd.Flags().Changed("template") &&
 				!cmd.Flags().Changed("attachment") &&
 				!cmd.Flags().Changed("version") &&
-				!cmd.Flags().Changed("conversation") &&
+				!cmd.Flags().Changed("conversion") &&
+				!cmd.Flags().Changed("reference") &&
 				!hasStdinData() {
 				cmd.Help()
 				return
@@ -148,18 +149,6 @@ Configure your API keys and preferred models, then start chatting or executing c
 				if !thinkFlag {
 					// if think flag is not set, check if it's enabled globally
 					thinkFlag = IsThinkEnabled()
-				}
-
-				// Check if -c/--conversation was used without a value
-				if cmd.Flags().Changed("conversation") {
-					// Flag was used without a value, use a default name
-					// Debug what's happening
-					//service.Debugf("Conversation flag was changed, value is: '%s'", convoName)
-
-					// set convo history path, if the path is not empty, it would load the history
-					service.NewOpenChatConversation(convoName, true)
-					service.NewOpenAIConversation(convoName, true)
-					service.NewGemini2Conversation(convoName, true)
 				}
 
 				// Process all prompt building
@@ -298,6 +287,7 @@ func processQuery(prompt string, files []*service.FileData) {
 		AppendMarkdown:   includeMarkdown,
 		OutputFile:       "",
 		QuietMode:        false,
+		ConvoName:        convoName,
 	}
 	err := service.CallAgent(&op)
 	if err != nil {

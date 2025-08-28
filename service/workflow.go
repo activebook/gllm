@@ -84,13 +84,13 @@ func buildAgentPrompt(agent *WorkflowAgent, prompt string) string {
 
 // Terminal colors for workflow confirmation
 const (
-	agentNameColor    = "\033[95m" // Bright Magenta
-	agentRoleColor    = "\033[36m" // Cyan
-	modelColor        = "\033[92m" // Bright Green
-	directoryColor    = "\033[93m" // Yellow
-	promptColor       = "\033[96m" // Cyan
-	booleanTrueColor  = "\033[92m" // Bright Green
-	booleanFalseColor = "\033[90m" // Bright Black
+	agentNameColor     = "\033[95m" // Bright Magenta
+	agentRoleColor     = "\033[36m" // Cyan
+	modelColor         = "\033[92m" // Bright Green
+	directoryColor     = "\033[93m" // Yellow
+	promptColor        = "\033[96m" // Cyan
+	booleanTrueColor   = "\033[92m" // Bright Green
+	booleanFalseColor  = "\033[90m" // Bright Black
 	workflowResetColor = "\033[0m"  // Reset
 )
 
@@ -102,7 +102,7 @@ func promptUserForConfirmation(agent *WorkflowAgent) bool {
 	fmt.Printf("   %sOutput directory:%s %s%s%s\n", directoryColor, workflowResetColor, directoryColor, agent.OutputDir, workflowResetColor)
 	fmt.Printf("   %sSystem prompt:%s %s%s%s\n", promptColor, workflowResetColor, promptColor, agent.SystemPrompt, workflowResetColor)
 	fmt.Printf("   %sTemplate:%s %s%s%s\n", promptColor, workflowResetColor, promptColor, agent.Template, workflowResetColor)
-	
+
 	// Format search status
 	searchStatus := "false"
 	searchColor := booleanFalseColor
@@ -111,7 +111,7 @@ func promptUserForConfirmation(agent *WorkflowAgent) bool {
 		searchColor = booleanTrueColor
 	}
 	fmt.Printf("   %sSearch:%s %s%s%s\n", searchColor, workflowResetColor, searchColor, searchStatus, workflowResetColor)
-	
+
 	// Format tools status
 	toolsStatus := "false"
 	toolsColor := booleanFalseColor
@@ -120,7 +120,7 @@ func promptUserForConfirmation(agent *WorkflowAgent) bool {
 		toolsColor = booleanTrueColor
 	}
 	fmt.Printf("   %sTools enabled:%s %s%s%s\n", toolsColor, workflowResetColor, toolsColor, toolsStatus, workflowResetColor)
-	
+
 	// Format think mode status
 	thinkStatus := "false"
 	thinkColor := booleanFalseColor
@@ -129,7 +129,7 @@ func promptUserForConfirmation(agent *WorkflowAgent) bool {
 		thinkColor = booleanTrueColor
 	}
 	fmt.Printf("   %sThink mode:%s %s%s%s\n", thinkColor, workflowResetColor, thinkColor, thinkStatus, workflowResetColor)
-	
+
 	// Format usage tracking status
 	usageStatus := "false"
 	usageColor := booleanFalseColor
@@ -138,7 +138,7 @@ func promptUserForConfirmation(agent *WorkflowAgent) bool {
 		usageColor = booleanTrueColor
 	}
 	fmt.Printf("   %sUsage tracking:%s %s%s%s\n", usageColor, workflowResetColor, usageColor, usageStatus, workflowResetColor)
-	
+
 	// Format markdown output status
 	markdownStatus := "false"
 	markdownColor := booleanFalseColor
@@ -147,7 +147,7 @@ func promptUserForConfirmation(agent *WorkflowAgent) bool {
 		markdownColor = booleanTrueColor
 	}
 	fmt.Printf("   %sMarkdown output:%s %s%s%s\n", markdownColor, workflowResetColor, markdownColor, markdownStatus, workflowResetColor)
-	
+
 	// Format pass through status
 	passThroughStatus := "false"
 	passThroughColor := booleanFalseColor
@@ -381,6 +381,7 @@ func executeAgent(agent *WorkflowAgent, prompt string) error {
 		AppendUsage:      agent.Usage,
 		OutputFile:       agent.OutputFile, // Write to file
 		QuietMode:        quiet,            // Worker in quiet mode
+		ConvoName:        "",
 	}
 
 	err := CallAgent(&agentOptions)

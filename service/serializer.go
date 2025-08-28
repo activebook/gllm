@@ -99,7 +99,7 @@ type OpenAIImageURL struct {
 }
 
 // Detects the conversation provider based on message format
-func DetectMessageProvider(data []byte) string {
+func DetectMessageProvider(data []byte) ModelProvider {
 	// Try to unmarshal as array of messages
 	var messages []json.RawMessage
 	if err := json.Unmarshal(data, &messages); err != nil {

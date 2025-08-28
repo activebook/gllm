@@ -4,11 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 
 	openai "github.com/sashabaranov/go-openai"
 	//"github.com/google/generative-ai-go/genai"
@@ -26,26 +24,32 @@ type ConversationManager interface {
 	GetPath() string
 	Load() error
 	Save() error
+	Open(title string) error
 	Clear() error
+	Push(messages ...interface{})
+	GetMessages() interface{}
+	SetMessages(messages interface{})
 }
 
 // BaseConversation holds common fields and methods for all conversation types
 type BaseConversation struct {
-	Name       string
-	Path       string
-	ShouldLoad bool
+	Name string
+	Path string
 }
 
 // SetPath sets the file path for saving the conversation
 func (c *BaseConversation) SetPath(title string) {
+	if title == "" {
+		c.Path = ""
+		return
+	}
 	dir := MakeUserSubDir("gllm", "convo")
 	c.Path = GetFilePath(dir, title+".json")
-	if c.ShouldLoad {
-		// Check if file exists, if not, create an empty one
-		if _, err := os.Stat(c.Path); os.IsNotExist(err) {
-			empty := []byte("[]")
-			_ = os.WriteFile(c.Path, empty, 0644)
-		}
+
+	// Check if file exists, if not, create an empty one
+	if _, err := os.Stat(c.Path); os.IsNotExist(err) {
+		empty := []byte("[]")
+		_ = os.WriteFile(c.Path, empty, 0644)
 	}
 }
 
@@ -55,7 +59,7 @@ func (c *BaseConversation) GetPath() string {
 
 // Common validation and file operations
 func (c *BaseConversation) readFile() ([]byte, error) {
-	if !c.ShouldLoad {
+	if c.Name == "" {
 		return nil, nil
 	}
 
@@ -81,14 +85,36 @@ func (c *BaseConversation) readFile() ([]byte, error) {
 }
 
 func (c *BaseConversation) writeFile(data []byte) error {
-	if !c.ShouldLoad {
+	if c.Name == "" {
 		return nil
 	}
 	return os.WriteFile(c.Path, data, 0644)
 }
 
+func (c *BaseConversation) Push(messages ...interface{}) {
+}
+
+func (c *BaseConversation) GetMessages() interface{} {
+	return nil
+}
+
+func (c *BaseConversation) SetMessages(messages interface{}) {
+}
+
+func (c *BaseConversation) Open(title string) error {
+	return nil
+}
+
+func (c *BaseConversation) Save() error {
+	return nil
+}
+
+func (c *BaseConversation) Load() error {
+	return nil
+}
+
 func (c *BaseConversation) Clear() error {
-	if !c.ShouldLoad {
+	if c.Name == "" {
 		return nil
 	}
 	// Clear the content of the file by writing an empty string to it
@@ -110,73 +136,55 @@ type OpenChatConversation struct {
 	Messages []*model.ChatCompletionMessage
 }
 
-var openchatInstance *OpenChatConversation
-var openchatOnce sync.Once
-
-// NewOpenChatConversation creates or returns the singleton instance
-func NewOpenChatConversation(title string, shouldLoad bool) *OpenChatConversation {
-	openchatOnce.Do(func() {
-		openchatInstance = &OpenChatConversation{
-			BaseConversation: BaseConversation{
-				Name:       GetDefaultConvoName(),
-				ShouldLoad: shouldLoad,
-			},
-			Messages: []*model.ChatCompletionMessage{},
-		}
-		if shouldLoad {
-			if title == "" {
-				title = GetDefaultConvoName()
-			} else {
-				// check if it's an index
-				index, err := strconv.Atoi(title)
-				if err == nil {
-					// It's an index, resolve to conversation name using your sorted list logic
-					convos, err := ListSortedConvos(GetConvoDir())
-					if err != nil {
-						// handle error
-						Warnf("Failed to resolve conversation index: %v", err)
-						Warnf("Using default conversation")
-						title = GetDefaultConvoName()
-					}
-					if index < 1 || index > len(convos) {
-						// handle out of range
-						Warnf("Conversation index out of range: %d", index)
-						Warnf("Using default conversation")
-						title = GetDefaultConvoName()
-					} else {
-						title = convos[index-1].Name
-					}
-				}
-			}
-			openchatInstance.Name = title
-			sanitized := GetSanitizeTitle(openchatInstance.Name)
-			openchatInstance.SetPath(sanitized)
-		}
-	})
-	return openchatInstance
-}
-
-// GetOpenChatConversation returns the singleton instance
-func GetOpenChatConversation() *OpenChatConversation {
-	if openchatInstance == nil {
-		return NewOpenChatConversation("", false)
+// Open initializes an OpenChatConversation with the provided title, resolving
+// an index to the actual conversation name if necessary. It resets the messages,
+// sanitizes the conversation name for the path, and sets the internal path accordingly.
+// Returns an error if the title cannot be resolved.
+func (c *OpenChatConversation) Open(title string) error {
+	// check if it's an index
+	title, err := FindConvosByIndex(title)
+	if err != nil {
+		return err
 	}
-	return openchatInstance
-}
-
-// PushMessage adds a message to the conversation
-func (c *OpenChatConversation) PushMessage(message *model.ChatCompletionMessage) {
-	c.Messages = append(c.Messages, message)
+	// If title is still empty, no convo found
+	if title == "" {
+		return nil
+	}
+	// Set the name and path
+	c.BaseConversation = BaseConversation{
+		Name: title,
+	}
+	c.Messages = []*model.ChatCompletionMessage{}
+	sanitized := GetSanitizeTitle(c.Name)
+	c.SetPath(sanitized)
+	return nil
 }
 
 // PushMessages adds multiple messages to the conversation
-func (c *OpenChatConversation) PushMessages(messages []*model.ChatCompletionMessage) {
-	c.Messages = append(c.Messages, messages...)
+func (c *OpenChatConversation) Push(messages ...interface{}) {
+	for _, msg := range messages {
+		switch v := msg.(type) {
+		case *model.ChatCompletionMessage:
+			c.Messages = append(c.Messages, v)
+		case []*model.ChatCompletionMessage:
+			c.Messages = append(c.Messages, v...)
+		}
+	}
+}
+
+func (c *OpenChatConversation) GetMessages() interface{} {
+	return c.Messages
+}
+
+func (c *OpenChatConversation) SetMessages(messages interface{}) {
+	if msgs, ok := messages.([]*model.ChatCompletionMessage); ok {
+		c.Messages = msgs
+	}
 }
 
 // Save persists the conversation to disk
 func (c *OpenChatConversation) Save() error {
-	if !c.ShouldLoad || len(c.Messages) == 0 {
+	if c.Name == "" || len(c.Messages) == 0 {
 		return nil
 	}
 
@@ -202,6 +210,10 @@ func (c *OpenChatConversation) Save() error {
 
 // Load retrieves the conversation from disk
 func (c *OpenChatConversation) Load() error {
+	if c.Name == "" {
+		return nil
+	}
+
 	data, err := c.readFile()
 	if err != nil || data == nil {
 		return err
@@ -222,13 +234,15 @@ func (c *OpenChatConversation) Load() error {
 	return nil
 }
 
+// Clear removes all messages from the conversation
+func (c *OpenChatConversation) Clear() error {
+	c.Messages = []*model.ChatCompletionMessage{}
+	return c.BaseConversation.Clear()
+}
+
 /*
  * OpenAI Conversation
  */
-
-// Add OpenAI conversation variables
-var openaiInstance *OpenAIConversation
-var openaiOnce sync.Once
 
 // OpenAIConversation represents a conversation using OpenAI format
 type OpenAIConversation struct {
@@ -236,70 +250,51 @@ type OpenAIConversation struct {
 	Messages []openai.ChatCompletionMessage
 }
 
-// NewOpenAIConversation creates or returns the singleton instance
-func NewOpenAIConversation(title string, shouldLoad bool) *OpenAIConversation {
-	openaiOnce.Do(func() {
-		openaiInstance = &OpenAIConversation{
-			BaseConversation: BaseConversation{
-				Name:       GetDefaultConvoName(),
-				ShouldLoad: shouldLoad,
-			},
-			Messages: []openai.ChatCompletionMessage{},
-		}
-		if shouldLoad {
-			if title == "" {
-				title = GetDefaultConvoName()
-			} else {
-				// check if it's an index
-				index, err := strconv.Atoi(title)
-				if err == nil {
-					// It's an index, resolve to conversation name using your sorted list logic
-					convos, err := ListSortedConvos(GetConvoDir())
-					if err != nil {
-						// handle error
-						Warnf("Failed to resolve conversation index: %v", err)
-						Warnf("Using default conversation")
-						title = GetDefaultConvoName()
-					}
-					if index < 1 || index > len(convos) {
-						// handle out of range
-						Warnf("Conversation index out of range: %d", index)
-						Warnf("Using default conversation")
-						title = GetDefaultConvoName()
-					} else {
-						title = convos[index-1].Name
-					}
-				}
-			}
-			openaiInstance.Name = title
-			sanitized := GetSanitizeTitle(openaiInstance.Name)
-			openaiInstance.SetPath(sanitized)
-		}
-	})
-	return openaiInstance
-}
-
-// GetOpenAIConversation returns the singleton instance
-func GetOpenAIConversation() *OpenAIConversation {
-	if openaiInstance == nil {
-		return NewOpenAIConversation("", false)
+func (c *OpenAIConversation) Open(title string) error {
+	// check if it's an index
+	title, err := FindConvosByIndex(title)
+	if err != nil {
+		return err
 	}
-	return openaiInstance
-}
-
-// PushMessage adds a message to the conversation
-func (c *OpenAIConversation) PushMessage(message openai.ChatCompletionMessage) {
-	c.Messages = append(c.Messages, message)
+	// If title is still empty, no convo found
+	if title == "" {
+		return nil
+	}
+	// Set the name and path
+	c.BaseConversation = BaseConversation{
+		Name: title,
+	}
+	c.Messages = []openai.ChatCompletionMessage{}
+	sanitized := GetSanitizeTitle(c.Name)
+	c.SetPath(sanitized)
+	return nil
 }
 
 // PushMessages adds multiple messages to the conversation
-func (c *OpenAIConversation) PushMessages(messages []openai.ChatCompletionMessage) {
-	c.Messages = append(c.Messages, messages...)
+func (c *OpenAIConversation) Push(messages ...interface{}) {
+	for _, msg := range messages {
+		switch v := msg.(type) {
+		case openai.ChatCompletionMessage:
+			c.Messages = append(c.Messages, v)
+		case []openai.ChatCompletionMessage:
+			c.Messages = append(c.Messages, v...)
+		}
+	}
+}
+
+func (c *OpenAIConversation) GetMessages() interface{} {
+	return c.Messages
+}
+
+func (c *OpenAIConversation) SetMessages(messages interface{}) {
+	if msgs, ok := messages.([]openai.ChatCompletionMessage); ok {
+		c.Messages = msgs
+	}
 }
 
 // Save persists the conversation to disk
 func (c *OpenAIConversation) Save() error {
-	if !c.ShouldLoad || len(c.Messages) == 0 {
+	if c.Name == "" || len(c.Messages) == 0 {
 		return nil
 	}
 
@@ -325,51 +320,37 @@ func (c *OpenAIConversation) Save() error {
 
 // Load retrieves the conversation from disk
 func (c *OpenAIConversation) Load() error {
-	if !c.ShouldLoad {
+	if c.Name == "" {
 		return nil
 	}
 
-	// Ensure directory exists
-	dir := filepath.Dir(c.Path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create conversation directory: %w", err)
-	}
-
-	// Check if file exists
-	if _, err := os.Stat(c.Path); os.IsNotExist(err) {
-		// Create empty file
-		empty := []byte("[]")
-		return os.WriteFile(c.Path, empty, 0644)
-	}
-
-	// Read file
-	data, err := os.ReadFile(c.Path)
-	if err != nil {
-		return fmt.Errorf("failed to read conversation file: %w", err)
+	// read file
+	data, err := c.readFile()
+	if err != nil || data == nil {
+		return err
 	}
 
 	// Parse messages
-	var messages []openai.ChatCompletionMessage
-	if err := json.Unmarshal(data, &messages); err != nil {
+
+	if err := json.Unmarshal(data, &c.Messages); err != nil {
 		// If there's an error unmarshaling, it might be an old format
-		// Try to handle gracefully by starting fresh
-		Warnf("Failed to parse conversation file, starting fresh: %v", err)
-		c.Messages = []openai.ChatCompletionMessage{}
-		return nil
+		return fmt.Errorf("failed to parse conversation file: %v", err)
 	}
 
-	c.Messages = messages
+	if len(c.Messages) > 0 {
+		msg := c.Messages[0]
+		if msg.Content == "" {
+			return fmt.Errorf("invalid conversation format: isn't a compatible format. '%s'", c.Path)
+		}
+	}
+
 	return nil
 }
 
 // Clear removes all messages from the conversation
 func (c *OpenAIConversation) Clear() error {
 	c.Messages = []openai.ChatCompletionMessage{}
-	if c.ShouldLoad {
-		empty := []byte("[]")
-		return os.WriteFile(c.Path, empty, 0644)
-	}
-	return nil
+	return c.BaseConversation.Clear()
 }
 
 /*
@@ -644,13 +625,38 @@ func (c *OpenAIConversation) Clear() error {
 
 type ConvoMeta struct {
 	Name     string
-	Provider string
+	Provider ModelProvider
 	ModTime  int64
 }
 
 func GetConvoDir() string {
 	dir := MakeUserSubDir("gllm", "convo")
 	return dir
+}
+
+func FindConvosByIndex(idx string) (string, error) {
+	if strings.TrimSpace(idx) == "" {
+		return "", nil
+	}
+	// check if it's an index
+	index, err := strconv.Atoi(idx)
+	if err == nil {
+		// It's an index, resolve to conversation name using your sorted list logic
+		convos, err := ListSortedConvos(GetConvoDir())
+		if err != nil {
+			return "", err
+		}
+		if index < 1 || index > len(convos) {
+			// handle out of range
+			return "", fmt.Errorf("conversation index out of range: %d", index)
+		} else {
+			title := convos[index-1].Name
+			return title, nil
+		}
+	} else {
+		// idx is not a index
+		return idx, nil
+	}
 }
 
 // listSortedConvos returns a slice of convoMeta sorted by modTime descending
@@ -664,7 +670,7 @@ func ListSortedConvos(convoDir string) ([]ConvoMeta, error) {
 		if !file.IsDir() && strings.HasSuffix(file.Name(), ".json") {
 			title := strings.TrimSuffix(file.Name(), ".json")
 			fullPath := GetFilePath(convoDir, file.Name())
-			var provider string
+			var provider ModelProvider
 			data, err := os.ReadFile(fullPath)
 			if err == nil {
 				provider = DetectMessageProvider(data)

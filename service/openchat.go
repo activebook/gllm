@@ -139,14 +139,13 @@ func (ag *Agent) GenerateOpenChatStream() error {
 	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
 
 	// Load previous messages if any
-	convo := GetOpenChatConversation()
-	err := convo.Load()
+	err := ag.Convo.Load()
 	if err != nil {
 		// Notify error and return
 		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}, nil)
 		return err
 	}
-	convo.PushMessages(messages) // Add new messages to the conversation
+	ag.Convo.Push(messages) // Add new messages to the conversation
 
 	// Process the chat with recursive tool call handling
 	err = chat.process(ag)
@@ -164,8 +163,6 @@ type OpenChat struct {
 }
 
 func (c *OpenChat) process(ag *Agent) error {
-	convo := GetOpenChatConversation()
-
 	// For some models, there isn't thinking property
 	// So we need to check whether to add it or not
 	thinkProperty := true
@@ -192,11 +189,13 @@ func (c *OpenChat) process(ag *Agent) error {
 				}
 			}
 		}
+		// Get all history messages
+		messages, _ := ag.Convo.GetMessages().([]*model.ChatCompletionMessage)
 		// Create the request with thinking mode
 		req := model.CreateChatCompletionRequest{
 			Model:       ag.ModelName,
 			Temperature: &ag.Temperature,
-			Messages:    convo.Messages,
+			Messages:    messages,
 			Tools:       c.tools,
 			Thinking:    thinking,
 		}
@@ -239,7 +238,7 @@ func (c *OpenChat) process(ag *Agent) error {
 		ag.addUpOpenChatTokenUsage(resp)
 
 		// Add the assistant's message to the conversation
-		convo.PushMessage(assistantMessage)
+		ag.Convo.Push(assistantMessage)
 
 		// If there are tool calls, process them
 		if len(*toolCalls) > 0 {
@@ -252,7 +251,7 @@ func (c *OpenChat) process(ag *Agent) error {
 					continue
 				}
 				// Add the tool response to the conversation
-				convo.PushMessage(toolMessage)
+				ag.Convo.Push(toolMessage)
 			}
 			// Continue the conversation recursively
 		} else {
@@ -280,7 +279,7 @@ func (c *OpenChat) process(ag *Agent) error {
 
 	// No more message
 	// Save the conversation
-	err := convo.Save()
+	err := ag.Convo.Save()
 	if err != nil {
 		return fmt.Errorf("failed to save conversation: %v", err)
 	}
