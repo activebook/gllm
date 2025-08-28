@@ -100,7 +100,8 @@ func (g *Gemini2Conversation) Load() error {
 
 	if len(g.Messages) > 0 {
 		msg := g.Messages[0]
-		if msg.Parts == nil {
+		// Try to detect Gemini format
+		if len(msg.Parts) <= 0 || msg.Role == "" {
 			return fmt.Errorf("invalid conversation format: isn't a compatible format. '%s'", g.Path)
 		}
 	}

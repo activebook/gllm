@@ -226,7 +226,8 @@ func (c *OpenChatConversation) Load() error {
 
 	if len(c.Messages) > 0 {
 		msg := c.Messages[0]
-		if msg.Content == nil {
+		// Check whether all nil (aka not correct format)
+		if msg.Content == nil && msg.FunctionCall == nil && msg.ReasoningContent == nil && msg.Name == nil && len(msg.ToolCalls) == 0 {
 			return fmt.Errorf("invalid conversation format: isn't a compatible format. '%s'", c.Path)
 		}
 	}
@@ -339,7 +340,7 @@ func (c *OpenAIConversation) Load() error {
 
 	if len(c.Messages) > 0 {
 		msg := c.Messages[0]
-		if msg.Content == "" {
+		if msg.Content == "" && len(msg.ToolCalls) == 0 && msg.FunctionCall == nil && msg.ReasoningContent == "" {
 			return fmt.Errorf("invalid conversation format: isn't a compatible format. '%s'", c.Path)
 		}
 	}
