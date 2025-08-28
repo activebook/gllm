@@ -163,9 +163,11 @@ func (c *OpenChatConversation) Open(title string) error {
 // PushMessages adds multiple messages to the conversation
 func (c *OpenChatConversation) Push(messages ...interface{}) {
 	for _, msg := range messages {
-		if chatMsg, ok := msg.(*model.ChatCompletionMessage); ok {
-			// It's the correct type
-			c.Messages = append(c.Messages, chatMsg)
+		switch v := msg.(type) {
+		case *model.ChatCompletionMessage:
+			c.Messages = append(c.Messages, v)
+		case []*model.ChatCompletionMessage:
+			c.Messages = append(c.Messages, v...)
 		}
 	}
 }
@@ -271,9 +273,11 @@ func (c *OpenAIConversation) Open(title string) error {
 // PushMessages adds multiple messages to the conversation
 func (c *OpenAIConversation) Push(messages ...interface{}) {
 	for _, msg := range messages {
-		if chatMsg, ok := msg.(openai.ChatCompletionMessage); ok {
-			// It's the correct type
-			c.Messages = append(c.Messages, chatMsg)
+		switch v := msg.(type) {
+		case openai.ChatCompletionMessage:
+			c.Messages = append(c.Messages, v)
+		case []openai.ChatCompletionMessage:
+			c.Messages = append(c.Messages, v...)
 		}
 	}
 }
@@ -330,7 +334,7 @@ func (c *OpenAIConversation) Load() error {
 	var messages []openai.ChatCompletionMessage
 	if err := json.Unmarshal(data, &messages); err != nil {
 		// If there's an error unmarshaling, it might be an old format
-		return fmt.Errorf("Failed to parse conversation file: %v", err)
+		return fmt.Errorf("failed to parse conversation file: %v", err)
 	}
 	c.Messages = messages
 	return nil
@@ -637,7 +641,7 @@ func FindConvosByIndex(idx string) (string, error) {
 		}
 		if index < 1 || index > len(convos) {
 			// handle out of range
-			return "", fmt.Errorf("Conversation index out of range: %d", index)
+			return "", fmt.Errorf("conversation index out of range: %d", index)
 		} else {
 			title := convos[index-1].Name
 			return title, nil

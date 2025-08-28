@@ -40,9 +40,11 @@ func (g *Gemini2Conversation) Open(title string) error {
 // PushContents adds multiple content items to the history
 func (g *Gemini2Conversation) Push(messages ...interface{}) {
 	for _, msg := range messages {
-		if chatMsg, ok := msg.(*genai.Content); ok {
-			// It's the correct type
-			g.Messages = append(g.Messages, chatMsg)
+		switch v := msg.(type) {
+		case *genai.Content:
+			g.Messages = append(g.Messages, v)
+		case []*genai.Content:
+			g.Messages = append(g.Messages, v...)
 		}
 	}
 }
