@@ -345,13 +345,14 @@ func DisplayOpenAIConversationLog(data []byte, msgCount int, msgLength int) {
 					}
 					if contentMap, ok := item.(map[string]interface{}); ok {
 						if contentType, ok := contentMap["type"].(string); ok {
-							if contentType == "text" {
+							switch contentType {
+							case "text":
 								if text, ok := contentMap["text"].(string); ok {
 									fmt.Printf("text (%s)", TruncateString(text, msgLength))
 								}
-							} else if contentType == "image_url" {
+							case "image_url":
 								fmt.Printf("%simage%s", ContentTypeColors["image"], ResetColor)
-							} else {
+							default:
 								fmt.Print(contentType)
 							}
 						}
@@ -399,27 +400,4 @@ func DisplayOpenAIConversationLog(data []byte, msgCount int, msgLength int) {
 			fmt.Printf("  %s... and %d old messages before%s\n", GrayColor, len(messages)-messageLimit, ResetColor)
 		}
 	}
-}
-
-func getFileName(fileData map[string]interface{}) (string, bool) {
-	if fileData == nil {
-		return "", false
-	}
-
-	// Check common fields that might contain filename
-	possibleFields := []string{"file_name", "filename", "name", "title"}
-	for _, field := range possibleFields {
-		if val, ok := fileData[field].(string); ok && val != "" {
-			return val, true
-		}
-	}
-
-	return "", false
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
