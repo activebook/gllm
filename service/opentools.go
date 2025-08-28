@@ -8,6 +8,7 @@ import (
 	"github.com/sashabaranov/go-openai"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"github.com/volcengine/volcengine-go-sdk/volcengine"
+	"google.golang.org/genai"
 )
 
 type ToolType string
@@ -148,6 +149,95 @@ func (ot *OpenTool) ToOpenChatTool() *model.Tool {
 			Name:        ot.Function.Name,
 			Description: ot.Function.Description,
 			Parameters:  ot.Function.Parameters,
+		},
+	}
+}
+
+// ToGeminiFunctions converts a GenericTool to a genai.Tool
+func (ot *OpenTool) ToGeminiFunctions() *genai.FunctionDeclaration {
+	// Convert parameters from map[string]interface{} to *genai.Schema
+	properties := make(map[string]*genai.Schema)
+
+	// Extract properties from the OpenTool parameters
+	if props, ok := ot.Function.Parameters["properties"].(map[string]interface{}); ok {
+		for key, value := range props {
+			if propMap, ok := value.(map[string]interface{}); ok {
+				schema := &genai.Schema{}
+				if typeVal, ok := propMap["type"]; ok {
+					switch typeVal {
+					case "string":
+						schema.Type = genai.TypeString
+					case "integer":
+						schema.Type = genai.TypeInteger
+					case "boolean":
+						schema.Type = genai.TypeBoolean
+					case "array":
+						schema.Type = genai.TypeArray
+					case "object":
+						schema.Type = genai.TypeObject
+					}
+				}
+				if descVal, ok := propMap["description"]; ok {
+					if descStr, ok := descVal.(string); ok {
+						schema.Description = descStr
+					}
+				}
+				if defaultVal, ok := propMap["default"]; ok {
+					schema.Default = defaultVal
+				}
+				if enumVal, ok := propMap["enum"]; ok {
+					if enumSlice, ok := enumVal.([]interface{}); ok {
+						var enumStrs []string
+						for _, e := range enumSlice {
+							if str, ok := e.(string); ok {
+								enumStrs = append(enumStrs, str)
+							}
+						}
+						schema.Enum = enumStrs
+					} else if enumStrSlice, ok := enumVal.([]string); ok {
+						schema.Enum = enumStrSlice
+					}
+				}
+				if itemsVal, ok := propMap["items"]; ok {
+					if itemsMap, ok := itemsVal.(map[string]interface{}); ok {
+						itemSchema := &genai.Schema{}
+						if typeVal, ok := itemsMap["type"]; ok {
+							switch typeVal {
+							case "string":
+								itemSchema.Type = genai.TypeString
+							case "integer":
+								itemSchema.Type = genai.TypeInteger
+							case "boolean":
+								itemSchema.Type = genai.TypeBoolean
+							}
+						}
+						schema.Items = itemSchema
+					}
+				}
+				properties[key] = schema
+			}
+		}
+	}
+
+	// Handle required fields
+	var required []string
+	if req, ok := ot.Function.Parameters["required"].([]string); ok {
+		required = req
+	} else if req, ok := ot.Function.Parameters["required"].([]interface{}); ok {
+		for _, r := range req {
+			if s, ok := r.(string); ok {
+				required = append(required, s)
+			}
+		}
+	}
+
+	return &genai.FunctionDeclaration{
+		Name:        ot.Function.Name,
+		Description: ot.Function.Description,
+		Parameters: &genai.Schema{
+			Type:       genai.TypeObject,
+			Properties: properties,
+			Required:   required,
 		},
 	}
 }
