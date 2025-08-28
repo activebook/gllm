@@ -88,7 +88,7 @@ gllm convo remove "2 - 5" --force`,
 			// Handle range removal
 			start, err1 := strconv.Atoi(rangeParts[0])
 			end, err2 := strconv.Atoi(rangeParts[1])
-			
+
 			if err1 == nil && err2 == nil {
 				convos, err := service.ListSortedConvos(convoDir)
 				if err != nil {
@@ -99,7 +99,7 @@ gllm convo remove "2 - 5" --force`,
 					fmt.Println("No conversations found.")
 					return nil
 				}
-				
+
 				// Validate range
 				if start < 1 || end < 1 || start > len(convos) || end > len(convos) {
 					return fmt.Errorf("range %d-%d out of range (1-%d)", start, end, len(convos))
@@ -107,7 +107,7 @@ gllm convo remove "2 - 5" --force`,
 				if start > end {
 					return fmt.Errorf("invalid range: start (%d) cannot be greater than end (%d)", start, end)
 				}
-				
+
 				// Collect matching files in range
 				for i := start; i <= end; i++ {
 					convoPath := filepath.Join(convoDir, convos[i-1].Name+".json")
@@ -161,7 +161,7 @@ gllm convo remove "2 - 5" --force`,
 // handleAsPattern handles the pattern as either an index or a file pattern
 func handleAsPattern(pattern string, convoDir string) []string {
 	var matches []string
-	
+
 	// Try to parse as index
 	index, err := strconv.Atoi(pattern)
 	if err == nil {
@@ -188,7 +188,7 @@ func handleAsPattern(pattern string, convoDir string) []string {
 		fmt.Printf("Failed to parse pattern: %v\n", err)
 		return []string{}
 	}
-	
+
 	return matches
 }
 
@@ -299,7 +299,9 @@ Using the --message-chars (-c) flag, set the maximum length of each message's co
 		switch provider {
 		case service.ModelGemini:
 			service.DisplayGeminiConversationLog(data, convoMessageCount, convoMessageLength)
-		case service.ModelOpenAI, service.ModelOpenAICompatible:
+		case service.ModelOpenChat:
+			service.DisplayOpenAIConversationLog(data, convoMessageCount, convoMessageLength)
+		case service.ModelOpenAI, service.ModelMistral, service.ModelOpenAICompatible:
 			service.DisplayOpenAIConversationLog(data, convoMessageCount, convoMessageLength)
 		default:
 			fmt.Println("Unknown conversation format.")

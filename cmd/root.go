@@ -158,7 +158,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 
 					// set convo history path, if the path is not empty, it would load the history
 					service.NewOpenChatConversation(convoName, true)
-					//service.NewGeminiConversation(convoName, true)
+					service.NewOpenAIConversation(convoName, true)
 					service.NewGemini2Conversation(convoName, true)
 				}
 

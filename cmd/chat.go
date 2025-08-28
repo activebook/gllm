@@ -102,7 +102,7 @@ Special commands:
 				convoName = GenerateChatFilename()
 			}
 			service.NewOpenChatConversation(convoName, true)
-			//service.NewGeminiConversation(convoName, true)
+			service.NewOpenAIConversation(convoName, true)
 			service.NewGemini2Conversation(convoName, true)
 
 			// Process all prompt building
@@ -242,10 +242,11 @@ func buildChatInfo(files []*service.FileData) *ChatInfo {
 	provider := service.DetectModelProvider(modelInfo["endpoint"].(string))
 	var cm service.ConversationManager
 	switch provider {
-	case service.ModelOpenAICompatible:
+	case service.ModelOpenAI, service.ModelMistral, service.ModelOpenAICompatible:
+		cm = service.GetOpenAIConversation()
+	case service.ModelOpenChat:
 		cm = service.GetOpenChatConversation()
 	case service.ModelGemini:
-		//cm = service.GetGeminiConversation()
 		cm = service.GetGemini2Conversation()
 	}
 	mr := GetMaxRecursions()
@@ -575,7 +576,9 @@ func (ci *ChatInfo) showHistory(num int, chars int) {
 	switch ci.Provider {
 	case service.ModelGemini:
 		service.DisplayGeminiConversationLog(data, num, chars)
-	case service.ModelOpenAICompatible:
+	case service.ModelOpenChat:
+		service.DisplayOpenAIConversationLog(data, num, chars)
+	case service.ModelOpenAI, service.ModelMistral, service.ModelOpenAICompatible:
 		service.DisplayOpenAIConversationLog(data, num, chars)
 	default:
 		fmt.Println("Unknown provider")
