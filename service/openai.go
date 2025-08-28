@@ -432,15 +432,15 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 // Each of these interactions consumes tokens that should be tracked
 func addUpOpenAITokenUsage(ag *Agent, resp *openai.ChatCompletionStreamResponse) {
 	//Warnf("addUpTokenUsage - PromptTokenCount: %d, CompletionTokenCount: %d, TotalTokenCount: %d", resp.Usage.PromptTokens, resp.Usage.CompletionTokens, resp.Usage.TotalTokens)
-	cachedTokens := 0
-	thoughtTokens := 0
-	if resp.Usage.PromptTokensDetails != nil {
-		cachedTokens = int(resp.Usage.PromptTokensDetails.CachedTokens)
-	}
-	if resp.Usage.CompletionTokensDetails != nil {
-		thoughtTokens = int(resp.Usage.CompletionTokensDetails.ReasoningTokens)
-	}
 	if resp != nil && resp.Usage != nil && ag.TokenUsage != nil {
+		cachedTokens := 0
+		thoughtTokens := 0
+		if resp.Usage.PromptTokensDetails != nil {
+			cachedTokens = int(resp.Usage.PromptTokensDetails.CachedTokens)
+		}
+		if resp.Usage.CompletionTokensDetails != nil {
+			thoughtTokens = int(resp.Usage.CompletionTokensDetails.ReasoningTokens)
+		}
 		ag.TokenUsage.RecordTokenUsage(
 			int(resp.Usage.PromptTokens),
 			int(resp.Usage.CompletionTokens),
