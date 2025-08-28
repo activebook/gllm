@@ -238,6 +238,20 @@ type ChatInfo struct {
 
 func buildChatInfo(files []*service.FileData) *ChatInfo {
 
+	// Bugfix:
+	// When convoName is an index number, and use it to find convo file
+	// it will return the convo file(sorted by modified time)
+	// but if user mannually update other convo file, the modified time will change
+	// so the next time using index to load convo file, would load the wrong one
+	// How to fix:
+	// First, we need convert convoName
+	// And, keep that name, the next time, it willn't use the index to load convo file
+	name, _ := service.FindConvosByIndex(convoName)
+	if name != "" {
+		convoName = name
+	}
+
+	// Construct conversation manager
 	_, modelInfo := GetEffectiveModel()
 	provider := service.DetectModelProvider(modelInfo["endpoint"].(string))
 	cm, err := service.ConstructConversationManager(convoName, provider)
