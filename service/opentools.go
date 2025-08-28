@@ -1,13 +1,23 @@
 package service
 
 import (
+	"encoding/json"
+	"fmt"
+	"strings"
+
 	"github.com/sashabaranov/go-openai"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 )
 
+type ToolType string
+
+const (
+	ToolTypeFunction ToolType = "function"
+)
+
 // OpenTool is a generic tool definition that is not tied to any specific model.
 type OpenTool struct {
-	Type     string
+	Type     ToolType
 	Function *OpenFunctionDefinition
 }
 
@@ -16,6 +26,105 @@ type OpenFunctionDefinition struct {
 	Name        string
 	Description string
 	Parameters  map[string]interface{}
+}
+
+const (
+	// ToolRespConfirmShell is the template for the response to the user before executing a command.
+	ToolRespConfirmShell = "Based on your request, I've prepared the following command to execute on your system:\n\n" +
+		"```\n%s\n```\n\n" +
+		"This command will %s\n\n" +
+		`**Check:** 
+- First, Proceed with caution. Check whether this command may make irreversible changes or affect critical parts of your system. 
+- Second, Ensure that the command is safe and does not contain any malicious or harmful actions.
+- Third, If you deem it's safe, execute the command. If not, let user to choose whether to proceed or modify the command.
+Such as:
+Would you like me to run this command for you? Please confirm with 'yes', 'proceed', or provide alternative instructions.
+`
+
+	// ToolRespShellOutput is the template for the response to the user after executing a command.
+	ToolRespShellOutput = `shell executed: %s
+Status:
+%s
+%s`
+
+	// ToolRespConfirmFileOp is the template for the response to the user before performing file operations.
+	ToolRespConfirmFileOp = "Based on your request, I'm about to perform the following file operation:\n\n" +
+		"```\n%s\n```\n\n" +
+		"This operation will %s\n\n" +
+		`**Check:** 
+- First, Proceed with caution. Check whether this operation may make irreversible changes or affect critical parts of your system. 
+- Second, Ensure that the operation is safe and does not contain any malicious or harmful actions.
+- Third, If you deem it's safe, execute the operation. If not, let user to choose whether to proceed or modify the operation.
+Such as:
+Would you like me to proceed with this operation? Please confirm with 'yes', 'proceed', or provide alternative instructions.
+`
+)
+
+var (
+	embeddingTools = []string{
+		"shell",
+		"read_file",
+		"write_file",
+		"edit_file",
+		"delete_file",
+		"create_directory",
+		"list_directory",
+		"delete_directory",
+		"move",
+		"copy",
+		"search_files",
+		"search_text_in_file",
+		"read_multiple_files",
+		"web_fetch",
+	}
+	searchTools = []string{
+		"web_search",
+	}
+)
+
+type ToolsUse struct {
+	Enable      bool // Whether tools can be used
+	AutoApprove bool // Whether tools can be used without user confirmation
+}
+
+func GetAllEmbeddingTools() []string {
+	return embeddingTools
+}
+
+func GetAllSearchTools() []string {
+	return searchTools
+}
+
+func AvailableEmbeddingTool(toolName string) bool {
+	for _, tool := range embeddingTools {
+		if tool == toolName {
+			return true
+		}
+	}
+	return false
+}
+
+func AvailableSearchTool(toolName string) bool {
+	for _, tool := range searchTools {
+		if tool == toolName {
+			return true
+		}
+	}
+	return false
+}
+
+func formatToolCallArguments(argsMap map[string]interface{}) string {
+	var argsList []string
+	for k, v := range argsMap {
+		switch val := v.(type) {
+		case []interface{}, map[string]interface{}:
+			jsonStr, _ := json.Marshal(val)
+			argsList = append(argsList, fmt.Sprintf("%s=%s", k, string(jsonStr)))
+		default:
+			argsList = append(argsList, fmt.Sprintf("%s=%v", k, v))
+		}
+	}
+	return strings.Join(argsList, ", ")
 }
 
 // ToOpenAITool converts a GenericTool to an openai.Tool
@@ -42,12 +151,12 @@ func (ot *OpenTool) ToOpenChatTool() *model.Tool {
 	}
 }
 
-// getGenericEmbeddingTools returns the embedding tools for all models
-func getGenericEmbeddingTools() []*OpenTool {
+// getOpenEmbeddingTools returns the embedding tools for all models
+func getOpenEmbeddingTools() []*OpenTool {
 	var tools []*OpenTool
 
 	// Shell tool
-	shellTool := getGenericShellTool()
+	shellTool := getOpenShellTool()
 
 	tools = append(tools, shellTool)
 
@@ -67,7 +176,7 @@ func getGenericEmbeddingTools() []*OpenTool {
 		},
 	}
 	webFetchTool := OpenTool{
-		Type:     "function",
+		Type:     ToolTypeFunction,
 		Function: &webFetchFunc,
 	}
 
@@ -94,7 +203,7 @@ func getGenericEmbeddingTools() []*OpenTool {
 		},
 	}
 	readFileTool := OpenTool{
-		Type:     "function",
+		Type:     ToolTypeFunction,
 		Function: &readFileFunc,
 	}
 
@@ -126,7 +235,7 @@ func getGenericEmbeddingTools() []*OpenTool {
 		},
 	}
 	writeFileTool := OpenTool{
-		Type:     "function",
+		Type:     ToolTypeFunction,
 		Function: &writeFileFunc,
 	}
 
@@ -148,7 +257,7 @@ func getGenericEmbeddingTools() []*OpenTool {
 		},
 	}
 	createDirTool := OpenTool{
-		Type:     "function",
+		Type:     ToolTypeFunction,
 		Function: &createDirFunc,
 	}
 
@@ -170,7 +279,7 @@ func getGenericEmbeddingTools() []*OpenTool {
 		},
 	}
 	listDirTool := OpenTool{
-		Type:     "function",
+		Type:     ToolTypeFunction,
 		Function: &listDirFunc,
 	}
 
@@ -198,7 +307,7 @@ func getGenericEmbeddingTools() []*OpenTool {
 		},
 	}
 	deleteFileTool := OpenTool{
-		Type:     "function",
+		Type:     ToolTypeFunction,
 		Function: &deleteFileFunc,
 	}
 
@@ -226,7 +335,7 @@ func getGenericEmbeddingTools() []*OpenTool {
 		},
 	}
 	deleteDirTool := OpenTool{
-		Type:     "function",
+		Type:     ToolTypeFunction,
 		Function: &deleteDirFunc,
 	}
 
@@ -258,7 +367,7 @@ func getGenericEmbeddingTools() []*OpenTool {
 		},
 	}
 	moveTool := OpenTool{
-		Type:     "function",
+		Type:     ToolTypeFunction,
 		Function: &moveFunc,
 	}
 
@@ -284,7 +393,7 @@ func getGenericEmbeddingTools() []*OpenTool {
 		},
 	}
 	searchFilesTool := OpenTool{
-		Type:     "function",
+		Type:     ToolTypeFunction,
 		Function: &searchFilesFunc,
 	}
 
@@ -310,7 +419,7 @@ func getGenericEmbeddingTools() []*OpenTool {
 		},
 	}
 	searchTextTool := OpenTool{
-		Type:     "function",
+		Type:     ToolTypeFunction,
 		Function: &searchTextFunc,
 	}
 
@@ -338,7 +447,7 @@ func getGenericEmbeddingTools() []*OpenTool {
 		},
 	}
 	readMultipleFilesTool := OpenTool{
-		Type:     "function",
+		Type:     ToolTypeFunction,
 		Function: &readMultipleFilesFunc,
 	}
 
@@ -394,7 +503,7 @@ func getGenericEmbeddingTools() []*OpenTool {
 		},
 	}
 	editFileTool := OpenTool{
-		Type:     "function",
+		Type:     ToolTypeFunction,
 		Function: &editFileFunc,
 	}
 
@@ -426,7 +535,7 @@ func getGenericEmbeddingTools() []*OpenTool {
 		},
 	}
 	copyTool := OpenTool{
-		Type:     "function",
+		Type:     ToolTypeFunction,
 		Function: &copyFunc,
 	}
 
@@ -435,7 +544,7 @@ func getGenericEmbeddingTools() []*OpenTool {
 	return tools
 }
 
-func getGenericShellTool() *OpenTool {
+func getOpenShellTool() *OpenTool {
 	shellFunc := OpenFunctionDefinition{
 		Name: "shell",
 		Description: `Executes a shell command on the user's local machine.
@@ -485,14 +594,14 @@ LLM should call with:
 	}
 
 	shellTool := OpenTool{
-		Type:     "function",
+		Type:     ToolTypeFunction,
 		Function: &shellFunc,
 	}
 
 	return &shellTool
 }
 
-func getGenericWebSearchTool() *OpenTool {
+func getOpenWebSearchTool() *OpenTool {
 	searchFunc := OpenFunctionDefinition{
 		Name:        "web_search",
 		Description: "Retrieve the most relevant and up-to-date information from the web.",
@@ -508,7 +617,7 @@ func getGenericWebSearchTool() *OpenTool {
 		},
 	}
 	searchTool := OpenTool{
-		Type:     "function",
+		Type:     ToolTypeFunction,
 		Function: &searchFunc,
 	}
 

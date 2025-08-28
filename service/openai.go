@@ -513,12 +513,20 @@ func addUpOpenAITokenUsage(ag *Agent, resp *openai.ChatCompletionStreamResponse)
 
 // getOpenAIEmbeddingTools returns the embedding tools for OpenAI
 func (ag *Agent) getOpenAIEmbeddingTools() []openai.Tool {
-	//return getEmbeddingToolsImpl()
-	return []openai.Tool{}
+	var tools []openai.Tool
+
+	// Get generic tools and convert them to OpenAI tools
+	genericTools := getOpenEmbeddingTools()
+	for _, genericTool := range genericTools {
+		tools = append(tools, genericTool.ToOpenAITool())
+	}
+
+	return tools
 }
 
 // getOpenAIWebSearchTool returns the web search tool for OpenAI
 func (ag *Agent) getOpenAIWebSearchTool() openai.Tool {
-	//return getWebSearchToolImpl()
-	return openai.Tool{}
+	// Get generic web search tool and convert it to OpenAI tool
+	genericTool := getOpenWebSearchTool()
+	return genericTool.ToOpenAITool()
 }

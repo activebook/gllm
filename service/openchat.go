@@ -478,3 +478,21 @@ func (ag *Agent) addUpOpenChatTokenUsage(resp *model.ChatCompletionStreamRespons
 			int(resp.Usage.TotalTokens))
 	}
 }
+
+func (ag *Agent) getOpenChatEmbeddingTools() []*model.Tool {
+	var tools []*model.Tool
+
+	// Get generic tools and convert them to OpenChat tools
+	genericTools := getOpenEmbeddingTools()
+	for _, genericTool := range genericTools {
+		tools = append(tools, genericTool.ToOpenChatTool())
+	}
+
+	return tools
+}
+
+func (ag *Agent) getOpenChatWebSearchTool() *model.Tool {
+	// Get generic web search tool and convert it to OpenChat tool
+	genericTool := getOpenWebSearchTool()
+	return genericTool.ToOpenChatTool()
+}
