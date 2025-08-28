@@ -137,14 +137,13 @@ func (ag *Agent) GenerateOpenAIStream() error {
 	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
 
 	// Load previous messages if any
-	convo := GetOpenAIConversation()
-	err := convo.Load()
+	err := ag.Convo.Load()
 	if err != nil {
 		// Notify error and return
 		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}, nil)
 		return err
 	}
-	convo.PushMessages(messages) // Add new messages to the conversation
+	ag.Convo.Push(messages) // Add new messages to the conversation
 
 	// Process the chat with recursive tool call handling
 	err = chat.process(ag)
@@ -162,8 +161,6 @@ type OpenAI struct {
 }
 
 func (oa *OpenAI) process(ag *Agent) error {
-	convo := GetOpenAIConversation()
-
 	// Recursively process the conversation
 	// Because the model can call tools multiple times
 	i := 0
@@ -172,11 +169,14 @@ func (oa *OpenAI) process(ag *Agent) error {
 		//Debugf("Processing conversation at times: %d\n", i)
 		oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusProcessing}, oa.op.proceed)
 
+		// Get all history messages
+		messages, _ := ag.Convo.GetMessages().([]openai.ChatCompletionMessage)
+
 		// Create the request
 		req := openai.ChatCompletionRequest{
 			Model:       ag.ModelName,
 			Temperature: ag.Temperature,
-			Messages:    convo.Messages,
+			Messages:    messages,
 			Tools:       oa.tools,
 			Stream:      true,
 		}
@@ -210,7 +210,7 @@ func (oa *OpenAI) process(ag *Agent) error {
 		addUpOpenAITokenUsage(ag, resp)
 
 		// Add the assistant's message to the conversation
-		convo.PushMessage(assistantMessage)
+		ag.Convo.Push(assistantMessage)
 
 		// If there are tool calls, process them
 		if len(toolCalls) > 0 {
@@ -223,7 +223,7 @@ func (oa *OpenAI) process(ag *Agent) error {
 					continue
 				}
 				// Add the tool response to the conversation
-				convo.PushMessage(toolMessage)
+				ag.Convo.Push(toolMessage)
 			}
 			// Continue the conversation recursively
 		} else {
@@ -245,7 +245,7 @@ func (oa *OpenAI) process(ag *Agent) error {
 
 	// No more message
 	// Save the conversation
-	err := convo.Save()
+	err := ag.Convo.Save()
 	if err != nil {
 		return fmt.Errorf("failed to save conversation: %v", err)
 	}

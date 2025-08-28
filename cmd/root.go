@@ -152,14 +152,12 @@ Configure your API keys and preferred models, then start chatting or executing c
 
 				// Check if -c/--conversation was used without a value
 				if cmd.Flags().Changed("conversation") {
-					// Flag was used without a value, use a default name
+					// Flag was used without a value, use a temp name
 					// Debug what's happening
 					//service.Debugf("Conversation flag was changed, value is: '%s'", convoName)
-
-					// set convo history path, if the path is not empty, it would load the history
-					service.NewOpenChatConversation(convoName, true)
-					service.NewOpenAIConversation(convoName, true)
-					service.NewGemini2Conversation(convoName, true)
+					if convoName == "" {
+						convoName = GenerateTempFileName()
+					}
 				}
 
 				// Process all prompt building
@@ -298,6 +296,7 @@ func processQuery(prompt string, files []*service.FileData) {
 		AppendMarkdown:   includeMarkdown,
 		OutputFile:       "",
 		QuietMode:        false,
+		ConvoName:        convoName,
 	}
 	err := service.CallAgent(&op)
 	if err != nil {

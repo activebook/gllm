@@ -99,11 +99,8 @@ Special commands:
 
 			// Always save a conversation file regardless of the flag
 			if !cmd.Flags().Changed("conversation") {
-				convoName = GenerateChatFilename()
+				convoName = GenerateChatFileName()
 			}
-			service.NewOpenChatConversation(convoName, true)
-			service.NewOpenAIConversation(convoName, true)
-			service.NewGemini2Conversation(convoName, true)
 
 			// Process all prompt building
 			if cmd.Flags().Changed("attachment") {
@@ -123,6 +120,9 @@ Special commands:
 
 		// Build the ChatInfo object
 		chatInfo := buildChatInfo(files)
+		if chatInfo == nil {
+			return
+		}
 
 		// Start the REPL
 		chatInfo.startREPL()
@@ -146,7 +146,7 @@ func init() {
 	chatCmd.Flags().StringVarP(&sysPromptFlag, "system", "S", "", "System prompt to use for the chat session")
 	chatCmd.Flags().StringVarP(&templateFlag, "template", "p", "", "Template to use for the chat session")
 	chatCmd.Flags().StringSliceVarP(&attachments, "attachment", "a", []string{}, "Specify file(s) or image(s) to append to the chat sessioin")
-	chatCmd.Flags().StringVarP(&convoName, "conversation", "c", GenerateChatFilename(), "Name for this chat session")
+	chatCmd.Flags().StringVarP(&convoName, "conversation", "c", GenerateChatFileName(), "Name for this chat session")
 	chatCmd.Flags().BoolVarP(&searchFlag, "search", "s", false, "Search engine for the chat session")
 	chatCmd.Flags().BoolVarP(&toolsFlag, "tools", "t", true, "Enable or disable tools for the chat session")
 	chatCmd.Flags().BoolVarP(&thinkFlag, "think", "T", false, "Enable or disable deep think mode for the chat session")
@@ -228,7 +228,7 @@ func (ci *ChatInfo) startREPL() {
 
 type ChatInfo struct {
 	Model         string
-	Provider      string
+	Provider      service.ModelProvider
 	Files         []*service.FileData
 	Conversion    service.ConversationManager
 	QuitFlag      bool
@@ -240,14 +240,10 @@ func buildChatInfo(files []*service.FileData) *ChatInfo {
 
 	_, modelInfo := GetEffectiveModel()
 	provider := service.DetectModelProvider(modelInfo["endpoint"].(string))
-	var cm service.ConversationManager
-	switch provider {
-	case service.ModelOpenAI, service.ModelMistral, service.ModelOpenAICompatible:
-		cm = service.GetOpenAIConversation()
-	case service.ModelOpenChat:
-		cm = service.GetOpenChatConversation()
-	case service.ModelGemini:
-		cm = service.GetGemini2Conversation()
+	cm, err := service.ConstructConversationManager(convoName, provider)
+	if err != nil {
+		service.Errorf("Error constructing conversation manager: %v\n", err)
+		return nil
 	}
 	mr := GetMaxRecursions()
 	ci := ChatInfo{
@@ -276,7 +272,7 @@ func (ci *ChatInfo) handleInput(input string) {
 	}
 
 	// Process as normal LLM query...
-	ci.callLLM(input)
+	ci.callAgent(input)
 }
 
 func (ci *ChatInfo) clearContext() {
@@ -764,7 +760,7 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	// Continue the REPL
 }
 
-func (ci *ChatInfo) callLLM(input string) {
+func (ci *ChatInfo) callAgent(input string) {
 
 	var finalPrompt strings.Builder
 	appendText(&finalPrompt, GetEffectiveTemplate())
@@ -807,6 +803,7 @@ func (ci *ChatInfo) callLLM(input string) {
 		AppendMarkdown:   includeMarkdown,
 		OutputFile:       ci.outputFile,
 		QuietMode:        false,
+		ConvoName:        convoName,
 	}
 
 	err := service.CallAgent(&op)

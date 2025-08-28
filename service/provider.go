@@ -4,17 +4,19 @@ import (
 	"strings"
 )
 
+type ModelProvider string
+
 const (
 	// Model types
-	ModelGemini           = "gemini" // for google gemini models
-	ModelOpenAI           = "openai"
-	ModelOpenChat         = "openchat" // for chinese models
-	ModelOpenAICompatible = "openai-compatible"
-	ModelMistral          = "mistral" // for mistral models
-	ModelUnknown          = "unknown"
+	ModelGemini           ModelProvider = "gemini" // for google gemini models
+	ModelOpenAI           ModelProvider = "openai"
+	ModelOpenChat         ModelProvider = "openchat" // for chinese models
+	ModelOpenAICompatible ModelProvider = "openai-compatible"
+	ModelMistral          ModelProvider = "mistral" // for mistral models
+	ModelUnknown          ModelProvider = "unknown"
 )
 
-func DetectModelProvider(endPoint string) string {
+func DetectModelProvider(endPoint string) ModelProvider {
 	goo_domains := []string{"googleapis.com", "google.com"}
 	for _, domain := range goo_domains {
 		if strings.Contains(endPoint, domain) {

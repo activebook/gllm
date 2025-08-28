@@ -46,6 +46,7 @@ type Agent struct {
 	Std             *StdRenderer        // Standard renderer
 	OutputFile      *FileRenderer       // File renderer
 	Status          StatusStack         // Stack to manage streaming status
+	Convo           ConversationManager // Conversation manager
 	Indicator       *Indicator          // Indicator Spinner
 	LastWrittenData string              // Last written data
 }
@@ -87,6 +88,42 @@ func constructSearchEngine(searchEngine *map[string]any) *SearchEngine {
 	return &se
 }
 
+func ConstructConversationManager(convoName string, provider ModelProvider) (ConversationManager, error) {
+	//var convo ConversationManager
+	switch provider {
+	case ModelOpenChat:
+		// Used for Chinese Models
+		convo := OpenChatConversation{}
+		err := convo.Open(convoName)
+		if err != nil {
+			return nil, err
+		}
+		return &convo, nil
+
+	case ModelOpenAI, ModelMistral, ModelOpenAICompatible:
+		// Used for OpenAI compatible models
+		convo := OpenAIConversation{}
+		err := convo.Open(convoName)
+		if err != nil {
+			return nil, err
+		}
+		return &convo, nil
+
+	case ModelGemini:
+		// Used for Gemini
+		convo := Gemini2Conversation{}
+		err := convo.Open(convoName)
+		if err != nil {
+			return nil, err
+		}
+		return &convo, nil
+
+	default:
+		convo := BaseConversation{}
+		return &convo, nil
+	}
+}
+
 type AgentOptions struct {
 	Prompt           string
 	SysPrompt        string
@@ -101,6 +138,7 @@ type AgentOptions struct {
 	AppendUsage      bool
 	OutputFile       string
 	QuietMode        bool
+	ConvoName        string
 }
 
 func CallAgent(op *AgentOptions) error {
@@ -193,6 +231,13 @@ func CallAgent(op *AgentOptions) error {
 
 	// Check if the endpoint is compatible with OpenAI
 	provider := DetectModelProvider(ag.EndPoint)
+
+	// Construct conversation manager
+	cm, err := ConstructConversationManager(op.ConvoName, provider)
+	if err != nil {
+		return err
+	}
+	ag.Convo = cm
 
 	// Start the generation in a goroutine
 	go func() {

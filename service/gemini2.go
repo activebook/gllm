@@ -85,8 +85,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	}
 
 	// Load previous messages if any
-	convo := GetGemini2Conversation()
-	err = convo.Load()
+	err = ag.Convo.Load()
 	if err != nil {
 		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}, nil)
 		return err
@@ -151,7 +150,8 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	// but it won't consume tokens, because it was cached in local and remote server
 	// so gemini model would fast load the cached history KV
 	// it will only consume tokens on new input
-	chat, err := ga.client.Chats.Create(ga.ctx, ag.ModelName, &config, convo.History)
+	messages, _ := ag.Convo.GetMessages().([]*genai.Content)
+	chat, err := ga.client.Chats.Create(ga.ctx, ag.ModelName, &config, messages)
 	if err != nil {
 		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create chat: %v", err)}, nil)
 		return err
@@ -232,8 +232,8 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	}
 
 	// Save the conversation history(curated)
-	convo.History = chat.History(true)
-	err = convo.Save()
+	ag.Convo.SetMessages(chat.History(true))
+	err = ag.Convo.Save()
 	if err != nil {
 		return fmt.Errorf("failed to save conversation: %v", err)
 	}

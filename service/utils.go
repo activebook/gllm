@@ -26,12 +26,6 @@ func GetSanitizeTitle(title string) string {
 	return sanitized
 }
 
-func GetDefaultConvoName() string {
-	// Get the default conversation name from the config
-	// This is a placeholder function. Replace with actual logic to get the default name.
-	return "default"
-}
-
 func GetUserConfigDir() string {
 	// Prefer os.UserConfigDir()
 	userConfigDir, err := os.UserConfigDir()
