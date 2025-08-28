@@ -126,7 +126,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	// CodeExecution and GoogleSearch cannot be enabled simultaneously.
 	if ag.ToolsUse.Enable {
 		// load embedding Tools
-		config.Tools = append(config.Tools, ag.getGemini2EmbeddingTools()...)
+		config.Tools = append(config.Tools, ag.getGemini2EmbeddingTools())
 		if ag.SearchEngine.UseSearch {
 			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
 			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn,
@@ -176,7 +176,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		}
 		// Record token usage
 		// The final response contains the token usage metainfo
-		addUpGemini2TokenUsage(ag, resp)
+		ag.addUpGemini2TokenUsage(resp)
 
 		// No furtheer calls
 		if len(*funcCalls) == 0 {
@@ -331,20 +331,20 @@ func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Functi
 
 	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
 	toolHandlers := map[string]func(*genai.FunctionCall) (*genai.FunctionResponse, error){
-		"shell":               ag.processGemini2ShellToolCall,
-		"read_file":           ag.processGemini2ReadFileToolCall,
-		"write_file":          ag.processGemini2WriteFileToolCall,
-		"create_directory":    ag.processGemini2CreateDirectoryToolCall,
-		"list_directory":      ag.processGemini2ListDirectoryToolCall,
-		"delete_file":         ag.processGemini2DeleteFileToolCall,
-		"delete_directory":    ag.processGemini2DeleteDirectoryToolCall,
-		"move":                ag.processGemini2MoveToolCall,
-		"copy":                ag.processGemini2CopyToolCall,
-		"search_files":        ag.processGemini2SearchFilesToolCall,
-		"search_text_in_file": ag.processGemini2SearchTextInFileToolCall,
-		"read_multiple_files": ag.processGemini2ReadMultipleFilesToolCall,
-		"web_fetch":           ag.processGemini2WebFetchToolCall,
-		"edit_file":           ag.processGemini2EditFileToolCall,
+		"shell":               ag.Gemini2ShellToolCall,
+		"read_file":           ag.Gemini2ReadFileToolCall,
+		"write_file":          ag.Gemini2WriteFileToolCall,
+		"create_directory":    ag.Gemini2CreateDirectoryToolCall,
+		"list_directory":      ag.Gemini2ListDirectoryToolCall,
+		"delete_file":         ag.Gemini2DeleteFileToolCall,
+		"delete_directory":    ag.Gemini2DeleteDirectoryToolCall,
+		"move":                ag.Gemini2MoveToolCall,
+		"copy":                ag.Gemini2CopyToolCall,
+		"search_files":        ag.Gemini2SearchFilesToolCall,
+		"search_text_in_file": ag.Gemini2SearchTextInFileToolCall,
+		"read_multiple_files": ag.Gemini2ReadMultipleFilesToolCall,
+		"web_fetch":           ag.Gemini2WebFetchToolCall,
+		"edit_file":           ag.Gemini2EditFileToolCall,
 	}
 
 	if handler, ok := toolHandlers[call.Name]; ok {
@@ -371,7 +371,7 @@ func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Functi
 // Each response may contain tool calls that trigger additional processing
 // New responses are generated based on tool call results
 // Each of these interactions consumes tokens that should be tracked
-func addUpGemini2TokenUsage(ag *Agent, resp *genai.GenerateContentResponse) {
+func (ag *Agent) addUpGemini2TokenUsage(resp *genai.GenerateContentResponse) {
 	if resp != nil && resp.UsageMetadata != nil && ag.TokenUsage != nil {
 		// Warnf("addUpTokenUsage - PromptTokenCount: %d, CandidatesTokenCount: %d, CachedContentTokenCount: %d, ThoughtsTokenCount: %d, TotalTokenCount: %d",
 		// 	resp.UsageMetadata.PromptTokenCount,

@@ -205,8 +205,15 @@ func CallAgent(op *AgentOptions) error {
 		}()
 
 		switch provider {
-		case ModelOpenAICompatible:
+		case ModelOpenChat:
+			// Used for Chinese Models, they use "thinking[enable/disable]" as extra_body
 			if err := ag.GenerateOpenChatStream(); err != nil {
+				// Send error through channel instead of returning
+				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
+			}
+		case ModelOpenAI, ModelMistral, ModelOpenAICompatible:
+			// Used for OpenAI compatible models
+			if err := ag.GenerateOpenAIStream(); err != nil {
 				// Send error through channel instead of returning
 				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 			}

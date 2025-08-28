@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 
+	openai "github.com/sashabaranov/go-openai"
 	//"github.com/google/generative-ai-go/genai"
 	"github.com/spf13/viper"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
@@ -217,6 +219,156 @@ func (c *OpenChatConversation) Load() error {
 		}
 	}
 
+	return nil
+}
+
+/*
+ * OpenAI Conversation
+ */
+
+// Add OpenAI conversation variables
+var openaiInstance *OpenAIConversation
+var openaiOnce sync.Once
+
+// OpenAIConversation represents a conversation using OpenAI format
+type OpenAIConversation struct {
+	BaseConversation
+	Messages []openai.ChatCompletionMessage
+}
+
+// NewOpenAIConversation creates or returns the singleton instance
+func NewOpenAIConversation(title string, shouldLoad bool) *OpenAIConversation {
+	openaiOnce.Do(func() {
+		openaiInstance = &OpenAIConversation{
+			BaseConversation: BaseConversation{
+				Name:       GetDefaultConvoName(),
+				ShouldLoad: shouldLoad,
+			},
+			Messages: []openai.ChatCompletionMessage{},
+		}
+		if shouldLoad {
+			if title == "" {
+				title = GetDefaultConvoName()
+			} else {
+				// check if it's an index
+				index, err := strconv.Atoi(title)
+				if err == nil {
+					// It's an index, resolve to conversation name using your sorted list logic
+					convos, err := ListSortedConvos(GetConvoDir())
+					if err != nil {
+						// handle error
+						Warnf("Failed to resolve conversation index: %v", err)
+						Warnf("Using default conversation")
+						title = GetDefaultConvoName()
+					}
+					if index < 1 || index > len(convos) {
+						// handle out of range
+						Warnf("Conversation index out of range: %d", index)
+						Warnf("Using default conversation")
+						title = GetDefaultConvoName()
+					} else {
+						title = convos[index-1].Name
+					}
+				}
+			}
+			openaiInstance.Name = title
+			sanitized := GetSanitizeTitle(openaiInstance.Name)
+			openaiInstance.SetPath(sanitized)
+		}
+	})
+	return openaiInstance
+}
+
+// GetOpenAIConversation returns the singleton instance
+func GetOpenAIConversation() *OpenAIConversation {
+	if openaiInstance == nil {
+		return NewOpenAIConversation("", false)
+	}
+	return openaiInstance
+}
+
+// PushMessage adds a message to the conversation
+func (c *OpenAIConversation) PushMessage(message openai.ChatCompletionMessage) {
+	c.Messages = append(c.Messages, message)
+}
+
+// PushMessages adds multiple messages to the conversation
+func (c *OpenAIConversation) PushMessages(messages []openai.ChatCompletionMessage) {
+	c.Messages = append(c.Messages, messages...)
+}
+
+// Save persists the conversation to disk
+func (c *OpenAIConversation) Save() error {
+	if !c.ShouldLoad || len(c.Messages) == 0 {
+		return nil
+	}
+
+	if !shouldSaveSearchResults() {
+		// Most major systems (including ChatGPT and Google's Gemini) indeed discard search results between turns
+		// Clear content for tool messages before saving
+		empty := ""
+		for i := range c.Messages {
+			msg := c.Messages[i]
+			if msg.Role == openai.ChatMessageRoleTool {
+				msg.Content = empty
+			}
+		}
+	}
+
+	data, err := json.MarshalIndent(c.Messages, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to serialize conversation: %w", err)
+	}
+
+	return c.writeFile(data)
+}
+
+// Load retrieves the conversation from disk
+func (c *OpenAIConversation) Load() error {
+	if !c.ShouldLoad {
+		return nil
+	}
+
+	// Ensure directory exists
+	dir := filepath.Dir(c.Path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create conversation directory: %w", err)
+	}
+
+	// Check if file exists
+	if _, err := os.Stat(c.Path); os.IsNotExist(err) {
+		// Create empty file
+		empty := []byte("[]")
+		return os.WriteFile(c.Path, empty, 0644)
+	}
+
+	// Read file
+	data, err := os.ReadFile(c.Path)
+	if err != nil {
+		return fmt.Errorf("failed to read conversation file: %w", err)
+	}
+
+	// Parse messages
+	var messages []openai.ChatCompletionMessage
+	if err := json.Unmarshal(data, &messages); err != nil {
+		// If there's an error unmarshaling, it might be an old format
+		// Try to handle gracefully by starting fresh
+		Warnf("Failed to parse conversation file, starting fresh: %v", err)
+		c.Messages = []openai.ChatCompletionMessage{}
+		return nil
+	}
+
+	c.Messages = messages
+	return nil
+}
+
+// Clear removes all messages from the conversation
+func (c *OpenAIConversation) Clear() error {
+	c.Messages = []openai.ChatCompletionMessage{}
+	if c.ShouldLoad {
+		empty := []byte("[]")
+		return os.WriteFile(c.Path, empty, 0644)
+	}
 	return nil
 }
 
