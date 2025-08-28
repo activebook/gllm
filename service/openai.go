@@ -161,7 +161,7 @@ type OpenAI struct {
 	op     *OpenProcessor
 }
 
-func (c *OpenAI) process(ag *Agent) error {
+func (oa *OpenAI) process(ag *Agent) error {
 	convo := GetOpenAIConversation()
 
 	// Recursively process the conversation
@@ -170,14 +170,14 @@ func (c *OpenAI) process(ag *Agent) error {
 	for range ag.MaxRecursions {
 		i++
 		//Debugf("Processing conversation at times: %d\n", i)
-		c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusProcessing}, c.op.proceed)
+		oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusProcessing}, oa.op.proceed)
 
 		// Create the request
 		req := openai.ChatCompletionRequest{
 			Model:       ag.ModelName,
 			Temperature: ag.Temperature,
 			Messages:    convo.Messages,
-			Tools:       c.tools,
+			Tools:       oa.tools,
 			Stream:      true,
 		}
 
@@ -190,17 +190,17 @@ func (c *OpenAI) process(ag *Agent) error {
 		}
 
 		// Make the streaming request
-		stream, err := c.client.CreateChatCompletionStream(c.op.ctx, req)
+		stream, err := oa.client.CreateChatCompletionStream(oa.op.ctx, req)
 		if err != nil {
 			return fmt.Errorf("stream creation error: %v", err)
 		}
 		defer stream.Close()
 
 		// Wait for the main goroutine to tell sub-goroutine to proceed
-		c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusStarted}, c.op.proceed)
+		oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusStarted}, oa.op.proceed)
 
 		// Process the stream and collect tool calls
-		assistantMessage, toolCalls, resp, err := c.processStream(stream)
+		assistantMessage, toolCalls, resp, err := oa.processStream(stream)
 		if err != nil {
 			return fmt.Errorf("error processing stream: %v", err)
 		}
@@ -216,7 +216,7 @@ func (c *OpenAI) process(ag *Agent) error {
 		if len(toolCalls) > 0 {
 			// Process each tool call
 			for _, toolCall := range toolCalls {
-				toolMessage, err := c.processToolCall(toolCall)
+				toolMessage, err := oa.processToolCall(toolCall)
 				if err != nil {
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
 					// Send error info to user but continue processing other tool calls
@@ -233,14 +233,14 @@ func (c *OpenAI) process(ag *Agent) error {
 	}
 
 	// Add queries to the output if any
-	if len(c.op.queries) > 0 {
-		q := "\n\n" + ag.SearchEngine.RetrieveQueries(c.op.queries)
-		c.op.data <- StreamData{Text: q, Type: DataTypeNormal}
+	if len(oa.op.queries) > 0 {
+		q := "\n\n" + ag.SearchEngine.RetrieveQueries(oa.op.queries)
+		oa.op.data <- StreamData{Text: q, Type: DataTypeNormal}
 	}
 	// Add references to the output if any
-	if len(c.op.references) > 0 {
-		refs := "\n\n" + ag.SearchEngine.RetrieveReferences(c.op.references)
-		c.op.data <- StreamData{Text: refs, Type: DataTypeNormal}
+	if len(oa.op.references) > 0 {
+		refs := "\n\n" + ag.SearchEngine.RetrieveReferences(oa.op.references)
+		oa.op.data <- StreamData{Text: refs, Type: DataTypeNormal}
 	}
 
 	// No more message
@@ -251,15 +251,15 @@ func (c *OpenAI) process(ag *Agent) error {
 	}
 
 	// Flush all data to the channel
-	c.op.data <- StreamData{Type: DataTypeFinished}
-	<-c.op.proceed
+	oa.op.data <- StreamData{Type: DataTypeFinished}
+	<-oa.op.proceed
 	// Notify that the stream is finished
-	c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusFinished}, nil)
+	oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusFinished}, nil)
 	return nil
 }
 
 // processStream processes the stream and collects tool calls
-func (c *OpenAI) processStream(stream *openai.ChatCompletionStream) (openai.ChatCompletionMessage, []openai.ToolCall, *openai.ChatCompletionStreamResponse, error) {
+func (oa *OpenAI) processStream(stream *openai.ChatCompletionStream) (openai.ChatCompletionMessage, []openai.ToolCall, *openai.ChatCompletionStreamResponse, error) {
 	assistantMessage := openai.ChatCompletionMessage{
 		Role: openai.ChatMessageRoleAssistant,
 	}
@@ -285,18 +285,18 @@ func (c *OpenAI) processStream(stream *openai.ChatCompletionStream) (openai.Chat
 			delta := response.Choices[0].Delta
 
 			// State transitions
-			switch c.op.status.Peek() {
+			switch oa.op.status.Peek() {
 			case StatusReasoning:
 				// If reasoning content is empty, switch back to normal state
 				// This is to handle the case where reasoning content is empty but we already have content
 				// Aka, the model is done with reasoning content and starting to output normal content
 				if delta.ReasoningContent == "" && delta.Content != "" {
-					c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusReasoningOver}, c.op.proceed)
+					oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusReasoningOver}, oa.op.proceed)
 				}
 			default:
 				// If reasoning content is not empty, switch to reasoning state
 				if delta.ReasoningContent != "" {
-					c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusReasoning}, c.op.proceed)
+					oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusReasoning}, oa.op.proceed)
 				}
 			}
 
@@ -304,11 +304,11 @@ func (c *OpenAI) processStream(stream *openai.ChatCompletionStream) (openai.Chat
 				// For reasoning model
 				text := delta.ReasoningContent
 				reasoningBuffer.WriteString(text)
-				c.op.data <- StreamData{Text: text, Type: DataTypeReasoning}
+				oa.op.data <- StreamData{Text: text, Type: DataTypeReasoning}
 			} else if delta.Content != "" {
 				text := delta.Content
 				contentBuffer.WriteString(text)
-				c.op.data <- StreamData{Text: text, Type: DataTypeNormal}
+				oa.op.data <- StreamData{Text: text, Type: DataTypeNormal}
 			}
 
 			// Handle tool calls in the stream
@@ -381,7 +381,7 @@ func (c *OpenAI) processStream(stream *openai.ChatCompletionStream) (openai.Chat
 }
 
 // processToolCall processes a single tool call and returns a tool response message
-func (c *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompletionMessage, error) {
+func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompletionMessage, error) {
 	// Parse the query from the arguments
 	var argsMap map[string]interface{}
 	if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &argsMap); err != nil {
@@ -389,28 +389,28 @@ func (c *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompletio
 	}
 
 	// Call function
-	c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, formatToolCallArguments(argsMap))}, c.op.proceed)
+	oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, formatToolCallArguments(argsMap))}, oa.op.proceed)
 
 	var msg openai.ChatCompletionMessage
 	var err error
 
 	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
 	toolHandlers := map[string]func(openai.ToolCall, *map[string]interface{}) (openai.ChatCompletionMessage, error){
-		// "shell":               c.processShellToolCall,
-		// "web_fetch":           c.processWebFetchToolCall,
-		// "web_search":          c.processWebSearchToolCall,
-		// "read_file":           c.processReadFileToolCall,
-		// "write_file":          c.processWriteFileToolCall,
-		// "edit_file":           c.processEditFileToolCall,
-		// "create_directory":    c.processCreateDirectoryToolCall,
-		// "list_directory":      c.processListDirectoryToolCall,
-		// "delete_file":         c.processDeleteFileToolCall,
-		// "delete_directory":    c.processDeleteDirectoryToolCall,
-		// "move":                c.processMoveToolCall,
-		// "copy":                c.processCopyToolCall,
-		// "search_files":        c.processSearchFilesToolCall,
-		// "search_text_in_file": c.processSearchTextInFileToolCall,
-		// "read_multiple_files": c.processReadMultipleFilesToolCall,
+		"shell":               oa.op.OpenAIShellToolCall,
+		"web_fetch":           oa.op.OpenAIWebFetchToolCall,
+		"web_search":          oa.op.OpenAIWebSearchToolCall,
+		"read_file":           oa.op.OpenAIReadFileToolCall,
+		"write_file":          oa.op.OpenAIWriteFileToolCall,
+		"edit_file":           oa.op.OpenAIEditFileToolCall,
+		"create_directory":    oa.op.OpenAICreateDirectoryToolCall,
+		"list_directory":      oa.op.OpenAIListDirectoryToolCall,
+		"delete_file":         oa.op.OpenAIDeleteFileToolCall,
+		"delete_directory":    oa.op.OpenAIDeleteDirectoryToolCall,
+		"move":                oa.op.OpenAIMoveToolCall,
+		"copy":                oa.op.OpenAICopyToolCall,
+		"search_files":        oa.op.OpenAISearchFilesToolCall,
+		"search_text_in_file": oa.op.OpenAISearchTextInFileToolCall,
+		"read_multiple_files": oa.op.OpenAIReadMultipleFilesToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {
@@ -421,7 +421,7 @@ func (c *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompletio
 	}
 
 	// Function call is done
-	c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusFunctionCallingOver}, c.op.proceed)
+	oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusFunctionCallingOver}, oa.op.proceed)
 	return msg, err
 }
 
@@ -449,67 +449,6 @@ func addUpOpenAITokenUsage(ag *Agent, resp *openai.ChatCompletionStreamResponse)
 			int(resp.Usage.TotalTokens))
 	}
 }
-
-// // Need to implement all the tool call processing functions
-// func (c *OpenAI) processShellToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-// 	return processShellToolCallImpl(toolCall, argsMap)
-// }
-
-// func (c *OpenAI) processWebFetchToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-// 	return processWebFetchToolCallImpl(toolCall, argsMap)
-// }
-
-// func (c *OpenAI) processWebSearchToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-// 	return processWebSearchToolCallImpl(toolCall, argsMap, c.queries, c.references)
-// }
-
-// func (c *OpenAI) processReadFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-// 	return processReadFileToolCallImpl(toolCall, argsMap)
-// }
-
-// func (c *OpenAI) processWriteFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-// 	return processWriteFileToolCallImpl(toolCall, argsMap)
-// }
-
-// func (c *OpenAI) processEditFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-// 	return processEditFileToolCallImpl(toolCall, argsMap)
-// }
-
-// func (c *OpenAI) processCreateDirectoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-// 	return processCreateDirectoryToolCallImpl(toolCall, argsMap)
-// }
-
-// func (c *OpenAI) processListDirectoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-// 	return processListDirectoryToolCallImpl(toolCall, argsMap)
-// }
-
-// func (c *OpenAI) processDeleteFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-// 	return processDeleteFileToolCallImpl(toolCall, argsMap)
-// }
-
-// func (c *OpenAI) processDeleteDirectoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-// 	return processDeleteDirectoryToolCallImpl(toolCall, argsMap)
-// }
-
-// func (c *OpenAI) processMoveToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-// 	return processMoveToolCallImpl(toolCall, argsMap)
-// }
-
-// func (c *OpenAI) processCopyToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-// 	return processCopyToolCallImpl(toolCall, argsMap)
-// }
-
-// func (c *OpenAI) processSearchFilesToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-// 	return processSearchFilesToolCallImpl(toolCall, argsMap)
-// }
-
-// func (c *OpenAI) processSearchTextInFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-// 	return processSearchTextInFileToolCallImpl(toolCall, argsMap)
-// }
-
-// func (c *OpenAI) processReadMultipleFilesToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-// 	return processReadMultipleFilesToolCallImpl(toolCall, argsMap)
-// }
 
 // getOpenAIEmbeddingTools returns the embedding tools for OpenAI
 func (ag *Agent) getOpenAIEmbeddingTools() []openai.Tool {

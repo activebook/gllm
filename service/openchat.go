@@ -434,21 +434,21 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 
 	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
 	toolHandlers := map[string]func(*model.ToolCall, *map[string]interface{}) (*model.ChatCompletionMessage, error){
-		"shell":               c.op.processShellToolCall,
-		"web_fetch":           c.op.processWebFetchToolCall,
-		"web_search":          c.op.processWebSearchToolCall,
-		"read_file":           c.op.processReadFileToolCall,
-		"write_file":          c.op.processWriteFileToolCall,
-		"edit_file":           c.op.processEditFileToolCall,
-		"create_directory":    c.op.processCreateDirectoryToolCall,
-		"list_directory":      c.op.processListDirectoryToolCall,
-		"delete_file":         c.op.processDeleteFileToolCall,
-		"delete_directory":    c.op.processDeleteDirectoryToolCall,
-		"move":                c.op.processMoveToolCall,
-		"copy":                c.op.processCopyToolCall,
-		"search_files":        c.op.processSearchFilesToolCall,
-		"search_text_in_file": c.op.processSearchTextInFileToolCall,
-		"read_multiple_files": c.op.processReadMultipleFilesToolCall,
+		"shell":               c.op.OpenChatShellToolCall,
+		"web_fetch":           c.op.OpenChatWebFetchToolCall,
+		"web_search":          c.op.OpenChatWebSearchToolCall,
+		"read_file":           c.op.OpenChatReadFileToolCall,
+		"write_file":          c.op.OpenChatWriteFileToolCall,
+		"edit_file":           c.op.OpenChatEditFileToolCall,
+		"create_directory":    c.op.OpenChatCreateDirectoryToolCall,
+		"list_directory":      c.op.OpenChatListDirectoryToolCall,
+		"delete_file":         c.op.OpenChatDeleteFileToolCall,
+		"delete_directory":    c.op.OpenChatDeleteDirectoryToolCall,
+		"move":                c.op.OpenChatMoveToolCall,
+		"copy":                c.op.OpenChatCopyToolCall,
+		"search_files":        c.op.OpenChatSearchFilesToolCall,
+		"search_text_in_file": c.op.OpenChatSearchTextInFileToolCall,
+		"read_multiple_files": c.op.OpenChatReadMultipleFilesToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {

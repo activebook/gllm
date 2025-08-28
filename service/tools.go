@@ -10,23 +10,17 @@ import (
 	"runtime"
 	"sort"
 	"strings"
-
-	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
-	"github.com/volcengine/volcengine-go-sdk/volcengine"
 )
 
 // Tool implementation functions
 
-func (op *OpenProcessor) processReadFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
+// Shared implementation functions that work with map[string]interface{} arguments
+// These functions contain the actual logic that can be shared between OpenAI and OpenChat
 
+func readFileToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
-		return nil, fmt.Errorf("path not found in arguments")
+		return "", fmt.Errorf("path not found in arguments")
 	}
 
 	// Check if line numbers are requested
@@ -40,11 +34,7 @@ func (op *OpenProcessor) processReadFileToolCall(toolCall *model.ToolCall, argsM
 	// Read the file
 	content, err := os.ReadFile(path)
 	if err != nil {
-		response := fmt.Sprintf("Error reading file %s: %v", path, err)
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		}
-		return &toolMessage, nil
+		return fmt.Sprintf("Error reading file %s: %v", path, err), nil
 	}
 
 	var response string
@@ -61,27 +51,18 @@ func (op *OpenProcessor) processReadFileToolCall(toolCall *model.ToolCall, argsM
 		response = fmt.Sprintf("Content of %s:\n%s", path, string(content))
 	}
 
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, nil
+	return response, nil
 }
 
-func (op *OpenProcessor) processWriteFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
+func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
-		return nil, fmt.Errorf("path not found in arguments")
+		return "", fmt.Errorf("path not found in arguments")
 	}
 
 	content, ok := (*argsMap)["content"].(string)
 	if !ok {
-		return nil, fmt.Errorf("content not found in arguments")
+		return "", fmt.Errorf("content not found in arguments")
 	}
 
 	// Check if confirmation is needed
@@ -91,91 +72,52 @@ func (op *OpenProcessor) processWriteFileToolCall(toolCall *model.ToolCall, args
 		needConfirm = true
 	}
 
-	if needConfirm && !op.toolsUse.AutoApprove {
+	if needConfirm && !toolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("write to file %s", path), fmt.Sprintf("write content to the file at path: %s", path))
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(outStr),
-		}
-		return &toolMessage, nil
+		return outStr, nil
 	}
 
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		response := fmt.Sprintf("Error creating directory for %s: %v", path, err)
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		}
-		return &toolMessage, nil
+		return fmt.Sprintf("Error creating directory for %s: %v", path, err), nil
 	}
 
 	// Write the file
 	err := os.WriteFile(path, []byte(content), 0644)
 	if err != nil {
-		response := fmt.Sprintf("Error writing file %s: %v", path, err)
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		}
-		return &toolMessage, nil
+		return fmt.Sprintf("Error writing file %s: %v", path, err), nil
 	}
 
-	response := fmt.Sprintf("Successfully wrote to file %s", path)
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, nil
+	return fmt.Sprintf("Successfully wrote to file %s", path), nil
 }
 
-func (op *OpenProcessor) processCreateDirectoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
+func createDirectoryToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
-		return nil, fmt.Errorf("path not found in arguments")
+		return "", fmt.Errorf("path not found in arguments")
 	}
 
 	// Create the directory
 	err := os.MkdirAll(path, 0755)
 	if err != nil {
-		response := fmt.Sprintf("Error creating directory %s: %v", path, err)
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		}
-		return &toolMessage, nil
+		return fmt.Sprintf("Error creating directory %s: %v", path, err), nil
 	}
 
-	response := fmt.Sprintf("Successfully created directory %s", path)
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, nil
+	return fmt.Sprintf("Successfully created directory %s", path), nil
 }
 
-func (op *OpenProcessor) processListDirectoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
+func listDirectoryToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
-		return nil, fmt.Errorf("path not found in arguments")
+		return "", fmt.Errorf("path not found in arguments")
 	}
 
 	// List directory contents
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		response := fmt.Sprintf("Error reading directory %s: %v", path, err)
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		}
-		return &toolMessage, nil
+		return fmt.Sprintf("Error reading directory %s: %v", path, err), nil
 	}
 
 	var result strings.Builder
@@ -188,22 +130,13 @@ func (op *OpenProcessor) processListDirectoryToolCall(toolCall *model.ToolCall, 
 		}
 	}
 
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(result.String()),
-	}
-	return &toolMessage, nil
+	return result.String(), nil
 }
 
-func (op *OpenProcessor) processDeleteFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
+func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
-		return nil, fmt.Errorf("path not found in arguments")
+		return "", fmt.Errorf("path not found in arguments")
 	}
 
 	// Check if confirmation is needed
@@ -213,42 +146,25 @@ func (op *OpenProcessor) processDeleteFileToolCall(toolCall *model.ToolCall, arg
 		needConfirm = true
 	}
 
-	if needConfirm && !op.toolsUse.AutoApprove {
+	if needConfirm && !toolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("delete file %s", path), fmt.Sprintf("delete the file at path: %s", path))
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(outStr),
-		}
-		return &toolMessage, nil
+		return outStr, nil
 	}
 
 	// Delete the file
 	err := os.Remove(path)
 	if err != nil {
-		response := fmt.Sprintf("Error deleting file %s: %v", path, err)
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		}
-		return &toolMessage, nil
+		return fmt.Sprintf("Error deleting file %s: %v", path, err), nil
 	}
 
-	response := fmt.Sprintf("Successfully deleted file %s", path)
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, nil
+	return fmt.Sprintf("Successfully deleted file %s", path), nil
 }
 
-func (op *OpenProcessor) processDeleteDirectoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
+func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
-		return nil, fmt.Errorf("path not found in arguments")
+		return "", fmt.Errorf("path not found in arguments")
 	}
 
 	// Check if confirmation is needed
@@ -258,47 +174,30 @@ func (op *OpenProcessor) processDeleteDirectoryToolCall(toolCall *model.ToolCall
 		needConfirm = true
 	}
 
-	if needConfirm && !op.toolsUse.AutoApprove {
+	if needConfirm && !toolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("delete directory %s", path), fmt.Sprintf("delete the directory at path: %s and all its contents", path))
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(outStr),
-		}
-		return &toolMessage, nil
+		return outStr, nil
 	}
 
 	// Delete the directory
 	err := os.RemoveAll(path)
 	if err != nil {
-		response := fmt.Sprintf("Error deleting directory %s: %v", path, err)
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		}
-		return &toolMessage, nil
+		return fmt.Sprintf("Error deleting directory %s: %v", path, err), nil
 	}
 
-	response := fmt.Sprintf("Successfully deleted directory %s", path)
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, nil
+	return fmt.Sprintf("Successfully deleted directory %s", path), nil
 }
 
-func (op *OpenProcessor) processMoveToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
+func moveToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
 	source, ok := (*argsMap)["source"].(string)
 	if !ok {
-		return nil, fmt.Errorf("source not found in arguments")
+		return "", fmt.Errorf("source not found in arguments")
 	}
 
 	destination, ok := (*argsMap)["destination"].(string)
 	if !ok {
-		return nil, fmt.Errorf("destination not found in arguments")
+		return "", fmt.Errorf("destination not found in arguments")
 	}
 
 	// Check if confirmation is needed
@@ -308,58 +207,37 @@ func (op *OpenProcessor) processMoveToolCall(toolCall *model.ToolCall, argsMap *
 		needConfirm = true
 	}
 
-	if needConfirm && !op.toolsUse.AutoApprove {
+	if needConfirm && !toolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("move %s to %s", source, destination), fmt.Sprintf("move the file or directory from %s to %s", source, destination))
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(outStr),
-		}
-		return &toolMessage, nil
+		return outStr, nil
 	}
 
 	// Move/rename the file or directory
 	err := os.Rename(source, destination)
 	if err != nil {
-		response := fmt.Sprintf("Error moving %s to %s: %v", source, destination, err)
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		}
-		return &toolMessage, nil
+		return fmt.Sprintf("Error moving %s to %s: %v", source, destination, err), nil
 	}
 
-	response := fmt.Sprintf("Successfully moved %s to %s", source, destination)
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, nil
+	return fmt.Sprintf("Successfully moved %s to %s", source, destination), nil
 }
 
-func (op *OpenProcessor) processSearchFilesToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
+func searchFilesToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	directory, ok := (*argsMap)["directory"].(string)
 	if !ok {
-		return nil, fmt.Errorf("directory not found in arguments")
+		return "", fmt.Errorf("directory not found in arguments")
 	}
 
 	pattern, ok := (*argsMap)["pattern"].(string)
 	if !ok {
-		return nil, fmt.Errorf("pattern not found in arguments")
+		return "", fmt.Errorf("pattern not found in arguments")
 	}
 
 	// Search for files matching the pattern
 	fullPattern := filepath.Join(directory, pattern)
 	matches, err := filepath.Glob(fullPattern)
 	if err != nil {
-		response := fmt.Sprintf("Error searching for files with pattern %s: %v", fullPattern, err)
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		}
-		return &toolMessage, nil
+		return fmt.Sprintf("Error searching for files with pattern %s: %v", fullPattern, err), nil
 	}
 
 	var result strings.Builder
@@ -372,37 +250,24 @@ func (op *OpenProcessor) processSearchFilesToolCall(toolCall *model.ToolCall, ar
 		}
 	}
 
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(result.String()),
-	}
-	return &toolMessage, nil
+	return result.String(), nil
 }
 
-func (op *OpenProcessor) processSearchTextInFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
+func searchTextInFileToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
-		return nil, fmt.Errorf("path not found in arguments")
+		return "", fmt.Errorf("path not found in arguments")
 	}
 
 	searchText, ok := (*argsMap)["text"].(string)
 	if !ok {
-		return nil, fmt.Errorf("text not found in arguments")
+		return "", fmt.Errorf("text not found in arguments")
 	}
 
 	// Open the file
 	file, err := os.Open(path)
 	if err != nil {
-		response := fmt.Sprintf("Error opening file %s: %v", path, err)
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		}
-		return &toolMessage, nil
+		return fmt.Sprintf("Error opening file %s: %v", path, err), nil
 	}
 	defer file.Close()
 
@@ -424,11 +289,7 @@ func (op *OpenProcessor) processSearchTextInFileToolCall(toolCall *model.ToolCal
 	}
 
 	if err := scanner.Err(); err != nil {
-		response := fmt.Sprintf("Error reading file %s: %v", path, err)
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		}
-		return &toolMessage, nil
+		return fmt.Sprintf("Error reading file %s: %v", path, err), nil
 	}
 
 	if foundCount == 0 {
@@ -437,22 +298,13 @@ func (op *OpenProcessor) processSearchTextInFileToolCall(toolCall *model.ToolCal
 		result.WriteString(fmt.Sprintf("\nFound %d match(es).", foundCount))
 	}
 
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(result.String()),
-	}
-	return &toolMessage, nil
+	return result.String(), nil
 }
 
-func (op *OpenProcessor) processReadMultipleFilesToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
+func readMultipleFilesToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	pathsInterface, ok := (*argsMap)["paths"].([]interface{})
 	if !ok {
-		return nil, fmt.Errorf("paths not found in arguments or not an array")
+		return "", fmt.Errorf("paths not found in arguments or not an array")
 	}
 
 	// Check if line numbers are requested
@@ -468,7 +320,7 @@ func (op *OpenProcessor) processReadMultipleFilesToolCall(toolCall *model.ToolCa
 	for i, v := range pathsInterface {
 		path, ok := v.(string)
 		if !ok {
-			return nil, fmt.Errorf("path at index %d is not a string", i)
+			return "", fmt.Errorf("path at index %d is not a string", i)
 		}
 		paths[i] = path
 	}
@@ -498,42 +350,27 @@ func (op *OpenProcessor) processReadMultipleFilesToolCall(toolCall *model.ToolCa
 		result.WriteString("\n\n")
 	}
 
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(result.String()),
-	}
-	return &toolMessage, nil
+	return result.String(), nil
 }
 
-func (op *OpenProcessor) processShellToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	// Create a tool message
-	// Tool Message's Content wouldn't be serialized in the response
-	// That's not a problem, because each time, the tool result could be different!
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
+func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
 	cmdStr, ok := (*argsMap)["command"].(string)
 	if !ok {
-		return nil, fmt.Errorf("command not found in arguments for tool call ID %s", toolCall.ID)
+		return "", fmt.Errorf("command not found in arguments")
 	}
 	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
 	if !ok {
 		// there is no need_confirm parameter, so we assume it's false
 		needConfirm = false
 	}
-	if needConfirm && !op.toolsUse.AutoApprove {
+	if needConfirm && !toolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
 		descStr, ok := (*argsMap)["purpose"].(string)
 		if !ok {
-			return nil, fmt.Errorf("purpose not found in arguments for tool call ID %s", toolCall.ID)
+			return "", fmt.Errorf("purpose not found in arguments")
 		}
 		outStr := fmt.Sprintf(ToolRespConfirmShell, cmdStr, descStr)
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(outStr),
-		}
-		return &toolMessage, nil
+		return outStr, nil
 	}
 
 	var errStr string
@@ -577,23 +414,13 @@ func (op *OpenProcessor) processShellToolCall(toolCall *model.ToolCall, argsMap 
 	// Create a response that prompts the LLM to provide insightful analysis of the command output
 	finalResponse := fmt.Sprintf(ToolRespShellOutput, cmdStr, errorInfo, outputInfo)
 
-	// Create and return the tool response message
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(finalResponse),
-	}
-	return &toolMessage, nil
+	return finalResponse, nil
 }
 
-func (op *OpenProcessor) processWebFetchToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
+func webFetchToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	url, ok := (*argsMap)["url"].(string)
 	if !ok {
-		return nil, fmt.Errorf("url not found in arguments for tool call ID %s", toolCall.ID)
+		return "", fmt.Errorf("url not found in arguments")
 	}
 
 	// Call the fetch function
@@ -602,81 +429,60 @@ func (op *OpenProcessor) processWebFetchToolCall(toolCall *model.ToolCall, argsM
 	// Check if FetchProcess returned any results
 	if len(results) == 0 {
 		// If no content was fetched or extracted, create an error message for the user.
-		response := fmt.Sprintf("Failed to fetch content from %s or no content was extracted. Please check the URL or try again.", url)
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		}
-		return &toolMessage, nil
+		return fmt.Sprintf("Failed to fetch content from %s or no content was extracted. Please check the URL or try again.", url), nil
 	}
 
 	// Create and return the tool response message
-	response := fmt.Sprintf("Fetched content from %s:\n%s", url, results[0])
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, nil
+	return fmt.Sprintf("Fetched content from %s:\n%s", url, results[0]), nil
 }
 
-func (op *OpenProcessor) processWebSearchToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func webSearchToolCallImpl(argsMap *map[string]interface{}, queries *[]string, references *[]map[string]interface{}, search *SearchEngine) (string, error) {
 	query, ok := (*argsMap)["query"].(string)
 	if !ok {
-		return nil, fmt.Errorf("query not found in arguments for tool call ID %s", toolCall.ID)
+		return "", fmt.Errorf("query not found in arguments")
 	}
 
 	// Call the search function
-	engine := op.search.Name
+	engine := search.Name
 	var data map[string]any
 	var err error
 	switch engine {
 	case GoogleSearchEngine:
 		// Use Google Search Engine
-		data, err = op.search.GoogleSearch(query)
+		data, err = search.GoogleSearch(query)
 	case BingSearchEngine:
 		// Use Bing Search Engine
-		data, err = op.search.BingSearch(query)
+		data, err = search.BingSearch(query)
 	case TavilySearchEngine:
 		// Use Tavily Search Engine
-		data, err = op.search.TavilySearch(query)
+		data, err = search.TavilySearch(query)
 	case DummySearchEngine:
 		// Use None Search Engine
-		data, err = op.search.NoneSearch(query)
+		data, err = search.NoneSearch(query)
 	default:
 		err = fmt.Errorf("unknown search engine: %s", engine)
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("error performing search for query '%s': %v", query, err)
+		return "", fmt.Errorf("error performing search for query '%s': %v", query, err)
 	}
 	// keep the search results for references
-	op.queries = append(op.queries, query)
-	op.references = append(op.references, data)
+	*queries = append(*queries, query)
+	*references = append(*references, data)
 
 	// Convert search results to JSON string
 	resultsJSON, err := json.Marshal(data)
 	if err != nil {
-		return nil, fmt.Errorf("error marshaling search results for query '%s': %v", query, err)
+		return "", fmt.Errorf("error marshaling search results for query '%s': %v", query, err)
 	}
 
-	// Create and return the tool response message
-	return &model.ChatCompletionMessage{
-		Role: model.ChatMessageRoleTool,
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(string(resultsJSON)),
-		}, Name: Ptr(""),
-		ToolCallID: toolCall.ID,
-	}, nil
+	return string(resultsJSON), nil
 }
 
-func (op *OpenProcessor) processEditFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
+func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
-		return nil, fmt.Errorf("path not found in arguments")
+		return "", fmt.Errorf("path not found in arguments")
 	}
 
 	// Check if confirmation is needed
@@ -689,11 +495,11 @@ func (op *OpenProcessor) processEditFileToolCall(toolCall *model.ToolCall, argsM
 	// Get the edits to apply
 	editsInterface, ok := (*argsMap)["edits"].([]interface{})
 	if !ok {
-		return nil, fmt.Errorf("edits not found in arguments or not an array")
+		return "", fmt.Errorf("edits not found in arguments or not an array")
 	}
 
 	// If confirmation is needed, ask the user before proceeding
-	if needConfirm && !op.toolsUse.AutoApprove {
+	if needConfirm && !toolsUse.AutoApprove {
 		var editsDescription strings.Builder
 		editsDescription.WriteString("The following edits will be applied to the file:\n")
 		for _, editInterface := range editsInterface {
@@ -716,10 +522,7 @@ func (op *OpenProcessor) processEditFileToolCall(toolCall *model.ToolCall, argsM
 		}
 
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("edit file %s", path), editsDescription.String())
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(outStr),
-		}
-		return &toolMessage, nil
+		return outStr, nil
 	}
 
 	// Convert edits to a structured format
@@ -778,11 +581,7 @@ func (op *OpenProcessor) processEditFileToolCall(toolCall *model.ToolCall, argsM
 	// Read the file
 	content, err := os.ReadFile(path)
 	if err != nil {
-		response := fmt.Sprintf("Error reading file %s: %v", path, err)
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		}
-		return &toolMessage, nil
+		return fmt.Sprintf("Error reading file %s: %v", path, err), nil
 	}
 
 	// Split content into lines
@@ -825,35 +624,21 @@ func (op *OpenProcessor) processEditFileToolCall(toolCall *model.ToolCall, argsM
 	// Write the modified content back to the file
 	err = os.WriteFile(path, []byte(newContent), 0644)
 	if err != nil {
-		response := fmt.Sprintf("Error writing file %s: %v", path, err)
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		}
-		return &toolMessage, nil
+		return fmt.Sprintf("Error writing file %s: %v", path, err), nil
 	}
 
-	response := fmt.Sprintf("Successfully edited file %s", path)
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, nil
+	return fmt.Sprintf("Successfully edited file %s", path), nil
 }
 
-func (op *OpenProcessor) processCopyToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
+func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
 	source, ok := (*argsMap)["source"].(string)
 	if !ok {
-		return nil, fmt.Errorf("source not found in arguments")
+		return "", fmt.Errorf("source not found in arguments")
 	}
 
 	destination, ok := (*argsMap)["destination"].(string)
 	if !ok {
-		return nil, fmt.Errorf("destination not found in arguments")
+		return "", fmt.Errorf("destination not found in arguments")
 	}
 
 	// Check if confirmation is needed
@@ -863,30 +648,19 @@ func (op *OpenProcessor) processCopyToolCall(toolCall *model.ToolCall, argsMap *
 		needConfirm = true
 	}
 
-	if needConfirm && !op.toolsUse.AutoApprove {
+	if needConfirm && !toolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("copy %s to %s", source, destination), fmt.Sprintf("copy the file or directory from %s to %s", source, destination))
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(outStr),
-		}
-		return &toolMessage, nil
+		return outStr, nil
 	}
 
 	// Copy the file or directory
 	err := copyFileOrDir(source, destination)
 	if err != nil {
-		response := fmt.Sprintf("Error copying %s to %s: %v", source, destination, err)
-		toolMessage.Content = &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		}
-		return &toolMessage, nil
+		return fmt.Sprintf("Error copying %s to %s: %v", source, destination, err), nil
 	}
 
-	response := fmt.Sprintf("Successfully copied %s to %s", source, destination)
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, nil
+	return fmt.Sprintf("Successfully copied %s to %s", source, destination), nil
 }
 
 // Helper function to copy files or directories
