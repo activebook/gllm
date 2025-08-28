@@ -648,7 +648,7 @@ func FindConvosByIndex(idx string) (string, error) {
 		}
 	} else {
 		// idx is not a index
-		return "", nil
+		return idx, nil
 	}
 }
 

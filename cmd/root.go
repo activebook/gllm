@@ -72,7 +72,8 @@ Configure your API keys and preferred models, then start chatting or executing c
 				!cmd.Flags().Changed("template") &&
 				!cmd.Flags().Changed("attachment") &&
 				!cmd.Flags().Changed("version") &&
-				!cmd.Flags().Changed("conversation") &&
+				!cmd.Flags().Changed("conversion") &&
+				!cmd.Flags().Changed("reference") &&
 				!hasStdinData() {
 				cmd.Help()
 				return
@@ -148,16 +149,6 @@ Configure your API keys and preferred models, then start chatting or executing c
 				if !thinkFlag {
 					// if think flag is not set, check if it's enabled globally
 					thinkFlag = IsThinkEnabled()
-				}
-
-				// Check if -c/--conversation was used without a value
-				if cmd.Flags().Changed("conversation") {
-					// Flag was used without a value, use a temp name
-					// Debug what's happening
-					//service.Debugf("Conversation flag was changed, value is: '%s'", convoName)
-					if convoName == "" {
-						convoName = GenerateTempFileName()
-					}
 				}
 
 				// Process all prompt building
