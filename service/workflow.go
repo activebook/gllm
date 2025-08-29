@@ -35,7 +35,8 @@ type WorkflowAgent struct {
 	OutputDir     string
 	MaxRecursions int
 	OutputFile    string
-	PassThrough   bool // pass through current agent, only for debugging
+	PassThrough   bool   // pass through current agent, only for debugging
+	ConvoName     string // conversation name, for iterate prompt
 }
 
 // WorkflowConfig defines the structure for the entire workflow.
@@ -44,6 +45,11 @@ type WorkflowConfig struct {
 	InterActiveMode bool // Allow user confirm at each agent
 }
 
+/*
+clearupOutputDir removes the specified output directory and all its contents,
+then recreates an empty directory at the same path. Returns an error if the
+directory path is empty or if any operation fails.
+*/
 func clearupOutputDir(outputDir string) error {
 	var err error
 	if outputDir == "" {
@@ -170,6 +176,56 @@ func promptUserForConfirmation(agent *WorkflowAgent) bool {
 	return response == "y" || response == "yes"
 }
 
+/*
+waitForNewPrompt prompts the user to confirm proceeding with the next step,
+returning an empty string on confirmation. If declined, it asks for input on
+desired changes and returns the user's response in lowercase. Handles input errors
+by printing a message and returning an empty string.
+*/
+func waitForNewPrompt() string {
+	fmt.Printf("\n%sDoes that work for you? Proceed with next step? (y:/N:):%s ", agentNameColor, workflowResetColor)
+
+	var prompt string
+	var err error
+	reader := bufio.NewReader(os.Stdin)
+	prompt, err = reader.ReadString('\n')
+	if err != nil {
+		fmt.Printf("Error reading input: %v. Skipping agent.\n", err)
+		return ""
+	}
+
+	response := strings.ToLower(strings.TrimSpace(prompt))
+	cont := response == "y" || response == "yes"
+	if cont {
+		return ""
+	}
+
+	fmt.Printf("\n%sPlease specify any changes you would like to make:%s ", agentNameColor, workflowResetColor)
+
+	prompt, err = reader.ReadString('\n')
+	if err != nil {
+		fmt.Printf("Error reading input: %v. Skipping agent.\n", err)
+		return ""
+	}
+
+	response = strings.ToLower(strings.TrimSpace(prompt))
+	return response
+}
+
+/*
+runMasterAgent executes the given WorkflowAgent as a master agent.
+
+It builds the agent’s prompt by reading and concatenating the content of all files in the input directory,
+then appending the provided prompt if input files exist. If there is no input directory, it uses the initial prompt.
+After preparing the prompt and setting up the output file, it invokes the agent execution.
+
+Parameters:
+
+	agent - pointer to the WorkflowAgent to execute
+	prompt - initial prompt for the agent
+
+Returns an error if any step fails during file reading, prompt building, or agent execution.
+*/
 func runMasterAgent(agent *WorkflowAgent, prompt string) error {
 	var finalPrompt string
 	agentInfo := fmt.Sprintf("[%s (%s)]", agent.Name, agent.Role)
@@ -193,7 +249,7 @@ func runMasterAgent(agent *WorkflowAgent, prompt string) error {
 				appendText(&content, data)
 			}
 		}
-		finalPrompt = content.String()
+		finalPrompt = content.String() + "\n" + prompt
 	} else {
 		// First agent gets the initial prompt
 		finalPrompt = prompt
@@ -209,6 +265,11 @@ func runMasterAgent(agent *WorkflowAgent, prompt string) error {
 	return err
 }
 
+/*
+runWorkerAgent processes all files in the specified input directory for the given WorkflowAgent.
+It launches concurrent goroutines to execute agent tasks on each file, collects errors from all tasks,
+and returns a joined error if any tasks fail, or nil on success.
+*/
 func runWorkerAgent(agent *WorkflowAgent) error {
 	agentInfo := fmt.Sprintf("[%s (%s)]", agent.Name, agent.Role)
 	if agent.InputDir == "" {
@@ -281,6 +342,41 @@ func runWorkerAgent(agent *WorkflowAgent) error {
 	return nil
 }
 
+/*
+runWorkflowAgent runs the specified workflow agent based on its role.
+It clears the agent's output directory, then executes the master or worker routine as appropriate.
+Returns an error if setup or execution fails.
+*/
+func runWorkflowAgent(agent *WorkflowAgent, workflowPrompt string) error {
+	// Clear the output directory before running the agent
+	if err := clearupOutputDir(agent.OutputDir); err != nil {
+		agentInfo := fmt.Sprintf("[%s (%s)]", agent.Name, agent.Role)
+		err = fmt.Errorf("%s: %v", agentInfo, err)
+		return err
+	}
+
+	// run agent based on its role
+	switch agent.Role {
+	case WorkflowAgentTypeMaster:
+		err := runMasterAgent(agent, workflowPrompt)
+		if err != nil {
+			err = fmt.Errorf("workflow: %v", err)
+			return err
+		}
+
+	case WorkflowAgentTypeWorker:
+		err := runWorkerAgent(agent)
+		if err != nil {
+			err = fmt.Errorf("workflow: %v", err)
+			return err
+		}
+
+	default:
+		Warnf("Unknown agent role '%s' for agent %s, skipping.", agent.Role, agent.Name)
+	}
+	return nil
+}
+
 func measureWorkflowTime() func() {
 	start := time.Now()
 	return func() {
@@ -290,6 +386,12 @@ func measureWorkflowTime() func() {
 	}
 }
 
+/*
+RunWorkflow executes a workflow using the provided WorkflowConfig and initial prompt.
+It processes a series of agents in order, handling agent roles, interactive mode,
+and prompt modifications for the first agent as needed. Returns an error if the
+workflow encounters issues such as missing agent roles or agent execution errors.
+*/
 // RunWorkflow executes the defined workflow.
 func RunWorkflow(config *WorkflowConfig, prompt string) error {
 	var err error
@@ -306,7 +408,7 @@ func RunWorkflow(config *WorkflowConfig, prompt string) error {
 	// use defer, even error occured it still can measure
 	defer measureWorkflowTime()()
 
-	for _, agent := range config.Agents {
+	for i, agent := range config.Agents {
 		agentInfo := fmt.Sprintf("[%s (%s)]", agent.Name, agent.Role)
 
 		// Print the agent working flow
@@ -335,35 +437,47 @@ func RunWorkflow(config *WorkflowConfig, prompt string) error {
 			}
 		}
 
-		// Clear the output directory before running the agent
-		if err = clearupOutputDir(agent.OutputDir); err != nil {
-			err = fmt.Errorf("%s: %v", agentInfo, err)
+		if i == 0 {
+			// First agent gets the temp convo name
+			if agent.ConvoName == "" {
+				convoName := GenerateTempFileName()
+				agent.ConvoName = convoName
+			}
+		}
+
+		// Run the agent
+		err = runWorkflowAgent(&agent, workflowPrompt)
+		if err != nil {
 			return err
 		}
 
-		switch agent.Role {
-		case WorkflowAgentTypeMaster:
-			err = runMasterAgent(&agent, workflowPrompt)
-			if err != nil {
-				err = fmt.Errorf("workflow: %v", err)
-				return err
+		// Need user to confirm the output of the first agent
+		// User can change its plan and execute again
+		if i == 0 {
+			for {
+				// Ask user if they want to proceed or modify the prompt
+				workflowPrompt = waitForNewPrompt()
+				if workflowPrompt == "" {
+					break
+				}
+				// Run the agent again with new prompt
+				agent.Template = ""     // Reset template
+				agent.SystemPrompt = "" // Reset system prompt
+				err = runWorkflowAgent(&agent, workflowPrompt)
+				if err != nil {
+					return err
+				}
 			}
-
-		case WorkflowAgentTypeWorker:
-			err = runWorkerAgent(&agent)
-			if err != nil {
-				err = fmt.Errorf("workflow: %v", err)
-				return err
-			}
-
-		default:
-			Warnf("Unknown agent role '%s' for agent %s, skipping.", agent.Role, agent.Name)
 		}
 	}
 	Successf("Workflow finished.")
 	return nil
 }
 
+/*
+executeAgent initializes agent options and executes the workflow agent with the given prompt.
+Sets quiet mode based on agent role. Returns an error if execution fails.
+*/
 func executeAgent(agent *WorkflowAgent, prompt string) error {
 	// Only Master can output to the console, Worker in quiet mode
 	quiet := (agent.Role == WorkflowAgentTypeWorker)
@@ -381,7 +495,7 @@ func executeAgent(agent *WorkflowAgent, prompt string) error {
 		AppendUsage:      agent.Usage,
 		OutputFile:       agent.OutputFile, // Write to file
 		QuietMode:        quiet,            // Worker in quiet mode
-		ConvoName:        "",
+		ConvoName:        agent.ConvoName,  // conversation name, for iterate prompt
 	}
 
 	err := CallAgent(&agentOptions)
