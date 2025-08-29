@@ -113,8 +113,8 @@ func promptUserForConfirmation(agent *WorkflowAgent) bool {
 	fmt.Printf("   %sModel:%s %s%v%s\n", modelColor, workflowResetColor, modelColor, (*agent.Model)["model"], workflowResetColor)
 	fmt.Printf("   %sInput directory:%s %s%s%s\n", directoryColor, workflowResetColor, directoryColor, agent.InputDir, workflowResetColor)
 	fmt.Printf("   %sOutput directory:%s %s%s%s\n", directoryColor, workflowResetColor, directoryColor, agent.OutputDir, workflowResetColor)
-	fmt.Printf("   %sSystem prompt:%s %s%s%s\n", promptColor, workflowResetColor, promptColor, agent.SystemPrompt, workflowResetColor)
-	fmt.Printf("   %sTemplate:%s %s%s%s\n", promptColor, workflowResetColor, promptColor, agent.Template, workflowResetColor)
+	fmt.Printf("   %sSystem prompt:%s %s%s\n", promptColor, workflowResetColor, agent.SystemPrompt, workflowResetColor)
+	fmt.Printf("   %sTemplate:%s %s%s\n", promptColor, workflowResetColor, agent.Template, workflowResetColor)
 
 	// Format search status
 	searchStatus := "false"
