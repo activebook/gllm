@@ -86,12 +86,30 @@ Within the chat, you can use various commands:
 
 ### Multi-turn Conversations
 
+There are two main ways to have a multi-turn conversation:
+
+**1. Single-Line Style (using named conversations)**
+
+You can maintain a conversation across multiple commands by assigning a name to your conversation with the `-c` flag. This is useful for scripting or when you want to continue a specific line of inquiry.
+
 - **Start or continue a named conversation:**
   ```sh
   gllm "Who's the POTUS right now?" -c my_convo
   gllm "Tell me more about his policies." -c my_convo
   ```
   ![Conversation Screenshot](screenshots/conversation.png)
+
+**2. Chat Style (interactive session)**
+
+For a more interactive experience, you can use the `chat` command to enter a real-time chat session.
+
+- **Start an interactive chat session:**
+  ```sh
+  gllm chat
+  ```
+  Within the chat, the conversation history is automatically maintained.
+
+  ![Chat Mode Screenshot](screenshots/chatmode2.png)
 
 ### File Attachments
 
