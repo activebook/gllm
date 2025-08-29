@@ -58,6 +58,18 @@ func GetFileContent(filePath string) (string, error) {
 	return string(data), nil
 }
 
+func GenerateTempFileName() string {
+	// Get the default conversation name from the config
+	// This is a placeholder function. Replace with actual logic to get the default name.
+	// Get the current time
+	currentTime := time.Now()
+
+	// Format the time as a string in the format "chat_YYYY-MM-DD_HH-MM-SS.json"
+	filename := fmt.Sprintf("temp_%s", currentTime.Format("2006-01-02_15-04-05"))
+
+	return filename
+}
+
 // Helper function to truncate strings with ellipsis
 func TruncateString(s string, maxLen int) string {
 	s = strings.TrimSpace(s)
