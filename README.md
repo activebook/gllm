@@ -1,346 +1,172 @@
 # gllm - Golang Command-Line LLM Companion
 
-`gllm` is a powerful CLI tool designed to interact seamlessly with various Large Language Models (LLMs). Supports features like interactive chat, multi-turn conversations, file attachments, search integration, command agent, multi-agents workflow, deep research, and extensive customization.
+`gllm` is a powerful CLI tool designed to interact seamlessly with various Large Language Models (LLMs). It supports features like interactive chat, multi-turn conversations, file attachments, search integration, a command agent, multi-agent workflows, deep research, and extensive customization.
 
-## 🚀 Features  
+## 🚀 Features
 
-- **Flexible Model Selection**: Easily configure and switch between different LLMs.  
-- **Interactive Chat Mode**: Start real-time conversations with AI models.  
-- **Prompt Templates & System Prompts**: Manage reusable prompts and instructions.  
-- **Attachment Support**: Process files and images as part of queries.  
-- **Search Support**: Using search engines, find relevant and latest information.  
-- **Reading PDF Support**: Google models support PDF processing (OpenAI compatibles only for text/image).  
-- **Reasoning Support**: Generate detailed explanations, logical breakdowns, and step-by-step analysis.  
-- **Markdown Support**: Format Markdown contents and make it easier to read.
-- **Multi-turn Chat**: Engage in multiple rounds of conversation.  
-- **Check out history and context**: In chat mode or multi-turn chat, easily view the full context.
-- **Configuration Management**: Customize model behavior and settings.  
+- **Flexible Model Selection**: Easily configure and switch between different LLMs.
+- **Interactive Chat Mode**: Start real-time conversations with AI models.
+- **Prompt Templates & System Prompts**: Manage reusable prompts and instructions.
+- **Attachment Support**: Process files, images, and URLs as part of your queries.
+- **Search Integration**: Use search engines to find the latest and most relevant information.
+- **PDF & Image Processing**: Supports processing of PDF documents and images with capable models.
+- **Reasoning & Deep Thinking**: Generate detailed explanations, logical breakdowns, and step-by-step analysis.
+- **Markdown Support**: Renders Markdown for easy-to-read formatted output.
+- **Multi-turn Conversations**: Engage in multiple rounds of conversation and manage chat history.
 - **Command Agent Mode**: Let LLMs plan and execute commands with your confirmation.
-- **More Integrated Tools**: Let LLMs plan and use more integrated tools.
-- **Track Token Usage**: Track token usage meta info.  
-- **Import/Export Configuration**: Import/Export custermized configuration file.
-- **Multi-Agents workflow**: Now you can use multi-agents to build and run a complex workflow.
-- **Version Control**: Easily track and update your setup.  
+- **Multi-Agent Workflows**: Build and run complex workflows with multiple agents for tasks like deep research.
+- **Token Usage Tracking**: Monitor your token consumption.
+- **Configuration Management**: Easily manage models, templates, system prompts, and search engines.
+- **Version Control**: Easily track and update your `gllm` setup.
 
 ---
 
 ## 📌 Installation
 
+### Homebrew (macOS)
+
 ```sh
-# Install via package manager (if available)
 brew tap activebook/gllm
 brew install gllm
+```
 
-# Or manually build from source
+### Build from Source
+
+```sh
 git clone https://github.com/activebook/gllm.git
 cd gllm
 go build -o gllm
-```
-
-## 📦 Upgrade
-
-```sh
-brew tap activebook/gllm
-brew upgrade gllm
 ```
 
 ---
 
 ## 🎯 Usage
 
-### 🔹 Basic Commands
+### Basic Commands
+
+- **Ask a simple question:**
+  ```sh
+  gllm "What is Go?"
+  ```
+  ![One-Shot Screenshot](screenshots/oneshot.png)
+
+- **Use a specific model:**
+  ```sh
+  gllm "Where is the best place to visit in London?" -m gpt4o
+  ```
+
+- **Use a template for a specific task:**
+  ```sh
+  gllm "How to find a process and terminate it?" -p shellmate
+  ```
+
+- **Search the web:**
+  ```sh
+  gllm "Who is the current POTUS?" -s
+  ```
+  ![Search Screenshot](screenshots/search.png)
+
+### Interactive Chat
+
+Start an interactive chat session:
 
 ```sh
-gllm "What is Go?"               # Default model & system prompt
-gllm "Where is the best place to visit in London?" -m gpt4o # Switch model
-gllm "How to find a process and terminate it?" -t shellmate  # Use shellmate prompt to specific shell question
-gllm -s "Who's the POTUS right now? and check what's his latest tariff policy" -m gemini-pro -r 10 # Use Gemini model to search and set max references to 10
+gllm chat
 ```
 
-### 🔹 Attachments (Files, Image, Urls)
+![Chat Mode Screenshot](screenshots/chatmode.png)
 
-```sh
-gllm "Summarize this" -a report.txt  # Use file as input
-gllm "Translate into English" -a image1.jpg  # Use image as input and vision model
-gllm "Summarize all:" -a "https://www.cnbc.com" -a "https://www.nytimes.com" # Attach multiple urls
-gllm "Transcribe this audio" -a speech.mp3  # Use audil as input (only for gemini multimodal models)
-```
+Within the chat, you can use various commands:
 
-### 🔍 Search & Vision
+- `/help`: Show available commands.
+- `/history`: View conversation history.
+- `/system <prompt>`: Change the system prompt.
+- `/attach <file>`: Attach a file to the conversation.
+- `! <command>`: Execute a shell command.
 
-```sh
-gllm "Who is the President of the United States right now?" --search # Use search to find latest news
-gllm "Who is he/she in this photo? And what is his/her current title?" -s -a "face.png" --model gemini # Use vision model and search engine to find people in image
-gllm "When was gpt4.5 released?" --search=google # Use specific search engine to find latest news
-```
+### Multi-turn Conversations
 
-### 💬 Keep Conversations (Multi-turn chat)
+- **Start or continue a named conversation:**
+  ```sh
+  gllm "Who's the POTUS right now?" -c my_convo
+  gllm "Tell me more about his policies." -c my_convo
+  ```
+  ![Conversation Screenshot](screenshots/conversation.png)
 
-```sh
-gllm -s "Who's the POTUS right now?" -c abc     # Start a conversation and retain the full context (last 10 messages)
-gllm "Tell me again, who's the POTUS right now?" -c abc  # Continue the default conversation
-gllm "Let's talk about why we exist." -c newtalk      # Start a new named conversation called 'newtalk'
-gllm -s "Look up what famous people have said about this." -c newtalk  # Continue the 'newtalk' conversation
-gllm "Tell me more about his books." -c 1  # Continue the 'newtalk' conversation" with convo index (latest convo)
-```
+### File Attachments
 
-⚠️ Warning: If you're using **Gemini mode** and an **OpenAI-compatible model**, keep in mind that they **cannot be used within the same conversation**.  
-These models handle chat messages differently, and mixing them will lead to unexpected behavior.
+- **Summarize a text file:**
+  ```sh
+  gllm "Summarize this" -a report.txt
+  ```
 
-### 🖥️ >> Interactive Chat (**Available!**)
+- **Analyze an image:**
+  ```sh
+  gllm "What is in this image?" -a image.png
+  ```
 
-```sh
-gllm chat                       # Start chat with defaults
-gllm chat -m gpt4o             # Start chat with a specific model
-gllm chat --sys-prompt coder    # Use a named system prompt
-gllm chat -c my_chat            # Start a new chat session
-gllm chat -c 1                  # Follow a previous chat session with a convo index
-gllm chat -s                    # Start a new conversation with search
-```
+- **Process a PDF document (with a capable model like Gemini):**
+  ```sh
+  gllm "Summarize this PDF" -a document.pdf
+  ```
+  ![PDF Screenshot](screenshots/pdf.png)
 
-#### 🛠️ You can change setting in the chat session
+### Multi-Agent Workflows (Deep Research)
 
-```sh
-gllm> /exit, /quit    # Exit the chat session
-gllm> /clear, /reset  # Clear context
-gllm> /help           # Show available commands
-gllm> /history /h [num] [chars]   # Show recent conversation history (default: 20 messages, 200 chars)
-gllm> /markdown, /mark [on|off|only]  # Switch whether to render markdown or not
-gllm> /system, /S [name|prompt]  # change system prompt
-gllm> /template, /t [name|tmpl]  # change template
-gllm> /search, /s [search_engine] # select a search engine to use
-gllm> /reference. /r [num]        # change link reference count
-gllm> /attach, /a [filename]      # Attach a file to the chat session
-gllm> /detach, /d [filename|all]  # Detach a file to the chat session
-```
+`gllm` allows you to define and run complex workflows with multiple agents. This is useful for tasks like deep research, where you can have a planner agent, a dispatcher agent, and multiple worker agents to carry out sub-tasks.
 
-⚠️ Warning: You can't switch models within the same conversation. Once you choose a model, you'll need to stick with it throughout. Just like when using different models online, you can continue or change topics, you can do search and attach files, but **the model type remains the same**.
+- **List available workflows:**
+  ```sh
+  gllm workflow list
+  ```
 
-### 🔹 Prompt Templates
+- **Start a workflow:**
+  ```sh
+  gllm workflow start "Research the latest advancements in AI."
+  ```
 
-```sh
-gllm --template coder              # Use predefined coder prompt
-gllm "Act as shell" --system-prompt "You are a Linux shell..."
-gllm --system-prompt shell-assistant --template shellmate
-```
+Here's an example of a deep research workflow in action:
 
-### 🔹 Configuration Management
-
-```sh
-gllm config path     # Show config file location
-gllm config show     # Display loaded configurations
-```
-
-### 🔹 Model Management
-
-```sh
-gllm model list                          # List available models
-gllm model add --name gpt4 --key $API_KEY --model gpt-4o --temp 0.7
-gllm model default gpt4                   # Set default model
-```
-
-### 🔹 Template & System Prompt Management
-
-```sh
-gllm template list                        # List available templates
-gllm template add coder "You are an expert Go programmer..."
-gllm system add --name coder --content "You are an expert Go programmer..."
-gllm system default coder                 # Set default system prompt
-```
-
-### 🔹 New update! & Search Engine Management
-
-```sh
-gllm search list                          # List available search engines   
-gllm search google --key $API_KEY --cx $SEARCH_ENGINE_ID # Use Google Search Engine
-gllm search tavily --key $API_KEY                       # Use Tavily Search Engine
-gllm search default [google,tavily]     # Set default search engine
-gllm search save [on|off]         # Save search results on conversation history (careful! could induce token consumption. default: off)
-```
-
-### 🔹 New update! & Conversation Management
-
-```sh
-gllm convo list            # list all conversations
-gllm convo remove newtalk  # remove a conversation
-gllm convo remove "chat_*" # wildcard remove multiple conversations
-gllm convo info newtalk    # show a conversation in details
-gllm convo info 1          # use index to view a conversation in details
-gllm convo info newtalk -n 100 -c 300 # view history context (the lastest 100 messages, 300 characters each)
-gllm convo clear           # clear all conversations
-```
-
-### 🔹 New update! & Markdown output Management
-
-```sh
-gllm markdown on            # enable markdown output which append the end of the streaming contents
-gllm markdown off           # disable markdown output
-gllm markdown only          # only render markdown output
-```
-
-### 🔹 New update! & Plugins Management
-
-```sh
-gllm plugin list            # list all plugins, loaded add a checkmark before the name
-gllm plugin load exec       # load exec plugin, to execute the command
-gllm plugin unload exec     # unload exec plugin
-```
-
-### 🔹 Std input Support
-
-```sh
-cat script.py | gllm "Help me fix bugs in this python coding snippet:" -a - # Use std input as file attachment
-cat image.png | gllm "What is this image about?" -a - # Use std input as image attachment
-cat jap.txt | gllm "Translate all this into English" # Use std input as text input
-cat report.txt | gllm "Summarize this"
-echo "What is the capital of France?" | gllm # Use std input as text input
-echo "Who's the POTUS right now?" | gllm -s # Use std input as search query
-```
-
-### 🔹 Python code execution (only for gemini2.0)
-
-```sh
-gllm --code "import time\\nstart = time.time()\\nis_prime = lambda n: n > 1 and all(n % d for d in range(2, int(n**0.5) + 1))\\nLIMIT = 100000\\ncount = sum(1 for x in range(LIMIT) if is_prime(x))\\nend = time.time()\\nprint(f'Number of primes less than {LIMIT}: {count}')\\nprint(f'Time taken: {end - start:.2f} seconds')" -m gemini2.5
-```
-
-### 🔹 New update! & Workflow Agents (Deep Research)
-
-```sh
-gllm workflow list            # list all agents
-gllm workflow add -n planner -o "./planner"      # add a planner agent
-gllm workflow set planner --pass on # enable agent passthrough
-gllm workflow start "who's the sweetheart in 2000-2010s in Britain?"  # Start workflow (deep research)
-gllm workflow start -i | --interactive # interacive mode workflow
-```
-
-### 🔹 Version Information
-
-```sh
-gllm version
-gllm --version
-```
+1.  **Planner:** Designs a plan for the research.
+    ![Planner Screenshot](screenshots/deepresearch_planner.png)
+2.  **Dispatcher:** Dispatches sub-tasks to worker agents.
+    ![Dispatcher Screenshot](screenshots/deepresearch_dispatcher.png)
+3.  **Workers:** Execute the sub-tasks in parallel.
+    ![Workers Screenshot](screenshots/deepresearch_workers.png)
+4.  **Summarizer:** Summarizes the results from the workers to provide a final report.
+    ![Summarizer Screenshot](screenshots/deepresearch_summarizer.png)
 
 ---
 
 ## 🛠 Configuration
 
-By default, `gllm` stores configurations in a user-specific directory. Use the `config` commands to manage settings.
+`gllm` stores its configuration in a user-specific directory. You can manage the configuration using the `config` command.
 
-```yaml
-default:
-  model: gpt4
-  system_prompt: coder
-  template: default
-  search: google
-  markdown: on
-models:
-  - name: gpt4
-    endpoint: "https://api.openai.com"
-    key: "$OPENAI_KEY"
-    model: "gpt-4o"
-    temperature: 0.7
-search_engines:
-  - google:
-    key: "$GOOGLE_API_KEY"
-  - tavily:
-```
+- **Show the configuration file path:**
+  ```sh
+  gllm config path
+  ```
 
----
+- **Print all configurations:**
+  ```sh
+  gllm config print
+  ```
+  ![Config Screenshot](screenshots/config.png)
 
-### 💡 Why gllm?
-
-- Simplifies interaction with LLMs via CLI.
-- Supports multiple models and configurations.
-- Powerful customization with templates and prompts.
-- Works with text, code, and image-based queries.
-- Supports search with image and query.
-- Check reasoning details.
-- Easy to read markdown formatted output.
-- Supports multiple conversations.
-- Powerful and flexible Command Agent mode.
-- Check out context details.
-
-Start using `gllm` today and supercharge your command-line AI experience! 🚀
-
----
-
-## Project Features
-
-This project includes various features to enhance usability and efficiency. Below is an overview of the key functionalities.
-
-## Installation & Usage
-
-| Topic & Description | Screenshot |
-|---------------------|------------|
-| **Install**: Easily install using Homebrew | ![Install Screenshot](screenshots/install.png) |
-| **Upgrade**: Upgrade to the latest version | ![Upgrade Screenshot](screenshots/upgrade.png) |
-| **How to Use**: Simply run the command | ![Help Screenshot](screenshots/howto.png) |
-
----
-
-## Core Functionalities
-
-| Feature & Description | Screenshot |
-|----------------------|------------|
-| **General Usage**: Quick overview of core commands | ![Usage Screenshot](screenshots/usage.png) |
-| **Search Info**: Perform smart, targeted searches | ![Search Screenshot](screenshots/search.png) |
-| **Search Thoroughly**: Deep-dive web searches for comprehensive results | ![Search Example](screenshots/searchex.png) |
-| **Configuration**: Customize settings to fit your workflow | ![Config Screenshot](screenshots/config.png) |
-| **Reasoning**: Leverage advanced reasoning capabilities | ![Reasoning Screenshot](screenshots/reasoning.png) |
-
----
-
-## Additional Features
-
-| Feature & Description | Screenshot |
-|----------------------|------------|
-| **Multi-Search**: Run multiple searches in one command | ![Multi-Search Screenshot](screenshots/multisearch.png) |
-| **Multi-Turn**: Continue previous conversations seamlessly | ![Conversation Screenshot](screenshots/conversation.png) |
-| **PDF Reading** *(Gemini only)*: Extract and analyze PDF content | ![PDF Screenshot](screenshots/pdf.png) |
-| **Code Execution** *(Gemini only)*: Execute Python code directly | ![Code Execution Screenshot](screenshots/code.png) |
-| **Markdown Output**: Generate clean, readable Markdown | ![Markdown Screenshot](screenshots/markdown.png) |
-| **One-Shot Agent**: Run task in one shot | ![One-Shot Screenshot](screenshots/oneshot.png) |
-| **Tools-Use Agent**: Use more integrated tools | ![Tools-Use Screenshot](screenshots/tools.png) |
-| **Tokens Usage**: Track tokens usage metainfo | ![Tokens-Usage Screenshot](screenshots/tokens.png) |
-
----
-
-## Interactive Chat Features
-
-| Feature & Description | Screenshot |
-|----------------------|------------|
-| **Chat Mode**: Enter an interactive chat session | ![Chat Mode Screenshot](screenshots/chatmode.png) |
-| **Follow-Up**: Pose follow-up questions in the same session | ![Follow-Up Screenshot](screenshots/chatmode2.png) |
-| **Chat History with Tool Calls**: View your conversation context and tool usage | ![Tool Calls Screenshot](screenshots/chathistory.png) |
-| **Chat History with Reasoning**: Inspect past reasoning steps alongside your chat | ![Reasoning History Screenshot](screenshots/chathistory2.png) |
-| **Command Agent mode**: Utilize the power of command-line agents | ![Command Agent Screenshot](screenshots/commandagent.png) |
-| **Multi-Commands In One-Shot**: Run multiple commands in one shot | ![Multi-Commands Screenshot](screenshots/multicommands.png) |
-
----
-
-## Workflow Features (Deep Research)
-
-| Feature & Description | Screenshot |
-|----------------------|------------|
-| **Planner**: Design a deep research plan | ![Planner](screenshots/deepresearch_planner.png) |
-| **Dispatcher**: Dispatch subtasks | ![Dispatcher](screenshots/deepresearch_dispatcher.png) |
-| **Workers**: subtask execution, parallelly operate | ![Workers](screenshots/deepresearch_workers.png) |
-| **Summarizer**: Summarize all subtask results, get the final report in details | ![Summarizer](screenshots/deepresearch_summarizer.png) |
-
-Check out more detials in [examples](examples/workflow/) directory.
-
----
-
-For more details, using `gllm --help` to check.
+- **Manage models, templates, system prompts, and search engines:**
+  ```sh
+  gllm model --help
+  gllm template --help
+  gllm system --help
+  gllm search --help
+  ```
 
 ---
 
 ## 🏗 Contributing
 
-@cite {
-  @author: Charles Liu
-  @github: <https://github.com/activebook>
-  @website: <https://activebook.github.io>
-}
+Contributions are welcome! Please feel free to submit a pull request or open an issue.
 
 ---
+
+*Created by Charles Liu ([@activebook](https://github.com/activebook))*
