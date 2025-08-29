@@ -86,12 +86,30 @@ Within the chat, you can use various commands:
 
 ### Multi-turn Conversations
 
+There are two main ways to have a multi-turn conversation:
+
+**1. Single-Line Style (using named conversations)**
+
+You can maintain a conversation across multiple commands by assigning a name to your conversation with the `-c` flag. This is useful for scripting or when you want to continue a specific line of inquiry.
+
 - **Start or continue a named conversation:**
   ```sh
   gllm "Who's the POTUS right now?" -c my_convo
   gllm "Tell me more about his policies." -c my_convo
   ```
   ![Conversation Screenshot](screenshots/conversation.png)
+
+**2. Chat Style (interactive session)**
+
+For a more interactive experience, you can use the `chat` command to enter a real-time chat session.
+
+- **Start an interactive chat session:**
+  ```sh
+  gllm chat
+  ```
+  Within the chat, the conversation history is automatically maintained.
+
+  ![Chat Mode Screenshot](screenshots/chatmode2.png)
 
 ### File Attachments
 
@@ -111,19 +129,55 @@ Within the chat, you can use various commands:
   ```
   ![PDF Screenshot](screenshots/pdf.png)
 
-### Multi-Agent Workflows (Deep Research)
+### Workflows
 
-`gllm` allows you to define and run complex workflows with multiple agents. This is useful for tasks like deep research, where you can have a planner agent, a dispatcher agent, and multiple worker agents to carry out sub-tasks.
+`gllm` allows you to define and run complex workflows with multiple agents. A workflow consists of a sequence of agents, where the output of one agent serves as the input for the next. This is useful for tasks like deep research, automated code generation, and more.
 
-- **List available workflows:**
-  ```sh
-  gllm workflow list
-  ```
+#### How it Works
 
-- **Start a workflow:**
-  ```sh
-  gllm workflow start "Research the latest advancements in AI."
-  ```
+A workflow is defined by a series of agents, each with a specific role and configuration. There are two types of agents:
+
+- **`master`**: A master agent orchestrates the workflow. It takes an initial prompt and its output is passed to the next agent in the sequence. A workflow must have at least one master agent.
+- **`worker`**: A worker agent performs a specific task. It receives input from the previous agent, processes it, and its output is passed to the next agent.
+
+When a workflow is executed, `gllm` processes each agent in the defined order. The output from one agent is written to a directory that becomes the input for the next agent.
+
+#### Workflow Commands
+
+You can manage your workflows using the `gllm workflow` command:
+
+- **`gllm workflow list`**: List all agents in the current workflow.
+- **`gllm workflow add`**: Add a new agent to the workflow.
+- **`gllm workflow remove`**: Remove an agent from the workflow.
+- **`gllm workflow set`**: Modify the properties of an existing agent.
+- **`gllm workflow move`**: Change the order of agents in the workflow.
+- **`gllm workflow info`**: Display detailed information about a specific agent.
+- **`gllm workflow start`**: Execute the workflow.
+
+#### Example: A Simple Research Workflow
+
+Here's an example of a simple research workflow with two agents: a `planner` and a `researcher`.
+
+1.  **Planner (master)**: This agent takes a research topic and creates a research plan.
+2.  **Researcher (worker)**: This agent takes the research plan and executes it, gathering information and generating a report.
+
+To create this workflow, you would use the `gllm workflow add` command:
+
+```sh
+# Add the planner agent
+gllm workflow add --name planner --model groq-oss --role master --output "workflow/planner" --template "Create a research plan for the following topic: {{.prompt}}"
+
+# Add the researcher agent
+gllm workflow add --name researcher --model gemini-pro --role worker --input "workflow/planner" --output "workflow/researcher" --template "Execute the following research plan: {{.prompt}}"
+```
+
+To execute the workflow, you would use the `gllm workflow start` command:
+
+```sh
+gllm workflow start "The future of artificial intelligence"
+```
+
+This will start the workflow. The `planner` agent will create a research plan and save it to the `workflow/planner` directory. The `researcher` agent will then read the plan from that directory, execute the research, and save the final report to the `workflow/researcher` directory.
 
 Here's an example of a deep research workflow in action:
 

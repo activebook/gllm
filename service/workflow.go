@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -10,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/chzyer/readline"
 )
 
 type WorkflowAgentType string
@@ -17,6 +18,12 @@ type WorkflowAgentType string
 const (
 	WorkflowAgentTypeMaster WorkflowAgentType = "master"
 	WorkflowAgentTypeWorker WorkflowAgentType = "worker"
+)
+
+const (
+	WokflowConfirmPrompt = "\033[96mDo you want to proceed with this agent? (y/N):\033[0m "         // use for wait for user confirm
+	WokflowProceedPrompt = "\033[96mDoes that work for you? Proceed with next step? (y/N):\033[0m " // use for wait for proceed prompt
+	WokflowModifyPrompt  = "\033[96mPlease specify any changes you would like to make:\033[0m "     // use for wait for user modify prompt
 )
 
 // WorkflowAgent defines the structure for a single agent in the workflow.
@@ -106,8 +113,8 @@ func promptUserForConfirmation(agent *WorkflowAgent) bool {
 	fmt.Printf("   %sModel:%s %s%v%s\n", modelColor, workflowResetColor, modelColor, (*agent.Model)["model"], workflowResetColor)
 	fmt.Printf("   %sInput directory:%s %s%s%s\n", directoryColor, workflowResetColor, directoryColor, agent.InputDir, workflowResetColor)
 	fmt.Printf("   %sOutput directory:%s %s%s%s\n", directoryColor, workflowResetColor, directoryColor, agent.OutputDir, workflowResetColor)
-	fmt.Printf("   %sSystem prompt:%s %s%s%s\n", promptColor, workflowResetColor, promptColor, agent.SystemPrompt, workflowResetColor)
-	fmt.Printf("   %sTemplate:%s %s%s%s\n", promptColor, workflowResetColor, promptColor, agent.Template, workflowResetColor)
+	fmt.Printf("   %sSystem prompt:%s %s%s\n", promptColor, workflowResetColor, agent.SystemPrompt, workflowResetColor)
+	fmt.Printf("   %sTemplate:%s %s%s\n", promptColor, workflowResetColor, agent.Template, workflowResetColor)
 
 	// Format search status
 	searchStatus := "false"
@@ -163,10 +170,15 @@ func promptUserForConfirmation(agent *WorkflowAgent) bool {
 	}
 	fmt.Printf("   %sPass through:%s %s%s%s\n", passThroughColor, workflowResetColor, passThroughColor, passThroughStatus, workflowResetColor)
 
-	fmt.Printf("\n%sDo you want to proceed with this agent? (y/N):%s ", agentNameColor, workflowResetColor)
+	// Set the prompt question
+	rl, err := readline.New(WokflowConfirmPrompt)
+	if err != nil {
+		fmt.Printf("Error initializing readline: %v. Skipping agent.\n", err)
+		return false
+	}
+	defer rl.Close()
 
-	reader := bufio.NewReader(os.Stdin)
-	input, err := reader.ReadString('\n')
+	input, err := rl.Readline()
 	if err != nil {
 		fmt.Printf("Error reading input: %v. Skipping agent.\n", err)
 		return false
@@ -183,12 +195,15 @@ desired changes and returns the user's response in lowercase. Handles input erro
 by printing a message and returning an empty string.
 */
 func waitForNewPrompt() string {
-	fmt.Printf("\n%sDoes that work for you? Proceed with next step? (y:/N:):%s ", agentNameColor, workflowResetColor)
+	// Wait for user to proceed or modify the prompt
+	rl, err := readline.New(WokflowProceedPrompt)
+	if err != nil {
+		fmt.Printf("Error initializing readline: %v. Skipping agent.\n", err)
+		return ""
+	}
+	defer rl.Close()
 
-	var prompt string
-	var err error
-	reader := bufio.NewReader(os.Stdin)
-	prompt, err = reader.ReadString('\n')
+	prompt, err := rl.Readline()
 	if err != nil {
 		fmt.Printf("Error reading input: %v. Skipping agent.\n", err)
 		return ""
@@ -200,9 +215,15 @@ func waitForNewPrompt() string {
 		return ""
 	}
 
-	fmt.Printf("\n%sPlease specify any changes you would like to make:%s ", agentNameColor, workflowResetColor)
+	// Create a new readline instance for modification prompt
+	rl2, err := readline.New(WokflowModifyPrompt)
+	if err != nil {
+		fmt.Printf("Error initializing readline: %v. Skipping agent.\n", err)
+		return ""
+	}
+	defer rl2.Close()
 
-	prompt, err = reader.ReadString('\n')
+	prompt, err = rl2.Readline()
 	if err != nil {
 		fmt.Printf("Error reading input: %v. Skipping agent.\n", err)
 		return ""
