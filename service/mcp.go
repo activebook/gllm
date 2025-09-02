@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -47,12 +48,54 @@ type MCPClient struct {
 // httpUrl → StreamableHTTPClientTransport
 // url → SSEClientTransport
 // command → StdioClientTransport
-func (mc *MCPClient) Init() {
+func (mc *MCPClient) Init() error {
 	mc.ctx = context.Background()
 
 	// Create a new client, with no features.
 	mc.client = mcp.NewClient(&mcp.Implementation{Name: "mcp-client", Version: "v1.0.0"}, nil)
 
+	var err error
+	config, err := LoadMCPServers()
+	if err != nil {
+		return err
+	}
+
+	// Create a set of allowed servers for quick lookup
+	allowed := make(map[string]bool)
+	for _, s := range config.AllowMCPServers {
+		if s != "" {
+			allowed[s] = true
+		}
+	}
+
+	// Connect to each server based on its type
+	for name, server := range config.MCPServers {
+		// Skip if not in allowed list (if allow list is not empty)
+		if len(allowed) > 0 && !allowed[name] {
+			continue
+		}
+
+		if server.Type == "sse" || server.Url != "" || server.BaseUrl != "" {
+			// Add SSE server
+			err = mc.AddSseServer(server.Name, server.BaseUrl, server.Headers)
+		} else if server.Type == "std" || server.Command != "" {
+			// Add stdio server
+			dir := server.WorkDir
+			if dir == "" {
+				dir = server.Cwd
+			}
+			err = mc.AddStdServer(server.Name, server.Command, server.Env, dir, server.Args...)
+		} else if server.Type == "http" || server.HttpUrl != "" {
+			// Add HTTP server
+			err = mc.AddHttpServer(server.Name, server.HttpUrl, server.Headers)
+		}
+
+		if err != nil {
+			// don't continue with other servers
+			return err
+		}
+	}
+	return nil
 }
 
 func (mc *MCPClient) Close() {
@@ -110,9 +153,20 @@ func (mc *MCPClient) AddHttpServer(name string, url string, headers map[string]s
 	return nil
 }
 
-func (mc *MCPClient) AddStdServer(name string, cmd string, args ...string) error {
+func (mc *MCPClient) AddStdServer(name string, cmd string, env map[string]string, cwd string, args ...string) error {
 	// Connect to a server over stdin/stdout
 	transport := &mcp.CommandTransport{Command: exec.Command(cmd, args...)}
+
+	// Set the environment variables
+	transport.Command.Env = os.Environ()
+	for k, v := range env {
+		transport.Command.Env = append(transport.Command.Env, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	// Set the working directory
+	transport.Command.Dir = cwd
+
+	// Connect to the server
 	session, err := mc.client.Connect(mc.ctx, transport, nil)
 	if err != nil {
 		return err
