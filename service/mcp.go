@@ -45,10 +45,11 @@ type MCPSession struct {
 }
 
 type MCPClient struct {
-	ctx      context.Context
-	client   *mcp.Client
-	sessions []*MCPSession
-	servers  []*MCPServer
+	ctx           context.Context
+	client        *mcp.Client
+	sessions      []*MCPSession
+	servers       []*MCPServer
+	toolToSession map[string]*MCPSession
 }
 
 // three types of transports supported:
@@ -57,6 +58,7 @@ type MCPClient struct {
 // command → StdioClientTransport
 func (mc *MCPClient) Init(loadAll bool) error {
 	mc.ctx = context.Background()
+	mc.toolToSession = make(map[string]*MCPSession)
 
 	// Create a new client, with no features.
 	mc.client = mcp.NewClient(&mcp.Implementation{Name: "mcp-client", Version: "v1.0.0"}, nil)
@@ -97,6 +99,12 @@ func (mc *MCPClient) Init(loadAll bool) error {
 		}
 		session := mc.sessions[len(mc.sessions)-1]
 		tools := mc.GetTools(session)
+		// Populate tool to session map for fast lookup
+		if tools != nil {
+			for _, tool := range *tools {
+				mc.toolToSession[tool.Name] = session
+			}
+		}
 		// Keep tools null for now, will be populated when listing
 		servers = append(servers, &MCPServer{Name: serverName, Allowed: server.Alllowed, Tools: tools})
 	}
@@ -109,6 +117,7 @@ func (mc *MCPClient) Close() {
 		session.cs.Close()
 	}
 	mc.sessions = []*MCPSession{}
+	mc.toolToSession = nil
 }
 
 func (mc *MCPClient) AddSseServer(name string, url string, headers map[string]string) error {
@@ -183,19 +192,7 @@ func (mc *MCPClient) AddStdServer(name string, cmd string, env map[string]string
 }
 
 func (mc *MCPClient) FindTool(toolName string) *MCPSession {
-	for _, session := range mc.sessions {
-		tools, err := session.cs.ListTools(mc.ctx, nil)
-		if err != nil {
-			continue
-		}
-		// Find the tool by name, only the first one is returned
-		for _, tool := range tools.Tools {
-			if tool.Name == toolName {
-				return session
-			}
-		}
-	}
-	return nil
+	return mc.toolToSession[toolName]
 }
 
 func (mc *MCPClient) CallTool(toolName string, args map[string]any) (string, error) {
