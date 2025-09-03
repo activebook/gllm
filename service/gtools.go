@@ -22,25 +22,51 @@ This means that you can't use a built-in tool and function calling at the same t
 */
 
 // Tool definitions for Gemini 2
-func (ag *Agent) getGemini2EmbeddingTools() *genai.Tool {
+func (ag *Agent) getGemini2EmbeddingTools(includeMCP bool) *genai.Tool {
 	openTools := getOpenEmbeddingTools()
 	var funcs []*genai.FunctionDeclaration
+
+	// Track registered tool names to prevent duplicates
+	registeredNames := make(map[string]bool)
 
 	for _, openTool := range openTools {
 		geminiTool := openTool.ToGeminiFunctions()
 		funcs = append(funcs, geminiTool)
+		registeredNames[geminiTool.Name] = true
 	}
 
-	// Add MCP tools if client is available
-	if ag.MCPClient != nil {
+	// Add MCP tools if requested and client is available
+	if includeMCP && ag.MCPClient != nil {
 		mcpTools := getMCPTools(ag.MCPClient)
 		for _, mcpTool := range mcpTools {
 			geminiTool := mcpTool.ToGeminiFunctions()
+			// Skip MCP tools that have the same name as built-in tools to avoid Gemini duplicate function declaration error
+			if registeredNames[geminiTool.Name] {
+				continue
+			}
 			funcs = append(funcs, geminiTool)
+			registeredNames[geminiTool.Name] = true
 		}
 	}
 
 	// The Gemini API expects all function declarations to be grouped together under a single Tool object.
+	return &genai.Tool{
+		FunctionDeclarations: funcs,
+	}
+}
+
+func (ag *Agent) getGemini2MCPTools() *genai.Tool {
+	if ag.MCPClient == nil {
+		return nil
+	}
+	mcpTools := getMCPTools(ag.MCPClient)
+	var funcs []*genai.FunctionDeclaration
+
+	for _, mcpTool := range mcpTools {
+		geminiTool := mcpTool.ToGeminiFunctions()
+		funcs = append(funcs, geminiTool)
+	}
+
 	return &genai.Tool{
 		FunctionDeclarations: funcs,
 	}
@@ -232,6 +258,10 @@ func (ag *Agent) Gemini2MCPToolCall(call *genai.FunctionCall) (*genai.FunctionRe
 		return nil, fmt.Errorf("MCP tool call failed: %v", err)
 	}
 
+	// Right now, gemini2 only support string response
+	// It cannot support other types(image/audio, etc.)
+	// So even though it can get base64 encoded data and MIME type
+	// It cannot recognize it.
 	resp.Response = map[string]any{
 		"output": result,
 		"error":  "",
