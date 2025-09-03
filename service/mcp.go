@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -54,12 +55,34 @@ type MCPClient struct {
 	toolToSession map[string]*MCPSession
 }
 
+/*
+A singleton pattern for the MCP client is an excellent approach.
+Since MCP functionality is independent of the LLM model and conversation context,
+a single shared instance can serve all requests across the application.
+*/
+var (
+	mcpClient     *MCPClient
+	mcpClientOnce sync.Once
+)
+
+func GetMCPClient() *MCPClient {
+	mcpClientOnce.Do(func() {
+		mcpClient = &MCPClient{}
+	})
+	return mcpClient
+}
+
 // three types of transports supported:
 // httpUrl → StreamableHTTPClientTransport
 // url → SSEClientTransport
 // command → StdioClientTransport
 // Only want list all servers, unless loadAll is false, then only load allowed servers
 func (mc *MCPClient) Init(loadAll bool) error {
+	if mc.client != nil {
+		// already initialized
+		return nil
+	}
+
 	mc.ctx = context.Background()
 	mc.toolToSession = make(map[string]*MCPSession)
 
@@ -126,6 +149,8 @@ func (mc *MCPClient) Close() {
 	}
 	mc.sessions = []*MCPSession{}
 	mc.toolToSession = nil
+	mc.client = nil
+	mc.ctx = nil
 }
 
 func (mc *MCPClient) AddSseServer(name string, url string, headers map[string]string) error {

@@ -32,6 +32,9 @@ var mcpListCmd = &cobra.Command{
 	Long:  `Lists all tools available from configured MCP servers.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		all, _ := cmd.Flags().GetBool("all")
+		// here we don't need to use the shared instance
+		// because we just need to check the available servers and tools
+		// not making any calls to the servers
 		client := &service.MCPClient{}
 		err := client.Init(all) // Load all servers if detail is true, else false
 		if err != nil {

@@ -40,7 +40,7 @@ Special commands:
 /template, /p <@name|tmpl> - change template
 /think, /T [on|off] - Switch whether to use deep think mode
 /search, /s <search_engine> [on|off] - select a search engine to use, or switch on/off
-/mcp [on|off|list] - Switch whether to use MCP servers, or list available servers
+/mcp [on|off|list] - Switch whether to use MCP servers, list available servers
 /reference. /r <num> - change link reference count
 /usage, /u [on|off] - Switch whether to show token usage information
 /attach, /a <filename> - Attach a file to the chat session
