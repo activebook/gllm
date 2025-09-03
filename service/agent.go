@@ -40,6 +40,7 @@ type Agent struct {
 	ToolsUse        ToolsUse            // Use tools
 	UseCodeTool     bool                // Use code tool
 	ThinkMode       bool                // Think mode
+	MCPClient       *MCPClient          // MCP client for MCP tools
 	MaxRecursions   int                 // Maximum number of recursions for model calls
 	Markdown        *Markdown           // Markdown renderer
 	TokenUsage      *TokenUsage         // Token usage metainfo
@@ -133,6 +134,7 @@ type AgentOptions struct {
 	MaxRecursions    int
 	ThinkMode        bool
 	UseTools         bool
+	UseMCP           bool
 	SkipToolsConfirm bool
 	AppendMarkdown   bool
 	AppendUsage      bool
@@ -163,6 +165,17 @@ func CallAgent(op *AgentOptions) error {
 
 	// Set up code tool settings
 	exeCode := IsCodeExecutionEnabled()
+
+	// Set up MCP client
+	var mc *MCPClient
+	if op.UseMCP {
+		mc = &MCPClient{}
+		err := mc.Init(false)
+		if err != nil {
+			err := fmt.Errorf("failed to init MCPServers: %v", err)
+			return err
+		}
+	}
 
 	// Create a channel to receive notifications
 	notifyCh := make(chan StreamNotify, 10) // Buffer to prevent blocking(used for status updates)
@@ -219,6 +232,7 @@ func CallAgent(op *AgentOptions) error {
 		SearchEngine:  *se,
 		ToolsUse:      toolsUse,
 		UseCodeTool:   exeCode,
+		MCPClient:     mc,
 		ThinkMode:     op.ThinkMode,
 		MaxRecursions: op.MaxRecursions,
 		Markdown:      markdown,

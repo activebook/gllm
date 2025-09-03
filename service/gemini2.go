@@ -129,7 +129,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		if ag.SearchEngine.UseSearch {
 			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
 			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn,
-				Data: fmt.Sprint("Embedding tools are enabled.\n" +
+				Data: fmt.Sprint("Embedding(MCP) tools are enabled.\n" +
 					"Because embedding tools is not compatible with Google Search tool," +
 					" so Google Search is unavailable now.\n" +
 					"Please disable embedding tools if want to use Google Search.")}, nil)
@@ -203,7 +203,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 
 			// Skip if not our expected function
 			// Because some model made up function name
-			if funcCall.Name != "" && !AvailableEmbeddingTool(funcCall.Name) && !AvailableSearchTool(funcCall.Name) {
+			if funcCall.Name != "" && !AvailableEmbeddingTool(funcCall.Name) && !AvailableSearchTool(funcCall.Name) && !AvailableMCPTool(funcCall.Name, ag.MCPClient) {
 				continue
 			}
 			// Handle tool call
@@ -349,6 +349,9 @@ func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Functi
 
 	if handler, ok := toolHandlers[call.Name]; ok {
 		resp, err = handler(call)
+	} else if ag.MCPClient != nil && ag.MCPClient.FindTool(call.Name) != nil {
+		// Handle MCP tool calls
+		resp, err = ag.Gemini2MCPToolCall(call)
 	} else {
 		// For web_search and other Google Search/CodeExecution tools that don't need special processing
 		resp, err = &genai.FunctionResponse{

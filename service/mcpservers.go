@@ -37,6 +37,11 @@ func LoadMCPServers() (*MCPConfig, error) {
 	// Get the path to the MCP servers configuration file
 	configPath := getMCPServersPath()
 
+	// Check if the configuration file exists
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return nil, nil
+	}
+
 	// Read the configuration file
 	data, err := os.ReadFile(configPath)
 	if err != nil {

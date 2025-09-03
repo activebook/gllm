@@ -74,6 +74,11 @@ func (ag *Agent) GenerateOpenChatStream() error {
 		searchTool := ag.getOpenChatWebSearchTool()
 		tools = append(tools, searchTool)
 	}
+	if ag.MCPClient != nil {
+		// Add MCP tools if MCP client is available
+		mcpTools := ag.getOpenChatMCPTools()
+		tools = append(tools, mcpTools...)
+	}
 
 	op := OpenProcessor{
 		ctx:        ctx,
@@ -85,6 +90,7 @@ func (ag *Agent) GenerateOpenChatStream() error {
 		queries:    make([]string, 0),
 		references: make([]map[string]interface{}, 0), // Updated to match new field type
 		status:     &ag.Status,
+		mcpClient:  ag.MCPClient,
 	}
 	chat := &OpenChat{
 		client: client,
@@ -355,7 +361,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 
 					// Skip if not our expected function
 					// Because some model made up function name
-					if functionName != "" && !AvailableEmbeddingTool(functionName) && !AvailableSearchTool(functionName) {
+					if functionName != "" && !AvailableEmbeddingTool(functionName) && !AvailableSearchTool(functionName) && !AvailableMCPTool(functionName, c.op.mcpClient) {
 						continue
 					}
 
@@ -451,7 +457,11 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {
+		// Handle embedding tool calls
 		msg, err = handler(&toolCall, &argsMap)
+	} else if c.op.mcpClient != nil && c.op.mcpClient.FindTool(toolCall.Function.Name) != nil {
+		// Handle MCP tool calls
+		msg, err = c.op.OpenChatMCPToolCall(&toolCall, &argsMap)
 	} else {
 		msg = nil
 		err = fmt.Errorf("unknown function name: %s", toolCall.Function.Name)
@@ -494,4 +504,16 @@ func (ag *Agent) getOpenChatWebSearchTool() *model.Tool {
 	// Get generic web search tool and convert it to OpenChat tool
 	genericTool := getOpenWebSearchTool()
 	return genericTool.ToOpenChatTool()
+}
+
+func (ag *Agent) getOpenChatMCPTools() []*model.Tool {
+	var tools []*model.Tool
+	// Add MCP tools if client is available
+	if ag.MCPClient != nil {
+		mcpTools := getMCPTools(ag.MCPClient)
+		for _, mcpTool := range mcpTools {
+			tools = append(tools, mcpTool.ToOpenChatTool())
+		}
+	}
+	return tools
 }

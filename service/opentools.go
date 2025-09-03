@@ -116,6 +116,13 @@ func AvailableSearchTool(toolName string) bool {
 	return false
 }
 
+func AvailableMCPTool(toolName string, client *MCPClient) bool {
+	if client == nil {
+		return false
+	}
+	return client.FindTool(toolName) != nil
+}
+
 func formatToolCallArguments(argsMap map[string]interface{}) string {
 	var argsList []string
 	for k, v := range argsMap {
@@ -716,6 +723,88 @@ func getOpenWebSearchTool() *OpenTool {
 	return &searchTool
 }
 
+// MCPToolsToOpenTool converts an MCPTools struct to an OpenTool with proper JSON schema
+func MCPToolsToOpenTool(mcpTool MCPTools) *OpenTool {
+	properties := make(map[string]interface{})
+	var required []string
+
+	// Use the Properties field which contains the full schema information
+	// instead of the Parameters field which only contains string descriptions
+	for paramName, schema := range mcpTool.Properties {
+		prop := make(map[string]interface{})
+		
+		// Set the type
+		if schema.Type != "" {
+			prop["type"] = schema.Type
+		} else if len(schema.Types) > 0 {
+			// If multiple types, use the first one
+			prop["type"] = schema.Types[0]
+		} else {
+			// Default to string if no type specified
+			prop["type"] = "string"
+		}
+		
+		// Set the description
+		if schema.Description != "" {
+			prop["description"] = schema.Description
+		}
+		
+		// Set default value if present
+		if schema.Default != nil {
+			prop["default"] = schema.Default
+		}
+		
+		// Handle enum values
+		if len(schema.Enum) > 0 {
+			prop["enum"] = schema.Enum
+		}
+		
+		// Handle array items
+		if schema.Items != nil && schema.Type == "array" {
+			items := make(map[string]interface{})
+			if schema.Items.Type != "" {
+				items["type"] = schema.Items.Type
+			}
+			prop["items"] = items
+		}
+		
+		properties[paramName] = prop
+		required = append(required, paramName)
+	}
+
+	parameters := map[string]interface{}{
+		"type":       "object",
+		"properties": properties,
+		"required":   required,
+	}
+
+	return &OpenTool{
+		Type: ToolTypeFunction,
+		Function: &OpenFunctionDefinition{
+			Name:        mcpTool.Name,
+			Description: mcpTool.Description,
+			Parameters:  parameters,
+		},
+	}
+}
+
+// getMCPTools retrieves all MCP tools from the MCPClient and converts them to OpenTool format
+func getMCPTools(client *MCPClient) []*OpenTool {
+	var tools []*OpenTool
+
+	servers := client.GetAllServers()
+	for _, server := range servers {
+		if server.Tools != nil {
+			for _, mcpTool := range *server.Tools {
+				openTool := MCPToolsToOpenTool(mcpTool)
+				tools = append(tools, openTool)
+			}
+		}
+	}
+
+	return tools
+}
+
 // OpenProcessor is the main processor for OpenAI-like models
 // For tools implementation
 // - It manages the context, notifications, data streaming, and tool usage
@@ -730,6 +819,7 @@ type OpenProcessor struct {
 	queries    []string                 // List of queries to be sent to the AI assistant
 	references []map[string]interface{} // keep track of the references
 	status     *StatusStack             // Stack to manage streaming status
+	mcpClient  *MCPClient               // MCP client for MCP tool calls
 }
 
 // OpenAI tool implementations (wrapper functions)
@@ -926,6 +1016,47 @@ func (op *OpenProcessor) OpenAIReadMultipleFilesToolCall(toolCall openai.ToolCal
 		ToolCallID: toolCall.ID,
 		Content:    response,
 	}, nil
+}
+
+// MCP tool call implementations
+func (op *OpenProcessor) OpenAIMCPToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+	if op.mcpClient == nil {
+		return openai.ChatCompletionMessage{}, fmt.Errorf("MCP client not initialized")
+	}
+
+	// Call the MCP tool
+	result, err := op.mcpClient.CallTool(toolCall.Function.Name, *argsMap)
+	if err != nil {
+		return openai.ChatCompletionMessage{}, fmt.Errorf("MCP tool call failed: %v", err)
+	}
+
+	return openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Content:    result,
+	}, nil
+}
+
+func (op *OpenProcessor) OpenChatMCPToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	if op.mcpClient == nil {
+		return nil, fmt.Errorf("MCP client not initialized")
+	}
+
+	// Call the MCP tool
+	result, err := op.mcpClient.CallTool(toolCall.Function.Name, *argsMap)
+	if err != nil {
+		return nil, fmt.Errorf("MCP tool call failed: %v", err)
+	}
+
+	toolMessage := model.ChatCompletionMessage{
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Name:       Ptr(""),
+		Content: &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(result),
+		},
+	}
+	return &toolMessage, nil
 }
 
 // OpenChat tool implementations (wrapper functions)

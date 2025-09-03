@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -31,6 +32,7 @@ type MCPTools struct {
 	Name        string
 	Description string
 	Parameters  map[string]string
+	Properties  map[string]*jsonschema.Schema // Keep origin JSON Schema
 }
 
 type MCPServer struct {
@@ -56,6 +58,7 @@ type MCPClient struct {
 // httpUrl → StreamableHTTPClientTransport
 // url → SSEClientTransport
 // command → StdioClientTransport
+// Only want list all servers, unless loadAll is false, then only load allowed servers
 func (mc *MCPClient) Init(loadAll bool) error {
 	mc.ctx = context.Background()
 	mc.toolToSession = make(map[string]*MCPSession)
@@ -67,6 +70,11 @@ func (mc *MCPClient) Init(loadAll bool) error {
 	config, err := LoadMCPServers()
 	if err != nil {
 		return err
+	}
+
+	if config == nil {
+		//return fmt.Errorf("no MCP configuration found")
+		return nil
 	}
 
 	// Load mcp servers
@@ -267,6 +275,7 @@ func (mc *MCPClient) GetTools(session *MCPSession) *[]MCPTools {
 			Name:        tool.Name,
 			Description: tool.Description,
 			Parameters:  params,
+			Properties:  tool.InputSchema.Properties,
 		})
 	}
 	return &mcpTools
