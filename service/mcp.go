@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"os"
@@ -228,7 +229,20 @@ func (mc *MCPClient) FindTool(toolName string) *MCPSession {
 	return mc.toolToSession[toolName]
 }
 
-func (mc *MCPClient) CallTool(toolName string, args map[string]any) (string, error) {
+type MCPToolResponseType string
+
+const (
+	MCPResponseText  MCPToolResponseType = "text"
+	MCPResponseImage MCPToolResponseType = "image"
+	MCPResponseAudio MCPToolResponseType = "audio"
+)
+
+type MCPToolResponse struct {
+	Types    []MCPToolResponseType
+	Contents []string
+}
+
+func (mc *MCPClient) CallTool(toolName string, args map[string]any) (*MCPToolResponse, error) {
 	params := &mcp.CallToolParams{
 		Name:      toolName,
 		Arguments: args,
@@ -237,25 +251,40 @@ func (mc *MCPClient) CallTool(toolName string, args map[string]any) (string, err
 	// Find the session by tool name
 	session := mc.FindTool(toolName)
 	if session == nil {
-		return "", fmt.Errorf("no session found for tool %s", toolName)
+		return nil, fmt.Errorf("no session found for tool %s", toolName)
 	}
 	//log.Printf("Calling tool %s on session %s", toolName, session.ID())
 	res, err := session.cs.CallTool(mc.ctx, params)
 	if err != nil {
-		return ",", fmt.Errorf("call tool failed: %v", err)
+		return nil, fmt.Errorf("call tool failed: %v", err)
 	}
 
-	// Collect the tool's output
-	sb := strings.Builder{}
+	response := &MCPToolResponse{}
+
 	for _, c := range res.Content {
-		sb.WriteString(c.(*mcp.TextContent).Text)
+		if cc, ok := c.(*mcp.TextContent); ok {
+			response.Types = append(response.Types, MCPResponseText)
+			response.Contents = append(response.Contents, cc.Text)
+		} else if cc, ok := c.(*mcp.ImageContent); ok {
+			base64Data := base64.StdEncoding.EncodeToString(cc.Data)
+			str := fmt.Sprintf("data:%s;base64,%s", cc.MIMEType, base64Data)
+			response.Types = append(response.Types, MCPResponseImage)
+			response.Contents = append(response.Contents, str)
+		} else if cc, ok := c.(*mcp.AudioContent); ok {
+			base64Data := base64.StdEncoding.EncodeToString(cc.Data)
+			str := fmt.Sprintf("data:%s;base64,%s", cc.MIMEType, base64Data)
+			response.Types = append(response.Types, MCPResponseAudio)
+			response.Contents = append(response.Contents, str)
+		} else {
+			response.Types = append(response.Types, MCPResponseText)
+			response.Contents = append(response.Contents, "Unknown content type")
+		}
 	}
-	output := sb.String()
 
 	if res.IsError {
-		return "", fmt.Errorf("call tool failed: %v", output)
+		return nil, fmt.Errorf("call tool failed: %v", response.Contents)
 	}
-	return output, nil
+	return response, nil
 }
 
 // Returns a map grouping tools by MCP server session name,
