@@ -266,7 +266,7 @@ var mcpAddCmd = &cobra.Command{
 var mcpSetCmd = &cobra.Command{
 	Use:   "set",
 	Short: "Set/update an MCP server",
-	Long:  `Set or update an existing MCP server in the configuration. Requires name. Type is determined from existing server. For sse/http types, url is required. For std/local types, command is required.`,
+	Long:  `Set or update an existing MCP server in the configuration. Requires name. Type is determined from existing server. Only validate required fields when they are being set.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		name, _ := cmd.Flags().GetString("name")
 		url, _ := cmd.Flags().GetString("url")
@@ -298,14 +298,17 @@ var mcpSetCmd = &cobra.Command{
 		// Get type from existing server
 		serverType := existingServer.Type
 
-		// Validate type-specific required fields
+		// Validate type-specific required fields only when flags are provided
+		urlChanged := cmd.Flags().Changed("url")
+		commandChanged := cmd.Flags().Changed("command")
+
 		if serverType == "sse" || serverType == "http" {
-			if url == "" {
+			if urlChanged && url == "" {
 				fmt.Printf("Error: url is required for type %s\n", serverType)
 				return
 			}
 		} else if serverType == "std" || serverType == "local" {
-			if command == "" {
+			if commandChanged && command == "" {
 				fmt.Printf("Error: command is required for type %s\n", serverType)
 				return
 			}
@@ -315,12 +318,12 @@ var mcpSetCmd = &cobra.Command{
 		serverConfig := existingServer
 		serverConfig.Name = name
 
-		// Set type-specific fields
-		if serverType == "sse" {
+		// Set type-specific fields only when flags are provided
+		if serverType == "sse" && urlChanged {
 			serverConfig.Url = url
-		} else if serverType == "http" {
+		} else if serverType == "http" && urlChanged {
 			serverConfig.HttpUrl = url
-		} else if serverType == "std" || serverType == "local" {
+		} else if (serverType == "std" || serverType == "local") && commandChanged {
 			// Parse command into Command and Args
 			parts := strings.Fields(command)
 			if len(parts) > 0 {
@@ -331,8 +334,8 @@ var mcpSetCmd = &cobra.Command{
 			}
 		}
 
-		// Parse headers (merge with existing)
-		if len(headers) > 0 {
+		// Parse headers (merge with existing) only when provided
+		if cmd.Flags().Changed("header") {
 			if serverConfig.Headers == nil {
 				serverConfig.Headers = make(map[string]string)
 			}
@@ -344,8 +347,8 @@ var mcpSetCmd = &cobra.Command{
 			}
 		}
 
-		// Parse env vars (merge with existing)
-		if len(envVars) > 0 {
+		// Parse env vars (merge with existing) only when provided
+		if cmd.Flags().Changed("env") {
 			if serverConfig.Env == nil {
 				serverConfig.Env = make(map[string]string)
 			}
@@ -357,27 +360,29 @@ var mcpSetCmd = &cobra.Command{
 			}
 		}
 
-		// Handle allow flag - add or remove from AllowMCPServers
-		if allow {
-			serverConfig.Allowed = true
-			// Check if already in AllowMCPServers
-			found := false
-			for _, allowed := range config.AllowMCPServers {
-				if allowed == name {
-					found = true
-					break
+		// Handle allow flag only when explicitly provided
+		if cmd.Flags().Changed("allow") {
+			if allow {
+				serverConfig.Allowed = true
+				// Check if already in AllowMCPServers
+				found := false
+				for _, allowed := range config.AllowMCPServers {
+					if allowed == name {
+						found = true
+						break
+					}
 				}
-			}
-			if !found {
-				config.AllowMCPServers = append(config.AllowMCPServers, name)
-			}
-		} else {
-			serverConfig.Allowed = false
-			// Remove from AllowMCPServers if present
-			for i, allowed := range config.AllowMCPServers {
-				if allowed == name {
-					config.AllowMCPServers = append(config.AllowMCPServers[:i], config.AllowMCPServers[i+1:]...)
-					break
+				if !found {
+					config.AllowMCPServers = append(config.AllowMCPServers, name)
+				}
+			} else {
+				serverConfig.Allowed = false
+				// Remove from AllowMCPServers if present
+				for i, allowed := range config.AllowMCPServers {
+					if allowed == name {
+						config.AllowMCPServers = append(config.AllowMCPServers[:i], config.AllowMCPServers[i+1:]...)
+						break
+					}
 				}
 			}
 		}
