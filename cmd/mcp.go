@@ -392,6 +392,46 @@ var mcpSetCmd = &cobra.Command{
 	},
 }
 
+var mcpRemoveCmd = &cobra.Command{
+	Use:   "remove",
+	Short: "Remove an MCP server",
+	Long:  `Remove an MCP server from the configuration. Requires name of the server to remove.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		name, _ := cmd.Flags().GetString("name")
+
+		// Validate required fields
+		if name == "" {
+			fmt.Println("Error: name is required")
+			return
+		}
+
+		// Load existing config
+		config, err := service.LoadMCPServers()
+		if err != nil {
+			fmt.Printf("Error loading MCP config: %v\n", err)
+			return
+		}
+
+		// Check if server exists
+		if _, exists := config.MCPServers[name]; !exists {
+			fmt.Printf("Error: MCP server '%s' does not exist\n", name)
+			return
+		}
+
+		// Remove the server from config
+		delete(config.MCPServers, name)
+
+		// Save config
+		err = service.SaveMCPServers(config)
+		if err != nil {
+			fmt.Printf("Error saving MCP config: %v\n", err)
+			return
+		}
+
+		fmt.Printf("Successfully removed MCP server '%s'\n", name)
+	},
+}
+
 func init() {
 	mcpListCmd.Flags().BoolP("all", "a", false, "List all mcp servers, including blocked ones")
 	mcpAddCmd.Flags().StringP("name", "n", "", "Name of the MCP server (required)")
@@ -405,11 +445,13 @@ func init() {
 	mcpSetCmd.Flags().StringP("command", "c", "", "Command for std/local type servers")
 	mcpSetCmd.Flags().StringSliceP("header", "H", []string{}, "HTTP headers in key=value format (can be used multiple times)")
 	mcpSetCmd.Flags().StringSliceP("env", "e", []string{}, "Environment variables in key=value format (can be used multiple times)")
+	mcpRemoveCmd.Flags().StringP("name", "n", "", "Name of the MCP server to remove (required)")
 	mcpCmd.AddCommand(mcpListCmd)
 	mcpCmd.AddCommand(mcpOnCmd)
 	mcpCmd.AddCommand(mcpOffCmd)
 	mcpCmd.AddCommand(mcpAddCmd)
 	mcpCmd.AddCommand(mcpSetCmd)
+	mcpCmd.AddCommand(mcpRemoveCmd)
 	rootCmd.AddCommand(mcpCmd)
 }
 
