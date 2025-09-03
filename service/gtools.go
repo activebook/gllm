@@ -1,6 +1,8 @@
 package service
 
 import (
+	"fmt"
+
 	"google.golang.org/genai"
 )
 
@@ -27,6 +29,15 @@ func (ag *Agent) getGemini2EmbeddingTools() *genai.Tool {
 	for _, openTool := range openTools {
 		geminiTool := openTool.ToGeminiFunctions()
 		funcs = append(funcs, geminiTool)
+	}
+
+	// Add MCP tools if client is available
+	if ag.MCPClient != nil {
+		mcpTools := getMCPTools(ag.MCPClient)
+		for _, mcpTool := range mcpTools {
+			geminiTool := mcpTool.ToGeminiFunctions()
+			funcs = append(funcs, geminiTool)
+		}
 	}
 
 	// The Gemini API expects all function declarations to be grouped together under a single Tool object.
@@ -194,6 +205,35 @@ func (ag *Agent) Gemini2DeleteDirectoryToolCall(call *genai.FunctionCall) (*gena
 
 	resp.Response = map[string]any{
 		"output": response,
+		"error":  "",
+	}
+	return &resp, nil
+}
+
+func (ag *Agent) Gemini2MCPToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+	if ag.MCPClient == nil {
+		return nil, fmt.Errorf("MCP client not initialized")
+	}
+
+	resp := genai.FunctionResponse{
+		ID:   call.ID,
+		Name: call.Name,
+	}
+
+	// Convert genai.FunctionCall.Args to map[string]interface{}
+	argsMap := make(map[string]interface{})
+	for k, v := range call.Args {
+		argsMap[k] = v
+	}
+
+	// Call the MCP tool
+	result, err := ag.MCPClient.CallTool(call.Name, argsMap)
+	if err != nil {
+		return nil, fmt.Errorf("MCP tool call failed: %v", err)
+	}
+
+	resp.Response = map[string]any{
+		"output": result,
 		"error":  "",
 	}
 	return &resp, nil

@@ -24,6 +24,7 @@ func init() {
 	workflowAddCmd.Flags().StringP("name", "n", "", "Agent name (required)")
 	workflowAddCmd.Flags().StringP("model", "m", "", "Model to use (required)")
 	workflowAddCmd.Flags().StringP("tools", "t", "", "Tools setting (enabled/disabled)")
+	workflowAddCmd.Flags().StringP("mcp", "c", "", "MCP setting (enabled/disabled)")
 	workflowAddCmd.Flags().StringP("search", "s", "", "Search setting")
 	workflowAddCmd.Flags().StringP("template", "p", "", "Template to use")
 	workflowAddCmd.Flags().StringP("system", "S", "", "System prompt to use")
@@ -42,6 +43,7 @@ func init() {
 	workflowSetCmd.Flags().StringP("name", "n", "", "Agent name")
 	workflowSetCmd.Flags().StringP("model", "m", "", "Model to use")
 	workflowSetCmd.Flags().StringP("tools", "t", "", "Tools setting (enabled/disabled)")
+	workflowSetCmd.Flags().StringP("mcp", "c", "", "MCP setting (enabled/disabled)")
 	workflowSetCmd.Flags().StringP("search", "s", "", "Search setting")
 	workflowSetCmd.Flags().StringP("template", "p", "", "Template to use")
 	workflowSetCmd.Flags().StringP("system", "S", "", "System prompt to use")
@@ -236,6 +238,7 @@ gllm workflow add --name planner --model groq-oss --tools enabled --template pla
 		name, _ := cmd.Flags().GetString("name")
 		model, _ := cmd.Flags().GetString("model")
 		tools, _ := cmd.Flags().GetString("tools")
+		mcp, _ := cmd.Flags().GetString("mcp")
 		search, _ := cmd.Flags().GetString("search")
 		template, _ := cmd.Flags().GetString("template")
 		sysPrompt, _ := cmd.Flags().GetString("system")
@@ -284,6 +287,13 @@ gllm workflow add --name planner --model groq-oss --tools enabled --template pla
 				newAgent["tools"] = boolVal
 			} else {
 				newAgent["tools"] = false
+			}
+		}
+		if mcp != "" {
+			if boolVal, err := convertUserInputToBool(mcp); err == nil {
+				newAgent["mcp"] = boolVal
+			} else {
+				newAgent["mcp"] = false
 			}
 		}
 		if search != "" {
@@ -575,6 +585,15 @@ gllm workflow set planner --model groq-oss --role master`,
 				agentMap["tools"] = boolVal
 			} else {
 				agentMap["tools"] = false
+			}
+			updated = true
+		}
+
+		if mcp, err := cmd.Flags().GetString("mcp"); err == nil && mcp != "" {
+			if boolVal, err := convertUserInputToBool(mcp); err == nil {
+				agentMap["mcp"] = boolVal
+			} else {
+				agentMap["mcp"] = false
 			}
 			updated = true
 		}
@@ -905,6 +924,7 @@ gllm workflow start -i  # Run in interactive mode`,
 				Template:      getStringValue(agent, "template"),
 				SystemPrompt:  getStringValue(agent, "system"),
 				Tools:         getBoolValue(agent, "tools"),
+				MCP:           getBoolValue(agent, "mcp"),
 				Think:         getBoolValue(agent, "think"),
 				Usage:         getBoolValue(agent, "usage"),
 				Markdown:      getBoolValue(agent, "markdown"),
@@ -1039,6 +1059,12 @@ func printAgentDetails(agent map[string]interface{}) {
 		fmt.Printf("  Tools: %v\n", tools)
 	} else {
 		fmt.Printf("  Tools: false\n")
+	}
+
+	if mcp, exists := agent["mcp"]; exists {
+		fmt.Printf("  MCP: %v\n", mcp)
+	} else {
+		fmt.Printf("  MCP: false\n")
 	}
 
 	if usage, exists := agent["usage"]; exists {

@@ -2,6 +2,7 @@
 .qodo
 gllm.yaml
 gllm-config.yaml
+mcp.json
 design.md
 **test/*
 **test/*.*

@@ -15,6 +15,7 @@
 - **Multi-turn Conversations**: Engage in multiple rounds of conversation and manage chat history.
 - **Command Agent Mode**: Let LLMs plan and execute commands with your confirmation.
 - **Multi-Agent Workflows**: Build and run complex workflows with multiple agents for tasks like deep research.
+- **Model Context Protocol (MCP) Support**: Connect to external MCP servers to access additional tools and data sources.
 - **Token Usage Tracking**: Monitor your token consumption.
 - **Configuration Management**: Easily manage models, templates, system prompts, and search engines.
 - **Version Control**: Easily track and update your `gllm` setup.
@@ -189,6 +190,73 @@ Here's an example of a deep research workflow in action:
     ![Workers Screenshot](screenshots/deepresearch_workers.png)
 4.  **Summarizer:** Summarizes the results from the workers to provide a final report.
     ![Summarizer Screenshot](screenshots/deepresearch_summarizer.png)
+
+---
+
+## 🛠 Model Context Protocol (MCP)
+
+`gllm` supports the Model Context Protocol (MCP), allowing you to connect to external MCP servers to access additional tools and data sources. This enables LLMs to interact with external services, databases, and APIs through standardized protocols.
+
+### Enabling/Disabling MCP
+
+- **Enable MCP:**
+  ```sh
+  gllm mcp on
+  ```
+
+- **Disable MCP:**
+  ```sh
+  gllm mcp off
+  ```
+
+- **Check MCP status:**
+  ```sh
+  gllm mcp
+  ```
+
+### Managing MCP Servers
+
+You can add, configure, and manage MCP servers of different types:
+
+- **Add an MCP server:**
+  ```sh
+  # Add a stdio-based server
+  gllm mcp add --name my-server --type std --command "my-mcp-server"
+
+  # Add an SSE-based server
+  gllm mcp add --name sse-server --type sse --url "http://example.com/mcp"
+
+  # Add an HTTP-based server
+  gllm mcp add --name http-server --type http --url "http://example.com/mcp"
+  ```
+
+- **List available MCP tools:**
+  ```sh
+  gllm mcp list
+  ```
+  ![List MCP Tools Screenshot](screenshots/listmcp.png)
+
+- **Update an MCP server:**
+  ```sh
+  gllm mcp set --name my-server --allow true
+  ```
+
+- **Remove an MCP server:**
+  ```sh
+  gllm mcp remove --name my-server
+  ```
+
+### Using MCP in Queries
+
+Once MCP is enabled and servers are configured, the LLM can automatically use available MCP tools during conversations:
+
+```sh
+gllm "Use the available tools to fetch the latest news about AI"
+```
+
+![Use MCP Screenshot](screenshots/usemcp.png)
+
+The LLM will detect relevant MCP tools and use them to enhance its responses with external data and capabilities.
 
 ---
 

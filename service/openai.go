@@ -69,6 +69,11 @@ func (ag *Agent) GenerateOpenAIStream() error {
 		searchTool := ag.getOpenAIWebSearchTool()
 		tools = append(tools, searchTool)
 	}
+	if ag.MCPClient != nil {
+		// Add MCP tools if MCP client is available
+		mcpTools := ag.getOpenAIMCPTools()
+		tools = append(tools, mcpTools...)
+	}
 
 	op := OpenProcessor{
 		ctx:        ctx,
@@ -80,6 +85,7 @@ func (ag *Agent) GenerateOpenAIStream() error {
 		queries:    make([]string, 0),
 		references: make([]map[string]interface{}, 0), // Updated to match new field type
 		status:     &ag.Status,
+		mcpClient:  ag.MCPClient,
 	}
 	chat := &OpenAI{
 		client: client,
@@ -319,7 +325,7 @@ func (oa *OpenAI) processStream(stream *openai.ChatCompletionStream) (openai.Cha
 
 					// Skip if not our expected function
 					// Because some model made up function name
-					if functionName != "" && !AvailableEmbeddingTool(functionName) && !AvailableSearchTool(functionName) {
+					if functionName != "" && !AvailableEmbeddingTool(functionName) && !AvailableSearchTool(functionName) && !AvailableMCPTool(functionName, oa.op.mcpClient) {
 						continue
 					}
 
@@ -415,6 +421,9 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {
 		msg, err = handler(toolCall, &argsMap)
+	} else if oa.op.mcpClient != nil && oa.op.mcpClient.FindTool(toolCall.Function.Name) != nil {
+		// Handle MCP tool calls
+		msg, err = oa.op.OpenAIMCPToolCall(toolCall, &argsMap)
 	} else {
 		msg = openai.ChatCompletionMessage{}
 		err = fmt.Errorf("unknown function name: %s", toolCall.Function.Name)
@@ -468,4 +477,17 @@ func (ag *Agent) getOpenAIWebSearchTool() openai.Tool {
 	// Get generic web search tool and convert it to OpenAI tool
 	genericTool := getOpenWebSearchTool()
 	return genericTool.ToOpenAITool()
+}
+
+func (ag *Agent) getOpenAIMCPTools() []openai.Tool {
+	var tools []openai.Tool
+	// Add MCP tools if client is available
+	if ag.MCPClient != nil {
+		mcpTools := getMCPTools(ag.MCPClient)
+		for _, mcpTool := range mcpTools {
+			tools = append(tools, mcpTool.ToOpenAITool())
+		}
+	}
+
+	return tools
 }

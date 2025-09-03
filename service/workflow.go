@@ -36,6 +36,7 @@ type WorkflowAgent struct {
 	SystemPrompt  string
 	Tools         bool
 	Think         bool
+	MCP           bool
 	Usage         bool
 	Markdown      bool
 	InputDir      string
@@ -133,6 +134,15 @@ func promptUserForConfirmation(agent *WorkflowAgent) bool {
 		toolsColor = booleanTrueColor
 	}
 	fmt.Printf("   %sTools enabled:%s %s%s%s\n", toolsColor, workflowResetColor, toolsColor, toolsStatus, workflowResetColor)
+
+	// MCP  status
+	mcpStatus := "false"
+	mcpColor := booleanFalseColor
+	if agent.MCP {
+		mcpStatus = "true"
+		mcpColor = booleanTrueColor
+	}
+	fmt.Printf("   %sMCP enabled:%s %s%s%s\n", mcpColor, workflowResetColor, mcpColor, mcpStatus, workflowResetColor)
 
 	// Format think mode status
 	thinkStatus := "false"
@@ -511,6 +521,7 @@ func executeAgent(agent *WorkflowAgent, prompt string) error {
 		MaxRecursions:    agent.MaxRecursions,
 		ThinkMode:        agent.Think,
 		UseTools:         agent.Tools,
+		UseMCP:           agent.MCP,
 		SkipToolsConfirm: true, // Always skip tools confirmation
 		AppendMarkdown:   agent.Markdown,
 		AppendUsage:      agent.Usage,

@@ -38,6 +38,7 @@ var (
 	convoName        string   // gllm --conversation(-c) "My Conversation" "What is the stock price of Tesla right now?"
 	confirmToolsFlag bool     // gllm --confirm-tools "Allow skipping confirmation for tool operations"
 	thinkFlag        bool     // gllm --think(-T) "Enable deep think mode"
+	mcpFlag          bool     // gllm --mcp "Enable model to use MCP servers"
 
 	// Global cmd instance, to be used by subcommands
 	rootCmd = &cobra.Command{
@@ -72,8 +73,9 @@ Configure your API keys and preferred models, then start chatting or executing c
 				!cmd.Flags().Changed("template") &&
 				!cmd.Flags().Changed("attachment") &&
 				!cmd.Flags().Changed("version") &&
-				!cmd.Flags().Changed("conversion") &&
+				!cmd.Flags().Changed("conversation") &&
 				!cmd.Flags().Changed("reference") &&
+				!cmd.Flags().Changed("mcp") &&
 				!hasStdinData() {
 				cmd.Help()
 				return
@@ -149,6 +151,12 @@ Configure your API keys and preferred models, then start chatting or executing c
 				if !thinkFlag {
 					// if think flag is not set, check if it's enabled globally
 					thinkFlag = IsThinkEnabled()
+				}
+
+				// MCP
+				if !mcpFlag {
+					// if mcp flag is not set, check if it's enabled globally
+					mcpFlag = AreMCPServersEnabled()
 				}
 
 				// Process all prompt building
@@ -282,6 +290,7 @@ func processQuery(prompt string, files []*service.FileData) {
 		MaxRecursions:    maxRecursions,
 		ThinkMode:        thinkFlag,
 		UseTools:         toolsFlag,
+		UseMCP:           mcpFlag,
 		SkipToolsConfirm: confirmToolsFlag,
 		AppendUsage:      includeUsage,
 		AppendMarkdown:   includeMarkdown,
@@ -311,6 +320,14 @@ func Execute() {
 		}
 	}
 
+	// Ensure MCPClient resources are cleaned up on exit
+	// This is a safeguard; the shared instance should ideally be closed only once
+	// when the application is truly exiting, not after every command execution.
+	// Hence, we place it here in Execute() which is called once in main.
+	// If you create separate MCPClient instances elsewhere, ensure they are closed too.
+	// If the application grows more complex (e.g., with subcommands that run indefinitely),
+	// consider a more robust lifecycle management strategy.
+	defer service.GetMCPClient().Close()
 	if err := rootCmd.Execute(); err != nil {
 		service.Errorf("'%s'\n", err)
 		os.Exit(1)
@@ -353,6 +370,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&deepDiveFlag, "deep-dive", "", false, "Fetch more details from the search (default: off)")
 	rootCmd.Flags().BoolVarP(&confirmToolsFlag, "confirm-tools", "", false, "Skip confirmation for tool operations (default: no)")
 	rootCmd.Flags().BoolVarP(&thinkFlag, "think", "T", false, "Enable deep think mode")
+	rootCmd.Flags().BoolVarP(&mcpFlag, "mcp", "", false, "Enable model to use MCP servers")
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
 
 	// Add more persistent flags here if needed (e.g., --verbose, --log-file)

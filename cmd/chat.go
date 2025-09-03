@@ -40,6 +40,7 @@ Special commands:
 /template, /p <@name|tmpl> - change template
 /think, /T [on|off] - Switch whether to use deep think mode
 /search, /s <search_engine> [on|off] - select a search engine to use, or switch on/off
+/mcp [on|off|list] - Switch whether to use MCP servers, list available servers
 /reference. /r <num> - change link reference count
 /usage, /u [on|off] - Switch whether to show token usage information
 /attach, /a <filename> - Attach a file to the chat session
@@ -97,6 +98,12 @@ Special commands:
 				thinkFlag = IsThinkEnabled()
 			}
 
+			// MCP
+			if !mcpFlag {
+				// if mcp flag is not set, check if it's enabled globally
+				mcpFlag = AreMCPServersEnabled()
+			}
+
 			// Always save a conversation file regardless of the flag
 			if !cmd.Flags().Changed("conversation") {
 				convoName = GenerateChatFileName()
@@ -150,6 +157,7 @@ func init() {
 	chatCmd.Flags().BoolVarP(&searchFlag, "search", "s", false, "Search engine for the chat session")
 	chatCmd.Flags().BoolVarP(&toolsFlag, "tools", "t", true, "Enable or disable tools for the chat session")
 	chatCmd.Flags().BoolVarP(&thinkFlag, "think", "T", false, "Enable or disable deep think mode for the chat session")
+	chatCmd.Flags().BoolVarP(&mcpFlag, "mcp", "", false, "Enable or disable MCP servers for the chat session")
 	chatCmd.Flags().Lookup("search").NoOptDefVal = service.GetDefaultSearchEngineName()
 	chatCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
 	chatCmd.Flags().BoolVar(&deepDiveFlag, "deep-dive", false, "Enable deep dive search to fetch all links from search results")
@@ -514,6 +522,7 @@ func (ci *ChatInfo) showInfo() {
 	fmt.Fprintf(w, "%s\t%s\n", keyColor("Search Engine"), highlightColor(GetEffectSearchEngineName()))
 	fmt.Fprintf(w, "%s\t%t\n", keyColor("Deep Think"), IsThinkEnabled())
 	fmt.Fprintf(w, "%s\t%t\n", keyColor("Embedding Tools"), AreToolsEnabled())
+	fmt.Fprintf(w, "%s\t%t\n", keyColor("MCP Servers"), AreMCPServersEnabled())
 	fmt.Fprintf(w, "%s\t%t\n", keyColor("Markdown"), IncludeMarkdown())
 	fmt.Fprintf(w, "%s\t%t\n", keyColor("Usage Metainfo"), IncludeUsageMetainfo())
 	fmt.Fprintf(w, "%s\t%s\n", keyColor("Output File"), ci.outputFile)
@@ -556,6 +565,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /think, /T \"[on|off]\" - Switch whether to use deep think mode")
 	fmt.Println("  /search, /s \"<engine>[on|off]\" - Change the search engine, or switch on/off")
 	fmt.Println("  /tools, /t \"[on|off|skip|confirm]\" - Switch whether to use embedding tools, skip tools confirmation")
+	fmt.Println("  /mcp \"[on|off|list]\" - Switch whether to use MCP servers, or list available servers")
 	fmt.Println("  /reference, /r \"<num>\" - Change the search link reference count")
 	fmt.Println("  /usage, /u \"[on|off]\" - Switch whether to show token usage information")
 	fmt.Println("  /output, /o <filename> [off] - Save to output file for model responses")
@@ -614,6 +624,19 @@ func (ci *ChatInfo) setUseTools(useTools string) {
 
 	default:
 		toolsCmd.Run(toolsCmd, nil)
+	}
+}
+
+func (ci *ChatInfo) setUseMCP(useMCP string) {
+	switch useMCP {
+	case "on":
+		SwitchMCP(useMCP)
+	case "off":
+		SwitchMCP(useMCP)
+	case "list":
+		mcpListCmd.Run(mcpListCmd, []string{})
+	default:
+		mcpCmd.Run(mcpCmd, []string{})
 	}
 }
 
@@ -716,6 +739,14 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		tools := strings.TrimSpace(parts[1])
 		ci.setUseTools(tools)
 
+	case "/mcp":
+		if len(parts) < 2 {
+			mcpCmd.Run(mcpCmd, []string{})
+			return
+		}
+		mcp := strings.TrimSpace(parts[1])
+		ci.setUseMCP(mcp)
+
 	case "/think", "/T":
 		if len(parts) < 2 {
 			thinkCmd.Run(thinkCmd, []string{})
@@ -798,6 +829,8 @@ func (ci *ChatInfo) callAgent(input string) {
 
 	// check if think flag is set
 	thinkFlag = IsThinkEnabled()
+	// check if mcp flag is set
+	mcpFlag = AreMCPServersEnabled()
 	// Include usage metainfo
 	includeUsage := IncludeUsageMetainfo()
 	// Include markdown
@@ -812,6 +845,7 @@ func (ci *ChatInfo) callAgent(input string) {
 		MaxRecursions:    ci.maxRecursions,
 		ThinkMode:        thinkFlag,
 		UseTools:         toolsFlag,
+		UseMCP:           mcpFlag,
 		SkipToolsConfirm: confirmToolsFlag,
 		AppendUsage:      includeUsage,
 		AppendMarkdown:   includeMarkdown,
