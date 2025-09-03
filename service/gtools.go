@@ -26,9 +26,13 @@ func (ag *Agent) getGemini2EmbeddingTools(includeMCP bool) *genai.Tool {
 	openTools := getOpenEmbeddingTools()
 	var funcs []*genai.FunctionDeclaration
 
+	// Track registered tool names to prevent duplicates
+	registeredNames := make(map[string]bool)
+
 	for _, openTool := range openTools {
 		geminiTool := openTool.ToGeminiFunctions()
 		funcs = append(funcs, geminiTool)
+		registeredNames[geminiTool.Name] = true
 	}
 
 	// Add MCP tools if requested and client is available
@@ -36,7 +40,12 @@ func (ag *Agent) getGemini2EmbeddingTools(includeMCP bool) *genai.Tool {
 		mcpTools := getMCPTools(ag.MCPClient)
 		for _, mcpTool := range mcpTools {
 			geminiTool := mcpTool.ToGeminiFunctions()
+			// Skip MCP tools that have the same name as built-in tools to avoid Gemini duplicate function declaration error
+			if registeredNames[geminiTool.Name] {
+				continue
+			}
 			funcs = append(funcs, geminiTool)
+			registeredNames[geminiTool.Name] = true
 		}
 	}
 
