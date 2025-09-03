@@ -33,6 +33,12 @@ type MCPTools struct {
 	Parameters  map[string]string
 }
 
+type MCPServer struct {
+	Name    string
+	Allowed bool
+	Tools   *[]MCPTools
+}
+
 type MCPSession struct {
 	name string
 	cs   *mcp.ClientSession
@@ -42,13 +48,14 @@ type MCPClient struct {
 	ctx      context.Context
 	client   *mcp.Client
 	sessions []*MCPSession
+	servers  []*MCPServer
 }
 
 // three types of transports supported:
 // httpUrl → StreamableHTTPClientTransport
 // url → SSEClientTransport
 // command → StdioClientTransport
-func (mc *MCPClient) Init() error {
+func (mc *MCPClient) Init(loadAll bool) error {
 	mc.ctx = context.Background()
 
 	// Create a new client, with no features.
@@ -60,41 +67,40 @@ func (mc *MCPClient) Init() error {
 		return err
 	}
 
-	// Create a set of allowed servers for quick lookup
-	allowed := make(map[string]bool)
-	for _, s := range config.AllowMCPServers {
-		if s != "" {
-			allowed[s] = true
-		}
-	}
-
+	// Load mcp servers
+	servers := []*MCPServer{}
 	// Connect to each server based on its type
-	for name, server := range config.MCPServers {
+	for serverName, server := range config.MCPServers {
 		// Skip if not in allowed list (if allow list is not empty)
-		if len(allowed) > 0 && !allowed[name] {
+		if !server.Alllowed && !loadAll {
 			continue
 		}
 
 		if server.Type == "sse" || server.Url != "" || server.BaseUrl != "" {
 			// Add SSE server
-			err = mc.AddSseServer(server.Name, server.BaseUrl, server.Headers)
+			err = mc.AddSseServer(serverName, server.BaseUrl, server.Headers)
 		} else if server.Type == "std" || server.Command != "" {
 			// Add stdio server
 			dir := server.WorkDir
 			if dir == "" {
 				dir = server.Cwd
 			}
-			err = mc.AddStdServer(server.Name, server.Command, server.Env, dir, server.Args...)
+			err = mc.AddStdServer(serverName, server.Command, server.Env, dir, server.Args...)
 		} else if server.Type == "http" || server.HttpUrl != "" {
 			// Add HTTP server
-			err = mc.AddHttpServer(server.Name, server.HttpUrl, server.Headers)
+			err = mc.AddHttpServer(serverName, server.HttpUrl, server.Headers)
 		}
 
 		if err != nil {
 			// don't continue with other servers
 			return err
 		}
+		session := mc.sessions[len(mc.sessions)-1]
+		tools := mc.GetTools(session)
+		// Keep tools null for now, will be populated when listing
+		servers = append(servers, &MCPServer{Name: serverName, Allowed: server.Alllowed, Tools: tools})
 	}
+	mc.servers = servers
 	return nil
 }
 
@@ -224,28 +230,47 @@ func (mc *MCPClient) CallTool(toolName string, args map[string]any) (string, err
 
 // Returns a map grouping tools by MCP server session name,
 // with each session containing a slice of its available tools.
-func (mc *MCPClient) GetAllTools() *map[string]*[]MCPTools {
-	allTools := make(map[string]*[]MCPTools)
+func (mc *MCPClient) GetAllServers() []*MCPServer {
+	return mc.servers
+}
 
-	// List all tools available on the server
-	for _, session := range mc.sessions {
-		var mcpTools []MCPTools
-		tools, err := session.cs.ListTools(mc.ctx, nil)
-		if err != nil {
-			continue
-		}
-		for _, tool := range tools.Tools {
-			params := make(map[string]string)
-			for k, v := range tool.InputSchema.Properties {
-				params[k] = v.String()
-			}
-			mcpTools = append(mcpTools, MCPTools{
-				Name:        tool.Name,
-				Description: tool.Description,
-				Parameters:  params,
-			})
-		}
-		allTools[session.name] = &mcpTools
+func (mc *MCPClient) GetTools(session *MCPSession) *[]MCPTools {
+	tools, err := session.cs.ListTools(mc.ctx, nil)
+	if err != nil {
+		return nil
 	}
-	return &allTools
+	var mcpTools []MCPTools
+	for _, tool := range tools.Tools {
+		params := make(map[string]string)
+		for k, v := range tool.InputSchema.Properties {
+			// Extract meaningful schema information instead of using String()
+			var schemaDesc string
+			if v.Type != "" {
+				schemaDesc = v.Type
+			} else if len(v.Types) > 0 {
+				schemaDesc = fmt.Sprintf("[%s]", strings.Join(v.Types, ", "))
+			} else {
+				schemaDesc = "any"
+			}
+
+			// Add additional schema details
+			if v.Description != "" {
+				schemaDesc += fmt.Sprintf(" (%s)", v.Description)
+			}
+			if v.Format != "" {
+				schemaDesc += fmt.Sprintf(" format:%s", v.Format)
+			}
+			if len(v.Enum) > 0 {
+				schemaDesc += fmt.Sprintf(" enum:%v", v.Enum)
+			}
+
+			params[k] = schemaDesc
+		}
+		mcpTools = append(mcpTools, MCPTools{
+			Name:        tool.Name,
+			Description: tool.Description,
+			Parameters:  params,
+		})
+	}
+	return &mcpTools
 }

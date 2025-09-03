@@ -22,6 +22,7 @@ type MCPServerConfig struct {
 	Cwd         string            `json:"cwd,omitempty"`
 	Name        string            `json:"name,omitempty"`
 	Description string            `json:"description,omitempty"`
+	Alllowed    bool              // whether to allow MCP servers
 }
 
 // MCPConfig represents the overall MCP configuration
@@ -50,20 +51,14 @@ func LoadMCPServers() (*MCPConfig, error) {
 	}
 
 	// Create a set of allowed servers for quick lookup
-	// allowed := make(map[string]bool)
-	// for _, s := range config.AllowMCPServers {
-	// 	if s != "" {
-	// 		allowed[s] = true
-	// 	}
-	// }
-
-	// Iterate through each server configuration
-	// for name, server := range config.MCPServers {
-	// 	// Skip if not in allowed list (if allow list is not empty)
-	// 	// if (len(allowed) > 0 && !allowed[name]) {
-	// 	// 	continue
-	// 	// }
-	// }
+	for _, s := range config.AllowMCPServers {
+		if s != "" {
+			if server, exists := config.MCPServers[s]; exists {
+				server.Alllowed = true
+				config.MCPServers[s] = server
+			}
+		}
+	}
 
 	return &config, nil
 }
