@@ -35,13 +35,19 @@ var mcpListCmd = &cobra.Command{
 		// here we don't need to use the shared instance
 		// because we just need to check the available servers and tools
 		// not making any calls to the servers
-		client := &service.MCPClient{}
+		var client *service.MCPClient
+		if !all {
+			client = service.GetMCPClient() // use the shared instance
+		} else {
+			// create a new instance to check all tools
+			client = &service.MCPClient{}
+			defer client.Close() // ensure resources are cleaned up
+		}
 		err := client.Init(all) // Load all servers if detail is true, else false
 		if err != nil {
 			fmt.Printf("Error initializing MCP client: %v\n", err)
 			return
 		}
-		defer client.Close()
 
 		servers := client.GetAllServers()
 		if len(servers) == 0 {

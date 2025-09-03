@@ -320,6 +320,14 @@ func Execute() {
 		}
 	}
 
+	// Ensure MCPClient resources are cleaned up on exit
+	// This is a safeguard; the shared instance should ideally be closed only once
+	// when the application is truly exiting, not after every command execution.
+	// Hence, we place it here in Execute() which is called once in main.
+	// If you create separate MCPClient instances elsewhere, ensure they are closed too.
+	// If the application grows more complex (e.g., with subcommands that run indefinitely),
+	// consider a more robust lifecycle management strategy.
+	defer service.GetMCPClient().Close()
 	if err := rootCmd.Execute(); err != nil {
 		service.Errorf("'%s'\n", err)
 		os.Exit(1)
