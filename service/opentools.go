@@ -1019,6 +1019,54 @@ func (op *OpenProcessor) OpenAIReadMultipleFilesToolCall(toolCall openai.ToolCal
 }
 
 // MCP tool call implementations
+/*
+Here is a bug:
+status: 422 Unprocessable Entity, message: %!s(<nil>),
+body: {"detail":[{"type":"string_type","loc":["body","messages",2,"ChatCompletionToolMessage","content"],"msg":"Input should be a valid string"
+it is caused by the tool call response can be only a simple string
+*/
+// func (op *OpenProcessor) OpenAIMCPToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+// 	if op.mcpClient == nil {
+// 		return openai.ChatCompletionMessage{}, fmt.Errorf("MCP client not initialized")
+// 	}
+
+// 	// Call the MCP tool
+// 	result, err := op.mcpClient.CallTool(toolCall.Function.Name, *argsMap)
+// 	if err != nil {
+// 		return openai.ChatCompletionMessage{}, fmt.Errorf("MCP tool call failed: %v", err)
+// 	}
+
+// 	parts := []openai.ChatMessagePart{}
+// 	for i, content := range result.Contents {
+// 		switch result.Types[i] {
+// 		case MCPResponseText:
+// 			part := openai.ChatMessagePart{
+// 				Type: openai.ChatMessagePartTypeText,
+// 				Text: content,
+// 			}
+// 			parts = append(parts, part)
+// 		case MCPResponseImage:
+// 			part := openai.ChatMessagePart{
+// 				Type: openai.ChatMessagePartTypeImageURL,
+// 				ImageURL: &openai.ChatMessageImageURL{
+// 					URL: content,
+// 				},
+// 			}
+// 			parts = append(parts, part)
+// 		default:
+// 			// Unknown file type, skip
+// 			// Don't deal with pdf, xls
+// 			// It needs upload to OpenAI's servers first, so we can't include them directly in a message.
+// 		}
+// 	}
+
+// 	return openai.ChatCompletionMessage{
+// 		Role:         openai.ChatMessageRoleTool,
+// 		ToolCallID:   toolCall.ID,
+// 		MultiContent: parts,
+// 	}, nil
+// }
+
 func (op *OpenProcessor) OpenAIMCPToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	if op.mcpClient == nil {
 		return openai.ChatCompletionMessage{}, fmt.Errorf("MCP client not initialized")
@@ -1030,23 +1078,15 @@ func (op *OpenProcessor) OpenAIMCPToolCall(toolCall openai.ToolCall, argsMap *ma
 		return openai.ChatCompletionMessage{}, fmt.Errorf("MCP tool call failed: %v", err)
 	}
 
-	parts := []openai.ChatMessagePart{}
+	// Concatenate all text and image URLs into a single string output
+	// Because currently the tool call response can be only a simple string
+	output := ""
 	for i, content := range result.Contents {
 		switch result.Types[i] {
 		case MCPResponseText:
-			part := openai.ChatMessagePart{
-				Type: openai.ChatMessagePartTypeText,
-				Text: content,
-			}
-			parts = append(parts, part)
+			output += content + "\n"
 		case MCPResponseImage:
-			part := openai.ChatMessagePart{
-				Type: openai.ChatMessagePartTypeImageURL,
-				ImageURL: &openai.ChatMessageImageURL{
-					URL: content,
-				},
-			}
-			parts = append(parts, part)
+			output += content + "\n"
 		default:
 			// Unknown file type, skip
 			// Don't deal with pdf, xls
@@ -1055,9 +1095,9 @@ func (op *OpenProcessor) OpenAIMCPToolCall(toolCall openai.ToolCall, argsMap *ma
 	}
 
 	return openai.ChatCompletionMessage{
-		Role:         openai.ChatMessageRoleTool,
-		ToolCallID:   toolCall.ID,
-		MultiContent: parts,
+		Role:       openai.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Content:    output,
 	}, nil
 }
 
@@ -1072,6 +1112,7 @@ func (op *OpenProcessor) OpenChatMCPToolCall(toolCall *model.ToolCall, argsMap *
 		return nil, fmt.Errorf("MCP tool call failed: %v", err)
 	}
 
+	// OpenChat supports text, image, audio toolcall responses
 	parts := []*model.ChatCompletionMessageContentPart{}
 	for i, content := range result.Contents {
 		switch result.Types[i] {

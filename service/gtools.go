@@ -249,6 +249,10 @@ func (ag *Agent) Gemini2MCPToolCall(call *genai.FunctionCall) (*genai.FunctionRe
 		return nil, fmt.Errorf("MCP tool call failed: %v", err)
 	}
 
+	// Right now, gemini2 only support string response
+	// It cannot support other types(image/audio, etc.)
+	// So even though it can get base64 encoded data and MIME type
+	// It cannot recognize it.
 	resp.Response = map[string]any{
 		"output": result,
 		"error":  "",
