@@ -105,7 +105,7 @@ func (mc *MCPClient) Init(loadAll bool) error {
 	// Connect to each server based on its type
 	for serverName, server := range config.MCPServers {
 		// Skip if not in allowed list (if allow list is not empty)
-		if !server.Alllowed && !loadAll {
+		if !server.Allowed && !loadAll {
 			continue
 		}
 
@@ -137,7 +137,7 @@ func (mc *MCPClient) Init(loadAll bool) error {
 			}
 		}
 		// Keep tools null for now, will be populated when listing
-		servers = append(servers, &MCPServer{Name: serverName, Allowed: server.Alllowed, Tools: tools})
+		servers = append(servers, &MCPServer{Name: serverName, Allowed: server.Allowed, Tools: tools})
 	}
 	mc.servers = servers
 	return nil

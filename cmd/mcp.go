@@ -220,7 +220,11 @@ var mcpAddCmd = &cobra.Command{
 		}
 
 		// Add to config
+		serverConfig.Allowed = true // allow by default
 		config.MCPServers[name] = serverConfig
+
+		// Add to allowed servers by default
+		config.AllowMCPServers = append(config.AllowMCPServers, name)
 
 		// Save config
 		err = service.SaveMCPServers(config)
@@ -269,6 +273,7 @@ var mcpSetCmd = &cobra.Command{
 		command, _ := cmd.Flags().GetString("command")
 		headers, _ := cmd.Flags().GetStringSlice("header")
 		envVars, _ := cmd.Flags().GetStringSlice("env")
+		allow, _ := cmd.Flags().GetBool("allow")
 
 		// Validate required fields
 		if name == "" {
@@ -352,6 +357,31 @@ var mcpSetCmd = &cobra.Command{
 			}
 		}
 
+		// Handle allow flag - add or remove from AllowMCPServers
+		if allow {
+			serverConfig.Allowed = true
+			// Check if already in AllowMCPServers
+			found := false
+			for _, allowed := range config.AllowMCPServers {
+				if allowed == name {
+					found = true
+					break
+				}
+			}
+			if !found {
+				config.AllowMCPServers = append(config.AllowMCPServers, name)
+			}
+		} else {
+			serverConfig.Allowed = false
+			// Remove from AllowMCPServers if present
+			for i, allowed := range config.AllowMCPServers {
+				if allowed == name {
+					config.AllowMCPServers = append(config.AllowMCPServers[:i], config.AllowMCPServers[i+1:]...)
+					break
+				}
+			}
+		}
+
 		// Update in config
 		config.MCPServers[name] = serverConfig
 
@@ -421,6 +451,14 @@ var mcpRemoveCmd = &cobra.Command{
 		// Remove the server from config
 		delete(config.MCPServers, name)
 
+		// Also remove from AllowMCPServers if present
+		for i, allowed := range config.AllowMCPServers {
+			if allowed == name {
+				config.AllowMCPServers = append(config.AllowMCPServers[:i], config.AllowMCPServers[i+1:]...)
+				break
+			}
+		}
+
 		// Save config
 		err = service.SaveMCPServers(config)
 		if err != nil {
@@ -445,6 +483,7 @@ func init() {
 	mcpSetCmd.Flags().StringP("command", "c", "", "Command for std/local type servers")
 	mcpSetCmd.Flags().StringSliceP("header", "H", []string{}, "HTTP headers in key=value format (can be used multiple times)")
 	mcpSetCmd.Flags().StringSliceP("env", "e", []string{}, "Environment variables in key=value format (can be used multiple times)")
+	mcpSetCmd.Flags().BoolP("allow", "a", false, "Allow this MCP server to be used")
 	mcpRemoveCmd.Flags().StringP("name", "n", "", "Name of the MCP server to remove (required)")
 	mcpCmd.AddCommand(mcpListCmd)
 	mcpCmd.AddCommand(mcpOnCmd)
