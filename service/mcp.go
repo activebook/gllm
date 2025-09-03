@@ -112,7 +112,7 @@ func (mc *MCPClient) Init(loadAll bool) error {
 		if server.Type == "sse" || server.Url != "" || server.BaseUrl != "" {
 			// Add SSE server
 			err = mc.AddSseServer(serverName, server.BaseUrl, server.Headers)
-		} else if server.Type == "std" || server.Command != "" {
+		} else if server.Type == "std" || server.Type == "local" || server.Command != "" {
 			// Add stdio server
 			dir := server.WorkDir
 			if dir == "" {
