@@ -68,6 +68,27 @@ func LoadMCPServers() (*MCPConfig, error) {
 	return &config, nil
 }
 
+// SaveMCPServers writes the MCP configuration to the specified JSON file
+func SaveMCPServers(config *MCPConfig) error {
+	// Get the path to the MCP servers configuration file
+	configPath := getMCPServersPath()
+
+	// Ensure the directory exists
+	dir := filepath.Dir(configPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	// Marshal the config to JSON
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	// Write to file
+	return os.WriteFile(configPath, data, 0644)
+}
+
 func getMCPServersPath() string {
 	var err error
 	// Prefer os.UserConfigDir()

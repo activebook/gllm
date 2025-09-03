@@ -5,12 +5,25 @@ import (
 
 	"github.com/activebook/gllm/service"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var mcpCmd = &cobra.Command{
 	Use:   "mcp",
-	Short: "Manage MCP (Model Context Protocol) servers and tools",
-	Long:  `Commands for interacting with MCP servers and listing available tools.`,
+	Short: "Enable/Disable MCP (Model Context Protocol) servers and tools",
+	Long: `MCP gives gllm the ability to access external data, tools, and services.
+Switch on/off to enable/disable all mcp servers`,
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(cmd.Long)
+		fmt.Println("-------------------------------------------")
+		fmt.Print("MCP is currently: ")
+		enabled := viper.GetBool("agent.mcp")
+		if enabled {
+			fmt.Println(switchOnColor + "enabled" + resetColor)
+		} else {
+			fmt.Println(switchOffColor + "disabled" + resetColor)
+		}
+	},
 }
 
 var mcpListCmd = &cobra.Command{
@@ -61,8 +74,54 @@ var mcpListCmd = &cobra.Command{
 	},
 }
 
+var mcpOnCmd = &cobra.Command{
+	Use:   "on",
+	Short: "Enable MCP Servers",
+	Run: func(cmd *cobra.Command, args []string) {
+		viper.Set("agent.mcp", true)
+		err := viper.WriteConfig()
+		if err != nil {
+			fmt.Printf("Error writing config: %v\n", err)
+			return
+		}
+		fmt.Printf("MCP %s\n", switchOnColor+"enabled"+resetColor)
+	},
+}
+
+var mcpOffCmd = &cobra.Command{
+	Use:   "off",
+	Short: "Disable MCP Servers",
+	Run: func(cmd *cobra.Command, args []string) {
+		viper.Set("agent.mcp", false)
+		err := viper.WriteConfig()
+		if err != nil {
+			fmt.Printf("Error writing config: %v\n", err)
+			return
+		}
+		fmt.Printf("MCP %s\n", switchOffColor+"disabled"+resetColor)
+	},
+}
+
 func init() {
 	mcpListCmd.Flags().BoolP("all", "a", false, "List all mcp servers, including blocked ones")
 	mcpCmd.AddCommand(mcpListCmd)
+	mcpCmd.AddCommand(mcpOnCmd)
+	mcpCmd.AddCommand(mcpOffCmd)
 	rootCmd.AddCommand(mcpCmd)
+}
+
+func AreMCPServersEnabled() bool {
+	enabled := viper.GetBool("agent.mcp")
+	return enabled
+}
+
+func SwitchMCP(s string) {
+	switch s {
+	case "on":
+		mcpOnCmd.Run(mcpOnCmd, nil)
+	case "off":
+		mcpOffCmd.Run(mcpOffCmd, nil)
+	default:
+		mcpCmd.Run(mcpCmd, nil)
+	}
 }
