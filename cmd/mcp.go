@@ -235,6 +235,7 @@ var mcpAddCmd = &cobra.Command{
 
 		fmt.Printf("Successfully added MCP server '%s':\n", name)
 		fmt.Printf("  Type: %s\n", serverConfig.Type)
+		fmt.Printf("  Allowed: %t\n", serverConfig.Allowed)
 		if serverConfig.Url != "" {
 			fmt.Printf("  URL: %s\n", serverConfig.Url)
 		}
@@ -399,6 +400,7 @@ var mcpSetCmd = &cobra.Command{
 
 		fmt.Printf("Successfully updated MCP server '%s':\n", name)
 		fmt.Printf("  Type: %s\n", serverConfig.Type)
+		fmt.Printf("  Allowed: %t\n", serverConfig.Allowed)
 		if serverConfig.Url != "" {
 			fmt.Printf("  URL: %s\n", serverConfig.Url)
 		}
