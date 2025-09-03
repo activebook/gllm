@@ -119,20 +119,22 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		config.SystemInstruction = &genai.Content{Parts: []*genai.Part{{Text: ag.SystemPrompt}}}
 	}
 
-	// - If UseTools is true, enable the embedding tools.
-	// - Else if UseSearchTool is true, enable Google Search.
-	// - Else if UseCodeTool is true, enable code execution.
-	// CodeExecution and GoogleSearch cannot be enabled simultaneously.
+	// - If UseTools is true, enable embedding tools (include MCP if client exists).
+	// - If UseSearch is true, enable Google Search (disable function tools).
+	// - If UseCodeTool is true, enable code execution.
+	// - If UseTools is false but MCP client exists, enable MCP-only tools.
+	// Function tools and Google Search cannot be enabled simultaneously.
 	if ag.ToolsUse.Enable {
-		// load embedding Tools
-		config.Tools = append(config.Tools, ag.getGemini2EmbeddingTools())
+		// load embedding tools (include MCP if available)
+		includeMCP := ag.MCPClient != nil
+		config.Tools = append(config.Tools, ag.getGemini2EmbeddingTools(includeMCP))
 		if ag.SearchEngine.UseSearch {
 			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
 			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn,
-				Data: fmt.Sprint("Embedding(MCP) tools are enabled.\n" +
-					"Because embedding tools is not compatible with Google Search tool," +
+				Data: fmt.Sprint("Function tools are enabled.\n" +
+					"Because function tools are not compatible with Google Search tool," +
 					" so Google Search is unavailable now.\n" +
-					"Please disable embedding tools if want to use Google Search.")}, nil)
+					"Please disable tools if you want to use Google Search.")}, nil)
 		}
 	} else if ag.SearchEngine.UseSearch {
 		// only load search tool
@@ -142,6 +144,11 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	} else if ag.UseCodeTool {
 		// Remember: CodeExecution and GoogleSearch cannot be enabled at the same time
 		config.Tools = append(config.Tools, ag.getGemini2CodeExecTool())
+	} else if ag.MCPClient != nil {
+		// Load MCP-only tools when embedding tools are disabled but MCP client exists
+		if mcpTool := ag.getGemini2MCPTools(); mcpTool != nil {
+			config.Tools = append(config.Tools, mcpTool)
+		}
 	}
 
 	// Create a chat session - this is the important part

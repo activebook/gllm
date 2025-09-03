@@ -22,7 +22,7 @@ This means that you can't use a built-in tool and function calling at the same t
 */
 
 // Tool definitions for Gemini 2
-func (ag *Agent) getGemini2EmbeddingTools() *genai.Tool {
+func (ag *Agent) getGemini2EmbeddingTools(includeMCP bool) *genai.Tool {
 	openTools := getOpenEmbeddingTools()
 	var funcs []*genai.FunctionDeclaration
 
@@ -31,8 +31,8 @@ func (ag *Agent) getGemini2EmbeddingTools() *genai.Tool {
 		funcs = append(funcs, geminiTool)
 	}
 
-	// Add MCP tools if client is available
-	if ag.MCPClient != nil {
+	// Add MCP tools if requested and client is available
+	if includeMCP && ag.MCPClient != nil {
 		mcpTools := getMCPTools(ag.MCPClient)
 		for _, mcpTool := range mcpTools {
 			geminiTool := mcpTool.ToGeminiFunctions()
@@ -41,6 +41,23 @@ func (ag *Agent) getGemini2EmbeddingTools() *genai.Tool {
 	}
 
 	// The Gemini API expects all function declarations to be grouped together under a single Tool object.
+	return &genai.Tool{
+		FunctionDeclarations: funcs,
+	}
+}
+
+func (ag *Agent) getGemini2MCPTools() *genai.Tool {
+	if ag.MCPClient == nil {
+		return nil
+	}
+	mcpTools := getMCPTools(ag.MCPClient)
+	var funcs []*genai.FunctionDeclaration
+
+	for _, mcpTool := range mcpTools {
+		geminiTool := mcpTool.ToGeminiFunctions()
+		funcs = append(funcs, geminiTool)
+	}
+
 	return &genai.Tool{
 		FunctionDeclarations: funcs,
 	}
