@@ -130,7 +130,10 @@ func (mc *MCPClient) Init(loadAll bool) error {
 			return err
 		}
 		session := mc.sessions[len(mc.sessions)-1]
-		tools := mc.GetTools(session)
+		tools, err := mc.GetTools(session)
+		if err != nil {
+			return err
+		}
 		// Populate tool to session map for fast lookup
 		if tools != nil {
 			for _, tool := range *tools {
@@ -293,10 +296,10 @@ func (mc *MCPClient) GetAllServers() []*MCPServer {
 	return mc.servers
 }
 
-func (mc *MCPClient) GetTools(session *MCPSession) *[]MCPTools {
+func (mc *MCPClient) GetTools(session *MCPSession) (*[]MCPTools, error) {
 	tools, err := session.cs.ListTools(mc.ctx, nil)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	var mcpTools []MCPTools
 	for _, tool := range tools.Tools {
@@ -332,5 +335,5 @@ func (mc *MCPClient) GetTools(session *MCPSession) *[]MCPTools {
 			Properties:  tool.InputSchema.Properties,
 		})
 	}
-	return &mcpTools
+	return &mcpTools, nil
 }
