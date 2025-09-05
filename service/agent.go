@@ -166,16 +166,6 @@ func CallAgent(op *AgentOptions) error {
 	// Set up code tool settings
 	exeCode := IsCodeExecutionEnabled()
 
-	// Set up MCP client
-	var mc *MCPClient
-	if op.UseMCP {
-		mc = GetMCPClient()   // use the shared instance
-		err := mc.Init(false) // Load only allowed servers
-		if err != nil {
-			return fmt.Errorf("failed to load MCPServers: %v", err)
-		}
-	}
-
 	// Create a channel to receive notifications
 	notifyCh := make(chan StreamNotify, 10) // Buffer to prevent blocking(used for status updates)
 	dataCh := make(chan StreamData, 10)     // Buffer to prevent blocking(used for streamed text data)
@@ -191,6 +181,25 @@ func CallAgent(op *AgentOptions) error {
 	if !op.QuietMode {
 		std = NewStdRenderer()
 		indicator = NewIndicator("Processing...")
+	}
+
+	// Set up MCP client
+	var mc *MCPClient
+	if op.UseMCP {
+		mc = GetMCPClient() // use the shared instance
+		if !op.QuietMode {
+			indicator.Start("Loading MCP servers...")
+		}
+		err := mc.Init(MCPLoadOption{
+			LoadAll:   false,
+			LoadTools: true, // only load tools
+		}) // Load only allowed servers
+		if !op.QuietMode {
+			indicator.Stop()
+		}
+		if err != nil {
+			return fmt.Errorf("failed to load MCPServers: %v", err)
+		}
 	}
 
 	// Need to append markdown

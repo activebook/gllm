@@ -28,11 +28,14 @@ Switch on/off to enable/disable all mcp servers`,
 }
 
 var mcpListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all available MCP tools",
-	Long:  `Lists all tools available from configured MCP servers.`,
+	Use:     "list",
+	Aliases: []string{"ls", "show", "pr"},
+	Short:   "List all available MCP tools",
+	Long:    `Lists all tools available from configured MCP servers.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		all, _ := cmd.Flags().GetBool("all")
+		prompts, _ := cmd.Flags().GetBool("prompts")
+		resources, _ := cmd.Flags().GetBool("resources")
 		// here we don't need to use the shared instance
 		// because we just need to check the available servers and tools
 		// not making any calls to the servers
@@ -44,7 +47,15 @@ var mcpListCmd = &cobra.Command{
 			client = &service.MCPClient{}
 			defer client.Close() // ensure resources are cleaned up
 		}
-		err := client.Init(all) // Load all servers if detail is true, else false
+		indicator := service.NewIndicator("")
+		indicator.Start("MCP Loading...")
+		err := client.Init(service.MCPLoadOption{
+			LoadAll:       all,
+			LoadTools:     true,
+			LoadResources: resources,
+			LoadPrompts:   prompts,
+		}) // Load all servers if detail is true, else false
+		indicator.Stop()
 		if err != nil {
 			fmt.Printf("Error initializing MCP client: %v\n", err)
 			return
@@ -75,6 +86,38 @@ var mcpListCmd = &cobra.Command{
 						fmt.Printf("    Parameters:\n")
 						for param, desc := range tool.Parameters {
 							fmt.Printf("      - %s: %s\n", param, desc)
+						}
+					}
+					fmt.Println()
+				}
+			}
+			if server.Resources != nil && len(*server.Resources) > 0 {
+				fmt.Println("  Resources:")
+				for _, resource := range *server.Resources {
+					fmt.Printf("    • %s%s%s\n", cmdOutputColor, resource.Name, resetColor)
+					if resource.Description != "" {
+						fmt.Printf("      Description: %s\n", resource.Description)
+					}
+					if resource.URI != "" {
+						fmt.Printf("      URI: %s\n", resource.URI)
+					}
+					if resource.MIMEType != "" {
+						fmt.Printf("      MIME Type: %s\n", resource.MIMEType)
+					}
+					fmt.Println()
+				}
+			}
+			if server.Prompts != nil && len(*server.Prompts) > 0 {
+				fmt.Println("  Prompts:")
+				for _, prompt := range *server.Prompts {
+					fmt.Printf("    • %s%s%s\n", cmdOutputColor, prompt.Name, resetColor)
+					if prompt.Description != "" {
+						fmt.Printf("      Description: %s\n", prompt.Description)
+					}
+					if len(prompt.Parameters) > 0 {
+						fmt.Printf("      Parameters:\n")
+						for param, desc := range prompt.Parameters {
+							fmt.Printf("        - %s: %s\n", param, desc)
 						}
 					}
 					fmt.Println()
@@ -142,12 +185,13 @@ var mcpAddCmd = &cobra.Command{
 		}
 
 		// Validate type-specific required fields
-		if serverType == "sse" || serverType == "http" {
+		switch serverType {
+		case "sse", "http":
 			if url == "" {
 				fmt.Printf("Error: url is required for type %s\n", serverType)
 				return
 			}
-		} else if serverType == "std" || serverType == "local" {
+		case "std", "local":
 			if command == "" {
 				fmt.Printf("Error: command is required for type %s\n", serverType)
 				return
@@ -182,11 +226,12 @@ var mcpAddCmd = &cobra.Command{
 		}
 
 		// Set type-specific fields
-		if serverType == "sse" {
+		switch serverType {
+		case "sse":
 			serverConfig.Url = url
-		} else if serverType == "http" {
+		case "http":
 			serverConfig.HttpUrl = url
-		} else if serverType == "std" || serverType == "local" {
+		case "std", "local":
 			// Parse command into Command and Args
 			parts := strings.Fields(command)
 			if len(parts) > 0 {
@@ -303,12 +348,13 @@ var mcpSetCmd = &cobra.Command{
 		urlChanged := cmd.Flags().Changed("url")
 		commandChanged := cmd.Flags().Changed("command")
 
-		if serverType == "sse" || serverType == "http" {
+		switch serverType {
+		case "sse", "http":
 			if urlChanged && url == "" {
 				fmt.Printf("Error: url is required for type %s\n", serverType)
 				return
 			}
-		} else if serverType == "std" || serverType == "local" {
+		case "std", "local":
 			if commandChanged && command == "" {
 				fmt.Printf("Error: command is required for type %s\n", serverType)
 				return
@@ -479,6 +525,8 @@ var mcpRemoveCmd = &cobra.Command{
 
 func init() {
 	mcpListCmd.Flags().BoolP("all", "a", false, "List all mcp servers, including blocked ones")
+	mcpListCmd.Flags().BoolP("prompts", "p", false, "Include MCP prompts, if available")
+	mcpListCmd.Flags().BoolP("resources", "r", false, "Include MCP resources, if available")
 	mcpAddCmd.Flags().StringP("name", "n", "", "Name of the MCP server (required)")
 	mcpAddCmd.Flags().StringP("type", "t", "", "Type of the MCP server: std, local, sse, http (required)")
 	mcpAddCmd.Flags().StringP("url", "u", "", "URL for sse/http type servers")

@@ -724,7 +724,7 @@ func getOpenWebSearchTool() *OpenTool {
 }
 
 // MCPToolsToOpenTool converts an MCPTools struct to an OpenTool with proper JSON schema
-func MCPToolsToOpenTool(mcpTool MCPTools) *OpenTool {
+func MCPToolsToOpenTool(mcpTool MCPTool) *OpenTool {
 	properties := make(map[string]interface{})
 	var required []string
 
