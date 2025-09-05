@@ -59,7 +59,14 @@ func LoadMCPServers() (*MCPConfig, error) {
 	for _, s := range config.AllowMCPServers {
 		if s != "" {
 			if server, exists := config.MCPServers[s]; exists {
+				// If the server exists in the AllowMCPServers list,
+				// Mark the server as allowed
 				server.Allowed = true
+				config.MCPServers[s] = server
+			} else if server.Allowed {
+				// If the server does not exist in the AllowMCPServers list,
+				// Mark the server as not allowed
+				server.Allowed = false
 				config.MCPServers[s] = server
 			}
 		}

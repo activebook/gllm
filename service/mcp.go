@@ -30,17 +30,32 @@ func (t *headerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.base.RoundTrip(req)
 }
 
-type MCPTools struct {
+type MCPTool struct {
 	Name        string
 	Description string
 	Parameters  map[string]string
 	Properties  map[string]*jsonschema.Schema // Keep origin JSON Schema
 }
 
+type MCPResource struct {
+	Name        string
+	Description string
+	URI         string
+	MIMEType    string
+}
+
+type MCPPrompt struct {
+	Name        string
+	Description string
+	Parameters  map[string]string
+}
+
 type MCPServer struct {
-	Name    string
-	Allowed bool
-	Tools   *[]MCPTools
+	Name      string
+	Allowed   bool
+	Tools     *[]MCPTool
+	Resources *[]MCPResource
+	Prompts   *[]MCPPrompt
 }
 
 type MCPSession struct {
@@ -54,6 +69,12 @@ type MCPClient struct {
 	sessions      []*MCPSession
 	servers       []*MCPServer
 	toolToSession map[string]*MCPSession
+}
+type MCPLoadOption struct {
+	LoadAll       bool // load all tools(allowed|blocked)
+	LoadTools     bool // load tools (tools/list)
+	LoadResources bool // load resources (resources/list)
+	LoadPrompts   bool // load prompts (prompts/list)
 }
 
 /*
@@ -78,7 +99,7 @@ func GetMCPClient() *MCPClient {
 // url → SSEClientTransport
 // command → StdioClientTransport
 // Only want list all servers, unless loadAll is false, then only load allowed servers
-func (mc *MCPClient) Init(loadAll bool) error {
+func (mc *MCPClient) Init(option MCPLoadOption) error {
 	if mc.client != nil {
 		// already initialized
 		return nil
@@ -106,10 +127,11 @@ func (mc *MCPClient) Init(loadAll bool) error {
 	// Connect to each server based on its type
 	for serverName, server := range config.MCPServers {
 		// Skip if not in allowed list (if allow list is not empty)
-		if !server.Allowed && !loadAll {
+		if !server.Allowed && !option.LoadAll {
 			continue
 		}
 
+		// Connect and add session
 		if server.Type == "sse" || server.Url != "" || server.BaseUrl != "" {
 			// Add SSE server
 			err = mc.AddSseServer(serverName, server.BaseUrl, server.Headers)
@@ -127,12 +149,14 @@ func (mc *MCPClient) Init(loadAll bool) error {
 
 		if err != nil {
 			// don't continue with other servers
-			return err
+			return fmt.Errorf("error loading mcp server %s: %v", serverName, err)
 		}
+
+		// Get the latest added session
 		session := mc.sessions[len(mc.sessions)-1]
 		tools, err := mc.GetTools(session)
 		if err != nil {
-			return err
+			return fmt.Errorf("error loading mcp server %s: %v", serverName, err)
 		}
 		// Populate tool to session map for fast lookup
 		if tools != nil {
@@ -140,8 +164,21 @@ func (mc *MCPClient) Init(loadAll bool) error {
 				mc.toolToSession[tool.Name] = session
 			}
 		}
-		// Keep tools null for now, will be populated when listing
-		servers = append(servers, &MCPServer{Name: serverName, Allowed: server.Allowed, Tools: tools})
+
+		// Get resources & prompts
+		var resources *[]MCPResource
+		var prompts *[]MCPPrompt
+		if option.LoadResources {
+			resources, _ = mc.GetResources(session)
+		}
+		if option.LoadPrompts {
+			prompts, _ = mc.GetPrompts(session)
+		}
+
+		// Add server to servers
+		servers = append(servers, &MCPServer{
+			Name: serverName, Allowed: server.Allowed,
+			Tools: tools, Prompts: prompts, Resources: resources})
 	}
 	mc.servers = servers
 	return nil
@@ -296,12 +333,12 @@ func (mc *MCPClient) GetAllServers() []*MCPServer {
 	return mc.servers
 }
 
-func (mc *MCPClient) GetTools(session *MCPSession) (*[]MCPTools, error) {
+func (mc *MCPClient) GetTools(session *MCPSession) (*[]MCPTool, error) {
 	tools, err := session.cs.ListTools(mc.ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	var mcpTools []MCPTools
+	var mcpTools []MCPTool
 	for _, tool := range tools.Tools {
 		params := make(map[string]string)
 		for k, v := range tool.InputSchema.Properties {
@@ -328,7 +365,7 @@ func (mc *MCPClient) GetTools(session *MCPSession) (*[]MCPTools, error) {
 
 			params[k] = schemaDesc
 		}
-		mcpTools = append(mcpTools, MCPTools{
+		mcpTools = append(mcpTools, MCPTool{
 			Name:        tool.Name,
 			Description: tool.Description,
 			Parameters:  params,
@@ -336,4 +373,44 @@ func (mc *MCPClient) GetTools(session *MCPSession) (*[]MCPTools, error) {
 		})
 	}
 	return &mcpTools, nil
+}
+
+func (mc *MCPClient) GetResources(session *MCPSession) (*[]MCPResource, error) {
+	res, err := session.cs.ListResources(mc.ctx, nil)
+	if err != nil {
+		// "resources/list": Method not found
+		return nil, err
+	}
+
+	var mcpResources []MCPResource
+	for _, resource := range res.Resources {
+		mcpResources = append(mcpResources, MCPResource{
+			Name:        resource.Name,
+			Description: resource.Description,
+			MIMEType:    resource.MIMEType,
+			URI:         resource.URI,
+		})
+	}
+	return &mcpResources, nil
+}
+
+func (mc *MCPClient) GetPrompts(session *MCPSession) (*[]MCPPrompt, error) {
+	prompts, err := session.cs.ListPrompts(mc.ctx, nil)
+	if err != nil {
+		// "prompts/list": Method not found
+		return nil, err
+	}
+	var mcpPrompts []MCPPrompt
+	for _, prompt := range prompts.Prompts {
+		params := make(map[string]string)
+		for _, arg := range prompt.Arguments {
+			params[arg.Name] = arg.Description
+		}
+		mcpPrompts = append(mcpPrompts, MCPPrompt{
+			Name:        prompt.Name,
+			Description: prompt.Description,
+			Parameters:  params,
+		})
+	}
+	return &mcpPrompts, nil
 }

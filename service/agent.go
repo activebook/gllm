@@ -169,8 +169,11 @@ func CallAgent(op *AgentOptions) error {
 	// Set up MCP client
 	var mc *MCPClient
 	if op.UseMCP {
-		mc = GetMCPClient()   // use the shared instance
-		err := mc.Init(false) // Load only allowed servers
+		mc = GetMCPClient() // use the shared instance
+		err := mc.Init(MCPLoadOption{
+			LoadAll:   false,
+			LoadTools: true, // only load tools
+		}) // Load only allowed servers
 		if err != nil {
 			return fmt.Errorf("failed to load MCPServers: %v", err)
 		}
