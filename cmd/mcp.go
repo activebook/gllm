@@ -47,12 +47,15 @@ var mcpListCmd = &cobra.Command{
 			client = &service.MCPClient{}
 			defer client.Close() // ensure resources are cleaned up
 		}
+		indicator := service.NewIndicator("")
+		indicator.Start("MCP Loading...")
 		err := client.Init(service.MCPLoadOption{
 			LoadAll:       all,
 			LoadTools:     true,
 			LoadResources: resources,
 			LoadPrompts:   prompts,
 		}) // Load all servers if detail is true, else false
+		indicator.Stop()
 		if err != nil {
 			fmt.Printf("Error initializing MCP client: %v\n", err)
 			return
