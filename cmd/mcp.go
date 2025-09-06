@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/activebook/gllm/service"
@@ -523,6 +524,85 @@ var mcpRemoveCmd = &cobra.Command{
 	},
 }
 
+var mcpExportCmd = &cobra.Command{
+	Use:   "export [file]",
+	Short: "Export MCP configuration to a file",
+	Long: `Export MCP configuration to a file.
+
+If no file is specified, the configuration will be exported to 'mcp.json' 
+in the current directory.`,
+	Args: cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		var exportFile string
+
+		if len(args) == 0 {
+			exportFile = "mcp.json"
+		} else {
+			exportFile = args[0]
+		}
+
+		// Load MCP config
+		config, err := service.LoadMCPServers()
+		if err != nil {
+			fmt.Printf("Error loading MCP configuration: %v\n", err)
+			return
+		}
+
+		if config == nil {
+			fmt.Println("No MCP configuration found to export")
+			return
+		}
+
+		// Export MCP config
+		err = service.SaveMCPServersToPath(config, exportFile)
+		if err != nil {
+			fmt.Printf("Error exporting MCP configuration: %v\n", err)
+			return
+		}
+
+		fmt.Printf("MCP configuration exported successfully to: %s\n", exportFile)
+	},
+}
+
+var mcpImportCmd = &cobra.Command{
+	Use:   "import [file]",
+	Short: "Import MCP configuration from a file",
+	Long: `Import MCP configuration from a file.
+
+This will replace the current MCP configuration with the imported one.`,
+	Args: cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		importFile := args[0]
+
+		// Check if file exists
+		if _, err := os.Stat(importFile); os.IsNotExist(err) {
+			fmt.Printf("MCP configuration file does not exist: %s\n", importFile)
+			return
+		}
+
+		// Load MCP config from file
+		config, err := service.LoadMCPServersFromPath(importFile)
+		if err != nil {
+			fmt.Printf("Error loading MCP configuration: %v\n", err)
+			return
+		}
+
+		if config == nil {
+			fmt.Println("No MCP configuration found in file")
+			return
+		}
+
+		// Save the imported config
+		err = service.SaveMCPServers(config)
+		if err != nil {
+			fmt.Printf("Error saving MCP configuration: %v\n", err)
+			return
+		}
+
+		fmt.Printf("MCP configuration imported successfully from: %s\n", importFile)
+	},
+}
+
 func init() {
 	mcpListCmd.Flags().BoolP("all", "a", false, "List all mcp servers, including blocked ones")
 	mcpListCmd.Flags().BoolP("prompts", "p", false, "Include MCP prompts, if available")
@@ -546,6 +626,8 @@ func init() {
 	mcpCmd.AddCommand(mcpAddCmd)
 	mcpCmd.AddCommand(mcpSetCmd)
 	mcpCmd.AddCommand(mcpRemoveCmd)
+	mcpCmd.AddCommand(mcpExportCmd)
+	mcpCmd.AddCommand(mcpImportCmd)
 	rootCmd.AddCommand(mcpCmd)
 }
 

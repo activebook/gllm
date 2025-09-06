@@ -4,6 +4,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -61,21 +62,31 @@ var configPathCmd = &cobra.Command{
 
 // configExportCmd represents the config export command
 var configExportCmd = &cobra.Command{
-	Use:   "export [file]",
-	Short: "Export configuration to a file",
-	Long: `Export current configuration to a file.
+	Use:   "export [directory]",
+	Short: "Export configuration to a directory",
+	Long: `Export current configuration to a directory.
 
-If no file is specified, the configuration will be exported to 'gllm-config.yaml' 
-in the current directory.`,
+If no directory is specified, the configuration will be exported to the current directory.
+Files will be saved as 'gllm.yaml' and 'mcp.json' (if MCP config exists).`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		var exportFile string
+		var exportDir string
 
 		if len(args) == 0 {
-			exportFile = "gllm-config.yaml"
+			exportDir = "."
 		} else {
-			exportFile = args[0]
+			exportDir = args[0]
 		}
+
+		// Ensure the export directory exists
+		if err := os.MkdirAll(exportDir, 0755); err != nil {
+			service.Errorf("Error creating export directory: %s\n", err)
+			return
+		}
+
+		// Set export file paths
+		exportFile := filepath.Join(exportDir, "gllm.yaml")
+		mcpExportFile := filepath.Join(exportDir, "mcp.json")
 
 		// Get all configuration settings
 		configMap := viper.AllSettings()
@@ -96,22 +107,50 @@ in the current directory.`,
 		}
 
 		fmt.Printf("Configuration exported successfully to: %s\n", exportFile)
+
+		// Check if MCP config exists and export it
+		mcpConfig, err := service.LoadMCPServers()
+		if err != nil {
+			service.Errorf("Error loading MCP configuration: %s\n", err)
+			return
+		}
+		if mcpConfig != nil {
+			// MCP config exists, save it to export location
+			if err := service.SaveMCPServersToPath(mcpConfig, mcpExportFile); err != nil {
+				service.Errorf("Error exporting MCP configuration: %s\n", err)
+				return
+			}
+			fmt.Printf("MCP configuration exported successfully to: %s\n", mcpExportFile)
+		} else {
+			fmt.Printf("No MCP configuration found to export\n")
+		}
 	},
 }
 
 // configImportCmd represents the config import command
 var configImportCmd = &cobra.Command{
-	Use:   "import [file]",
-	Short: "Import configuration from a file",
-	Long: `Import configuration from a file.
+	Use:   "import [directory]",
+	Short: "Import configuration from a directory",
+	Long: `Import configuration from a directory.
 
-This will merge the imported configuration with the current configuration,
-with the imported values taking precedence.`,
-	Args: cobra.ExactArgs(1),
+This will look for 'gllm.yaml' and 'mcp.json' files in the specified directory
+and merge them with the current configuration. If no directory is specified,
+it will look in the current directory.`,
+	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		importFile := args[0]
+		var importDir string
 
-		// Check if file exists
+		if len(args) == 0 {
+			importDir = "."
+		} else {
+			importDir = args[0]
+		}
+
+		// Set import file paths
+		importFile := filepath.Join(importDir, "gllm.yaml")
+		mcpImportFile := filepath.Join(importDir, "mcp.json")
+
+		// Check if main config file exists
 		if _, err := os.Stat(importFile); os.IsNotExist(err) {
 			service.Errorf("Configuration file does not exist: %s\n", importFile)
 			return
@@ -142,6 +181,26 @@ with the imported values taking precedence.`,
 		}
 
 		fmt.Printf("Configuration imported successfully from: %s\n", importFile)
+
+		// Check if MCP config exists and import it
+		if _, err := os.Stat(mcpImportFile); err == nil {
+			// MCP config exists, load and save it
+			mcpConfig, err := service.LoadMCPServersFromPath(mcpImportFile)
+			if err != nil {
+				service.Errorf("Error loading MCP configuration: %s\n", err)
+				return
+			}
+			if mcpConfig != nil {
+				// Save the MCP config to the default location
+				if err := service.SaveMCPServers(mcpConfig); err != nil {
+					service.Errorf("Error saving MCP configuration: %s\n", err)
+					return
+				}
+				fmt.Printf("MCP configuration imported successfully from: %s\n", mcpImportFile)
+			}
+		} else {
+			fmt.Printf("No MCP configuration file found to import\n")
+		}
 	},
 }
 
