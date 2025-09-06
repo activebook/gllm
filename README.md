@@ -49,7 +49,6 @@ go build -o gllm
   ```sh
   gllm "What is Go?"
   ```
-  ![One-Shot Screenshot](screenshots/oneshot.png)
 
 - **Use a specific model:**
   ```sh
@@ -98,7 +97,6 @@ You can maintain a conversation across multiple commands by assigning a name to 
   gllm "Who's the POTUS right now?" -c my_convo
   gllm "Tell me more about his policies." -c my_convo
   ```
-  ![Conversation Screenshot](screenshots/conversation.png)
 
 **2. Chat Style (interactive session)**
 
@@ -110,7 +108,6 @@ For a more interactive experience, you can use the `chat` command to enter a rea
   ```
   Within the chat, the conversation history is automatically maintained.
 
-  ![Chat Mode Screenshot](screenshots/chatmode2.png)
 
 ### File Attachments
 
@@ -128,7 +125,18 @@ For a more interactive experience, you can use the `chat` command to enter a rea
   ```sh
   gllm "Summarize this PDF" -a document.pdf
   ```
-  ![PDF Screenshot](screenshots/pdf.png)
+
+### Code Editing
+
+The command agent supports diff editing for precise code modifications.
+
+```sh
+gllm "Read this file to change function name"
+```
+
+| Edit code with diff | Cancel an edit |
+|---------------------|----------------|
+| ![Edit Code Screenshot](screenshots/editcode.png) | ![Cancel Edit Screenshot](screenshots/editcode_cancel.png) |
 
 ### Workflows
 
@@ -182,14 +190,9 @@ This will start the workflow. The `planner` agent will create a research plan an
 
 Here's an example of a deep research workflow in action:
 
-1.  **Planner:** Designs a plan for the research.
-    ![Planner Screenshot](screenshots/deepresearch_planner.png)
-2.  **Dispatcher:** Dispatches sub-tasks to worker agents.
-    ![Dispatcher Screenshot](screenshots/deepresearch_dispatcher.png)
-3.  **Workers:** Execute the sub-tasks in parallel.
-    ![Workers Screenshot](screenshots/deepresearch_workers.png)
-4.  **Summarizer:** Summarizes the results from the workers to provide a final report.
-    ![Summarizer Screenshot](screenshots/deepresearch_summarizer.png)
+| Planner | Dispatcher | Workers | Summarizer |
+|---------|------------|---------|-------------|
+| Designs a plan for the research.<br>![Planner Screenshot](screenshots/deepresearch_planner.png) | Dispatches sub-tasks to worker agents.<br>![Dispatcher Screenshot](screenshots/deepresearch_dispatcher.png) | Execute the sub-tasks in parallel.<br>![Workers Screenshot](screenshots/deepresearch_workers.png) | Summarizes the results from the workers to provide a final report.<br>![Summarizer Screenshot](screenshots/deepresearch_summarizer.png) |
 
 ---
 
@@ -251,7 +254,7 @@ You can add, configure, and manage MCP servers of different types:
 Once MCP is enabled and servers are configured, the LLM can automatically use available MCP tools during conversations:
 
 ```sh
-gllm "Use the available tools to fetch the latest news about AI"
+gllm "Use the available tools to fetch the latest info of golang version"
 ```
 
 ![Use MCP Screenshot](screenshots/usemcp.png)
@@ -273,7 +276,6 @@ The LLM will detect relevant MCP tools and use them to enhance its responses wit
   ```sh
   gllm config print
   ```
-  ![Config Screenshot](screenshots/config.png)
 
 - **Manage models, templates, system prompts, and search engines:**
   ```sh
