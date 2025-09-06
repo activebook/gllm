@@ -1,0 +1,43 @@
+{
+  "mcpServers": {    
+    "context7": {
+      "type": "http",
+      "httpUrl": "https://mcp.context7.com/mcp",
+      "name": "context7",
+      "Allowed": false
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem"
+      ],
+      "Allowed": false
+    },
+    "memory": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "Allowed": false
+    },
+
+    "tts-mcp-server": {
+      "command": "npx",
+      "args": [
+        "@activebook/tts-mcp-server"
+      ],
+      "env": {
+        "GOOGLE_API_KEY": "${GOOGLE_API_KEY}",
+        "GOOGLE_NAME_MODEL": "gemini-2.0-flash",
+        "GOOGLE_TTS_MODEL": "gemini-2.5-flash-preview-tts",
+        "GOOGLE_VOICE": "kore"
+      },
+      "Allowed": true
+    }
+  },
+  "allowMCPServers": [
+    "tts-mcp-server"
+  ]
+}
