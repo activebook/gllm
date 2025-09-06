@@ -249,6 +249,12 @@ You can add, configure, and manage MCP servers of different types:
   gllm mcp remove --name my-server
   ```
 
+- **Export/Import MCP servers:**
+  ```sh
+  gllm mcp export [path]
+  gllm mcp import [path]
+  ```
+
 ### Using MCP in Queries
 
 Once MCP is enabled and servers are configured, the LLM can automatically use available MCP tools during conversations:
@@ -275,6 +281,12 @@ The LLM will detect relevant MCP tools and use them to enhance its responses wit
 - **Print all configurations:**
   ```sh
   gllm config print
+  ```
+
+- **Export/Import the configuration file:**
+  ```sh
+  gllm config export [directory]
+  gllm config import [directory]
   ```
 
 - **Manage models, templates, system prompts, and search engines:**
