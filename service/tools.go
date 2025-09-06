@@ -664,9 +664,23 @@ func modifyFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse)
 
 	if needConfirm && !toolsUse.AutoApprove {
 		// Response with a prompt to let user confirm
-		outStr := fmt.Sprintf(ToolRespConfirmFileOp, diff)
+		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("modify file %s", path), diff)
 		return outStr, nil
 	}
+
+	// Create directory if it doesn't exist
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Sprintf("Error creating directory for %s: %v", path, err), nil
+	}
+
+	// Write the file
+	err = os.WriteFile(path, []byte(content), 0644)
+	if err != nil {
+		return fmt.Sprintf("Error writing file %s: %v", path, err), nil
+	}
+
+	return fmt.Sprintf("Successfully modified file %s", path), nil
 }
 
 func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {

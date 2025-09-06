@@ -69,6 +69,7 @@ var (
 		"read_file",
 		"write_file",
 		"edit_file",
+		"modify_file",
 		"delete_file",
 		"create_directory",
 		"list_directory",
@@ -610,26 +611,26 @@ func getOpenEmbeddingTools() []*OpenTool {
 
 	modifyFileFunc := OpenFunctionDefinition{
 		Name:        "modify_file",
-		Description: "Modify content in a file. This tool allows adding, replacing, or deleting content at a specific file",
+		Description: "Replace the entire content of a file with new content. This tool shows a colorful diff of the changes before applying them, allowing the user to review modifications safely.",
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"path": map[string]interface{}{
 					"type":        "string",
-					"description": "The path to the file to edit.",
+					"description": "The path to the file to modify.",
 				},
 				"content": map[string]interface{}{
 					"type":        "string",
-					"description": "The new would-be updated content for the file.",
+					"description": "The complete new content to replace the entire file with.",
 				},
 				"need_confirm": map[string]interface{}{
 					"type": "boolean",
-					"description": "Specifies whether to prompt the user for confirmation before editing the file. " +
-						"This should always be true for safety.",
+					"description": "Whether to show a diff preview and require user confirmation before applying changes. " +
+						"Defaults to true for safety - set to false only for automated operations.",
 					"default": true,
 				},
 			},
-			"required": []string{"path", "edits"},
+			"required": []string{"path", "content"},
 		},
 	}
 	modifyFileTool := OpenTool{
