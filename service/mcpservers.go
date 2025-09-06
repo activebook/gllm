@@ -96,6 +96,64 @@ func SaveMCPServers(config *MCPConfig) error {
 	return os.WriteFile(configPath, data, 0644)
 }
 
+// SaveMCPServersToPath writes the MCP configuration to a specific path
+func SaveMCPServersToPath(config *MCPConfig, path string) error {
+	// Ensure the directory exists
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	// Marshal the config to JSON
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	// Write to file
+	return os.WriteFile(path, data, 0644)
+}
+
+// LoadMCPServersFromPath reads the MCP configuration from a specific path
+func LoadMCPServersFromPath(path string) (*MCPConfig, error) {
+	// Check if the configuration file exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, nil
+	}
+
+	// Read the configuration file
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the JSON data into the MCPConfig struct
+	var config MCPConfig
+	err = json.Unmarshal(data, &config)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a set of allowed servers for quick lookup
+	for _, s := range config.AllowMCPServers {
+		if s != "" {
+			if server, exists := config.MCPServers[s]; exists {
+				// If the server exists in the AllowMCPServers list,
+				// Mark the server as allowed
+				server.Allowed = true
+				config.MCPServers[s] = server
+			} else if server.Allowed {
+				// If the server does not exist in the AllowMCPServers list,
+				// Mark the server as not allowed
+				server.Allowed = false
+				config.MCPServers[s] = server
+			}
+		}
+	}
+
+	return &config, nil
+}
+
 func getMCPServersPath() string {
 	var err error
 	// Prefer os.UserConfigDir()

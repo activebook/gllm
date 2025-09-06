@@ -419,6 +419,31 @@ func (ag *Agent) Gemini2WebFetchToolCall(call *genai.FunctionCall) (*genai.Funct
 	return &resp, nil
 }
 
+// func (ag *Agent) Gemini2EditFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+// 	resp := genai.FunctionResponse{
+// 		ID:   call.ID,
+// 		Name: call.Name,
+// 	}
+
+// 	// Convert genai.FunctionCall.Args to map[string]interface{}
+// 	argsMap := make(map[string]interface{})
+// 	for k, v := range call.Args {
+// 		argsMap[k] = v
+// 	}
+
+// 	// Call shared implementation
+// 	response, err := editFileToolCallImpl(&argsMap, &ag.ToolsUse)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	resp.Response = map[string]any{
+// 		"output": response,
+// 		"error":  "",
+// 	}
+// 	return &resp, nil
+// }
+
 func (ag *Agent) Gemini2EditFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
@@ -432,7 +457,7 @@ func (ag *Agent) Gemini2EditFileToolCall(call *genai.FunctionCall) (*genai.Funct
 	}
 
 	// Call shared implementation
-	response, err := editFileToolCallImpl(&argsMap, &ag.ToolsUse)
+	response, err := editFileToolCallImpl(&argsMap, &ag.ToolsUse, ag.gemini2ShowDiffConfirm, ag.gemini2CloseDiffConfirm)
 	if err != nil {
 		return nil, err
 	}
@@ -467,4 +492,19 @@ func (ag *Agent) Gemini2CopyToolCall(call *genai.FunctionCall) (*genai.FunctionR
 		"error":  "",
 	}
 	return &resp, nil
+}
+
+// Diff confirm func
+func (ag *Agent) gemini2ShowDiffConfirm(diff string) {
+	// Function call is over
+	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusFunctionCallingOver}, ag.ProceedChan)
+
+	// Show the diff confirm
+	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Data: diff, Status: StatusDiffConfirm}, ag.ProceedChan)
+}
+
+// Diff close func
+func (ag *Agent) gemini2CloseDiffConfirm() {
+	// Confirm diff is over
+	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusDiffConfirmOver}, ag.ProceedChan)
 }

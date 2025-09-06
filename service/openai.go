@@ -394,8 +394,16 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 		return openai.ChatCompletionMessage{}, fmt.Errorf("error parsing arguments: %v", err)
 	}
 
+	var args string
+	if toolCall.Function.Name == "edit_file" {
+		// Don't show content(the modified content could be too long)
+		args = formatToolCallArguments(argsMap, []string{"content"})
+	} else {
+		args = formatToolCallArguments(argsMap, []string{})
+	}
+
 	// Call function
-	oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, formatToolCallArguments(argsMap))}, oa.op.proceed)
+	oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, args)}, oa.op.proceed)
 
 	var msg openai.ChatCompletionMessage
 	var err error

@@ -54,13 +54,17 @@ Status:
 	ToolRespConfirmFileOp = "Based on your request, I'm about to perform the following file operation:\n\n" +
 		"```\n%s\n```\n\n" +
 		"This operation will %s\n\n" +
-		`**Check:** 
-- First, Proceed with caution. Check whether this operation may make irreversible changes or affect critical parts of your system. 
+		`**Check:**
+- First, Proceed with caution. Check whether this operation may make irreversible changes or affect critical parts of your system.
 - Second, Ensure that the operation is safe and does not contain any malicious or harmful actions.
 - Third, If you deem it's safe, execute the operation. If not, let user to choose whether to proceed or modify the operation.
 Such as:
 Would you like me to proceed with this operation? Please confirm with 'yes', 'proceed', or provide alternative instructions.
 `
+
+	// ToolRespConfirmEdityFile is the template for the response to the user before modifying a file, including the diff.
+	ToolRespConfirmEdityFile = "Apply this change? (Yes/No): "
+	ToolRespDiscardEditFile  = "OPERATION CANCELLED: The user has explicitly declined to apply these file modifications. The file will remain unchanged. Do not proceed with any file modifications or ask for further confirmation without explicit new user instruction. This operation is complete."
 )
 
 var (
@@ -123,9 +127,20 @@ func AvailableMCPTool(toolName string, client *MCPClient) bool {
 	return client.FindTool(toolName) != nil
 }
 
-func formatToolCallArguments(argsMap map[string]interface{}) string {
+func formatToolCallArguments(argsMap map[string]interface{}, ignoreKeys []string) string {
+	// Create a lookup map for efficient key checking
+	ignoreMap := make(map[string]bool)
+	for _, key := range ignoreKeys {
+		ignoreMap[key] = true
+	}
+
 	var argsList []string
 	for k, v := range argsMap {
+		// Skip keys that are in the ignore list
+		if ignoreMap[k] {
+			continue
+		}
+
 		switch val := v.(type) {
 		case []interface{}, map[string]interface{}:
 			jsonStr, _ := json.Marshal(val)
@@ -553,9 +568,66 @@ func getOpenEmbeddingTools() []*OpenTool {
 	tools = append(tools, &readMultipleFilesTool)
 
 	// Edit file tool
+	// editFileFunc := OpenFunctionDefinition{
+	// 	Name:        "edit_file",
+	// 	Description: "Edit specific lines in a file. This tool allows adding, replacing, or deleting content at specific line numbers.",
+	// 	Parameters: map[string]interface{}{
+	// 		"type": "object",
+	// 		"properties": map[string]interface{}{
+	// 			"path": map[string]interface{}{
+	// 				"type":        "string",
+	// 				"description": "The path to the file to edit.",
+	// 			},
+	// 			"edits": map[string]interface{}{
+	// 				"type": "array",
+	// 				"items": map[string]interface{}{
+	// 					"type": "object",
+	// 					"properties": map[string]interface{}{
+	// 						"line": map[string]interface{}{
+	// 							"type":        "integer",
+	// 							"description": "The line number to edit (1-indexed). For add operations, this is the position where content will be inserted.",
+	// 						},
+	// 						"content": map[string]interface{}{
+	// 							"type":        "string",
+	// 							"description": "The new content for the line. Empty string to delete the line (unless operation is specified).",
+	// 						},
+	// 						"operation": map[string]interface{}{
+	// 							"type": "string",
+	// 							"description": "The operation to perform on the specified line (1-indexed):\n" +
+	// 								"- 'add' or '++' to insert content at the given line position (if line is greater than the number of lines, content is appended).\n" +
+	// 								"- 'delete' or '--' to remove the line.\n" +
+	// 								"- 'replace' or '==' to replace the line content.\n" +
+	// 								"If 'operation' is omitted, 'delete' is assumed when 'content' is empty, otherwise 'replace' is used.\n" +
+	// 								"Accepted values: 'add', 'delete', 'replace'.",
+	// 							"enum": []string{"add", "delete", "replace"},
+	// 						},
+	// 					},
+	// 					"required": []string{"line"},
+	// 				},
+	// 				"description": "Array of edits to apply to the file. Each edit specifies a line number and the operation to perform.",
+	// 			},
+	// 			"need_confirm": map[string]interface{}{
+	// 				"type": "boolean",
+	// 				"description": "Specifies whether to prompt the user for confirmation before editing the file. " +
+	// 					"This should always be true for safety.",
+	// 				"default": true,
+	// 			},
+	// 		},
+	// 		"required": []string{"path", "edits"},
+	// 	},
+	// }
+	// editFileTool := OpenTool{
+	// 	Type:     ToolTypeFunction,
+	// 	Function: &editFileFunc,
+	// }
+
+	// tools = append(tools, &editFileTool)
+
 	editFileFunc := OpenFunctionDefinition{
-		Name:        "edit_file",
-		Description: "Edit specific lines in a file. This tool allows adding, replacing, or deleting content at specific line numbers.",
+		Name: "edit_file",
+		Description: "Overwrite a file's entire content with new content." +
+			" Use this to update source code, config files, or any text file — especially when you need to make substantial or precise changes to existing content." +
+			" If the user cancels the confirmation, just return the discard message, don't attempt to repeat the modified content.",
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -563,33 +635,9 @@ func getOpenEmbeddingTools() []*OpenTool {
 					"type":        "string",
 					"description": "The path to the file to edit.",
 				},
-				"edits": map[string]interface{}{
-					"type": "array",
-					"items": map[string]interface{}{
-						"type": "object",
-						"properties": map[string]interface{}{
-							"line": map[string]interface{}{
-								"type":        "integer",
-								"description": "The line number to edit (1-indexed). For add operations, this is the position where content will be inserted.",
-							},
-							"content": map[string]interface{}{
-								"type":        "string",
-								"description": "The new content for the line. Empty string to delete the line (unless operation is specified).",
-							},
-							"operation": map[string]interface{}{
-								"type": "string",
-								"description": "The operation to perform on the specified line (1-indexed):\n" +
-									"- 'add' or '++' to insert content at the given line position (if line is greater than the number of lines, content is appended).\n" +
-									"- 'delete' or '--' to remove the line.\n" +
-									"- 'replace' or '==' to replace the line content.\n" +
-									"If 'operation' is omitted, 'delete' is assumed when 'content' is empty, otherwise 'replace' is used.\n" +
-									"Accepted values: 'add', 'delete', 'replace'.",
-								"enum": []string{"add", "delete", "replace"},
-							},
-						},
-						"required": []string{"line"},
-					},
-					"description": "Array of edits to apply to the file. Each edit specifies a line number and the operation to perform.",
+				"content": map[string]interface{}{
+					"type":        "string",
+					"description": "The complete new content to replace the entire file with.",
 				},
 				"need_confirm": map[string]interface{}{
 					"type": "boolean",
@@ -598,7 +646,7 @@ func getOpenEmbeddingTools() []*OpenTool {
 					"default": true,
 				},
 			},
-			"required": []string{"path", "edits"},
+			"required": []string{"path", "content"},
 		},
 	}
 	editFileTool := OpenTool{
@@ -822,6 +870,20 @@ type OpenProcessor struct {
 	mcpClient  *MCPClient               // MCP client for MCP tool calls
 }
 
+// Diff confirm func
+func (op *OpenProcessor) showDiffConfirm(diff string) {
+	// Function call is over
+	op.status.ChangeTo(op.notify, StreamNotify{Status: StatusFunctionCallingOver}, op.proceed)
+	// Show the diff confirm
+	op.status.ChangeTo(op.notify, StreamNotify{Data: diff, Status: StatusDiffConfirm}, op.proceed)
+}
+
+// Diff close func
+func (op *OpenProcessor) closeDiffConfirm() {
+	// Confirm diff is over
+	op.status.ChangeTo(op.notify, StreamNotify{Status: StatusDiffConfirmOver}, op.proceed)
+}
+
 // OpenAI tool implementations (wrapper functions)
 func (op *OpenProcessor) OpenAIShellToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := shellToolCallImpl(argsMap, op.toolsUse)
@@ -888,8 +950,22 @@ func (op *OpenProcessor) OpenAIWriteFileToolCall(toolCall openai.ToolCall, argsM
 	}, nil
 }
 
+// func (op *OpenProcessor) OpenAIEditFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+// 	response, err := editFileToolCallImpl(argsMap, op.toolsUse)
+// 	if err != nil {
+// 		return openai.ChatCompletionMessage{}, err
+// 	}
+
+// 	return openai.ChatCompletionMessage{
+// 		Role:       openai.ChatMessageRoleTool,
+// 		ToolCallID: toolCall.ID,
+// 		Content:    response,
+// 	}, nil
+// }
+
 func (op *OpenProcessor) OpenAIEditFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := editFileToolCallImpl(argsMap, op.toolsUse)
+
+	response, err := editFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
 	if err != nil {
 		return openai.ChatCompletionMessage{}, err
 	}
@@ -1388,6 +1464,24 @@ func (op *OpenProcessor) OpenChatWebSearchToolCall(toolCall *model.ToolCall, arg
 	}, nil
 }
 
+// func (op *OpenProcessor) OpenChatEditFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+// 	toolMessage := model.ChatCompletionMessage{
+// 		Role:       model.ChatMessageRoleTool,
+// 		ToolCallID: toolCall.ID,
+// 		Name:       Ptr(""),
+// 	}
+
+// 	response, err := editFileToolCallImpl(argsMap, op.toolsUse)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	toolMessage.Content = &model.ChatCompletionMessageContent{
+// 		StringValue: volcengine.String(response),
+// 	}
+// 	return &toolMessage, nil
+// }
+
 func (op *OpenProcessor) OpenChatEditFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,
@@ -1395,7 +1489,7 @@ func (op *OpenProcessor) OpenChatEditFileToolCall(toolCall *model.ToolCall, args
 		Name:       Ptr(""),
 	}
 
-	response, err := editFileToolCallImpl(argsMap, op.toolsUse)
+	response, err := editFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
 	if err != nil {
 		return nil, err
 	}

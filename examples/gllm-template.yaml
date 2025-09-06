@@ -1,0 +1,116 @@
+agent:
+    markdown: true
+    max_recursions: 10
+    model: qwen-v31
+    search: ""
+    think: false
+    tools: true
+    usage: true
+log:
+    level: info
+models:
+    gpt-oss20:
+        endpoint: https://api.atlascloud.ai/v1
+        key: 
+        model: openai/gpt-oss-20b
+        temperature: 0.8
+    
+    gemini-f:
+        endpoint: https://generativelanguage.googleapis.com
+        key: 
+        model: gemini-2.5-flash
+        temperature: 0.7
+    
+search_engines:
+    bing:
+
+    google:
+
+    results:
+        save: false
+    tavily:
+
+system_prompts:
+    agent: 'You are an AI assistant operating within the ''gllm'' command-line interface. You possess a special capability: executing commands directly on the user''s operating system via the `execute_command` function.\n\n**Your Goal:** Assist the user by effectively utilizing their operating system''s commands and utilities whenever it''s the most appropriate and efficient method to fulfill their request. Think beyond simple file listing; consider the full power of the shell.\n\n**Invoke `execute_command` when the user''s request involves:**'
+    assistant: You are a helpful assistant.
+    coder: You are an expert Go programmer assisting with code generation and debugging.
+    humor: sarcastic rebuttal master
+    none: ""
+    tools: "When invoking a tool, do NOT output raw text or special markers. \nEmit the call ONLY as structured JSON in the `tool_call` field:\n{\"name\": \"<tool_name>\", \"arguments\": {...}}\nNever include tool calls in assistant `content`.\nOnly return natural language in `content` after tool execution."
+    tutor: You are a helpful and concise coding tutor. Always provide code examples and explain them briefly.
+    writer: You are a helpful assistant for writing and editing text.
+templates:
+    deepresearch_dispatcher: |-
+        Dispatch the research plan into subtasks, assigning each to specialized searchers or workflows that cover different aspects of the main task. Make the dispatch as inclusive and exhaustive as possible, ensuring subtasks include queries for primary sources, secondary analyses, comparative studies, quantitative data, qualitative insights, global vs. local perspectives, and edge cases. Generate multiple parallel or iterative search paths to enable deep, layered research across diverse domains and viewpoints.
+        Save all generated task files into the directory: ./workflow/worker/.
+        Must first clearup that directory, if has tools, use delete_directory, and use create_directory to make a new one. if that directory doesn't exist, create a new one.
+    deepresearch_planner: "Design and generate a comprehensive deep research plan. \nGiven a user request, identify the primary task, decompose it into sequential subtasks focused on deep dives into multiple perspectives, angles, and dimensions. \nRemember you can only make max 3 subtasks for saving tokens. Must consider cost efficiency.\nBreak the query into diverse research tasks that explore historical context, current developments, expert opinions, counterarguments, data-driven insights, interdisciplinary connections, potential future implications, and underrepresented viewpoints.\nEnsure the plan is structured as a detailed list of subtasks, each with clear objectives for thorough, multi-faceted investigation to achieve exhaustive coverage and nuanced understanding."
+    deepresearch_summarizer: Synthesize all gathered research from subtasks into a cohesive, deeply insightful summary. Preserve key details, main ideas, diverse perspectives, evidence-based findings, and critical analyses. Structure the output for readability with sections on core insights, supporting data, counterpoints, implications, and recommendations, ensuring the final report is intensely helpful, balanced, and reflective of multi-dimensional deep research.
+    deepresearch_worker: Execute the assigned research subtasks with depth and rigor. Perform thorough searches, cross-reference sources, analyze data from multiple angles, seek out primary evidence, evaluate biases, and explore related tangents for comprehensive insights. Use iterative querying if needed to refine and deepen results, ensuring each subtask uncovers layered details, contradictions, and novel connections.
+    dispatcher: |-
+        You are a task dispatcher agent.
+        Your role is to analyze a given task list and generate separate task files for each item.
+        Each file must include the full details of the task, so that other worker agents can execute them without further clarification.
+        Save all generated task files into the directory: ./workflow/worker/.
+        Remember you must first clearup that directory, if has tools, use delete_directory, if it doesn't exist, create a new one.
+        Do not request confirmation or validation—simply create the files and proceed.
+    executor: |-
+        You are a task executor agent.
+        Your responsibility is to read the task instructions provided and carry them out exactly as written.
+        Do not ask for confirmation or add extra commentary.
+        Do not reinterpret the task—just execute it literally and directly.
+        Always produce the requested output in the required format.
+    extractor: extract all text from image(s) and must keep its orignial form
+    none: ""
+    paraphraser: Paraphrase the following text in a way that is clear, concise, and retains the original meaning.
+    planner: |-
+        Design and generate a comprehensive task breakdown. Given a user request, identify the primary task, decompose it into sequential subtasks, and present a structured list detailing:
+        What: needs to be done for each subtask.
+        How: each subtask should be executed.
+        The expected result upon completion of each subtask.
+    shellmate: "You are a shell command assistant. Your goal is to help me by suggesting command-line instructions efficiently and concisely. Follow this format strictly:  \n\n1. **Command Output (Markdown Format)**  \n   - Only show the command first, formatted as code (e.g., triple backticks for shell commands).  \n   \n2. **Quote & Explanation**  \n   - A short, informative explanation of why this command is used.  \n   - A breakdown of key parameters.  \n\n3. **Alternative Commands**  \n   - Provide at least 3 alternative commands.  \n   - Each alternative must be on a new line.  \n   - Each alternative must have a **single-line** explanation of what it does and why it’s a viable option.  "
+    socrate: Craft a response that is eloquent, insightful, and deeply informative. Structure your answer with clarity and sophistication, incorporating relevant historical, scientific, or philosophical context where applicable. Use refined language, striking yet precise phrasing, and an engaging narrative style. Aim for a balance between depth and accessibility, ensuring the response is both intellectually stimulating and easy to comprehend. Where appropriate, include illustrative examples, analogies, or thought-provoking perspectives to enrich the discussion.
+    summarizer: Summarize all information concisely while preserving key details and main ideas.
+    translator: Translate the following text accurately and naturally into English, maintaining tone and context.
+workflow:
+    agents:
+        - input: ""
+          model: atlas-gpt-oss20
+          name: planner
+          output: ./workflow/planner
+          pass: false
+          role: master
+          template: "Design and generate a comprehensive deep research plan. \nGiven a user request, identify the primary task, decompose it into sequential subtasks focused on deep dives into multiple perspectives, angles, and dimensions. \nRemember you can only make max 3 subtasks for saving tokens. Must consider cost efficiency.\nBreak the query into diverse research tasks that explore historical context, current developments, expert opinions, counterarguments, data-driven insights, interdisciplinary connections, potential future implications, and underrepresented viewpoints.\nEnsure the plan is structured as a detailed list of subtasks, each with clear objectives for thorough, multi-faceted investigation to achieve exhaustive coverage and nuanced understanding."
+          think: true
+          tools: false
+        - input: ./workflow/planner
+          markdown: true
+          model: gemini-l
+          name: dispatcher
+          output: ./workflow/dispatcher
+          pass: false
+          role: master
+          template: |-
+            Dispatch the research plan into subtasks, assigning each to specialized searchers or workflows that cover different aspects of the main task. Make the dispatch as inclusive and exhaustive as possible, ensuring subtasks include queries for primary sources, secondary analyses, comparative studies, quantitative data, qualitative insights, global vs. local perspectives, and edge cases. Generate multiple parallel or iterative search paths to enable deep, layered research across diverse domains and viewpoints.
+            Save all generated task files into the directory: ./workflow/worker/.
+            Must first clearup that directory, if has tools, use delete_directory, and use create_directory to make a new one. if that directory doesn't exist, create a new one.
+          think: false
+          tools: true
+          usage: false
+        - input: ./workflow/worker
+          model: gemini-f
+          name: executor
+          output: ./workflow/summarizer
+          pass: false
+          role: worker
+          search: google
+          template: Execute the assigned research subtasks with depth and rigor. Perform thorough searches, cross-reference sources, analyze data from multiple angles, seek out primary evidence, evaluate biases, and explore related tangents for comprehensive insights. Use iterative querying if needed to refine and deepen results, ensuring each subtask uncovers layered details, contradictions, and novel connections.
+          think: true
+          tools: false
+        - input: ./workflow/summarizer/
+          markdown: true
+          model: qwen-v3
+          name: summarizer
+          output: ./workflow/final/
+          role: master
+          template: Synthesize all gathered research from subtasks into a cohesive, deeply insightful summary. Preserve key details, main ideas, diverse perspectives, evidence-based findings, and critical analyses. Structure the output for readability with sections on core insights, supporting data, counterpoints, implications, and recommendations, ensuring the final report is intensely helpful, balanced, and reflective of multi-dimensional deep research.

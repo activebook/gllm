@@ -431,8 +431,16 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		return nil, fmt.Errorf("error parsing arguments: %v", err)
 	}
 
+	var args string
+	if toolCall.Function.Name == "edit_file" {
+		// Don't show content(the modified content could be too long)
+		args = formatToolCallArguments(argsMap, []string{"content"})
+	} else {
+		args = formatToolCallArguments(argsMap, []string{})
+	}
+
 	// Call function
-	c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, formatToolCallArguments(argsMap))}, c.op.proceed)
+	c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, args)}, c.op.proceed)
 
 	var msg *model.ChatCompletionMessage
 	var err error

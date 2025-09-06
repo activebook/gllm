@@ -330,8 +330,16 @@ func (ag *Agent) processGemini2Stream(ctx context.Context,
 
 func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 
+	var args string
+	if call.Name == "edit_file" {
+		// Don't show content(the modified content could be too long)
+		args = formatToolCallArguments(call.Args, []string{"content"})
+	} else {
+		args = formatToolCallArguments(call.Args, []string{})
+	}
+
 	// Call function
-	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", call.Name, formatToolCallArguments(call.Args))}, ag.ProceedChan)
+	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", call.Name, args)}, ag.ProceedChan)
 
 	var resp *genai.FunctionResponse
 	var err error
