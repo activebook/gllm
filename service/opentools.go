@@ -64,7 +64,7 @@ Would you like me to proceed with this operation? Please confirm with 'yes', 'pr
 
 	// ToolRespConfirmModifyFile is the template for the response to the user before modifying a file, including the diff.
 	ToolRespConfirmModifyFile = "Apply this change? (Yes/No): "
-	ToolRespDiscardModifyFile = "Discard this change."
+	ToolRespDiscardModifyFile = "DISCARD CONFIRMED: User has chosen not to apply this file modification. The file will remain unchanged. Do not attempt to modify this file again without explicit new user instruction."
 )
 
 var (

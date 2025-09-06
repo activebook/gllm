@@ -394,7 +394,7 @@ func CallAgent(op *AgentOptions) error {
 				ag.WriteDiffConfirm(notify.Data)
 				proceedCh <- true
 			case StatusDiffConfirmOver:
-				ag.StopIndicator()
+				ag.WriteDiffConfirm("") // just write a newline
 				proceedCh <- true
 			}
 
