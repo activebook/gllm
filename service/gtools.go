@@ -444,6 +444,31 @@ func (ag *Agent) Gemini2EditFileToolCall(call *genai.FunctionCall) (*genai.Funct
 	return &resp, nil
 }
 
+func (ag *Agent) Gemini2ModifyFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+	resp := genai.FunctionResponse{
+		ID:   call.ID,
+		Name: call.Name,
+	}
+
+	// Convert genai.FunctionCall.Args to map[string]interface{}
+	argsMap := make(map[string]interface{})
+	for k, v := range call.Args {
+		argsMap[k] = v
+	}
+
+	// Call shared implementation
+	response, err := modifyFileToolCallImpl(&argsMap, &ag.ToolsUse)
+	if err != nil {
+		return nil, err
+	}
+
+	resp.Response = map[string]any{
+		"output": response,
+		"error":  "",
+	}
+	return &resp, nil
+}
+
 func (ag *Agent) Gemini2CopyToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,

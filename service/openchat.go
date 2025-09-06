@@ -445,6 +445,7 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		"read_file":           c.op.OpenChatReadFileToolCall,
 		"write_file":          c.op.OpenChatWriteFileToolCall,
 		"edit_file":           c.op.OpenChatEditFileToolCall,
+		"modify_file":         c.op.OpenChatModifyFileToolCall,
 		"create_directory":    c.op.OpenChatCreateDirectoryToolCall,
 		"list_directory":      c.op.OpenChatListDirectoryToolCall,
 		"delete_file":         c.op.OpenChatDeleteFileToolCall,

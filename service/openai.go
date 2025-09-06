@@ -408,6 +408,7 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 		"read_file":           oa.op.OpenAIReadFileToolCall,
 		"write_file":          oa.op.OpenAIWriteFileToolCall,
 		"edit_file":           oa.op.OpenAIEditFileToolCall,
+		"modify_file":         oa.op.OpenAIModifyFileToolCall,
 		"create_directory":    oa.op.OpenAICreateDirectoryToolCall,
 		"list_directory":      oa.op.OpenAIListDirectoryToolCall,
 		"delete_file":         oa.op.OpenAIDeleteFileToolCall,

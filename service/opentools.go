@@ -553,9 +553,64 @@ func getOpenEmbeddingTools() []*OpenTool {
 	tools = append(tools, &readMultipleFilesTool)
 
 	// Edit file tool
-	editFileFunc := OpenFunctionDefinition{
-		Name:        "edit_file",
-		Description: "Edit specific lines in a file. This tool allows adding, replacing, or deleting content at specific line numbers.",
+	// editFileFunc := OpenFunctionDefinition{
+	// 	Name:        "edit_file",
+	// 	Description: "Edit specific lines in a file. This tool allows adding, replacing, or deleting content at specific line numbers.",
+	// 	Parameters: map[string]interface{}{
+	// 		"type": "object",
+	// 		"properties": map[string]interface{}{
+	// 			"path": map[string]interface{}{
+	// 				"type":        "string",
+	// 				"description": "The path to the file to edit.",
+	// 			},
+	// 			"edits": map[string]interface{}{
+	// 				"type": "array",
+	// 				"items": map[string]interface{}{
+	// 					"type": "object",
+	// 					"properties": map[string]interface{}{
+	// 						"line": map[string]interface{}{
+	// 							"type":        "integer",
+	// 							"description": "The line number to edit (1-indexed). For add operations, this is the position where content will be inserted.",
+	// 						},
+	// 						"content": map[string]interface{}{
+	// 							"type":        "string",
+	// 							"description": "The new content for the line. Empty string to delete the line (unless operation is specified).",
+	// 						},
+	// 						"operation": map[string]interface{}{
+	// 							"type": "string",
+	// 							"description": "The operation to perform on the specified line (1-indexed):\n" +
+	// 								"- 'add' or '++' to insert content at the given line position (if line is greater than the number of lines, content is appended).\n" +
+	// 								"- 'delete' or '--' to remove the line.\n" +
+	// 								"- 'replace' or '==' to replace the line content.\n" +
+	// 								"If 'operation' is omitted, 'delete' is assumed when 'content' is empty, otherwise 'replace' is used.\n" +
+	// 								"Accepted values: 'add', 'delete', 'replace'.",
+	// 							"enum": []string{"add", "delete", "replace"},
+	// 						},
+	// 					},
+	// 					"required": []string{"line"},
+	// 				},
+	// 				"description": "Array of edits to apply to the file. Each edit specifies a line number and the operation to perform.",
+	// 			},
+	// 			"need_confirm": map[string]interface{}{
+	// 				"type": "boolean",
+	// 				"description": "Specifies whether to prompt the user for confirmation before editing the file. " +
+	// 					"This should always be true for safety.",
+	// 				"default": true,
+	// 			},
+	// 		},
+	// 		"required": []string{"path", "edits"},
+	// 	},
+	// }
+	// editFileTool := OpenTool{
+	// 	Type:     ToolTypeFunction,
+	// 	Function: &editFileFunc,
+	// }
+
+	// tools = append(tools, &editFileTool)
+
+	modifyFileFunc := OpenFunctionDefinition{
+		Name:        "modify_file",
+		Description: "Modify content in a file. This tool allows adding, replacing, or deleting content at a specific file",
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -563,33 +618,9 @@ func getOpenEmbeddingTools() []*OpenTool {
 					"type":        "string",
 					"description": "The path to the file to edit.",
 				},
-				"edits": map[string]interface{}{
-					"type": "array",
-					"items": map[string]interface{}{
-						"type": "object",
-						"properties": map[string]interface{}{
-							"line": map[string]interface{}{
-								"type":        "integer",
-								"description": "The line number to edit (1-indexed). For add operations, this is the position where content will be inserted.",
-							},
-							"content": map[string]interface{}{
-								"type":        "string",
-								"description": "The new content for the line. Empty string to delete the line (unless operation is specified).",
-							},
-							"operation": map[string]interface{}{
-								"type": "string",
-								"description": "The operation to perform on the specified line (1-indexed):\n" +
-									"- 'add' or '++' to insert content at the given line position (if line is greater than the number of lines, content is appended).\n" +
-									"- 'delete' or '--' to remove the line.\n" +
-									"- 'replace' or '==' to replace the line content.\n" +
-									"If 'operation' is omitted, 'delete' is assumed when 'content' is empty, otherwise 'replace' is used.\n" +
-									"Accepted values: 'add', 'delete', 'replace'.",
-								"enum": []string{"add", "delete", "replace"},
-							},
-						},
-						"required": []string{"line"},
-					},
-					"description": "Array of edits to apply to the file. Each edit specifies a line number and the operation to perform.",
+				"content": map[string]interface{}{
+					"type":        "string",
+					"description": "The new would-be updated content for the file.",
 				},
 				"need_confirm": map[string]interface{}{
 					"type": "boolean",
@@ -601,12 +632,12 @@ func getOpenEmbeddingTools() []*OpenTool {
 			"required": []string{"path", "edits"},
 		},
 	}
-	editFileTool := OpenTool{
+	modifyFileTool := OpenTool{
 		Type:     ToolTypeFunction,
-		Function: &editFileFunc,
+		Function: &modifyFileFunc,
 	}
 
-	tools = append(tools, &editFileTool)
+	tools = append(tools, &modifyFileTool)
 
 	// Copy file/directory tool
 	copyFunc := OpenFunctionDefinition{
@@ -890,6 +921,19 @@ func (op *OpenProcessor) OpenAIWriteFileToolCall(toolCall openai.ToolCall, argsM
 
 func (op *OpenProcessor) OpenAIEditFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := editFileToolCallImpl(argsMap, op.toolsUse)
+	if err != nil {
+		return openai.ChatCompletionMessage{}, err
+	}
+
+	return openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Content:    response,
+	}, nil
+}
+
+func (op *OpenProcessor) OpenAIModifyFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+	response, err := modifyFileToolCallImpl(argsMap, op.toolsUse)
 	if err != nil {
 		return openai.ChatCompletionMessage{}, err
 	}
@@ -1396,6 +1440,24 @@ func (op *OpenProcessor) OpenChatEditFileToolCall(toolCall *model.ToolCall, args
 	}
 
 	response, err := editFileToolCallImpl(argsMap, op.toolsUse)
+	if err != nil {
+		return nil, err
+	}
+
+	toolMessage.Content = &model.ChatCompletionMessageContent{
+		StringValue: volcengine.String(response),
+	}
+	return &toolMessage, nil
+}
+
+func (op *OpenProcessor) OpenChatModifyFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	toolMessage := model.ChatCompletionMessage{
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Name:       Ptr(""),
+	}
+
+	response, err := modifyFileToolCallImpl(argsMap, op.toolsUse)
 	if err != nil {
 		return nil, err
 	}

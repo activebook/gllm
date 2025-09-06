@@ -630,6 +630,45 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (
 	return fmt.Sprintf("Successfully edited file %s", path), nil
 }
 
+func modifyFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
+	path, ok := (*argsMap)["path"].(string)
+	if !ok {
+		return "", fmt.Errorf("path not found in arguments")
+	}
+
+	// Check if confirmation is needed
+	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
+	if !ok {
+		// Default to true for safety
+		needConfirm = true
+	}
+
+	// Get the edits to apply
+	content, ok := (*argsMap)["content"].(string)
+	if !ok {
+		return "", fmt.Errorf("content not found in arguments or not an array")
+	}
+
+	// Here it first read the file(path) content
+	// Then use service.Diff() to compare the content
+	// if need confirm, return the diff
+	// else write to file
+
+	// Read the file
+	origin, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Sprintf("Error reading file %s: %v", path, err), nil
+	}
+	originalContent := string(origin)
+	diff := Diff(originalContent, content, path, "", 3)
+
+	if needConfirm && !toolsUse.AutoApprove {
+		// Response with a prompt to let user confirm
+		outStr := fmt.Sprintf(ToolRespConfirmFileOp, diff)
+		return outStr, nil
+	}
+}
+
 func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
 	source, ok := (*argsMap)["source"].(string)
 	if !ok {
