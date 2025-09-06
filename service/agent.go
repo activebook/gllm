@@ -390,6 +390,12 @@ func CallAgent(op *AgentOptions) error {
 			case StatusFunctionCallingOver:
 				ag.StopIndicator()
 				proceedCh <- true
+			case StatusDiffConfirm:
+				ag.WriteDiffConfirm(notify.Data)
+				proceedCh <- true
+			case StatusDiffConfirmOver:
+				ag.StopIndicator()
+				proceedCh <- true
 			}
 
 			// Re-enable data channel
@@ -471,6 +477,13 @@ func (ag *Agent) WriteUsage() {
 		if ag.Std != nil {
 			ag.TokenUsage.Render(ag.Std)
 		}
+	}
+}
+
+func (ag *Agent) WriteDiffConfirm(text string) {
+	// Only write to stdout
+	if ag.Std != nil {
+		ag.Std.Writeln(text)
 	}
 }
 

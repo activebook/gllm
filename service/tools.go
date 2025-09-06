@@ -630,7 +630,7 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (
 	return fmt.Sprintf("Successfully edited file %s", path), nil
 }
 
-func modifyFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
+func modifyFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, showDiff func(diff string), closeDiff func()) (string, error) {
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
@@ -649,38 +649,37 @@ func modifyFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse)
 		return "", fmt.Errorf("content not found in arguments or not an array")
 	}
 
-	// Here it first read the file(path) content
-	// Then use service.Diff() to compare the content
-	// if need confirm, return the diff
-	// else write to file
-
-	// Read the file
-	origin, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Sprintf("Error reading file %s: %v", path, err), nil
-	}
-	originalContent := string(origin)
-	diff := Diff(originalContent, content, path, "", 3)
-
+	// If confirmation is needed, ask the user before proceeding
 	if needConfirm && !toolsUse.AutoApprove {
-		// Response with a prompt to let user confirm
-		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("modify file %s", path), diff)
-		return outStr, nil
-	}
+		// Read the file
+		origin, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Sprintf("Error reading file %s: %v", path, err), nil
+		}
+		originalContent := string(origin)
 
-	// Create directory if it doesn't exist
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Sprintf("Error creating directory for %s: %v", path, err), nil
+		// Show the diff
+		diff := Diff(originalContent, content, "", "", 3)
+		showDiff(diff)
+
+		// Response with a prompt to let user confirm
+		confirm, err := NeedUserConfirm(ToolRespConfirmModifyFile)
+		closeDiff() // Close the diff
+		if err != nil {
+			return "", err
+		}
+		if !confirm {
+			return ToolRespDiscardModifyFile, nil
+		}
 	}
 
 	// Write the file
-	err = os.WriteFile(path, []byte(content), 0644)
+	err := os.WriteFile(path, []byte(content), 0644)
 	if err != nil {
 		return fmt.Sprintf("Error writing file %s: %v", path, err), nil
 	}
 
-	return fmt.Sprintf("Successfully modified file %s", path), nil
+	return fmt.Sprintf("Successfully edited file %s", path), nil
 }
 
 func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {

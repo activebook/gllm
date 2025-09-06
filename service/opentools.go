@@ -54,13 +54,17 @@ Status:
 	ToolRespConfirmFileOp = "Based on your request, I'm about to perform the following file operation:\n\n" +
 		"```\n%s\n```\n\n" +
 		"This operation will %s\n\n" +
-		`**Check:** 
-- First, Proceed with caution. Check whether this operation may make irreversible changes or affect critical parts of your system. 
+		`**Check:**
+- First, Proceed with caution. Check whether this operation may make irreversible changes or affect critical parts of your system.
 - Second, Ensure that the operation is safe and does not contain any malicious or harmful actions.
 - Third, If you deem it's safe, execute the operation. If not, let user to choose whether to proceed or modify the operation.
 Such as:
 Would you like me to proceed with this operation? Please confirm with 'yes', 'proceed', or provide alternative instructions.
 `
+
+	// ToolRespConfirmModifyFile is the template for the response to the user before modifying a file, including the diff.
+	ToolRespConfirmModifyFile = "Apply this change? (Yes/No): "
+	ToolRespDiscardModifyFile = "Discard this change."
 )
 
 var (
@@ -69,7 +73,6 @@ var (
 		"read_file",
 		"write_file",
 		"edit_file",
-		"modify_file",
 		"delete_file",
 		"create_directory",
 		"list_directory",
@@ -124,9 +127,20 @@ func AvailableMCPTool(toolName string, client *MCPClient) bool {
 	return client.FindTool(toolName) != nil
 }
 
-func formatToolCallArguments(argsMap map[string]interface{}) string {
+func formatToolCallArguments(argsMap map[string]interface{}, ignoreKeys []string) string {
+	// Create a lookup map for efficient key checking
+	ignoreMap := make(map[string]bool)
+	for _, key := range ignoreKeys {
+		ignoreMap[key] = true
+	}
+
 	var argsList []string
 	for k, v := range argsMap {
+		// Skip keys that are in the ignore list
+		if ignoreMap[k] {
+			continue
+		}
+
 		switch val := v.(type) {
 		case []interface{}, map[string]interface{}:
 			jsonStr, _ := json.Marshal(val)
@@ -609,15 +623,15 @@ func getOpenEmbeddingTools() []*OpenTool {
 
 	// tools = append(tools, &editFileTool)
 
-	modifyFileFunc := OpenFunctionDefinition{
-		Name:        "modify_file",
-		Description: "Replace the entire content of a file with new content. This tool shows a colorful diff of the changes before applying them, allowing the user to review modifications safely.",
+	editFileFunc := OpenFunctionDefinition{
+		Name:        "edit_file",
+		Description: "Overwrite a file's entire content with new content. Use this to update source code, config files, or any text file — especially when you need to make substantial or precise changes to existing content.",
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"path": map[string]interface{}{
 					"type":        "string",
-					"description": "The path to the file to modify.",
+					"description": "The path to the file to edit.",
 				},
 				"content": map[string]interface{}{
 					"type":        "string",
@@ -625,20 +639,20 @@ func getOpenEmbeddingTools() []*OpenTool {
 				},
 				"need_confirm": map[string]interface{}{
 					"type": "boolean",
-					"description": "Whether to show a diff preview and require user confirmation before applying changes. " +
-						"Defaults to true for safety - set to false only for automated operations.",
+					"description": "Specifies whether to prompt the user for confirmation before editing the file. " +
+						"This should always be true for safety.",
 					"default": true,
 				},
 			},
 			"required": []string{"path", "content"},
 		},
 	}
-	modifyFileTool := OpenTool{
+	editFileTool := OpenTool{
 		Type:     ToolTypeFunction,
-		Function: &modifyFileFunc,
+		Function: &editFileFunc,
 	}
 
-	tools = append(tools, &modifyFileTool)
+	tools = append(tools, &editFileTool)
 
 	// Copy file/directory tool
 	copyFunc := OpenFunctionDefinition{
@@ -854,6 +868,20 @@ type OpenProcessor struct {
 	mcpClient  *MCPClient               // MCP client for MCP tool calls
 }
 
+// Diff confirm func
+func (op *OpenProcessor) showDiffConfirm(diff string) {
+	// Function call is over
+	op.status.ChangeTo(op.notify, StreamNotify{Status: StatusFunctionCallingOver}, op.proceed)
+	// Show the diff confirm
+	op.status.ChangeTo(op.notify, StreamNotify{Data: diff, Status: StatusDiffConfirm}, op.proceed)
+}
+
+// Diff close func
+func (op *OpenProcessor) closeDiffConfirm() {
+	// Confirm diff is over
+	op.status.ChangeTo(op.notify, StreamNotify{Status: StatusDiffConfirmOver}, op.proceed)
+}
+
 // OpenAI tool implementations (wrapper functions)
 func (op *OpenProcessor) OpenAIShellToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := shellToolCallImpl(argsMap, op.toolsUse)
@@ -934,7 +962,8 @@ func (op *OpenProcessor) OpenAIEditFileToolCall(toolCall openai.ToolCall, argsMa
 }
 
 func (op *OpenProcessor) OpenAIModifyFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := modifyFileToolCallImpl(argsMap, op.toolsUse)
+
+	response, err := modifyFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
 	if err != nil {
 		return openai.ChatCompletionMessage{}, err
 	}
@@ -1458,7 +1487,7 @@ func (op *OpenProcessor) OpenChatModifyFileToolCall(toolCall *model.ToolCall, ar
 		Name:       Ptr(""),
 	}
 
-	response, err := modifyFileToolCallImpl(argsMap, op.toolsUse)
+	response, err := modifyFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
 	if err != nil {
 		return nil, err
 	}

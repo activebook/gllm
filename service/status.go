@@ -15,6 +15,8 @@ const (
 	StatusReasoningOver                    // 7
 	StatusFunctionCalling                  // 8
 	StatusFunctionCallingOver              // 9
+	StatusDiffConfirm                      // 10
+	StatusDiffConfirmOver                  // 11
 )
 
 type StreamNotify struct {
@@ -100,12 +102,21 @@ func (s *StatusStack) ChangeTo(
 			s.Clear()
 		}
 	case StatusReasoningOver:
-		for s.IsTop(StatusReasoning) {
+		for s.IsTop(StatusReasoning) || s.IsTop(StatusReasoningOver) {
 			s.Pop() // Remove the reasoning status
 		}
 	case StatusFunctionCallingOver:
-		for s.IsTop(StatusFunctionCalling) {
+		for s.IsTop(StatusFunctionCalling) || s.IsTop(StatusFunctionCallingOver) {
 			s.Pop() // Remove the function calling status
+		}
+	case StatusDiffConfirm:
+		// If we are entering diff confirm, we push it onto the stack
+		if !s.IsTop(StatusDiffConfirm) {
+			s.Push(StatusDiffConfirm)
+		}
+	case StatusDiffConfirmOver:
+		for s.IsTop(StatusDiffConfirm) || s.IsTop(StatusDiffConfirmOver) {
+			s.Pop() // Remove the diff confirm status
 		}
 	case StatusWarn:
 		// Do nothing

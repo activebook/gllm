@@ -457,7 +457,7 @@ func (ag *Agent) Gemini2ModifyFileToolCall(call *genai.FunctionCall) (*genai.Fun
 	}
 
 	// Call shared implementation
-	response, err := modifyFileToolCallImpl(&argsMap, &ag.ToolsUse)
+	response, err := modifyFileToolCallImpl(&argsMap, &ag.ToolsUse, ag.gemini2ShowDiffConfirm, ag.gemini2CloseDiffConfirm)
 	if err != nil {
 		return nil, err
 	}
@@ -492,4 +492,19 @@ func (ag *Agent) Gemini2CopyToolCall(call *genai.FunctionCall) (*genai.FunctionR
 		"error":  "",
 	}
 	return &resp, nil
+}
+
+// Diff confirm func
+func (ag *Agent) gemini2ShowDiffConfirm(diff string) {
+	// Function call is over
+	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusFunctionCallingOver}, ag.ProceedChan)
+
+	// Show the diff confirm
+	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Data: diff, Status: StatusDiffConfirm}, ag.ProceedChan)
+}
+
+// Diff close func
+func (ag *Agent) gemini2CloseDiffConfirm() {
+	// Confirm diff is over
+	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusDiffConfirmOver}, ag.ProceedChan)
 }

@@ -431,21 +431,29 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		return nil, fmt.Errorf("error parsing arguments: %v", err)
 	}
 
+	var args string
+	if toolCall.Function.Name == "edit_file" {
+		// Don't show content(the modified content could be too long)
+		args = formatToolCallArguments(argsMap, []string{"content"})
+	} else {
+		args = formatToolCallArguments(argsMap, []string{})
+	}
+
 	// Call function
-	c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, formatToolCallArguments(argsMap))}, c.op.proceed)
+	c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, args)}, c.op.proceed)
 
 	var msg *model.ChatCompletionMessage
 	var err error
 
 	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
 	toolHandlers := map[string]func(*model.ToolCall, *map[string]interface{}) (*model.ChatCompletionMessage, error){
-		"shell":               c.op.OpenChatShellToolCall,
-		"web_fetch":           c.op.OpenChatWebFetchToolCall,
-		"web_search":          c.op.OpenChatWebSearchToolCall,
-		"read_file":           c.op.OpenChatReadFileToolCall,
-		"write_file":          c.op.OpenChatWriteFileToolCall,
-		"edit_file":           c.op.OpenChatEditFileToolCall,
-		"modify_file":         c.op.OpenChatModifyFileToolCall,
+		"shell":      c.op.OpenChatShellToolCall,
+		"web_fetch":  c.op.OpenChatWebFetchToolCall,
+		"web_search": c.op.OpenChatWebSearchToolCall,
+		"read_file":  c.op.OpenChatReadFileToolCall,
+		"write_file": c.op.OpenChatWriteFileToolCall,
+		//"edit_file":           c.op.OpenChatEditFileToolCall,
+		"edit_file":           c.op.OpenChatModifyFileToolCall,
 		"create_directory":    c.op.OpenChatCreateDirectoryToolCall,
 		"list_directory":      c.op.OpenChatListDirectoryToolCall,
 		"delete_file":         c.op.OpenChatDeleteFileToolCall,

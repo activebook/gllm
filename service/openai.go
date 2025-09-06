@@ -394,21 +394,29 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 		return openai.ChatCompletionMessage{}, fmt.Errorf("error parsing arguments: %v", err)
 	}
 
+	var args string
+	if toolCall.Function.Name == "edit_file" {
+		// Don't show content(the modified content could be too long)
+		args = formatToolCallArguments(argsMap, []string{"content"})
+	} else {
+		args = formatToolCallArguments(argsMap, []string{})
+	}
+
 	// Call function
-	oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, formatToolCallArguments(argsMap))}, oa.op.proceed)
+	oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, args)}, oa.op.proceed)
 
 	var msg openai.ChatCompletionMessage
 	var err error
 
 	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
 	toolHandlers := map[string]func(openai.ToolCall, *map[string]interface{}) (openai.ChatCompletionMessage, error){
-		"shell":               oa.op.OpenAIShellToolCall,
-		"web_fetch":           oa.op.OpenAIWebFetchToolCall,
-		"web_search":          oa.op.OpenAIWebSearchToolCall,
-		"read_file":           oa.op.OpenAIReadFileToolCall,
-		"write_file":          oa.op.OpenAIWriteFileToolCall,
-		"edit_file":           oa.op.OpenAIEditFileToolCall,
-		"modify_file":         oa.op.OpenAIModifyFileToolCall,
+		"shell":      oa.op.OpenAIShellToolCall,
+		"web_fetch":  oa.op.OpenAIWebFetchToolCall,
+		"web_search": oa.op.OpenAIWebSearchToolCall,
+		"read_file":  oa.op.OpenAIReadFileToolCall,
+		"write_file": oa.op.OpenAIWriteFileToolCall,
+		//"edit_file":           oa.op.OpenAIEditFileToolCall,
+		"edit_file":           oa.op.OpenAIModifyFileToolCall,
 		"create_directory":    oa.op.OpenAICreateDirectoryToolCall,
 		"list_directory":      oa.op.OpenAIListDirectoryToolCall,
 		"delete_file":         oa.op.OpenAIDeleteFileToolCall,
