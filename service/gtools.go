@@ -419,6 +419,31 @@ func (ag *Agent) Gemini2WebFetchToolCall(call *genai.FunctionCall) (*genai.Funct
 	return &resp, nil
 }
 
+// func (ag *Agent) Gemini2EditFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+// 	resp := genai.FunctionResponse{
+// 		ID:   call.ID,
+// 		Name: call.Name,
+// 	}
+
+// 	// Convert genai.FunctionCall.Args to map[string]interface{}
+// 	argsMap := make(map[string]interface{})
+// 	for k, v := range call.Args {
+// 		argsMap[k] = v
+// 	}
+
+// 	// Call shared implementation
+// 	response, err := editFileToolCallImpl(&argsMap, &ag.ToolsUse)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	resp.Response = map[string]any{
+// 		"output": response,
+// 		"error":  "",
+// 	}
+// 	return &resp, nil
+// }
+
 func (ag *Agent) Gemini2EditFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
@@ -432,32 +457,7 @@ func (ag *Agent) Gemini2EditFileToolCall(call *genai.FunctionCall) (*genai.Funct
 	}
 
 	// Call shared implementation
-	response, err := editFileToolCallImpl(&argsMap, &ag.ToolsUse)
-	if err != nil {
-		return nil, err
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  "",
-	}
-	return &resp, nil
-}
-
-func (ag *Agent) Gemini2ModifyFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	// Convert genai.FunctionCall.Args to map[string]interface{}
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	// Call shared implementation
-	response, err := modifyFileToolCallImpl(&argsMap, &ag.ToolsUse, ag.gemini2ShowDiffConfirm, ag.gemini2CloseDiffConfirm)
+	response, err := editFileToolCallImpl(&argsMap, &ag.ToolsUse, ag.gemini2ShowDiffConfirm, ag.gemini2CloseDiffConfirm)
 	if err != nil {
 		return nil, err
 	}

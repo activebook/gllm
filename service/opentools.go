@@ -62,9 +62,9 @@ Such as:
 Would you like me to proceed with this operation? Please confirm with 'yes', 'proceed', or provide alternative instructions.
 `
 
-	// ToolRespConfirmModifyFile is the template for the response to the user before modifying a file, including the diff.
-	ToolRespConfirmModifyFile = "Apply this change? (Yes/No): "
-	ToolRespDiscardModifyFile = "DISCARD CONFIRMED: User has chosen not to apply this file modification. The file will remain unchanged. Do not attempt to modify this file again without explicit new user instruction."
+	// ToolRespConfirmEdityFile is the template for the response to the user before modifying a file, including the diff.
+	ToolRespConfirmEdityFile = "Apply this change? (Yes/No): "
+	ToolRespDiscardEditFile  = "OPERATION CANCELLED: The user has explicitly declined to apply these file modifications. The file will remain unchanged. Do not proceed with any file modifications or ask for further confirmation without explicit new user instruction. This operation is complete."
 )
 
 var (
@@ -624,8 +624,10 @@ func getOpenEmbeddingTools() []*OpenTool {
 	// tools = append(tools, &editFileTool)
 
 	editFileFunc := OpenFunctionDefinition{
-		Name:        "edit_file",
-		Description: "Overwrite a file's entire content with new content. Use this to update source code, config files, or any text file — especially when you need to make substantial or precise changes to existing content.",
+		Name: "edit_file",
+		Description: "Overwrite a file's entire content with new content." +
+			" Use this to update source code, config files, or any text file — especially when you need to make substantial or precise changes to existing content." +
+			" If the user cancels the confirmation, just return the discard message, don't attempt to repeat the modified content.",
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -948,22 +950,22 @@ func (op *OpenProcessor) OpenAIWriteFileToolCall(toolCall openai.ToolCall, argsM
 	}, nil
 }
 
+// func (op *OpenProcessor) OpenAIEditFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+// 	response, err := editFileToolCallImpl(argsMap, op.toolsUse)
+// 	if err != nil {
+// 		return openai.ChatCompletionMessage{}, err
+// 	}
+
+// 	return openai.ChatCompletionMessage{
+// 		Role:       openai.ChatMessageRoleTool,
+// 		ToolCallID: toolCall.ID,
+// 		Content:    response,
+// 	}, nil
+// }
+
 func (op *OpenProcessor) OpenAIEditFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := editFileToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		return openai.ChatCompletionMessage{}, err
-	}
 
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, nil
-}
-
-func (op *OpenProcessor) OpenAIModifyFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-
-	response, err := modifyFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
+	response, err := editFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
 	if err != nil {
 		return openai.ChatCompletionMessage{}, err
 	}
@@ -1462,6 +1464,24 @@ func (op *OpenProcessor) OpenChatWebSearchToolCall(toolCall *model.ToolCall, arg
 	}, nil
 }
 
+// func (op *OpenProcessor) OpenChatEditFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+// 	toolMessage := model.ChatCompletionMessage{
+// 		Role:       model.ChatMessageRoleTool,
+// 		ToolCallID: toolCall.ID,
+// 		Name:       Ptr(""),
+// 	}
+
+// 	response, err := editFileToolCallImpl(argsMap, op.toolsUse)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	toolMessage.Content = &model.ChatCompletionMessageContent{
+// 		StringValue: volcengine.String(response),
+// 	}
+// 	return &toolMessage, nil
+// }
+
 func (op *OpenProcessor) OpenChatEditFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,
@@ -1469,25 +1489,7 @@ func (op *OpenProcessor) OpenChatEditFileToolCall(toolCall *model.ToolCall, args
 		Name:       Ptr(""),
 	}
 
-	response, err := editFileToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		return nil, err
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, nil
-}
-
-func (op *OpenProcessor) OpenChatModifyFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := modifyFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
+	response, err := editFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
 	if err != nil {
 		return nil, err
 	}

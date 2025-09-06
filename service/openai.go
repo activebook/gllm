@@ -410,13 +410,12 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 
 	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
 	toolHandlers := map[string]func(openai.ToolCall, *map[string]interface{}) (openai.ChatCompletionMessage, error){
-		"shell":      oa.op.OpenAIShellToolCall,
-		"web_fetch":  oa.op.OpenAIWebFetchToolCall,
-		"web_search": oa.op.OpenAIWebSearchToolCall,
-		"read_file":  oa.op.OpenAIReadFileToolCall,
-		"write_file": oa.op.OpenAIWriteFileToolCall,
-		//"edit_file":           oa.op.OpenAIEditFileToolCall,
-		"edit_file":           oa.op.OpenAIModifyFileToolCall,
+		"shell":               oa.op.OpenAIShellToolCall,
+		"web_fetch":           oa.op.OpenAIWebFetchToolCall,
+		"web_search":          oa.op.OpenAIWebSearchToolCall,
+		"read_file":           oa.op.OpenAIReadFileToolCall,
+		"write_file":          oa.op.OpenAIWriteFileToolCall,
+		"edit_file":           oa.op.OpenAIEditFileToolCall,
 		"create_directory":    oa.op.OpenAICreateDirectoryToolCall,
 		"list_directory":      oa.op.OpenAIListDirectoryToolCall,
 		"delete_file":         oa.op.OpenAIDeleteFileToolCall,
