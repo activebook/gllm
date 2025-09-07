@@ -331,7 +331,7 @@ func (ag *Agent) processGemini2Stream(ctx context.Context,
 func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 
 	var args string
-	if call.Name == "edit_file" {
+	if call.Name == "edit_file" || call.Name == "write_file" {
 		// Don't show content(the modified content could be too long)
 		args = formatToolCallArguments(call.Args, []string{"content"})
 	} else {
