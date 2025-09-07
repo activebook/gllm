@@ -395,7 +395,7 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 	}
 
 	var args string
-	if toolCall.Function.Name == "edit_file" {
+	if toolCall.Function.Name == "edit_file" || toolCall.Function.Name == "write_file" {
 		// Don't show content(the modified content could be too long)
 		args = formatToolCallArguments(argsMap, []string{"content"})
 	} else {

@@ -64,7 +64,9 @@ Would you like me to proceed with this operation? Please confirm with 'yes', 'pr
 
 	// ToolRespConfirmEdityFile is the template for the response to the user before modifying a file, including the diff.
 	ToolRespConfirmEdityFile = "Apply this change? (Yes/No): "
-	ToolRespDiscardEditFile  = "OPERATION CANCELLED: The user has explicitly declined to apply these file modifications. The file will remain unchanged. Do not proceed with any file modifications or ask for further confirmation without explicit new user instruction. This operation is complete."
+	ToolRespDiscardEditFile  = "Based on your request, the OPERATION is CANCELLED: " +
+		"Cancel edit file: %s\n" +
+		"The user has explicitly declined to apply these file edits. The file will remain unchanged. Do not proceed with any file modifications or ask for further confirmation without explicit new user instruction."
 )
 
 var (

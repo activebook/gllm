@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -14,10 +15,26 @@ func Diff(content1, content2, file1, file2 string, contextLines int) string {
 	// Colors
 	var red, green, cyan, dim func(string) string
 
-	red = func(s string) string { return color.New(color.FgRed).Sprint(s) }
-	green = func(s string) string { return color.New(color.FgGreen).Sprint(s) }
-	cyan = func(s string) string { return color.New(color.FgCyan, color.Bold).Sprint(s) }
-	dim = func(s string) string { return color.New(color.Faint).Sprint(s) }
+	if supportsTrueColor() {
+		// True color: use slim background colors like VSCode
+
+		// Slight darker
+		// red = func(s string) string { return color.BgRGB(60, 20, 20).Sprint(s) }
+		// green = func(s string) string { return color.BgRGB(20, 60, 20).Sprint(s) }
+
+		// Slight lighter
+		red = func(s string) string { return color.BgRGB(75, 24, 24).Sprint(s) }
+		green = func(s string) string { return color.BgRGB(27, 75, 27).Sprint(s) }
+
+		cyan = func(s string) string { return color.New(color.FgCyan, color.Bold).Sprint(s) }
+		dim = func(s string) string { return color.New(color.Faint).Sprint(s) }
+	} else {
+		// 256-color fallback: use text colors
+		red = func(s string) string { return color.New(color.FgRed).Sprint(s) }
+		green = func(s string) string { return color.New(color.FgGreen).Sprint(s) }
+		cyan = func(s string) string { return color.New(color.FgCyan, color.Bold).Sprint(s) }
+		dim = func(s string) string { return color.New(color.Faint).Sprint(s) }
+	}
 
 	diff := difflib.UnifiedDiff{
 		A:        difflib.SplitLines(content1),
@@ -119,4 +136,11 @@ func getTerminalWidth() int {
 		return 80 // fallback width
 	}
 	return width
+}
+
+// supportsTrueColor detects if the terminal supports true color (24-bit)
+// Returns true if COLORTERM is set to "truecolor" or "24bit"
+func supportsTrueColor() bool {
+	colorTerm := os.Getenv("COLORTERM")
+	return colorTerm == "truecolor" || colorTerm == "24bit"
 }

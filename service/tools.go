@@ -668,7 +668,7 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, s
 			return "", err
 		}
 		if !confirm {
-			return ToolRespDiscardEditFile, nil
+			return fmt.Sprintf(ToolRespDiscardEditFile, path), nil
 		}
 	}
 

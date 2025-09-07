@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -14,88 +16,164 @@ var colorCmd = &cobra.Command{
 	Use:   "color",
 	Short: "Show some different colors of gllm output",
 	Run: func(cmd *cobra.Command, args []string) {
-		// This is where you would implement the logic for your test command
+		fmt.Printf("Terminal Color Support: ")
+		if supportsTrueColor() {
+			color.New(color.FgGreen, color.Bold).Println("TRUE COLOR (24-bit)")
+		} else {
+			color.New(color.FgYellow).Println("256-color or basic")
+		}
+		fmt.Println()
 
-		colors := map[string]string{
-			// Standard Colors
-			"Black":   "\033[30m",
-			"Red":     "\033[31m",
-			"Green":   "\033[32m",
-			"Yellow":  "\033[33m",
-			"Blue":    "\033[34m",
-			"Magenta": "\033[35m",
-			"Cyan":    "\033[36m",
-			"White":   "\033[37m",
+		// Basic ANSI colors
+		fmt.Println("=== Basic ANSI Colors ===")
+		color.Black("Black Text")
+		color.Red("Red Text")
+		color.Green("Green Text")
+		color.Yellow("Yellow Text")
+		color.Blue("Blue Text")
+		color.Magenta("Magenta Text")
+		color.Cyan("Cyan Text")
+		color.White("White Text")
+		fmt.Println()
 
-			// Extra Named 256-color Variants
-			"Orange (256)":      "\033[38;5;214m",
-			"Dark Orange (256)": "\033[38;5;208m",
-			"Pink (256)":        "\033[38;5;213m",
-			"Violet (256)":      "\033[38;5;177m",
-			"Teal (256)":        "\033[38;5;37m",
-			"Turquoise (256)":   "\033[38;5;80m",
-			"Gold (256)":        "\033[38;5;220m",
-			"Silver (256)":      "\033[38;5;7m",
+		// Bright colors
+		fmt.Println("=== Bright Colors ===")
+		color.HiBlack("Bright Black")
+		color.HiRed("Bright Red")
+		color.HiGreen("Bright Green")
+		color.HiYellow("Bright Yellow")
+		color.HiBlue("Bright Blue")
+		color.HiMagenta("Bright Magenta")
+		color.HiCyan("Bright Cyan")
+		color.HiWhite("Bright White")
+		fmt.Println()
 
-			// Truecolor RGB Examples
-			"True Orange (RGB)":   "\033[38;2;255;165;0m",
-			"True Pink (RGB)":     "\033[38;2;255;105;180m",
-			"True Purple (RGB)":   "\033[38;2;128;0;128m",
-			"True Teal (RGB)":     "\033[38;2;0;128;128m",
-			"True Lime (RGB)":     "\033[38;2;0;255;0m",
-			"True Sky Blue (RGB)": "\033[38;2;135;206;235m",
-			"True Gray (RGB)":     "\033[38;2;128;128;128m",
+		// Background colors
+		fmt.Println("=== Background Colors ===")
+		color.New(color.BgBlack, color.FgWhite).Print("Black BG")
+		fmt.Print(" ")
+		color.New(color.BgRed, color.FgWhite).Print("Red BG")
+		fmt.Print(" ")
+		color.New(color.BgGreen, color.FgBlack).Print("Green BG")
+		fmt.Print(" ")
+		color.New(color.BgBlue, color.FgWhite).Print("Blue BG")
+		fmt.Print(" ")
+		color.New(color.BgMagenta, color.FgWhite).Print("Magenta BG")
+		fmt.Print(" ")
+		color.New(color.BgCyan, color.FgBlack).Print("Cyan BG")
+		fmt.Print(" ")
+		color.New(color.BgYellow, color.FgBlack).Print("Yellow BG")
+		fmt.Print(" ")
+		color.New(color.BgWhite, color.FgBlack).Print("White BG")
+		fmt.Println()
+		fmt.Println()
 
-			// Bright Variants
-			"Bright Black":   "\033[90m",
-			"Bright Red":     "\033[91m",
-			"Bright Green":   "\033[92m",
-			"Bright Yellow":  "\033[93m",
-			"Bright Blue":    "\033[94m",
-			"Bright Magenta": "\033[95m",
-			"Bright Cyan":    "\033[96m",
-			"Bright White":   "\033[97m",
+		// True color examples (only if supported)
+		if supportsTrueColor() {
+			fmt.Println("=== TRUE COLOR (24-bit RGB) Examples ===")
 
-			// Background Colors
-			"BG Black":   "\033[40m",
-			"BG Red":     "\033[41m",
-			"BG Green":   "\033[42m",
-			"BG Yellow":  "\033[43m",
-			"BG Blue":    "\033[44m",
-			"BG Magenta": "\033[45m",
-			"BG Cyan":    "\033[46m",
-			"BG White":   "\033[47m",
+			// Rainbow gradient
+			fmt.Println("Rainbow Gradient:")
+			rainbow := []struct{ r, g, b int }{
+				{255, 0, 0}, {255, 165, 0}, {255, 255, 0}, {0, 255, 0},
+				{0, 255, 255}, {0, 0, 255}, {128, 0, 128},
+			}
+			for _, rgb := range rainbow {
+				color.RGB(rgb.r, rgb.g, rgb.b).Print("█")
+			}
+			fmt.Println()
 
-			// Bright Backgrounds
-			"Bright BG Black":   "\033[100m",
-			"Bright BG Red":     "\033[101m",
-			"Bright BG Green":   "\033[102m",
-			"Bright BG Yellow":  "\033[103m",
-			"Bright BG Blue":    "\033[104m",
-			"Bright BG Magenta": "\033[105m",
-			"Bright BG Cyan":    "\033[106m",
-			"Bright BG White":   "\033[107m",
+			// Beautiful color palette
+			fmt.Println("Color Palette:")
+			palette := []struct {
+				name    string
+				r, g, b int
+			}{
+				{"Crimson", 220, 20, 60},
+				{"Coral", 255, 127, 80},
+				{"Gold", 255, 215, 0},
+				{"Lime", 0, 255, 0},
+				{"Aqua", 0, 255, 255},
+				{"Royal Blue", 65, 105, 225},
+				{"Purple", 128, 0, 128},
+				{"Hot Pink", 255, 105, 180},
+				{"Turquoise", 64, 224, 208},
+				{"Orange Red", 255, 69, 0},
+				{"Spring Green", 0, 255, 127},
+				{"Deep Sky Blue", 0, 191, 255},
+				{"Violet", 238, 130, 238},
+				{"Tomato", 255, 99, 71},
+				{"Chartreuse", 127, 255, 0},
+				{"Sky Blue", 135, 206, 235},
+			}
 
-			// Styling / Control
-			"Reset":     "\033[0m",
-			"Bold":      "\033[1m",
-			"Dim":       "\033[2m",
-			"Italic":    "\033[3m",
-			"Underline": "\033[4m",
-			"Blink":     "\033[5m",
-			"Reverse":   "\033[7m",
-			"Hidden":    "\033[8m",
+			for i, c := range palette {
+				col := color.RGB(c.r, c.g, c.b)
+				col.Printf("%-15s", c.name)
+				if (i+1)%4 == 0 {
+					fmt.Println()
+				}
+			}
+			fmt.Println()
+
+			// Background colors with true color
+			fmt.Println("True Color Backgrounds:")
+			trueBgColors := []struct {
+				name    string
+				r, g, b int
+			}{
+				{"Dark Red", 139, 0, 0},
+				{"Dark Green", 0, 100, 0},
+				{"Dark Blue", 0, 0, 139},
+				{"Dark Purple", 75, 0, 130},
+				{"Dark Orange", 255, 140, 0},
+				{"Dark Cyan", 0, 139, 139},
+			}
+
+			for _, bg := range trueBgColors {
+				color.BgRGB(bg.r, bg.g, bg.b).SprintFunc()(fmt.Sprintf(" %-12s ", bg.name))
+			}
+			fmt.Println()
+			fmt.Println()
+
+			// Gradient examples
+			fmt.Println("Gradient Examples:")
+			// Red to yellow gradient
+			fmt.Print("Red→Yellow: ")
+			for i := 0; i <= 20; i++ {
+				r := 255
+				g := (255 * i) / 20
+				b := 0
+				color.RGB(r, g, b).Print("█")
+			}
+			fmt.Println()
+
+			// Blue to green gradient
+			fmt.Print("Blue→Green: ")
+			for i := 0; i <= 20; i++ {
+				r := 0
+				g := (255 * i) / 20
+				b := 255 - (255*i)/20
+				color.RGB(r, g, b).Print("█")
+			}
+			fmt.Println()
+		} else {
+			fmt.Println("=== Limited Color Support ===")
+			fmt.Println("Your terminal doesn't support true color (24-bit).")
+			fmt.Println("For full color experience, use a modern terminal like:")
+			fmt.Println("- iTerm2")
+			fmt.Println("- Alacritty")
+			fmt.Println("- Windows Terminal")
+			fmt.Println("- GNOME Terminal")
+			fmt.Println("- Konsole")
 		}
 
-		fmt.Println("Printing all colors:")
-		for name, code := range colors {
-			fmt.Println(code, name, colors["Reset"])
-		}
-
-		//test.TestSearch2()
-		//test.TestQwQ()
-		//test.TestVV()
-
-		//service.ProcessGeminiChatStream("AIzaSyBwlIzbZ7bnRtYU7iicNdMnLYKkd8XVPDU", "gemini-2.0-flash", "You're a helper assistant", "how to cook?", 0.7, nil)
+		// Reset at the end
+		color.New(color.Reset).Print("")
 	},
+}
+
+func supportsTrueColor() bool {
+	colorTerm := os.Getenv("COLORTERM")
+	return colorTerm == "truecolor" || colorTerm == "24bit"
 }
