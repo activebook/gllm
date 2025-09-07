@@ -17,8 +17,15 @@ func Diff(content1, content2, file1, file2 string, contextLines int) string {
 
 	if supportsTrueColor() {
 		// True color: use slim background colors like VSCode
-		red = func(s string) string { return color.BgRGB(60, 20, 20).Sprint(s) }
-		green = func(s string) string { return color.BgRGB(20, 60, 20).Sprint(s) }
+
+		// Slight darker
+		// red = func(s string) string { return color.BgRGB(60, 20, 20).Sprint(s) }
+		// green = func(s string) string { return color.BgRGB(20, 60, 20).Sprint(s) }
+
+		// Slight lighter
+		red = func(s string) string { return color.BgRGB(75, 24, 24).Sprint(s) }
+		green = func(s string) string { return color.BgRGB(27, 75, 27).Sprint(s) }
+
 		cyan = func(s string) string { return color.New(color.FgCyan, color.Bold).Sprint(s) }
 		dim = func(s string) string { return color.New(color.Faint).Sprint(s) }
 	} else {
