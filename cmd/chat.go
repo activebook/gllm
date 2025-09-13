@@ -140,8 +140,6 @@ var ()
 
 const (
 	_gllmChatPrompt = "\033[96mgllm>\033[0m "
-	startPaste      = "\x1b[200~"
-	endPaste        = "\x1b[201~"
 )
 
 func init() {
@@ -181,10 +179,6 @@ func (ci *ChatInfo) startREPL() {
 	}
 	defer rl.Close()
 
-	// Enable bracketed-paste on the terminal
-	fmt.Fprint(os.Stdout, "\x1b[?2004h")
-	defer fmt.Fprint(os.Stdout, "\x1b[?2004l")
-
 	var inputLines []string
 	multilineMode := false
 
@@ -207,26 +201,6 @@ func (ci *ChatInfo) startREPL() {
 			}
 			fmt.Printf("Error reading line: %v\n", err)
 			continue
-		}
-
-		// Detect pasted blocks
-		if strings.HasPrefix(line, startPaste) {
-			// Strip opening marker and accumulate until closing marker
-			paste := strings.TrimPrefix(line, startPaste)
-			for {
-				chunk, err := rl.Readline()
-				if err != nil {
-					break
-				}
-				if strings.HasSuffix(chunk, endPaste) {
-					paste += "\n" + strings.TrimSuffix(chunk, endPaste)
-					break
-				}
-				paste += "\n" + chunk
-			}
-			line = paste
-			line = strings.TrimSuffix(line, endPaste)
-			fmt.Printf("Pasted:%s\n", line)
 		}
 
 		line = strings.TrimSpace(line)
