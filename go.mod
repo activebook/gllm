@@ -9,7 +9,6 @@ require (
 	github.com/chzyer/readline v1.5.1
 	github.com/fatih/color v1.18.0
 	github.com/google/jsonschema-go v0.2.1-0.20250825175020-748c325cec76
-	github.com/mattn/go-tty v0.0.7
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/modelcontextprotocol/go-sdk v0.3.1
 	github.com/pmezard/go-difflib v1.0.0
