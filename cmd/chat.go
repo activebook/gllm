@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"github.com/activebook/gllm/service"
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
+	"github.com/mattn/go-tty"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -41,7 +43,7 @@ Special commands:
 /think, /T [on|off] - Switch whether to use deep think mode
 /search, /s <search_engine> [on|off] - select a search engine to use, or switch on/off
 /mcp [on|off|list] - Switch whether to use MCP servers, list available servers
-/reference. /r <num> - change link reference count
+/reference, /r <num> - change link reference count
 /usage, /u [on|off] - Switch whether to show token usage information
 /attach, /a <filename> - Attach a file to the chat session
 /detach, /d <filename> - Detach a file to the chat session
@@ -74,9 +76,9 @@ Special commands:
 
 			// If template is provided, update the default template
 			if templateFlag != "" {
-				if err := SetEffectiveSystemPrompt(sysPromptFlag); err != nil {
+				if err := SetEffectiveTemplate(templateFlag); err != nil {
 					service.Warnf("%v", err)
-					fmt.Println("Using default system prompt instead")
+					fmt.Println("Using default template instead")
 				}
 			}
 
@@ -141,6 +143,64 @@ var ()
 const (
 	_gllmChatPrompt = "\033[96mgllm>\033[0m "
 )
+
+func readLineWithTTY(prompt string) (string, error) {
+	t, err := tty.Open()
+	if err != nil {
+		return "", err
+	}
+	defer t.Close()
+
+	var line strings.Builder
+	multiline := false
+	lastESC := false
+	currentPrompt := prompt
+
+	for {
+		r, err := t.ReadRune()
+		if err != nil {
+			return "", err
+		}
+
+		if lastESC {
+			lastESC = false
+			if r == '\r' {
+				// Alt+Enter
+				line.WriteRune('\n')
+				multiline = true
+				currentPrompt = "... "
+			} else {
+				// ignore other ESC sequences
+			}
+		} else if r == 27 { // ESC
+			lastESC = true
+		} else if r == '\r' {
+			// Enter
+			if multiline {
+				line.WriteRune('\n')
+				multiline = false
+				currentPrompt = prompt
+			} else {
+				return strings.TrimSpace(line.String()), nil
+			}
+		} else if r == 127 { // backspace
+			if line.Len() > 0 {
+				s := line.String()
+				line.Reset()
+				line.WriteString(s[:len(s)-1])
+			}
+		} else if r == 3 { // ctrl+c
+			return "", errors.New("interrupt")
+		} else if r == 4 { // ctrl+d
+			return "", errors.New("eof")
+		} else if r >= 32 { // printable
+			line.WriteRune(r)
+		}
+
+		// Update display
+		fmt.Print("\r" + currentPrompt + line.String())
+	}
+}
 
 func init() {
 	rootCmd.AddCommand(chatCmd)
@@ -330,7 +390,7 @@ func (ci *ChatInfo) setTemplate(template string) {
 func (ci *ChatInfo) setSystem(system string) {
 	if err := SetEffectiveSystemPrompt(system); err != nil {
 		service.Warnf("%v", err)
-		fmt.Println("Igonre system prompt")
+		fmt.Println("Ignore system prompt")
 	} else {
 		fmt.Printf("Switched to system prompt: %s\n", system)
 	}
