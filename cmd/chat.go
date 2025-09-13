@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -17,7 +16,6 @@ import (
 	"github.com/activebook/gllm/service"
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
-	"github.com/mattn/go-tty"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -142,65 +140,9 @@ var ()
 
 const (
 	_gllmChatPrompt = "\033[96mgllm>\033[0m "
+	startPaste      = "\x1b[200~"
+	endPaste        = "\x1b[201~"
 )
-
-func readLineWithTTY(prompt string) (string, error) {
-	t, err := tty.Open()
-	if err != nil {
-		return "", err
-	}
-	defer t.Close()
-
-	var line strings.Builder
-	multiline := false
-	lastESC := false
-	currentPrompt := prompt
-
-	for {
-		r, err := t.ReadRune()
-		if err != nil {
-			return "", err
-		}
-
-		if lastESC {
-			lastESC = false
-			if r == '\r' {
-				// Alt+Enter
-				line.WriteRune('\n')
-				multiline = true
-				currentPrompt = "... "
-			} else {
-				// ignore other ESC sequences
-			}
-		} else if r == 27 { // ESC
-			lastESC = true
-		} else if r == '\r' {
-			// Enter
-			if multiline {
-				line.WriteRune('\n')
-				multiline = false
-				currentPrompt = prompt
-			} else {
-				return strings.TrimSpace(line.String()), nil
-			}
-		} else if r == 127 { // backspace
-			if line.Len() > 0 {
-				s := line.String()
-				line.Reset()
-				line.WriteString(s[:len(s)-1])
-			}
-		} else if r == 3 { // ctrl+c
-			return "", errors.New("interrupt")
-		} else if r == 4 { // ctrl+d
-			return "", errors.New("eof")
-		} else if r >= 32 { // printable
-			line.WriteRune(r)
-		}
-
-		// Update display
-		fmt.Print("\r" + currentPrompt + line.String())
-	}
-}
 
 func init() {
 	rootCmd.AddCommand(chatCmd)
@@ -239,6 +181,10 @@ func (ci *ChatInfo) startREPL() {
 	}
 	defer rl.Close()
 
+	// Enable bracketed-paste on the terminal
+	fmt.Fprint(os.Stdout, "\x1b[?2004h")
+	defer fmt.Fprint(os.Stdout, "\x1b[?2004l")
+
 	var inputLines []string
 	multilineMode := false
 
@@ -261,6 +207,26 @@ func (ci *ChatInfo) startREPL() {
 			}
 			fmt.Printf("Error reading line: %v\n", err)
 			continue
+		}
+
+		// Detect pasted blocks
+		if strings.HasPrefix(line, startPaste) {
+			// Strip opening marker and accumulate until closing marker
+			paste := strings.TrimPrefix(line, startPaste)
+			for {
+				chunk, err := rl.Readline()
+				if err != nil {
+					break
+				}
+				if strings.HasSuffix(chunk, endPaste) {
+					paste += "\n" + strings.TrimSuffix(chunk, endPaste)
+					break
+				}
+				paste += "\n" + chunk
+			}
+			line = paste
+			line = strings.TrimSuffix(line, endPaste)
+			fmt.Printf("Pasted:%s\n", line)
 		}
 
 		line = strings.TrimSpace(line)
