@@ -35,6 +35,7 @@ Special commands:
 /info, /i - Show current settings
 /history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)
 /markdown, /m [on|off] - Switch whether to render markdown or not
+/mode single|multi - Switch input mode (chat(-) single, chat(≡) multi)
 /system, /S <@name|prompt> - change system prompt
 /tools, /t [on|off|skip|confirm] - Switch whether to use embedding tools, skip tools confirmation
 /template, /p <@name|tmpl> - change template
@@ -142,7 +143,7 @@ const (
 	_gllmSinglePrompt   = "\033[96mchat(-)>\033[0m "
 	_gllmMultiPrompt    = "\033[96mchat(≡)>\033[0m "
 	_gllmContinuePrompt = ">> "
-	_gllmFarewell       = "Goodbye!"
+	_gllmFarewell       = "Session ended."
 )
 
 func init() {
@@ -169,10 +170,12 @@ func init() {
 
 func (ci *ChatInfo) startREPL() {
 	fmt.Println("Welcome to GLLM Interactive Chat")
-	fmt.Println("Type 'exit' or 'quit' to end the session, or '/help' for commands")
-	fmt.Println("Multi-line mode: Press Enter to add lines, press Enter on empty line to submit")
-	fmt.Println("Use '/mode single' for immediate submission on Enter")
+	fmt.Println("Type '/exit' or '/quit' to end the session, or '/help' for commands")
+	fmt.Println("Use '/mode single|multi' to switch chat mode")
 	fmt.Println("Use '/' for commands")
+	fmt.Println("Use '!' for exec local commands")
+	fmt.Println("Use Ctrl+C/Ctrl+D to exit")
+	fmt.Println()
 	ci.showHelp()
 	fmt.Println()
 	ci.printModeStatus()
@@ -189,6 +192,7 @@ func (ci *ChatInfo) startREPL() {
 	defer rl.Close()
 
 	for {
+
 		var prompt string
 		if ci.InputMode == "single" {
 			if len(ci.InputLines) == 0 {
@@ -205,15 +209,23 @@ func (ci *ChatInfo) startREPL() {
 		}
 		rl.SetPrompt(prompt)
 
+		// In the middle of processing multi-line input
+		// Single("\") or Multi
+		haveMultiInputs := (len(ci.InputLines) > 0)
+
 		line, err := rl.Readline()
 		if err != nil { // Handle EOF or other errors
-			if err == readline.ErrInterrupt { // Handle Ctrl+C
-				fmt.Println("\n" + _gllmFarewell)
-				break
-			}
-			if err == io.EOF { // Handle Ctrl+D
-				fmt.Println("\n" + _gllmFarewell)
-				break
+			// Handle Ctrl+C and Handle Ctrl+D
+			if err == readline.ErrInterrupt || err == io.EOF {
+				if haveMultiInputs {
+					// Break out multi input
+					ci.InputLines = nil
+					continue
+				} else {
+					// Quit
+					fmt.Println("\n" + _gllmFarewell)
+					break
+				}
 			}
 			fmt.Printf("Error reading line: %v\n", err)
 			continue
@@ -221,72 +233,31 @@ func (ci *ChatInfo) startREPL() {
 
 		line = strings.TrimSpace(line)
 
-		// Handle commands immediately in both modes
-		if strings.HasPrefix(line, "/") {
-			ci.handleCommand(line)
-			if ci.QuitFlag {
-				break
+		// Handle special prefixes
+		// ! for shell commands
+		// Don't process commands/shell commands in the middle multi inputs
+		if !haveMultiInputs && (strings.HasPrefix(line, "/") || strings.HasPrefix(line, "!")) {
+			// Execute commands/shell commands
+			if strings.HasPrefix(line, "/") {
+				ci.handleCommand(line)
+				if ci.QuitFlag {
+					break
+				}
+			} else {
+				ci.executeShellCommand(line[1:])
 			}
 			continue
 		}
 
-		// Handle shell commands immediately in both modes
-		if strings.HasPrefix(line, "!") {
-			ci.executeShellCommand(line[1:])
-			continue
+		// Process input based on mode
+		switch ci.InputMode {
+		case "single":
+			ci.processSingleModeInput(line)
+		case "multi":
+			ci.processMultiModeInput(line)
 		}
-
-		if ci.InputMode == "single" {
-			// Single mode: process immediately, but support \ for line continuation
-			if strings.HasSuffix(line, "\\") {
-				// Line continuation: accumulate until no \
-				ci.InputLines = append(ci.InputLines, strings.TrimSuffix(line, "\\"))
-				continue
-			} else {
-				// End of input: combine accumulated lines if any
-				if len(ci.InputLines) > 0 {
-					ci.InputLines = append(ci.InputLines, line)
-					input := strings.Join(ci.InputLines, "\n")
-					ci.InputLines = nil
-					if input == "exit" || input == "quit" {
-						fmt.Println(_gllmFarewell)
-						break
-					}
-					ci.callAgent(input)
-					if ci.QuitFlag {
-						break
-					}
-				} else {
-					// Single line input
-					if line == "exit" || line == "quit" {
-						fmt.Println(_gllmFarewell)
-						break
-					}
-					if line == "" {
-						continue
-					}
-					ci.callAgent(line)
-					if ci.QuitFlag {
-						break
-					}
-				}
-			}
-		} else {
-			// Multi mode: accumulate lines, submit on empty line
-			if line == "" {
-				if len(ci.InputLines) > 0 {
-					// Submit accumulated input
-					input := strings.Join(ci.InputLines, "\n")
-					ci.InputLines = nil
-					ci.callAgent(input)
-					if ci.QuitFlag {
-						break
-					}
-				}
-			} else {
-				// Non-empty line: add to accumulation
-				ci.InputLines = append(ci.InputLines, line)
-			}
+		if ci.QuitFlag {
+			break
 		}
 	}
 }
@@ -708,15 +679,55 @@ func (ci *ChatInfo) setOutputFile(path string) {
 	}
 }
 
+func (ci *ChatInfo) processSingleModeInput(line string) {
+	// Single mode: process immediately, but support \ for line continuation
+	if strings.HasSuffix(line, "\\") {
+		// Line continuation: accumulate until no \
+		ci.InputLines = append(ci.InputLines, strings.TrimSuffix(line, "\\"))
+		return
+	}
+
+	// End of input: combine accumulated lines if any
+	if len(ci.InputLines) > 0 {
+		ci.InputLines = append(ci.InputLines, line)
+		input := strings.Join(ci.InputLines, "\n")
+		ci.InputLines = nil
+		ci.callAgent(input)
+		return
+	}
+
+	// Single line input
+	if line == "" {
+		return
+	}
+	ci.callAgent(line)
+}
+
+func (ci *ChatInfo) processMultiModeInput(line string) {
+	// Multi mode: accumulate lines, submit on empty line
+	if line == "" {
+		if len(ci.InputLines) > 0 {
+			// Submit accumulated input
+			input := strings.Join(ci.InputLines, "\n")
+			ci.InputLines = nil
+			ci.callAgent(input)
+			return
+		}
+	} else {
+		// Non-empty line: add to accumulation
+		ci.InputLines = append(ci.InputLines, line)
+	}
+}
+
 func (ci *ChatInfo) printModeStatus() {
 	if ci.InputMode == "single" {
-		color.New(color.FgGreen, color.Bold).Printf("Single mode: ")
+		color.New(color.FgGreen, color.Bold).Printf("Single-line mode: ")
 		color.New(color.FgCyan).Printf("chat(-)> ")
-		color.New(color.FgYellow).Println("- Press Enter to submit immediately")
+		color.New(color.FgYellow).Println("| Press Enter to submit immediately")
 	} else {
-		color.New(color.FgGreen, color.Bold).Printf("Multi mode: ")
+		color.New(color.FgGreen, color.Bold).Printf("Multi-line mode: ")
 		color.New(color.FgCyan).Printf("chat(≡)> ")
-		color.New(color.FgYellow).Println("- Press Enter to add lines, press Enter on empty line to submit")
+		color.New(color.FgYellow).Println("| Press Enter to add lines, press Enter on empty line to submit")
 	}
 }
 
