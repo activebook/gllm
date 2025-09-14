@@ -63,7 +63,7 @@ func Diff(content1, content2, file1, file2 string, contextLines int) string {
 			output.WriteString(cyan(line) + "\n")
 		case strings.HasPrefix(line, "@@"):
 			// Hunk header - use a simple separator instead of complex line numbers
-			separator := strings.Repeat("═", (getTerminalWidth()*3)/4)
+			separator := strings.Repeat("═", (GetTerminalWidth()*3)/4)
 			output.WriteString(dim(separator + "\n"))
 
 			// Parse the hunk header to extract starting line numbers for both files
@@ -123,9 +123,9 @@ func parseHunkHeader(line string, currentLineNum1, currentLineNum2 int) (int, in
 	return currentLineNum1, currentLineNum2
 }
 
-// getTerminalWidth returns the width of the terminal
+// GetTerminalWidth returns the width of the terminal
 // Uses tput cols command, with fallback to 80 if it fails
-func getTerminalWidth() int {
+func GetTerminalWidth() int {
 	cmd := exec.Command("tput", "cols")
 	output, err := cmd.Output()
 	if err != nil {

@@ -35,7 +35,7 @@ Special commands:
 /info, /i - Show current settings
 /history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)
 /markdown, /m [on|off] - Switch whether to render markdown or not
-/mode single|multi - Switch input mode (chat(-) single, chat(≡) multi)
+/mode single|multi - Switch input mode (chat(*) single, chat(#) multi)
 /system, /S <@name|prompt> - change system prompt
 /tools, /t [on|off|skip|confirm] - Switch whether to use embedding tools, skip tools confirmation
 /template, /p <@name|tmpl> - change template
@@ -44,6 +44,7 @@ Special commands:
 /mcp [on|off|list] - Switch whether to use MCP servers, list available servers
 /reference, /r <num> - change link reference count
 /usage, /u [on|off] - Switch whether to show token usage information
+/editor, /e <editor>|list - Open external editor for multi-line input
 /attach, /a <filename> - Attach a file to the chat session
 /detach, /d <filename> - Detach a file to the chat session
 /output, /o <filename> [off] - Save to output file for model responses
@@ -140,10 +141,12 @@ Special commands:
 var ()
 
 const (
-	_gllmSinglePrompt   = "\033[96mchat(-)>\033[0m "
-	_gllmMultiPrompt    = "\033[96mchat(≡)>\033[0m "
+	_gllmSinglePrompt   = "\033[96mchat(*)>\033[0m "
+	_gllmMultiPrompt    = "\033[96mchat(#)>\033[0m "
 	_gllmContinuePrompt = ">> "
+	_gllmConfirmPrompt  = "Press \033[96mEnter\033[0m to send, or use \033[96mCtrl+C/Ctrl+D\033[0m to discard"
 	_gllmFarewell       = "Session ended."
+	_gllmTempFile       = "gllm-edit-*.tmp"
 )
 
 func init() {
@@ -194,7 +197,9 @@ func (ci *ChatInfo) startREPL() {
 	for {
 
 		var prompt string
-		if ci.InputMode == "single" {
+		if ci.WaitingForConfirmation {
+			prompt = _gllmConfirmPrompt
+		} else if ci.InputMode == "single" {
 			if len(ci.InputLines) == 0 {
 				prompt = _gllmSinglePrompt
 			} else {
@@ -217,7 +222,12 @@ func (ci *ChatInfo) startREPL() {
 		if err != nil { // Handle EOF or other errors
 			// Handle Ctrl+C and Handle Ctrl+D
 			if err == readline.ErrInterrupt || err == io.EOF {
-				if haveMultiInputs {
+				if ci.WaitingForConfirmation {
+					// Discard editor content
+					ci.InputLines = nil
+					ci.WaitingForConfirmation = false
+					continue
+				} else if haveMultiInputs {
 					// Break out multi input
 					ci.InputLines = nil
 					continue
@@ -232,6 +242,12 @@ func (ci *ChatInfo) startREPL() {
 		}
 
 		line = strings.TrimSpace(line)
+
+		// Handle editor confirmation workflow
+		if ci.WaitingForConfirmation {
+			ci.handleEditorConfirmation()
+			continue
+		}
 
 		// Handle special prefixes
 		// ! for shell commands
@@ -263,15 +279,17 @@ func (ci *ChatInfo) startREPL() {
 }
 
 type ChatInfo struct {
-	Model         string
-	Provider      service.ModelProvider
-	Files         []*service.FileData
-	Conversion    service.ConversationManager
-	QuitFlag      bool
-	maxRecursions int
-	outputFile    string
-	InputMode     string
-	InputLines    []string
+	Model                  string
+	Provider               service.ModelProvider
+	Files                  []*service.FileData
+	Conversion             service.ConversationManager
+	QuitFlag               bool
+	maxRecursions          int
+	outputFile             string
+	InputMode              string
+	InputLines             []string
+	WaitingForConfirmation bool
+	PreferredEditor        string
 }
 
 func buildChatInfo(files []*service.FileData) *ChatInfo {
@@ -572,7 +590,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /info, /i - Show current settings")
 	fmt.Println("  /history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)")
 	fmt.Println("  /markdown, /m [on|off] - Switch whether to render markdown or not")
-	fmt.Println("  /mode single|multi - Switch input mode (chat(-) single, chat(≡) multi - press Enter on empty line to submit)")
+	fmt.Println("  /mode single|multi - Switch input mode (chat(*) single, chat(#) multi - press Enter on empty line to submit)")
 	fmt.Println("  /attach, /a <filename> - Attach a file to the conversation")
 	fmt.Println("  /detach, /d <filename|all> - Detach a file from the conversation")
 	fmt.Println("  /template, /p \"<tmpl|name>\" - Change the template")
@@ -583,6 +601,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /mcp \"[on|off|list]\" - Switch whether to use MCP servers, or list available servers")
 	fmt.Println("  /reference, /r \"<num>\" - Change the search link reference count")
 	fmt.Println("  /usage, /u \"[on|off]\" - Switch whether to show token usage information")
+	fmt.Println("  /editor, /e <editor>|list - Open external editor for multi-line input")
 	fmt.Println("  /output, /o <filename> [off] - Save to output file for model responses")
 	fmt.Println("  !<command> - Execute a shell command directly (e.g. !ls -la)")
 }
@@ -719,15 +738,85 @@ func (ci *ChatInfo) processMultiModeInput(line string) {
 	}
 }
 
+func (ci *ChatInfo) handleEditorCommand() {
+	editor := getPreferredEditor()
+	tempFile, err := createTempFile(_gllmTempFile)
+	if err != nil {
+		service.Errorf("Failed to create temp file: %v", err)
+		return
+	}
+	defer os.Remove(tempFile)
+
+	// Open in detected editor
+	cmd := exec.Command(editor, tempFile)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	fmt.Printf("Opening in %s...\n", editor)
+	if err := cmd.Run(); err != nil {
+		service.Errorf("Editor failed: %v", err)
+		return
+	}
+
+	// Read back edited content
+	recv, err := os.ReadFile(tempFile)
+	if err != nil {
+		service.Errorf("Failed to read edited content: %v", err)
+		return
+	}
+
+	content := string(recv)
+	content = strings.Trim(content, " \n")
+	if len(content) == 0 {
+		ci.InputLines = nil
+		ci.WaitingForConfirmation = false
+		fmt.Println("No content.")
+		return
+	}
+
+	lines := strings.Split(content, "\n")
+
+	ci.InputLines = lines
+	ci.WaitingForConfirmation = true
+
+	// Display edited content
+	separator := strings.Repeat("═", (service.GetTerminalWidth()*3)/4)
+	fmt.Println(separator)
+	for i, line := range lines {
+		fmt.Printf("%d: %s\n", i+1, line)
+	}
+	fmt.Println()
+}
+
+func (ci *ChatInfo) handleEditorConfirmation() {
+	// User pressed Enter - send content
+	input := strings.Join(ci.InputLines, "\n")
+	ci.InputLines = nil
+	ci.WaitingForConfirmation = false
+	ci.callAgent(input)
+}
+
+func (ci *ChatInfo) handleEditor() {
+	// No arguments - check if preferred editor is set
+	if getPreferredEditor() == "" {
+		// No preferred editor set, show list
+		listAvailableEditors()
+	} else {
+		// Preferred editor set, open it
+		ci.handleEditorCommand()
+	}
+}
+
 func (ci *ChatInfo) printModeStatus() {
 	if ci.InputMode == "single" {
 		color.New(color.FgGreen, color.Bold).Printf("Single-line mode: ")
-		color.New(color.FgCyan).Printf("chat(-)> ")
-		color.New(color.FgYellow).Println("| Press Enter to submit immediately")
+		color.New(color.FgCyan).Printf("chat(*)> ")
+		color.New(color.FgYellow).Println("- Press Enter to submit immediately")
 	} else {
 		color.New(color.FgGreen, color.Bold).Printf("Multi-line mode: ")
-		color.New(color.FgCyan).Printf("chat(≡)> ")
-		color.New(color.FgYellow).Println("| Press Enter to add lines, press Enter on empty line to submit")
+		color.New(color.FgCyan).Printf("chat(#)> ")
+		color.New(color.FgYellow).Println("- Press Enter to add lines, press Enter on empty line to submit")
 	}
 }
 
@@ -852,6 +941,14 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 			return
 		}
 		ci.detachFiles(cmd)
+
+	case "/editor", "/e":
+		if len(parts) < 2 {
+			ci.handleEditor()
+			return
+		}
+		arg := strings.TrimSpace(parts[1])
+		editorCmd.Run(editorCmd, []string{arg})
 
 	case "/output", "/o":
 		if len(parts) < 2 {
@@ -997,7 +1094,7 @@ func (ci *ChatInfo) executeShellCommand(command string) {
 func GetEffectiveChatMode() string {
 	mode := viper.GetString("chat.mode")
 	if mode == "" {
-		mode = "multi" // Default to multi mode
+		mode = "single" // Default to multi mode
 	}
 	return mode
 }
