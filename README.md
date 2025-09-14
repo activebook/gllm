@@ -6,6 +6,7 @@
 
 - **Flexible Model Selection**: Easily configure and switch between different LLMs.
 - **Interactive Chat Mode**: Start real-time conversations with AI models.
+- **Editor Integration**: Use your preferred text editor for comfortable multi-line input in chat mode.
 - **Prompt Templates & System Prompts**: Manage reusable prompts and instructions.
 - **Attachment Support**: Process files, images, and URLs as part of your queries.
 - **Search Integration**: Use search engines to find the latest and most relevant information.
@@ -83,6 +84,35 @@ Within the chat, you can use various commands:
 - `/system <prompt>`: Change the system prompt.
 - `/attach <file>`: Attach a file to the conversation.
 - `! <command>`: Execute a shell command.
+
+### ✏️ Multi-Line Input with Editor
+
+For longer messages or code snippets, use your preferred text editor directly in chat mode:
+
+```sh
+# In chat mode, type:
+/editor
+/e
+```
+
+**How to use:**
+1. Open prefered editor
+2. Compose your multi-line message
+3. Save and exit the editor
+4. Review the content in gllm
+5. Press Enter to send or Ctrl+C to discard
+
+**Setup your editor:**
+```sh
+# Set your preferred editor (vim, nano, code, etc.)
+gllm editor vim
+
+# List available editors
+gllm editor list
+
+# Check current editor
+gllm editor
+```
 
 ### Multi-turn Conversations
 
