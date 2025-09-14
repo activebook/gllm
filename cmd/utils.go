@@ -146,6 +146,15 @@ func validFilePath(filename string, force_overwritten bool) error {
 	return nil
 }
 
+func createTempFile(pattern string) (string, error) {
+	tempFile, err := os.CreateTemp("", pattern)
+	if err != nil {
+		return "", err
+	}
+
+	return tempFile.Name(), tempFile.Close()
+}
+
 func StartsWith(s string, prefix string) bool {
 	return strings.HasPrefix(s, prefix)
 }
