@@ -5,13 +5,9 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
-
-	"text/tabwriter"
 
 	"github.com/activebook/gllm/service"
 	"github.com/chzyer/readline"
@@ -144,7 +140,7 @@ const (
 	_gllmSinglePrompt   = "\033[96mchat(*)>\033[0m "
 	_gllmMultiPrompt    = "\033[96mchat(#)>\033[0m "
 	_gllmContinuePrompt = ">> "
-	_gllmConfirmPrompt  = "Press \033[96mEnter\033[0m to send, or use \033[96mCtrl+C/Ctrl+D\033[0m to discard"
+	_gllmConfirmPrompt  = "\033[96mEnter\033[0m to send (\033[96mCtrl+C/Ctrl+D\033[0m to discard) "
 	_gllmFarewell       = "Session ended."
 	_gllmTempFile       = "gllm-edit-*.tmp"
 )
@@ -171,113 +167,6 @@ func init() {
 	chatCmd.Flags().BoolVarP(&confirmToolsFlag, "confirm-tools", "", false, "Skip confirmation for tool operations")
 }
 
-func (ci *ChatInfo) startREPL() {
-	fmt.Println("Welcome to GLLM Interactive Chat")
-	fmt.Println("Type '/exit' or '/quit' to end the session, or '/help' for commands")
-	fmt.Println("Use '/mode single|multi' to switch chat mode")
-	fmt.Println("Use '/' for commands")
-	fmt.Println("Use '!' for exec local commands")
-	fmt.Println("Use Ctrl+C/Ctrl+D to exit")
-	fmt.Println()
-	ci.showHelp()
-	fmt.Println()
-	ci.printModeStatus()
-	fmt.Println()
-
-	cfg := &readline.Config{
-		Prompt: _gllmMultiPrompt,
-	}
-	rl, err := readline.NewEx(cfg)
-	if err != nil {
-		fmt.Printf("Error initializing readline: %v\n", err)
-		return
-	}
-	defer rl.Close()
-
-	for {
-
-		var prompt string
-		if ci.WaitingForConfirmation {
-			prompt = _gllmConfirmPrompt
-		} else if ci.InputMode == "single" {
-			if len(ci.InputLines) == 0 {
-				prompt = _gllmSinglePrompt
-			} else {
-				prompt = _gllmContinuePrompt
-			}
-		} else {
-			if len(ci.InputLines) == 0 {
-				prompt = _gllmMultiPrompt
-			} else {
-				prompt = _gllmContinuePrompt
-			}
-		}
-		rl.SetPrompt(prompt)
-
-		// In the middle of processing multi-line input
-		// Single("\") or Multi
-		haveMultiInputs := (len(ci.InputLines) > 0)
-
-		line, err := rl.Readline()
-		if err != nil { // Handle EOF or other errors
-			// Handle Ctrl+C and Handle Ctrl+D
-			if err == readline.ErrInterrupt || err == io.EOF {
-				if ci.WaitingForConfirmation {
-					// Discard editor content
-					ci.InputLines = nil
-					ci.WaitingForConfirmation = false
-					continue
-				} else if haveMultiInputs {
-					// Break out multi input
-					ci.InputLines = nil
-					continue
-				} else {
-					// Quit
-					fmt.Println("\n" + _gllmFarewell)
-					break
-				}
-			}
-			fmt.Printf("Error reading line: %v\n", err)
-			continue
-		}
-
-		line = strings.TrimSpace(line)
-
-		// Handle editor confirmation workflow
-		if ci.WaitingForConfirmation {
-			ci.handleEditorConfirmation()
-			continue
-		}
-
-		// Handle special prefixes
-		// ! for shell commands
-		// Don't process commands/shell commands in the middle multi inputs
-		if !haveMultiInputs && (strings.HasPrefix(line, "/") || strings.HasPrefix(line, "!")) {
-			// Execute commands/shell commands
-			if strings.HasPrefix(line, "/") {
-				ci.handleCommand(line)
-				if ci.QuitFlag {
-					break
-				}
-			} else {
-				ci.executeShellCommand(line[1:])
-			}
-			continue
-		}
-
-		// Process input based on mode
-		switch ci.InputMode {
-		case "single":
-			ci.processSingleModeInput(line)
-		case "multi":
-			ci.processMultiModeInput(line)
-		}
-		if ci.QuitFlag {
-			break
-		}
-	}
-}
-
 type ChatInfo struct {
 	Model                  string
 	Provider               service.ModelProvider
@@ -289,7 +178,6 @@ type ChatInfo struct {
 	InputMode              string
 	InputLines             []string
 	WaitingForConfirmation bool
-	PreferredEditor        string
 }
 
 func buildChatInfo(files []*service.FileData) *ChatInfo {
@@ -317,79 +205,140 @@ func buildChatInfo(files []*service.FileData) *ChatInfo {
 	}
 	mr := GetMaxRecursions()
 	ci := ChatInfo{
-		Model:         modelInfo["model"].(string),
-		Provider:      provider,
-		Files:         files,
-		Conversion:    cm,
-		QuitFlag:      false,
-		maxRecursions: mr,
-		InputMode:     GetEffectiveChatMode(),
-		InputLines:    []string{},
+		Model:                  modelInfo["model"].(string),
+		Provider:               provider,
+		Files:                  files,
+		Conversion:             cm,
+		QuitFlag:               false,
+		maxRecursions:          mr,
+		InputMode:              GetEffectiveChatMode(),
+		InputLines:             nil,
+		WaitingForConfirmation: false,
 	}
 	return &ci
 }
 
-func (ci *ChatInfo) clearContext() {
-	// Reset all settings
-	viper.Set("agent.system_prompt", "")
-	viper.Set("agent.template", "")
-	viper.Set("agent.search", "")
-	err := viper.WriteConfig()
+func (ci *ChatInfo) printWelcome() {
+	fmt.Println("Welcome to GLLM Interactive Chat")
+	fmt.Println("Type '/exit' or '/quit' to end the session, or '/help' for commands")
+	fmt.Println("Use '/mode single|multi' to switch chat mode")
+	fmt.Println("Use '/' for commands")
+	fmt.Println("Use '!' for exec local commands")
+	fmt.Println("Use Ctrl+C/Ctrl+D to exit")
+	fmt.Println()
+	ci.showHelp()
+	fmt.Println()
+	ci.printModeStatus()
+	fmt.Println()
+}
+
+func (ci *ChatInfo) startREPL() {
+	cfg := &readline.Config{
+		Prompt: _gllmSinglePrompt,
+	}
+	rl, err := readline.NewEx(cfg)
 	if err != nil {
-		service.Errorf("Error clearing context: %v\n", err)
+		fmt.Printf("Error initializing readline: %v\n", err)
 		return
 	}
-	// Empty the conversation history
-	err = ci.Conversion.Clear()
-	if err != nil {
-		service.Errorf("Error clearing context: %v\n", err)
-		return
-	}
-	// Empty attachments
-	ci.Files = []*service.FileData{}
-	fmt.Printf("Context cleared.\n")
-}
+	defer rl.Close()
 
-func (ci *ChatInfo) setTemplate(template string) {
-	if err := SetEffectiveTemplate(template); err != nil {
-		service.Warnf("%v", err)
-		fmt.Println("Ignore template prompt")
-	} else {
-		fmt.Printf("Switched to template: %s\n", template)
-	}
-}
+	// Start the REPL
+	ci.printWelcome()
+	for {
 
-func (ci *ChatInfo) setSystem(system string) {
-	if err := SetEffectiveSystemPrompt(system); err != nil {
-		service.Warnf("%v", err)
-		fmt.Println("Ignore system prompt")
-	} else {
-		fmt.Printf("Switched to system prompt: %s\n", system)
-	}
-}
+		var prompt string
+		if ci.WaitingForConfirmation {
+			// Need to confirm
+			prompt = _gllmConfirmPrompt
+		} else {
+			switch ci.InputMode {
+			case "single":
+				// Single mode
+				if len(ci.InputLines) == 0 {
+					prompt = _gllmSinglePrompt
+				} else {
+					prompt = _gllmContinuePrompt
+				}
+			case "multi":
+				// Multi mode
+				if len(ci.InputLines) == 0 {
+					prompt = _gllmMultiPrompt
+				} else {
+					prompt = _gllmContinuePrompt
+				}
+			}
+		}
+		rl.SetPrompt(prompt)
 
-func (ci *ChatInfo) setSearchEngine(engine string) {
-	switch engine {
-	case "on":
-		searchOnCmd.Run(searchCmd, []string{})
-	case "off":
-		searchOffCmd.Run(searchCmd, []string{})
-	default:
-		succeed := SetEffectSearchEngineName(engine)
-		if succeed {
-			fmt.Printf("Switched to search engine: %s\n", GetEffectSearchEngineName())
+		// In the middle of processing multi-line input
+		// Single("\") or Multi
+		haveMultiInputs := (len(ci.InputLines) > 0)
+
+		line, err := rl.Readline()
+		if err != nil { // Handle EOF or other errors
+			// Handle Ctrl+C and Handle Ctrl+D
+			if err == readline.ErrInterrupt || err == io.EOF {
+				if ci.WaitingForConfirmation || haveMultiInputs {
+					// Discard multiline or editor content
+					ci.resetInputState()
+					continue
+				} else {
+					// Quit
+					fmt.Println("\n" + _gllmFarewell)
+					break
+				}
+			}
+			fmt.Printf("Error reading line: %v\n", err)
+			continue
+		}
+
+		line = strings.TrimSpace(line)
+
+		// Handle special prefixes
+		// Don't process commands/shell commands in the middle multi inputs
+		if !ci.WaitingForConfirmation && !haveMultiInputs {
+			if ci.startWithInnerCommand(line) {
+				// / for inner commands
+				ci.handleCommand(line)
+				if ci.QuitFlag {
+					break
+				}
+				continue
+			} else if ci.startWithLocalCommand(line) {
+				// ! for shell commands
+				ci.executeShellCommand(line[1:])
+				continue
+			}
+		}
+
+		// Handle editor confirmation workflow
+		if ci.WaitingForConfirmation {
+			// we just care about the
+			ci.processEditorInput()
+			continue
+		} else {
+			switch ci.InputMode {
+			case "single":
+				ci.processSingleModeInput(line)
+			case "multi":
+				ci.processMultiModeInput(line)
+			}
+		}
+
+		// quit chat
+		if ci.QuitFlag {
+			break
 		}
 	}
 }
 
-func (ci *ChatInfo) setReferences(count string) {
-	num, err := strconv.Atoi(count)
-	if err != nil {
-		fmt.Println("Invalid number")
-		return
-	}
-	referenceFlag = num
-	fmt.Printf("Reference count set to %d\n", num)
+func (ci *ChatInfo) startWithInnerCommand(line string) bool {
+	return strings.HasPrefix(line, "/")
+}
+
+func (ci *ChatInfo) startWithLocalCommand(line string) bool {
+	return strings.HasPrefix(line, "!")
 }
 
 func (ci *ChatInfo) addAttachFiles(input string) {
@@ -525,179 +474,6 @@ func (ci *ChatInfo) detachFiles(input string) {
 	}
 }
 
-func (ci *ChatInfo) showInfo() {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-
-	sectionColor := color.New(color.FgCyan, color.Bold).SprintFunc()
-	headerColor := color.New(color.FgYellow, color.Bold).SprintFunc()
-	highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
-	keyColor := color.New(color.FgMagenta, color.Bold).SprintFunc()
-
-	printSection := func(title string) {
-		fmt.Println()
-		fullTitle := fmt.Sprintf("=== %s ===", strings.ToUpper(title))
-		lineWidth := 50
-		padding := (lineWidth - len(fullTitle)) / 2
-		if padding < 0 {
-			padding = 0
-		}
-		fmt.Printf("%s%s\n", strings.Repeat(" ", padding), sectionColor(fullTitle))
-		fmt.Println(color.New(color.FgCyan).Sprint(strings.Repeat("-", lineWidth)))
-	}
-
-	printSection("CURRENT SETTINGS")
-
-	// Basic settings
-	fmt.Fprintln(w, headerColor(" SETTING ")+"\t"+headerColor(" VALUE "))
-	fmt.Fprintln(w, headerColor("---------")+"\t"+headerColor("-------"))
-	fmt.Fprintf(w, "%s\t%s\n", keyColor("Model"), highlightColor(ci.Model))
-	fmt.Fprintf(w, "%s\t%s\n", keyColor("Search Engine"), highlightColor(GetEffectSearchEngineName()))
-	fmt.Fprintf(w, "%s\t%t\n", keyColor("Deep Think"), IsThinkEnabled())
-	fmt.Fprintf(w, "%s\t%t\n", keyColor("Embedding Tools"), AreToolsEnabled())
-	fmt.Fprintf(w, "%s\t%t\n", keyColor("MCP Servers"), AreMCPServersEnabled())
-	fmt.Fprintf(w, "%s\t%t\n", keyColor("Markdown"), IncludeMarkdown())
-	fmt.Fprintf(w, "%s\t%t\n", keyColor("Usage Metainfo"), IncludeUsageMetainfo())
-	fmt.Fprintf(w, "%s\t%s\n", keyColor("Output File"), ci.outputFile)
-	w.Flush()
-
-	// System prompt
-	printSection("SYSTEM PROMPT")
-	fmt.Printf("%s\n", GetEffectiveSystemPrompt())
-
-	// Template
-	printSection("TEMPLATE")
-	fmt.Printf("%s\n", GetEffectiveTemplate())
-
-	// Attachments
-	printSection("ATTACHMENTS")
-	if len(ci.Files) > 0 {
-		fmt.Printf("%s (%d):\n", keyColor("Attachments"), len(ci.Files))
-		for _, file := range ci.Files {
-			fmt.Printf("  - [%s]: %s\n", file.Format(), file.Path())
-		}
-	} else {
-		fmt.Println("Attachments: None")
-	}
-
-	fmt.Println(color.New(color.FgCyan, color.Bold).Sprint(strings.Repeat("=", 50)))
-}
-
-func (ci *ChatInfo) showHelp() {
-	fmt.Println("Available commands:")
-	fmt.Println("  /exit, /quit - Exit the chat session")
-	fmt.Println("  /clear, /reset - Clear conversation history")
-	fmt.Println("  /help, /? - Show this help message")
-	fmt.Println("  /info, /i - Show current settings")
-	fmt.Println("  /history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)")
-	fmt.Println("  /markdown, /m [on|off] - Switch whether to render markdown or not")
-	fmt.Println("  /mode single|multi - Switch input mode (chat(*) single, chat(#) multi - press Enter on empty line to submit)")
-	fmt.Println("  /attach, /a <filename> - Attach a file to the conversation")
-	fmt.Println("  /detach, /d <filename|all> - Detach a file from the conversation")
-	fmt.Println("  /template, /p \"<tmpl|name>\" - Change the template")
-	fmt.Println("  /system /S \"<prompt|name>\" - Change the system prompt")
-	fmt.Println("  /think, /T \"[on|off]\" - Switch whether to use deep think mode")
-	fmt.Println("  /search, /s \"<engine>[on|off]\" - Change the search engine, or switch on/off")
-	fmt.Println("  /tools, /t \"[on|off|skip|confirm]\" - Switch whether to use embedding tools, skip tools confirmation")
-	fmt.Println("  /mcp \"[on|off|list]\" - Switch whether to use MCP servers, or list available servers")
-	fmt.Println("  /reference, /r \"<num>\" - Change the search link reference count")
-	fmt.Println("  /usage, /u \"[on|off]\" - Switch whether to show token usage information")
-	fmt.Println("  /editor, /e <editor>|list - Open external editor for multi-line input")
-	fmt.Println("  /output, /o <filename> [off] - Save to output file for model responses")
-	fmt.Println("  !<command> - Execute a shell command directly (e.g. !ls -la)")
-}
-
-func (ci *ChatInfo) showHistory(num int, chars int) {
-
-	convoPath := ci.Conversion.GetPath()
-
-	// Check if conversation exists
-	if _, err := os.Stat(convoPath); os.IsNotExist(err) {
-		service.Errorf("Conversation '%s' not found.\n", convoPath)
-		return
-	}
-
-	// Read and parse the conversation file
-	data, err := os.ReadFile(convoPath)
-	if err != nil {
-		service.Errorf("error reading conversation file: %v", err)
-		return
-	}
-
-	convoName := strings.TrimSuffix(filepath.Base(convoPath), filepath.Ext(convoPath))
-	// Display conversation details
-	fmt.Printf("Name: %s\n", convoName)
-
-	switch ci.Provider {
-	case service.ModelGemini:
-		service.DisplayGeminiConversationLog(data, num, chars)
-	case service.ModelOpenChat:
-		service.DisplayOpenAIConversationLog(data, num, chars)
-	case service.ModelOpenAI, service.ModelMistral, service.ModelOpenAICompatible:
-		service.DisplayOpenAIConversationLog(data, num, chars)
-	default:
-		fmt.Println("Unknown provider")
-	}
-}
-
-func (ci *ChatInfo) setUseTools(useTools string) {
-
-	switch useTools {
-	// Set useTools on or off
-	case "on":
-		SwitchUseTools(useTools)
-	case "off":
-		SwitchUseTools(useTools)
-
-		// Set whether or not to skip tools confirmation
-	case "confirm":
-		confirmToolsFlag = false
-		fmt.Print("Tool operations would need confirmation\n")
-	case "skip":
-		confirmToolsFlag = true
-		fmt.Print("Tool confirmation would skip\n")
-
-	default:
-		toolsCmd.Run(toolsCmd, nil)
-	}
-}
-
-func (ci *ChatInfo) setUseMCP(useMCP string) {
-	switch useMCP {
-	case "on":
-		SwitchMCP(useMCP)
-	case "off":
-		SwitchMCP(useMCP)
-	case "list":
-		mcpListCmd.Run(mcpListCmd, []string{})
-	default:
-		mcpCmd.Run(mcpCmd, []string{})
-	}
-}
-
-func (ci *ChatInfo) setOutputFile(path string) {
-	switch path {
-	case "":
-		if ci.outputFile == "" {
-			fmt.Println("No output file is currently set")
-		} else {
-			fmt.Printf("Current output file: %s\n", ci.outputFile)
-		}
-	case "off":
-		ci.outputFile = ""
-		fmt.Println("No output file")
-	default:
-		filename := strings.TrimSpace(path)
-		err := validFilePath(filename, false)
-		if err != nil {
-			service.Warnf("%v", err)
-			return
-		}
-		// If we get here, the file can be created/overwritten
-		ci.outputFile = filename
-		fmt.Printf("Output file set to: %s\n", filename)
-	}
-}
-
 func (ci *ChatInfo) processSingleModeInput(line string) {
 	// Single mode: process immediately, but support \ for line continuation
 	if strings.HasSuffix(line, "\\") {
@@ -710,7 +486,7 @@ func (ci *ChatInfo) processSingleModeInput(line string) {
 	if len(ci.InputLines) > 0 {
 		ci.InputLines = append(ci.InputLines, line)
 		input := strings.Join(ci.InputLines, "\n")
-		ci.InputLines = nil
+		ci.resetInputState()
 		ci.callAgent(input)
 		return
 	}
@@ -728,7 +504,7 @@ func (ci *ChatInfo) processMultiModeInput(line string) {
 		if len(ci.InputLines) > 0 {
 			// Submit accumulated input
 			input := strings.Join(ci.InputLines, "\n")
-			ci.InputLines = nil
+			ci.resetInputState()
 			ci.callAgent(input)
 			return
 		}
@@ -769,8 +545,7 @@ func (ci *ChatInfo) handleEditorCommand() {
 	content := string(recv)
 	content = strings.Trim(content, " \n")
 	if len(content) == 0 {
-		ci.InputLines = nil
-		ci.WaitingForConfirmation = false
+		ci.resetInputState()
 		fmt.Println("No content.")
 		return
 	}
@@ -789,11 +564,10 @@ func (ci *ChatInfo) handleEditorCommand() {
 	fmt.Println()
 }
 
-func (ci *ChatInfo) handleEditorConfirmation() {
+func (ci *ChatInfo) processEditorInput() {
 	// User pressed Enter - send content
 	input := strings.Join(ci.InputLines, "\n")
-	ci.InputLines = nil
-	ci.WaitingForConfirmation = false
+	ci.resetInputState()
 	ci.callAgent(input)
 }
 
@@ -808,6 +582,11 @@ func (ci *ChatInfo) handleEditor() {
 	}
 }
 
+func (ci *ChatInfo) resetInputState() {
+	ci.InputLines = nil
+	ci.WaitingForConfirmation = false
+}
+
 func (ci *ChatInfo) printModeStatus() {
 	if ci.InputMode == "single" {
 		color.New(color.FgGreen, color.Bold).Printf("Single-line mode: ")
@@ -818,173 +597,6 @@ func (ci *ChatInfo) printModeStatus() {
 		color.New(color.FgCyan).Printf("chat(#)> ")
 		color.New(color.FgYellow).Println("- Press Enter to add lines, press Enter on empty line to submit")
 	}
-}
-
-func (ci *ChatInfo) handleCommand(cmd string) {
-	// Split the command into parts
-	parts := strings.SplitN(cmd, " ", 3)
-	command := parts[0]
-	switch command {
-	case "/exit", "/quit":
-		ci.QuitFlag = true
-		fmt.Println("Exiting chat session")
-		return
-
-	case "/help", "/?":
-		ci.showHelp()
-
-	case "/history", "/h":
-		num := 20
-		chars := 200
-		// Parse arguments
-		if len(parts) > 1 {
-			if n, err := strconv.Atoi(parts[1]); err == nil && n > 0 {
-				num = n
-			}
-		}
-		if len(parts) > 2 {
-			if c, err := strconv.Atoi(parts[2]); err == nil && c > 0 {
-				chars = c
-			}
-		}
-		ci.showHistory(num, chars)
-
-	case "/markdown", "/m":
-		if len(parts) < 2 {
-			markdownCmd.Run(markdownCmd, []string{})
-			return
-		}
-		mark := strings.TrimSpace(parts[1])
-		SwitchMarkdown(mark)
-
-	case "/clear", "/reset":
-		ci.clearContext()
-
-	case "/template", "/p":
-		if len(parts) < 2 {
-			templateListCmd.Run(templateListCmd, []string{})
-			return
-		}
-		// Join all remaining parts as they might contain spaces
-		tmpl := strings.Join(parts[1:], " ")
-		tmpl = strings.TrimSpace(tmpl)
-		ci.setTemplate(tmpl)
-
-	case "/system", "/S":
-		if len(parts) < 2 {
-			systemListCmd.Run(systemListCmd, []string{})
-			return
-		}
-		sysPrompt := strings.Join(parts[1:], " ")
-		sysPrompt = strings.TrimSpace(sysPrompt)
-		ci.setSystem(sysPrompt)
-
-	case "/search", "/s":
-		if len(parts) < 2 {
-			searchCmd.Run(searchCmd, []string{})
-			return
-		}
-		engine := strings.TrimSpace(parts[1])
-		ci.setSearchEngine(engine)
-
-	case "/tools", "/t":
-		if len(parts) < 2 {
-			toolsCmd.Run(toolsCmd, []string{})
-			return
-		}
-		tools := strings.TrimSpace(parts[1])
-		ci.setUseTools(tools)
-
-	case "/mcp":
-		if len(parts) < 2 {
-			mcpCmd.Run(mcpCmd, []string{})
-			return
-		}
-		mcp := strings.TrimSpace(parts[1])
-		ci.setUseMCP(mcp)
-
-	case "/think", "/T":
-		if len(parts) < 2 {
-			thinkCmd.Run(thinkCmd, []string{})
-			return
-		} else {
-			mode := strings.TrimSpace(parts[1])
-			SwitchThinkMode(mode)
-		}
-
-	case "/reference", "/r":
-		if len(parts) < 2 {
-			fmt.Println("Please specify a number")
-			return
-		}
-		count := strings.TrimSpace(parts[1])
-		ci.setReferences(count)
-
-	case "/usage", "/u":
-		if len(parts) < 2 {
-			usageCmd.Run(usageCmd, []string{})
-			return
-		}
-		usage := strings.TrimSpace(parts[1])
-		SwitchUsageMetainfo(usage)
-
-	case "/attach", "/a":
-		if len(parts) < 2 {
-			fmt.Println("Please specify a file path")
-			return
-		}
-		ci.addAttachFiles(cmd)
-
-	case "/detach", "/d":
-		if len(parts) < 2 {
-			fmt.Println("Please specify a file path")
-			return
-		}
-		ci.detachFiles(cmd)
-
-	case "/editor", "/e":
-		if len(parts) < 2 {
-			ci.handleEditor()
-			return
-		}
-		arg := strings.TrimSpace(parts[1])
-		editorCmd.Run(editorCmd, []string{arg})
-
-	case "/output", "/o":
-		if len(parts) < 2 {
-			ci.setOutputFile("")
-		} else {
-			filename := strings.TrimSpace(parts[1])
-			ci.setOutputFile(filename)
-		}
-
-	case "/mode":
-		if len(parts) < 2 {
-			fmt.Printf("Current input mode: %s\n", ci.InputMode)
-			return
-		}
-		mode := strings.TrimSpace(parts[1])
-		if mode == "single" || mode == "multi" {
-			if err := SetEffectiveChatMode(mode); err != nil {
-				service.Errorf("Failed to save chat mode: %v\n", err)
-				return
-			}
-			ci.InputMode = mode
-			fmt.Printf("Switched to %s mode\n", mode)
-			ci.printModeStatus()
-		} else {
-			fmt.Println("Invalid mode. Use 'single' or 'multi'")
-		}
-
-	case "/info", "/i":
-		// Show current model and conversation stats
-		ci.showInfo()
-
-	default:
-		fmt.Printf("Unknown command: %s\n", command)
-	}
-
-	// Continue the REPL
 }
 
 func (ci *ChatInfo) callAgent(input string) {
@@ -1054,6 +666,8 @@ func (ci *ChatInfo) callAgent(input string) {
 	SetEffectiveSystemPrompt("")
 	// Reset the template
 	SetEffectiveTemplate("")
+	// Reset the input lines
+	ci.resetInputState()
 }
 
 func (ci *ChatInfo) executeShellCommand(command string) {

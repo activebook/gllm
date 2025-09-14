@@ -35,7 +35,7 @@ Examples:
 			return
 		}
 
-		if args[0] == "list" {
+		if args[0] == "list" || args[0] == "pr" {
 			listAvailableEditors()
 		} else {
 			// Set editor
@@ -46,9 +46,10 @@ Examples:
 
 // editorListCmd represents the editor list subcommand
 var editorListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all available text editors",
-	Long:  `List all available text editors on the system with their installation status.`,
+	Use:     "list",
+	Aliases: []string{"ls", "pr"},
+	Short:   "List all available text editors",
+	Long:    `List all available text editors on the system with their installation status.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		listAvailableEditors()
 	},
