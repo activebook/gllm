@@ -139,7 +139,10 @@ Special commands:
 var ()
 
 const (
-	_gllmChatPrompt = "\033[96mgllm>\033[0m "
+	_gllmSinglePrompt   = "\033[96mchat(-)>\033[0m "
+	_gllmMultiPrompt    = "\033[96mchat(≡)>\033[0m "
+	_gllmContinuePrompt = ">> "
+	_gllmFarewell       = "Goodbye!"
 )
 
 func init() {
@@ -167,36 +170,49 @@ func init() {
 func (ci *ChatInfo) startREPL() {
 	fmt.Println("Welcome to GLLM Interactive Chat")
 	fmt.Println("Type 'exit' or 'quit' to end the session, or '/help' for commands")
-	fmt.Println("Use '\\' at the end of a line for multiline input")
+	fmt.Println("Multi-line mode: Press Enter to add lines, press Enter on empty line to submit")
+	fmt.Println("Use '/mode single' for immediate submission on Enter")
 	fmt.Println("Use '/' for commands")
 	ci.showHelp()
 	fmt.Println()
+	ci.printModeStatus()
+	fmt.Println()
 
-	rl, err := readline.New(_gllmChatPrompt)
+	cfg := &readline.Config{
+		Prompt: _gllmMultiPrompt,
+	}
+	rl, err := readline.NewEx(cfg)
 	if err != nil {
 		fmt.Printf("Error initializing readline: %v\n", err)
 		return
 	}
 	defer rl.Close()
 
-	var inputLines []string
-	multilineMode := false
-
 	for {
-		prompt := _gllmChatPrompt
-		if multilineMode {
-			prompt = "... "
+		var prompt string
+		if ci.InputMode == "single" {
+			if len(ci.InputLines) == 0 {
+				prompt = _gllmSinglePrompt
+			} else {
+				prompt = _gllmContinuePrompt
+			}
+		} else {
+			if len(ci.InputLines) == 0 {
+				prompt = _gllmMultiPrompt
+			} else {
+				prompt = _gllmContinuePrompt
+			}
 		}
 		rl.SetPrompt(prompt)
 
 		line, err := rl.Readline()
 		if err != nil { // Handle EOF or other errors
 			if err == readline.ErrInterrupt { // Handle Ctrl+C
-				fmt.Println("\nGoodbye!")
+				fmt.Println("\n" + _gllmFarewell)
 				break
 			}
 			if err == io.EOF { // Handle Ctrl+D
-				fmt.Println("\nGoodbye!")
+				fmt.Println("\n" + _gllmFarewell)
 				break
 			}
 			fmt.Printf("Error reading line: %v\n", err)
@@ -205,31 +221,72 @@ func (ci *ChatInfo) startREPL() {
 
 		line = strings.TrimSpace(line)
 
-		// Check if line ends with '\' for multiline input
-		if strings.HasSuffix(line, "\\") {
-			multilineMode = true
-			inputLines = append(inputLines, strings.TrimSuffix(line, "\\"))
+		// Handle commands immediately in both modes
+		if strings.HasPrefix(line, "/") {
+			ci.handleCommand(line)
+			if ci.QuitFlag {
+				break
+			}
 			continue
 		}
 
-		// Add the final line and process the input
-		inputLines = append(inputLines, line)
-		input := strings.Join(inputLines, "\n")
-		inputLines = nil // Reset for the next input
-		multilineMode = false
-
-		if input == "exit" || input == "quit" {
-			fmt.Println("Goodbye!")
-			break
-		}
-
-		if input == "" {
+		// Handle shell commands immediately in both modes
+		if strings.HasPrefix(line, "!") {
+			ci.executeShellCommand(line[1:])
 			continue
 		}
 
-		ci.handleInput(input)
-		if ci.QuitFlag {
-			break
+		if ci.InputMode == "single" {
+			// Single mode: process immediately, but support \ for line continuation
+			if strings.HasSuffix(line, "\\") {
+				// Line continuation: accumulate until no \
+				ci.InputLines = append(ci.InputLines, strings.TrimSuffix(line, "\\"))
+				continue
+			} else {
+				// End of input: combine accumulated lines if any
+				if len(ci.InputLines) > 0 {
+					ci.InputLines = append(ci.InputLines, line)
+					input := strings.Join(ci.InputLines, "\n")
+					ci.InputLines = nil
+					if input == "exit" || input == "quit" {
+						fmt.Println(_gllmFarewell)
+						break
+					}
+					ci.callAgent(input)
+					if ci.QuitFlag {
+						break
+					}
+				} else {
+					// Single line input
+					if line == "exit" || line == "quit" {
+						fmt.Println(_gllmFarewell)
+						break
+					}
+					if line == "" {
+						continue
+					}
+					ci.callAgent(line)
+					if ci.QuitFlag {
+						break
+					}
+				}
+			}
+		} else {
+			// Multi mode: accumulate lines, submit on empty line
+			if line == "" {
+				if len(ci.InputLines) > 0 {
+					// Submit accumulated input
+					input := strings.Join(ci.InputLines, "\n")
+					ci.InputLines = nil
+					ci.callAgent(input)
+					if ci.QuitFlag {
+						break
+					}
+				}
+			} else {
+				// Non-empty line: add to accumulation
+				ci.InputLines = append(ci.InputLines, line)
+			}
 		}
 	}
 }
@@ -242,6 +299,8 @@ type ChatInfo struct {
 	QuitFlag      bool
 	maxRecursions int
 	outputFile    string
+	InputMode     string
+	InputLines    []string
 }
 
 func buildChatInfo(files []*service.FileData) *ChatInfo {
@@ -275,26 +334,10 @@ func buildChatInfo(files []*service.FileData) *ChatInfo {
 		Conversion:    cm,
 		QuitFlag:      false,
 		maxRecursions: mr,
+		InputMode:     GetEffectiveChatMode(),
+		InputLines:    []string{},
 	}
 	return &ci
-}
-
-func (ci *ChatInfo) handleInput(input string) {
-
-	// Check if it's a command
-	if strings.HasPrefix(input, "/") {
-		ci.handleCommand(input)
-		return
-	}
-
-	// Check if it's a shell command
-	if strings.HasPrefix(input, "!") {
-		ci.executeShellCommand(input[1:])
-		return
-	}
-
-	// Process as normal LLM query...
-	ci.callAgent(input)
 }
 
 func (ci *ChatInfo) clearContext() {
@@ -558,6 +601,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /info, /i - Show current settings")
 	fmt.Println("  /history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)")
 	fmt.Println("  /markdown, /m [on|off] - Switch whether to render markdown or not")
+	fmt.Println("  /mode single|multi - Switch input mode (chat(-) single, chat(≡) multi - press Enter on empty line to submit)")
 	fmt.Println("  /attach, /a <filename> - Attach a file to the conversation")
 	fmt.Println("  /detach, /d <filename|all> - Detach a file from the conversation")
 	fmt.Println("  /template, /p \"<tmpl|name>\" - Change the template")
@@ -661,6 +705,18 @@ func (ci *ChatInfo) setOutputFile(path string) {
 		// If we get here, the file can be created/overwritten
 		ci.outputFile = filename
 		fmt.Printf("Output file set to: %s\n", filename)
+	}
+}
+
+func (ci *ChatInfo) printModeStatus() {
+	if ci.InputMode == "single" {
+		color.New(color.FgGreen, color.Bold).Printf("Single mode: ")
+		color.New(color.FgCyan).Printf("chat(-)> ")
+		color.New(color.FgYellow).Println("- Press Enter to submit immediately")
+	} else {
+		color.New(color.FgGreen, color.Bold).Printf("Multi mode: ")
+		color.New(color.FgCyan).Printf("chat(≡)> ")
+		color.New(color.FgYellow).Println("- Press Enter to add lines, press Enter on empty line to submit")
 	}
 }
 
@@ -794,6 +850,24 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 			ci.setOutputFile(filename)
 		}
 
+	case "/mode":
+		if len(parts) < 2 {
+			fmt.Printf("Current input mode: %s\n", ci.InputMode)
+			return
+		}
+		mode := strings.TrimSpace(parts[1])
+		if mode == "single" || mode == "multi" {
+			if err := SetEffectiveChatMode(mode); err != nil {
+				service.Errorf("Failed to save chat mode: %v\n", err)
+				return
+			}
+			ci.InputMode = mode
+			fmt.Printf("Switched to %s mode\n", mode)
+			ci.printModeStatus()
+		} else {
+			fmt.Println("Invalid mode. Use 'single' or 'multi'")
+		}
+
 	case "/info", "/i":
 		// Show current model and conversation stats
 		ci.showInfo()
@@ -906,4 +980,26 @@ func (ci *ChatInfo) executeShellCommand(command string) {
 		fmt.Printf(cmdOutputColor+"%s\n"+resetColor, output)
 	}
 	fmt.Print(resetColor) // Reset color after command output
+}
+
+// GetEffectiveChatMode returns the chat input mode to use
+func GetEffectiveChatMode() string {
+	mode := viper.GetString("chat.mode")
+	if mode == "" {
+		mode = "multi" // Default to multi mode
+	}
+	return mode
+}
+
+// SetEffectiveChatMode sets the chat input mode
+func SetEffectiveChatMode(mode string) error {
+	if mode != "single" && mode != "multi" {
+		return fmt.Errorf("invalid chat mode: %s (must be 'single' or 'multi')", mode)
+	}
+
+	viper.Set("chat.mode", mode)
+	if err := writeConfig(); err != nil {
+		return fmt.Errorf("failed to save chat mode: %w", err)
+	}
+	return nil
 }
