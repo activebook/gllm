@@ -333,7 +333,7 @@ func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Functi
 	var args string
 	if call.Name == "edit_file" || call.Name == "write_file" {
 		// Don't show content(the modified content could be too long)
-		args = formatToolCallArguments(call.Args, []string{"content"})
+		args = formatToolCallArguments(call.Args, []string{"content", "edits"})
 	} else {
 		args = formatToolCallArguments(call.Args, []string{})
 	}

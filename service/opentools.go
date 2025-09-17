@@ -627,9 +627,10 @@ func getOpenEmbeddingTools() []*OpenTool {
 
 	editFileFunc := OpenFunctionDefinition{
 		Name: "edit_file",
-		Description: "Overwrite a file's entire content with new content." +
-			" Use this to update source code, config files, or any text file — especially when you need to make substantial or precise changes to existing content." +
-			" If the user cancels the confirmation, just return the discard message, don't attempt to repeat the modified content.",
+		Description: "Apply targeted edits to a file using search-replace operations. " +
+			"Use this for precise code modifications, refactoring, or content updates. " +
+			"Provide search-replace blocks to specify exactly what to change. " +
+			"Each edit can modify, add, or delete specific code sections safely.",
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -637,18 +638,32 @@ func getOpenEmbeddingTools() []*OpenTool {
 					"type":        "string",
 					"description": "The path to the file to edit.",
 				},
-				"content": map[string]interface{}{
-					"type":        "string",
-					"description": "The complete new content to replace the entire file with.",
+				"edits": map[string]interface{}{
+					"type": "array",
+					"items": map[string]interface{}{
+						"type": "object",
+						"properties": map[string]interface{}{
+							"search": map[string]interface{}{
+								"type":        "string",
+								"description": "The exact text to find and replace. Include sufficient context for uniqueness.",
+							},
+							"replace": map[string]interface{}{
+								"type":        "string",
+								"description": "The replacement text. Use empty string to delete the search text.",
+							},
+						},
+						"required": []string{"search", "replace"},
+					},
+					"description": "Array of search-replace operations to apply to the file.",
 				},
 				"need_confirm": map[string]interface{}{
 					"type": "boolean",
-					"description": "Specifies whether to prompt the user for confirmation before editing the file. " +
+					"description": "Specifies whether to show diff and prompt for confirmation before editing the file. " +
 						"This should always be true for safety.",
 					"default": true,
 				},
 			},
-			"required": []string{"path", "content"},
+			"required": []string{"path", "edits"},
 		},
 	}
 	editFileTool := OpenTool{
@@ -966,7 +981,6 @@ func (op *OpenProcessor) OpenAIWriteFileToolCall(toolCall openai.ToolCall, argsM
 // }
 
 func (op *OpenProcessor) OpenAIEditFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-
 	response, err := editFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
 	if err != nil {
 		return openai.ChatCompletionMessage{}, err

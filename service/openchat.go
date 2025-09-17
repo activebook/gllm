@@ -434,7 +434,7 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	var args string
 	if toolCall.Function.Name == "edit_file" || toolCall.Function.Name == "write_file" {
 		// Don't show content(the modified content could be too long)
-		args = formatToolCallArguments(argsMap, []string{"content"})
+		args = formatToolCallArguments(argsMap, []string{"content", "edits"})
 	} else {
 		args = formatToolCallArguments(argsMap, []string{})
 	}

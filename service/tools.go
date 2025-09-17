@@ -643,22 +643,44 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, s
 	}
 
 	// Get the edits to apply
-	content, ok := (*argsMap)["content"].(string)
+	editsInterface, ok := (*argsMap)["edits"].([]interface{})
 	if !ok {
-		return "", fmt.Errorf("content not found in arguments or not an array")
+		return "", fmt.Errorf("edits not found in arguments or not an array")
 	}
 
-	// If confirmation is needed, ask the user before proceeding
-	if needConfirm && !toolsUse.AutoApprove {
-		// Read the file
-		origin, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Sprintf("Error reading file %s: %v", path, err), nil
-		}
-		originalContent := string(origin)
+	// Read the original file content
+	originalContent, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Sprintf("Error reading file %s: %v", path, err), nil
+	}
+	content := string(originalContent)
 
+	// Apply all search-replace operations
+	modifiedContent := content
+	for _, editInterface := range editsInterface {
+		editMap, ok := editInterface.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		searchText, ok := editMap["search"].(string)
+		if !ok {
+			continue
+		}
+
+		replaceText, ok := editMap["replace"].(string)
+		if !ok {
+			replaceText = "" // Default to empty string for deletions
+		}
+
+		// Apply the search-replace operation
+		modifiedContent = strings.ReplaceAll(modifiedContent, searchText, replaceText)
+	}
+
+	// If confirmation is needed, show the diff and ask the user
+	if needConfirm && !toolsUse.AutoApprove {
 		// Show the diff
-		diff := Diff(originalContent, content, "", "", 3)
+		diff := Diff(content, modifiedContent, "", "", 3)
 		showDiff(diff)
 
 		// Response with a prompt to let user confirm
@@ -672,8 +694,8 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, s
 		}
 	}
 
-	// Write the file
-	err := os.WriteFile(path, []byte(content), 0644)
+	// Write the modified content back to the file
+	err = os.WriteFile(path, []byte(modifiedContent), 0644)
 	if err != nil {
 		return fmt.Sprintf("Error writing file %s: %v", path, err), nil
 	}
