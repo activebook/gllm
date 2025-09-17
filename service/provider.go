@@ -31,7 +31,7 @@ func DetectModelProvider(endPoint string) ModelProvider {
 	}
 
 	// Chinese models and others
-	chn_domains := []string{".cn", "aliyuncs.com", "volces.com", "tencentcloud.com", "moonshot.cn", "moonshot.ai", "bigmodel.cn", "z.ai", "minimax.io", "minimax.com", "baidu.com", "deepseek.com"}
+	chn_domains := []string{".cn", "aliyuncs.com", "volces.com", "tencentcloud.com", "longcat.chat", "moonshot.cn", "moonshot.ai", "bigmodel.cn", "z.ai", "minimax.io", "minimax.com", "baidu.com", "deepseek.com"}
 	for _, domain := range chn_domains {
 		if strings.Contains(endPoint, domain) {
 			return ModelOpenChat
