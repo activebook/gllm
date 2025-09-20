@@ -175,48 +175,16 @@ gllm agent add research --model gemini-pro --search google --tools on --template
 			agentConfig["search"] = "" // explicit empty default
 		}
 
-		// Handle template - check if it's a reference or plain text
+		// Store template as-is (lazy resolution will happen during switch)
 		if template != "" {
-			// If template contains spaces, tabs, or newlines, treat as plain text
-			// Otherwise, treat as a reference to a named template
-			if strings.ContainsAny(template, " \t\n") {
-				// Plain text
-				agentConfig["template"] = template
-			} else {
-				// Reference to a named template
-				templates := viper.GetStringMapString("templates")
-				if templateContent, exists := templates[template]; exists {
-					// Valid template reference - store the actual content
-					agentConfig["template"] = templateContent
-				} else {
-					// Not found, but store it anyway as the user might have intended plain text
-					// This maintains backward compatibility
-					agentConfig["template"] = template
-				}
-			}
+			agentConfig["template"] = template
 		} else {
 			agentConfig["template"] = "" // explicit empty default
 		}
 
-		// Handle system prompt - check if it's a reference or plain text
+		// Store system prompt as-is (lazy resolution will happen during switch)
 		if sysPrompt != "" {
-			// If system prompt contains spaces, tabs, or newlines, treat as plain text
-			// Otherwise, treat as a reference to a named system prompt
-			if strings.ContainsAny(sysPrompt, " \t\n") {
-				// Plain text
-				agentConfig["system_prompt"] = sysPrompt
-			} else {
-				// Reference to a named system prompt
-				sysPrompts := viper.GetStringMapString("system_prompts")
-				if sysPromptContent, exists := sysPrompts[sysPrompt]; exists {
-					// Valid system prompt reference - store the actual content
-					agentConfig["system_prompt"] = sysPromptContent
-				} else {
-					// Not found, but store it anyway as the user might have intended plain text
-					// This maintains backward compatibility
-					agentConfig["system_prompt"] = sysPrompt
-				}
-			}
+			agentConfig["system_prompt"] = sysPrompt
 		} else {
 			agentConfig["system_prompt"] = "" // explicit empty default
 		}
@@ -333,47 +301,15 @@ gllm agent set research --name newresearch --model gpt4`,
 		}
 		// If search is empty string, we don't add it to the config (meaning no search engine)
 
-		// Handle template - check if it's a reference or plain text
+		// Store template as-is (lazy resolution will happen during switch)
 		if template != "" {
-			// If template contains spaces, tabs, or newlines, treat as plain text
-			// Otherwise, treat as a reference to a named template
-			if strings.ContainsAny(template, " \t\n") {
-				// Plain text
-				agentConfig["template"] = template
-			} else {
-				// Reference to a named template
-				templates := viper.GetStringMapString("templates")
-				if templateContent, exists := templates[template]; exists {
-					// Valid template reference - store the actual content
-					agentConfig["template"] = templateContent
-				} else {
-					// Not found, but store it anyway as the user might have intended plain text
-					// This maintains backward compatibility
-					agentConfig["template"] = template
-				}
-			}
+			agentConfig["template"] = template
 			updated = true
 		}
 
-		// Handle system prompt - check if it's a reference or plain text
+		// Store system prompt as-is (lazy resolution will happen during switch)
 		if sysPrompt != "" {
-			// If system prompt contains spaces, tabs, or newlines, treat as plain text
-			// Otherwise, treat as a reference to a named system prompt
-			if strings.ContainsAny(sysPrompt, " \t\n") {
-				// Plain text
-				agentConfig["system_prompt"] = sysPrompt
-			} else {
-				// Reference to a named system prompt
-				sysPrompts := viper.GetStringMapString("system_prompts")
-				if sysPromptContent, exists := sysPrompts[sysPrompt]; exists {
-					// Valid system prompt reference - store the actual content
-					agentConfig["system_prompt"] = sysPromptContent
-				} else {
-					// Not found, but store it anyway as the user might have intended plain text
-					// This maintains backward compatibility
-					agentConfig["system_prompt"] = sysPrompt
-				}
-			}
+			agentConfig["system_prompt"] = sysPrompt
 			updated = true
 		}
 

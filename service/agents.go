@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -214,9 +215,27 @@ func SwitchToAgent(name string) error {
 		return err
 	}
 
-	// Copy agent config to main agent section
+	// Copy agent config to main agent section with lazy resolution
 	for key, value := range agentConfig {
-		viper.Set("agent."+key, value)
+		if key == "template" {
+			if templateStr, ok := value.(string); ok {
+				// Resolve template reference lazily
+				resolvedTemplate := resolveTemplateReference(templateStr)
+				viper.Set("agent."+key, resolvedTemplate)
+			} else {
+				viper.Set("agent."+key, value)
+			}
+		} else if key == "system_prompt" {
+			if sysPromptStr, ok := value.(string); ok {
+				// Resolve system prompt reference lazily
+				resolvedSysPrompt := resolveSystemPromptReference(sysPromptStr)
+				viper.Set("agent."+key, resolvedSysPrompt)
+			} else {
+				viper.Set("agent."+key, value)
+			}
+		} else {
+			viper.Set("agent."+key, value)
+		}
 	}
 
 	// Write the config file
@@ -291,4 +310,40 @@ func GetCurrentAgentName() string {
 	// Users can determine this by comparing agent.* values with agents.* values
 	// This could be enhanced later if needed
 	return "unknown"
+}
+
+// resolveTemplateReference resolves a template reference to actual content lazily
+// If the template contains spaces/tabs/newlines, treat as plain text
+// Otherwise, try to resolve as a reference to a named template
+func resolveTemplateReference(template string) string {
+	if template == "" {
+		return ""
+	}
+
+	// Check if it's a reference (no spaces/tabs/newlines)
+	if !strings.ContainsAny(template, " \t\n") {
+		templates := viper.GetStringMapString("templates")
+		if templateContent, exists := templates[template]; exists {
+			return templateContent // Use resolved content
+		}
+	}
+	return template // Use as plain text
+}
+
+// resolveSystemPromptReference resolves a system prompt reference to actual content lazily
+// If the system prompt contains spaces/tabs/newlines, treat as plain text
+// Otherwise, try to resolve as a reference to a named system prompt
+func resolveSystemPromptReference(sysPrompt string) string {
+	if sysPrompt == "" {
+		return ""
+	}
+
+	// Check if it's a reference (no spaces/tabs/newlines)
+	if !strings.ContainsAny(sysPrompt, " \t\n") {
+		sysPrompts := viper.GetStringMapString("system_prompts")
+		if sysPromptContent, exists := sysPrompts[sysPrompt]; exists {
+			return sysPromptContent // Use resolved content
+		}
+	}
+	return sysPrompt // Use as plain text
 }
