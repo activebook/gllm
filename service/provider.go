@@ -16,25 +16,47 @@ const (
 	ModelUnknown          ModelProvider = "unknown"
 )
 
+// Provider domains mapping for better performance and maintainability
+var providerDomains = map[string]ModelProvider{
+	// Google domains
+	"googleapis.com": ModelGemini,
+	"google.com":     ModelGemini,
+	"ai.google.dev":  ModelGemini,
+
+	// Mistral domains
+	"mistral.ai":  ModelMistral,
+	"mistral.com": ModelMistral,
+	"codestral":   ModelMistral,
+	"magistral":   ModelMistral,
+
+	// Chinese/Other domains
+	".cn":              ModelOpenChat,
+	"aliyuncs.com":     ModelOpenChat,
+	"volces.com":       ModelOpenChat,
+	"tencentcloud.com": ModelOpenChat,
+	"longcat.chat":     ModelOpenChat,
+	"moonshot.cn":      ModelOpenChat,
+	"moonshot.ai":      ModelOpenChat,
+	"bigmodel.cn":      ModelOpenChat,
+	"z.ai":             ModelOpenChat,
+	"minimax.io":       ModelOpenChat,
+	"minimax.com":      ModelOpenChat,
+	"baidu.com":        ModelOpenChat,
+	"deepseek.com":     ModelOpenChat,
+}
+
 func DetectModelProvider(endPoint string) ModelProvider {
-	goo_domains := []string{"googleapis.com", "google.com"}
-	for _, domain := range goo_domains {
-		if strings.Contains(endPoint, domain) {
-			return ModelGemini
-		}
-	}
-	mistral_domains := []string{"mistral.ai", "mistral.com", "codestral", "magistral"}
-	for _, domain := range mistral_domains {
-		if strings.Contains(endPoint, domain) {
-			return ModelMistral
-		}
+	if endPoint == "" {
+		return ModelUnknown
 	}
 
-	// Chinese models and others
-	chn_domains := []string{".cn", "aliyuncs.com", "volces.com", "tencentcloud.com", "longcat.chat", "moonshot.cn", "moonshot.ai", "bigmodel.cn", "z.ai", "minimax.io", "minimax.com", "baidu.com", "deepseek.com"}
-	for _, domain := range chn_domains {
+	// Normalize endpoint to lowercase for case-insensitive matching
+	endPoint = strings.ToLower(endPoint)
+
+	// Check for exact matches first (more specific)
+	for domain, provider := range providerDomains {
 		if strings.Contains(endPoint, domain) {
-			return ModelOpenChat
+			return provider
 		}
 	}
 
