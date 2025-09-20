@@ -215,19 +215,6 @@ func validateWorkflow(agentsSlice []interface{}) error {
 	return nil
 }
 
-// convertUserInputToBool converts user-friendly strings to boolean values
-// Handles: on/off, enable/disable, true/false, 1/0
-func convertUserInputToBool(input string) (bool, error) {
-	switch strings.ToLower(strings.TrimSpace(input)) {
-	case "on", "enable", "enabled", "true", "1":
-		return true, nil
-	case "off", "disable", "disabled", "false", "0", "":
-		return false, nil
-	default:
-		return false, fmt.Errorf("invalid boolean value: %s", input)
-	}
-}
-
 var workflowAddCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Add a new agent to workflow",

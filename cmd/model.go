@@ -20,7 +20,7 @@ func init() {
 	modelCmd.AddCommand(modelInfoCmd)
 	modelCmd.AddCommand(modelRemoveCmd)
 	modelCmd.AddCommand(modelClearCmd)
-	modelCmd.AddCommand(modelDefaultCmd)
+	modelCmd.AddCommand(modelSwitchCmd)
 
 	// Add flags to the list command
 	modelListCmd.Flags().BoolP("verbose", "v", false, "Show model names and their content")
@@ -58,22 +58,15 @@ func decodeModelName(name string) string {
 	return strings.ReplaceAll(name, "#dot#", ".")
 }
 
-// configCmd represents the base command when called without any subcommands
+// modelCmd represents the base command when called without any subcommands
 var modelCmd = &cobra.Command{
 	Use:     "model",
 	Aliases: []string{"md"}, // Optional alias
 	Short:   "Manage gllm model configuration",
 	Long:    `The 'gllm model' command allows you to manage your configured large language models(llms).`,
-	// Run: func(cmd *cobra.Command, args []string) {
-	// 	fmt.Println("Use 'gllm config [subcommand] --help' for more information.")
-	// },
-	// Suggest showing help if 'gllm config' is run without subcommand
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// If no subcommand is given, show help
-		if len(args) == 0 {
-			return cmd.Help()
-		}
-		return cmd.Help()
+	Run: func(cmd *cobra.Command, args []string) {
+		// Simply delegate to the list command for consistency
+		modelListCmd.Run(cmd, args)
 	},
 }
 
@@ -123,9 +116,9 @@ var modelListCmd = &cobra.Command{
 			}
 		}
 		if defaultModel != "" {
-			fmt.Println("\n(*) Indicates the default model.")
+			fmt.Println("\n(*) Indicates the current model.")
 		} else {
-			fmt.Println("\nNo default model set. Use 'gllm model default <name>'.")
+			fmt.Println("\nNo model selected. Use 'gllm model switch <name>' to select one.")
 			fmt.Println("The first available model will be used if needed.")
 		}
 	},
@@ -376,29 +369,32 @@ gllm model clear --force`,
 	},
 }
 
-var modelDefaultCmd = &cobra.Command{
-	Use:     "default NAME",
-	Aliases: []string{"def"},
-	Short:   "Set the default model to use",
-	Args:    cobra.ExactArgs(1),
+var modelSwitchCmd = &cobra.Command{
+	Use:     "switch NAME",
+	Aliases: []string{"sw", "select"},
+	Short:   "Switch to a different model",
+	Long: `Switch to a different model configuration. This will change your current model
+to the specified one for all subsequent operations.`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 		encodedName := encodeModelName(name)
 		models := viper.GetStringMap("models")
 
-		// Check if the model exists before setting it as default
+		// Check if the model exists before switching to it
 		if _, exists := models[encodedName]; !exists {
-			return fmt.Errorf("model named '%s' not found. Cannot set as default", name)
+			return fmt.Errorf("model named '%s' not found. Use 'gllm model list' to see available models", name)
 		}
 
 		viper.Set("agent.model", encodedName)
 
 		// Write the config file
 		if err := writeConfig(); err != nil {
-			return fmt.Errorf("failed to save default model setting: %w", err)
+			return fmt.Errorf("failed to save model setting: %w", err)
 		}
 
-		fmt.Printf("Default model set to '%s' successfully.\n", name)
+		fmt.Printf("Switched to model '%s' successfully.\n", name)
+		fmt.Println("This model will be used for all subsequent operations.")
 		return nil
 	},
 }
