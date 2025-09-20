@@ -19,6 +19,7 @@
 - **Model Context Protocol (MCP) Support**: Connect to external MCP servers to access additional tools and data sources.
 - **Token Usage Tracking**: Monitor your token consumption.
 - **Configuration Management**: Easily manage models, templates, system prompts, and search engines.
+- **Agent Management**: Create, configure, and switch between different AI assistant profiles with custom models, tools, and settings.
 - **Version Control**: Easily track and update your `gllm` setup.
 
 ---
@@ -223,6 +224,35 @@ Here's an example of a deep research workflow in action:
 | Planner | Dispatcher | Workers | Summarizer |
 |---------|------------|---------|-------------|
 | Designs a plan for the research.<br>![Planner Screenshot](screenshots/deepresearch_planner.png) | Dispatches sub-tasks to worker agents.<br>![Dispatcher Screenshot](screenshots/deepresearch_dispatcher.png) | Execute the sub-tasks in parallel.<br>![Workers Screenshot](screenshots/deepresearch_workers.png) | Summarizes the results from the workers to provide a final report.<br>![Summarizer Screenshot](screenshots/deepresearch_summarizer.png) |
+
+---
+
+## 🤖 Agent Management
+
+Create and manage multiple AI assistant profiles with different configurations:
+
+```sh
+# Create agents for different tasks
+gllm agent add coder --model gpt-4o --tools on
+gllm agent add researcher --model gemini-pro --search google
+
+# Switch between agents
+gllm agent switch coder
+gllm agent switch researcher
+
+# List and manage agents
+gllm agent list
+gllm agent info coder
+gllm agent set coder --model gpt-4
+```
+
+**Agent Commands:**
+- `gllm agent add <name>` - Create a new agent
+- `gllm agent list` - List all agents
+- `gllm agent switch <name>` - Switch to an agent
+- `gllm agent info <name>` - Show agent details
+- `gllm agent set <name>` - Update an agent
+- `gllm agent remove <name>` - Delete an agent
 
 ---
 

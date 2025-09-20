@@ -174,8 +174,9 @@ func validateWorkflow(agentsSlice []interface{}) error {
 		} else {
 			// Validate model exists in configuration
 			modelName := model.(string)
+			encodedModelName := encodeModelName(modelName)
 			modelsMap := viper.GetStringMap("models")
-			if _, exists := modelsMap[modelName]; !exists {
+			if _, exists := modelsMap[encodedModelName]; !exists {
 				return fmt.Errorf("agent '%s' references model '%s' which is not configured. Please add the model first using 'gllm model add'", agent["name"], modelName)
 			}
 		}
@@ -213,19 +214,6 @@ func validateWorkflow(agentsSlice []interface{}) error {
 	}
 
 	return nil
-}
-
-// convertUserInputToBool converts user-friendly strings to boolean values
-// Handles: on/off, enable/disable, true/false, 1/0
-func convertUserInputToBool(input string) (bool, error) {
-	switch strings.ToLower(strings.TrimSpace(input)) {
-	case "on", "enable", "enabled", "true", "1":
-		return true, nil
-	case "off", "disable", "disabled", "false", "0", "":
-		return false, nil
-	default:
-		return false, fmt.Errorf("invalid boolean value: %s", input)
-	}
 }
 
 var workflowAddCmd = &cobra.Command{
@@ -937,7 +925,8 @@ gllm workflow start -i  # Run in interactive mode`,
 			// Handle model configuration
 			modelName := getStringValue(agent, "model")
 			if modelName != "" {
-				modelConfig := GetModelInfo(modelName)
+				encodedModelName := encodeModelName(modelName)
+				modelConfig := GetModelInfo(encodedModelName)
 				if len(modelConfig) > 0 {
 					workflowAgent.Model = &modelConfig
 				} else {
