@@ -76,7 +76,6 @@ var modelListCmd = &cobra.Command{
 	Short:   "List all set models",
 	Run: func(cmd *cobra.Command, args []string) {
 		highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
-		keyColor := color.New(color.FgMagenta, color.Bold).SprintFunc()
 		modelsMap := viper.GetStringMap("models")
 		defaultModel := viper.GetString("agent.model")
 
@@ -104,7 +103,7 @@ var modelListCmd = &cobra.Command{
 				pname = highlightColor(name)
 			} else {
 				indicator = " "
-				pname = keyColor(name)
+				pname = name
 			}
 			fmt.Printf(" %s %s\n", indicator, pname)
 			if verbose {

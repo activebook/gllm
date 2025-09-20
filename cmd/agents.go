@@ -103,11 +103,19 @@ gllm agent add research --model gemini-pro --search google --tools on --template
 			return
 		}
 
+		// Validate model exists in configuration
+		encodedModelName := encodeModelName(model)
+		modelsMap := viper.GetStringMap("models")
+		if _, exists := modelsMap[encodedModelName]; !exists {
+			fmt.Printf("Error: model '%s' is not configured. Please add the model first using 'gllm model add'.\n", model)
+			return
+		}
+
 		// Create agent configuration with explicit defaults
 		agentConfig := make(service.AgentConfig)
 
 		// Set model (required)
-		agentConfig["model"] = model
+		agentConfig["model"] = encodeModelName(model)
 
 		// Set boolean fields with explicit defaults (false if not provided)
 		if tools != "" {
@@ -292,7 +300,14 @@ gllm agent set research --name newresearch --model gpt4`,
 		updated := false
 
 		if model != "" {
-			agentConfig["model"] = model
+			// Validate model exists in configuration
+			encodedModelName := encodeModelName(model)
+			modelsMap := viper.GetStringMap("models")
+			if _, exists := modelsMap[encodedModelName]; !exists {
+				fmt.Printf("Error: model '%s' is not configured. Please add the model first using 'gllm model add'.\n", model)
+				return
+			}
+			agentConfig["model"] = encodeModelName(model)
 			updated = true
 		}
 
@@ -543,7 +558,7 @@ func printAgentConfigDetails(agent map[string]interface{}) {
 	}
 
 	if model, exists := agent["model"]; exists {
-		fmt.Printf("  Model: %s\n", model)
+		fmt.Printf("  Model: %s\n", decodeModelName(model.(string)))
 	}
 
 	if search, exists := agent["search"]; exists {

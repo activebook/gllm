@@ -174,8 +174,9 @@ func validateWorkflow(agentsSlice []interface{}) error {
 		} else {
 			// Validate model exists in configuration
 			modelName := model.(string)
+			encodedModelName := encodeModelName(modelName)
 			modelsMap := viper.GetStringMap("models")
-			if _, exists := modelsMap[modelName]; !exists {
+			if _, exists := modelsMap[encodedModelName]; !exists {
 				return fmt.Errorf("agent '%s' references model '%s' which is not configured. Please add the model first using 'gllm model add'", agent["name"], modelName)
 			}
 		}
@@ -924,7 +925,8 @@ gllm workflow start -i  # Run in interactive mode`,
 			// Handle model configuration
 			modelName := getStringValue(agent, "model")
 			if modelName != "" {
-				modelConfig := GetModelInfo(modelName)
+				encodedModelName := encodeModelName(modelName)
+				modelConfig := GetModelInfo(encodedModelName)
 				if len(modelConfig) > 0 {
 					workflowAgent.Model = &modelConfig
 				} else {
