@@ -25,7 +25,7 @@ var toolsOnCmd = &cobra.Command{
 	Short: "Enable all embedding tools",
 	Run: func(cmd *cobra.Command, args []string) {
 		viper.Set("agent.tools", true)
-		err := viper.WriteConfig()
+		err := writeConfig()
 		if err != nil {
 			fmt.Printf("Error writing config: %v\n", err)
 			return
@@ -40,7 +40,7 @@ var toolsOffCmd = &cobra.Command{
 	Short: "Disable all embedding tools",
 	Run: func(cmd *cobra.Command, args []string) {
 		viper.Set("agent.tools", false)
-		err := viper.WriteConfig()
+		err := writeConfig()
 		if err != nil {
 			fmt.Printf("Error writing config: %v\n", err)
 			return

@@ -143,9 +143,31 @@ type AgentOptions struct {
 	ConvoName        string
 }
 
-func CallAgent(op *AgentOptions) error {
-	var temperature float32
-	switch temp := (*op.ModelInfo)["temperature"].(type) {
+// validateModelConfig validates the model configuration and extracts required fields
+func validateModelConfig(modelInfo *map[string]any) (apiKey, endpoint, modelName string, temperature float32, err error) {
+	// Check if ModelInfo is nil (happens when no config file exists)
+	if modelInfo == nil {
+		return "", "", "", 0, fmt.Errorf("no model configuration found. Please run 'gllm model add' to configure a model first, or use 'gllm model list' to see existing models")
+	}
+
+	// Safely extract model configuration with type assertions
+	apiKey, ok := (*modelInfo)["key"].(string)
+	if !ok {
+		return "", "", "", 0, fmt.Errorf("invalid or missing API key in model configuration")
+	}
+
+	endpoint, ok = (*modelInfo)["endpoint"].(string)
+	if !ok {
+		return "", "", "", 0, fmt.Errorf("invalid or missing endpoint in model configuration")
+	}
+
+	modelName, ok = (*modelInfo)["model"].(string)
+	if !ok {
+		return "", "", "", 0, fmt.Errorf("invalid or missing model name in model configuration")
+	}
+
+	// Extract temperature with safe type conversion
+	switch temp := (*modelInfo)["temperature"].(type) {
 	case float64:
 		temperature = float32(temp)
 	case int:
@@ -156,7 +178,17 @@ func CallAgent(op *AgentOptions) error {
 		temperature = temp
 	default:
 		// Set a default value if type is unexpected
-		temperature = 0.7 // or whatever default makes sense
+		temperature = 0.7
+	}
+
+	return apiKey, endpoint, modelName, temperature, nil
+}
+
+func CallAgent(op *AgentOptions) error {
+	// Validate model configuration
+	apiKey, endpoint, modelName, temperature, err := validateModelConfig(op.ModelInfo)
+	if err != nil {
+		return err
 	}
 
 	// Set up search engine settings
@@ -227,9 +259,9 @@ func CallAgent(op *AgentOptions) error {
 	}
 
 	ag := Agent{
-		ApiKey:        (*op.ModelInfo)["key"].(string),
-		EndPoint:      (*op.ModelInfo)["endpoint"].(string),
-		ModelName:     (*op.ModelInfo)["model"].(string),
+		ApiKey:        apiKey,
+		EndPoint:      endpoint,
+		ModelName:     modelName,
 		SystemPrompt:  op.SysPrompt,
 		UserPrompt:    op.Prompt,
 		Temperature:   temperature,

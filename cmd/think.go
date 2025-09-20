@@ -34,7 +34,7 @@ var thinkOnCmd = &cobra.Command{
 		viper.Set("agent.think", true)
 
 		// Save the configuration
-		if err := viper.WriteConfig(); err != nil {
+		if err := writeConfig(); err != nil {
 			fmt.Printf("Error saving config: %v\n", err)
 			return
 		}
@@ -52,7 +52,7 @@ var thinkOffCmd = &cobra.Command{
 		viper.Set("agent.think", false)
 
 		// Save the configuration
-		if err := viper.WriteConfig(); err != nil {
+		if err := writeConfig(); err != nil {
 			fmt.Printf("Error saving config: %v\n", err)
 			return
 		}

@@ -312,6 +312,19 @@ func GetCurrentAgentName() string {
 	return "unknown"
 }
 
+// GetCurrentAgentConfig returns the current agent configuration from the agent section
+func GetCurrentAgentConfig() AgentConfig {
+	config := make(AgentConfig)
+
+	// Get all agent.* keys
+	agentSettings := viper.GetStringMap("agent")
+	for key, value := range agentSettings {
+		config[key] = value
+	}
+
+	return config
+}
+
 // ResolveTemplateReference resolves a template reference to actual content lazily
 // If the template contains spaces/tabs/newlines, treat as plain text
 // Otherwise, try to resolve as a reference to a named template

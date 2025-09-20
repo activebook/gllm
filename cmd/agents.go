@@ -58,7 +58,19 @@ var agentCmd = &cobra.Command{
 	Long: `Manage agent configurations that allow you to quickly switch between
 different AI assistant setups with different models, tools, and settings.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Delegate to list command for consistency with model command
+		// Show current agent configuration first
+		currentConfig := service.GetCurrentAgentConfig()
+		if len(currentConfig) > 0 {
+			fmt.Println("Current agent configuration:")
+			fmt.Println("============================")
+			printAgentConfigDetails(currentConfig)
+			fmt.Println()
+		} else {
+			fmt.Println("No current agent configuration found.")
+			fmt.Println()
+		}
+
+		// Then show the list of available agents
 		agentListCmd.Run(cmd, args)
 	},
 }
