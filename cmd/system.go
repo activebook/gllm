@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -39,7 +38,6 @@ var systemListCmd = &cobra.Command{
 	Aliases: []string{"ls"},
 	Short:   "List all saved system prompt names",
 	Run: func(cmd *cobra.Command, args []string) {
-		keyColor := color.New(color.FgMagenta, color.Bold).SprintFunc()
 		sys_prompts := viper.GetStringMapString("system_prompts")
 
 		if len(sys_prompts) == 0 {
@@ -57,7 +55,7 @@ var systemListCmd = &cobra.Command{
 			sort.Strings(names)
 			fmt.Println("Available system prompts (with details):")
 			for _, name := range names {
-				fmt.Printf(" %s\n %s\n\n", keyColor(name), sys_prompts[name])
+				fmt.Printf(" %s\n %s\n\n", name, sys_prompts[name])
 			}
 		} else {
 			fmt.Println("Available system prompts:")
@@ -68,7 +66,7 @@ var systemListCmd = &cobra.Command{
 			}
 			sort.Strings(names)
 			for _, name := range names {
-				fmt.Printf(" %s\n", keyColor(name))
+				fmt.Printf(" %s\n", name)
 			}
 		}
 	},

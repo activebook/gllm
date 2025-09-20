@@ -220,7 +220,7 @@ func SwitchToAgent(name string) error {
 		if key == "template" {
 			if templateStr, ok := value.(string); ok {
 				// Resolve template reference lazily
-				resolvedTemplate := resolveTemplateReference(templateStr)
+				resolvedTemplate := ResolveTemplateReference(templateStr)
 				viper.Set("agent."+key, resolvedTemplate)
 			} else {
 				viper.Set("agent."+key, value)
@@ -228,7 +228,7 @@ func SwitchToAgent(name string) error {
 		} else if key == "system_prompt" {
 			if sysPromptStr, ok := value.(string); ok {
 				// Resolve system prompt reference lazily
-				resolvedSysPrompt := resolveSystemPromptReference(sysPromptStr)
+				resolvedSysPrompt := ResolveSystemPromptReference(sysPromptStr)
 				viper.Set("agent."+key, resolvedSysPrompt)
 			} else {
 				viper.Set("agent."+key, value)
@@ -312,10 +312,10 @@ func GetCurrentAgentName() string {
 	return "unknown"
 }
 
-// resolveTemplateReference resolves a template reference to actual content lazily
+// ResolveTemplateReference resolves a template reference to actual content lazily
 // If the template contains spaces/tabs/newlines, treat as plain text
 // Otherwise, try to resolve as a reference to a named template
-func resolveTemplateReference(template string) string {
+func ResolveTemplateReference(template string) string {
 	if template == "" {
 		return ""
 	}
@@ -330,10 +330,10 @@ func resolveTemplateReference(template string) string {
 	return template // Use as plain text
 }
 
-// resolveSystemPromptReference resolves a system prompt reference to actual content lazily
+// ResolveSystemPromptReference resolves a system prompt reference to actual content lazily
 // If the system prompt contains spaces/tabs/newlines, treat as plain text
 // Otherwise, try to resolve as a reference to a named system prompt
-func resolveSystemPromptReference(sysPrompt string) string {
+func ResolveSystemPromptReference(sysPrompt string) string {
 	if sysPrompt == "" {
 		return ""
 	}

@@ -434,17 +434,8 @@ var agentInfoCmd = &cobra.Command{
 		fmt.Printf("Agent '%s' configuration:\n", name)
 		fmt.Println("==========================")
 
-		// Display configuration in a nice format
-		keys := make([]string, 0, len(agentConfig))
-		for key := range agentConfig {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-
-		for _, key := range keys {
-			value := agentConfig[key]
-			fmt.Printf("  %s: %v\n", key, value)
-		}
+		// Display configuration using the same formatting as add/set commands
+		printAgentConfigDetails(agentConfig)
 	},
 }
 
@@ -497,28 +488,34 @@ func printAgentConfigDetails(agent map[string]interface{}) {
 		fmt.Printf("  Model: %s\n", decodeModelName(model.(string)))
 	}
 
-	if search, exists := agent["search"]; exists {
-		fmt.Printf("  Search: %s\n", search)
-	} else {
-		fmt.Printf("  Search: \n")
-	}
-
 	if system, exists := agent["system_prompt"]; exists {
-		fmt.Printf("  System Prompt: %s\n", system)
+		if sysPromptStr, ok := system.(string); ok && sysPromptStr != "" {
+			// Resolve system prompt reference for display (don't modify stored config)
+			resolvedSysPrompt := service.ResolveSystemPromptReference(sysPromptStr)
+			fmt.Printf("  System Prompt: %s\n", resolvedSysPrompt)
+		} else {
+			fmt.Printf("  System Prompt: \n")
+		}
 	} else {
 		fmt.Printf("  System Prompt: \n")
 	}
 
 	if template, exists := agent["template"]; exists {
-		fmt.Printf("  Template: %s\n", template)
+		if templateStr, ok := template.(string); ok && templateStr != "" {
+			// Resolve template reference for display (don't modify stored config)
+			resolvedTemplate := service.ResolveTemplateReference(templateStr)
+			fmt.Printf("  Template: %s\n", resolvedTemplate)
+		} else {
+			fmt.Printf("  Template: \n")
+		}
 	} else {
 		fmt.Printf("  Template: \n")
 	}
 
-	if tools, exists := agent["tools"]; exists {
-		fmt.Printf("  Tools: %v\n", tools)
+	if search, exists := agent["search"]; exists {
+		fmt.Printf("  Search: %s\n", search)
 	} else {
-		fmt.Printf("  Tools: false\n")
+		fmt.Printf("  Search: \n")
 	}
 
 	if mcp, exists := agent["mcp"]; exists {
