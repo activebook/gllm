@@ -30,7 +30,7 @@ func init() {
 	modelAddCmd.Flags().StringP("endpoint", "e", "", "API endpoint URL (required)")
 	modelAddCmd.Flags().StringP("key", "k", "", "API key (required)")
 	modelAddCmd.Flags().StringP("model", "m", "", "Model ID (required)")
-	modelAddCmd.Flags().Float32P("temp", "t", 0.7, "Temperature for generation")
+	modelAddCmd.Flags().Float32P("temp", "t", 1.0, "Temperature for generation")
 	modelAddCmd.Flags().Float32P("top_p", "p", 1.0, "Top-p sampling parameter")
 	modelAddCmd.Flags().IntP("seed", "s", 0, "Seed for deterministic generation (default 0, use 0 for random)")
 
@@ -43,7 +43,7 @@ func init() {
 	modelSetCmd.Flags().StringP("endpoint", "e", "", "API endpoint URL")
 	modelSetCmd.Flags().StringP("key", "k", "", "API key")
 	modelSetCmd.Flags().StringP("model", "m", "", "Model ID")
-	modelSetCmd.Flags().Float32P("temp", "t", 0.7, "Temperature for generation")
+	modelSetCmd.Flags().Float32P("temp", "t", 1.0, "Temperature for generation")
 	modelSetCmd.Flags().Float32P("top_p", "p", 1.0, "Top-p sampling parameter")
 	modelSetCmd.Flags().IntP("seed", "s", 0, "Seed for deterministic generation (default 0, use 0 for random)")
 
@@ -132,7 +132,7 @@ var modelAddCmd = &cobra.Command{
 	Short: "Add a new named model",
 	Long: `Adds a new model with a specific configuration.
 Example:
-gllm model add --name gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 0.7`,
+gllm model add --name gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// When using MarkFlagRequired, Cobra will:
 		// Validate the required flags are provided before your function runs
@@ -209,7 +209,7 @@ var modelSetCmd = &cobra.Command{
 	Short: "Set a named model",
 	Long: `Sets a named model with a specific configuration.
 Example:
-gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 0.7`,
+gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0`,
 	Args: cobra.ExactArgs(1), // Requires exactly one argument (the name)
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]

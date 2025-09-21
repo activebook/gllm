@@ -180,7 +180,7 @@ func validateModelConfig(modelInfo *map[string]any) (apiKey, endpoint, modelName
 		temperature = temp
 	default:
 		// Set a default value if type is unexpected
-		temperature = 0.7
+		temperature = 1.0
 	}
 
 	// Extract top_p with safe type conversion
