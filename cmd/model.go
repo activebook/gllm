@@ -30,7 +30,9 @@ func init() {
 	modelAddCmd.Flags().StringP("endpoint", "e", "", "API endpoint URL (required)")
 	modelAddCmd.Flags().StringP("key", "k", "", "API key (required)")
 	modelAddCmd.Flags().StringP("model", "m", "", "Model ID (required)")
-	modelAddCmd.Flags().Float32P("temp", "t", 0.7, "Temperature for generation (default 0.7)")
+	modelAddCmd.Flags().Float32P("temp", "t", 1.0, "Temperature for generation")
+	modelAddCmd.Flags().Float32P("top_p", "p", 1.0, "Top-p sampling parameter")
+	modelAddCmd.Flags().IntP("seed", "s", 0, "Seed for deterministic generation (default 0, use 0 for random)")
 
 	modelAddCmd.MarkFlagRequired("name")
 	modelAddCmd.MarkFlagRequired("endpoint")
@@ -41,7 +43,9 @@ func init() {
 	modelSetCmd.Flags().StringP("endpoint", "e", "", "API endpoint URL")
 	modelSetCmd.Flags().StringP("key", "k", "", "API key")
 	modelSetCmd.Flags().StringP("model", "m", "", "Model ID")
-	modelSetCmd.Flags().Float32P("temp", "t", 0.7, "Temperature for generation (default 0.7)")
+	modelSetCmd.Flags().Float32P("temp", "t", 1.0, "Temperature for generation")
+	modelSetCmd.Flags().Float32P("top_p", "p", 1.0, "Top-p sampling parameter")
+	modelSetCmd.Flags().IntP("seed", "s", 0, "Seed for deterministic generation (default 0, use 0 for random)")
 
 	// Add the force flag to the remove command
 	modelRemoveCmd.Flags().BoolP("force", "f", false, "Skip error when model doesn't exist")
@@ -128,7 +132,7 @@ var modelAddCmd = &cobra.Command{
 	Short: "Add a new named model",
 	Long: `Adds a new model with a specific configuration.
 Example:
-gllm model add --name gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 0.7`,
+gllm model add --name gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// When using MarkFlagRequired, Cobra will:
 		// Validate the required flags are provided before your function runs
@@ -140,6 +144,8 @@ gllm model add --name gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --t
 		key, _ := cmd.Flags().GetString("key")
 		model, _ := cmd.Flags().GetString("model")
 		temp, _ := cmd.Flags().GetFloat32("temp")
+		topP, _ := cmd.Flags().GetFloat32("top_p")
+		seed, _ := cmd.Flags().GetInt("seed")
 
 		// Get existing models map
 		modelsMap := viper.GetStringMap("models")
@@ -160,6 +166,22 @@ gllm model add --name gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --t
 			"key":         key,
 			"model":       model,
 			"temperature": temp,
+			"top_p":       topP,
+		}
+
+		// Validate temperature value (should be between 0 and 2.0)
+		if temp < 0 || temp > 2.0 {
+			return fmt.Errorf("temperature must be between 0 and 2.0, got: %f", temp)
+		}
+
+		// Validate top_p value (should be between 0 and 1, exclusive of 0)
+		if topP <= 0 || topP > 1.0 {
+			return fmt.Errorf("top_p must be greater than 0 and less than or equal to 1.0, got: %f", topP)
+		}
+
+		// Only add seed if it's not 0 (0 means random)
+		if seed != 0 {
+			newModel["seed"] = seed
 		}
 
 		// Add the new model
@@ -187,7 +209,7 @@ var modelSetCmd = &cobra.Command{
 	Short: "Set a named model",
 	Long: `Sets a named model with a specific configuration.
 Example:
-gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 0.7`,
+gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0`,
 	Args: cobra.ExactArgs(1), // Requires exactly one argument (the name)
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
@@ -223,8 +245,39 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 0.7
 			modelConfig["model"] = model
 		}
 
-		if temp, err := cmd.Flags().GetFloat32("temp"); err == nil {
-			modelConfig["temperature"] = temp // Note: May want to convert to float
+		// Only update temperature if the flag was explicitly provided
+		if cmd.Flags().Changed("temp") {
+			if temp, err := cmd.Flags().GetFloat32("temp"); err == nil {
+				// Validate temperature value (should be between 0 and 2.0)
+				if temp < 0 || temp > 2.0 {
+					return fmt.Errorf("temperature must be between 0 and 2.0, got: %f", temp)
+				}
+				modelConfig["temperature"] = temp
+			}
+		}
+
+		// Only update top_p if the flag was explicitly provided
+		if cmd.Flags().Changed("top_p") {
+			if topP, err := cmd.Flags().GetFloat32("top_p"); err == nil {
+				// Validate top_p value (should be between 0 and 1, exclusive of 0)
+				if topP <= 0 || topP > 1.0 {
+					return fmt.Errorf("top_p must be greater than 0 and less than or equal to 1.0, got: %f", topP)
+				}
+				modelConfig["top_p"] = topP
+			}
+		}
+
+		// Only update seed if the flag was explicitly provided
+		if cmd.Flags().Changed("seed") {
+			if seed, err := cmd.Flags().GetInt("seed"); err == nil {
+				// Only add seed if it's not 0 (0 means random)
+				if seed != 0 {
+					modelConfig["seed"] = seed
+				} else {
+					// Remove seed if set to 0 (random)
+					delete(modelConfig, "seed")
+				}
+			}
 		}
 
 		// Update the entry

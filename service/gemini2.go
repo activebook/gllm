@@ -103,6 +103,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	// Create the model and generate content
 	config := genai.GenerateContentConfig{
 		Temperature: &ag.Temperature,
+		TopP:        &ag.TopP,
 		ThinkingConfig: &genai.ThinkingConfig{
 			// Let model decide how to allocate tokens
 			ThinkingBudget:  &thinkingBudgetVal,
@@ -113,6 +114,12 @@ func (ag *Agent) GenerateGemini2Stream() error {
 			//{CodeExecution: &genai.ToolCodeExecution{}},
 			//{GoogleSearch: &genai.GoogleSearch{}},
 		},
+	}
+
+	// Add seed if provided
+	if ag.Seed != nil {
+		seedInt32 := int32(*ag.Seed)
+		config.Seed = &seedInt32
 	}
 	// System Instruction (System Prompt)
 	if ag.SystemPrompt != "" {
