@@ -30,8 +30,8 @@ func init() {
 	modelAddCmd.Flags().StringP("endpoint", "e", "", "API endpoint URL (required)")
 	modelAddCmd.Flags().StringP("key", "k", "", "API key (required)")
 	modelAddCmd.Flags().StringP("model", "m", "", "Model ID (required)")
-	modelAddCmd.Flags().Float32P("temp", "t", 0.7, "Temperature for generation (default 0.7)")
-	modelAddCmd.Flags().Float32P("top_p", "p", 1.0, "Top-p sampling parameter (default 1.0)")
+	modelAddCmd.Flags().Float32P("temp", "t", 0.7, "Temperature for generation")
+	modelAddCmd.Flags().Float32P("top_p", "p", 1.0, "Top-p sampling parameter")
 	modelAddCmd.Flags().IntP("seed", "s", 0, "Seed for deterministic generation (default 0, use 0 for random)")
 
 	modelAddCmd.MarkFlagRequired("name")
@@ -43,8 +43,8 @@ func init() {
 	modelSetCmd.Flags().StringP("endpoint", "e", "", "API endpoint URL")
 	modelSetCmd.Flags().StringP("key", "k", "", "API key")
 	modelSetCmd.Flags().StringP("model", "m", "", "Model ID")
-	modelSetCmd.Flags().Float32P("temp", "t", 0.7, "Temperature for generation (default 0.7)")
-	modelSetCmd.Flags().Float32P("top_p", "p", 1.0, "Top-p sampling parameter (default 1.0)")
+	modelSetCmd.Flags().Float32P("temp", "t", 0.7, "Temperature for generation")
+	modelSetCmd.Flags().Float32P("top_p", "p", 1.0, "Top-p sampling parameter")
 	modelSetCmd.Flags().IntP("seed", "s", 0, "Seed for deterministic generation (default 0, use 0 for random)")
 
 	// Add the force flag to the remove command
