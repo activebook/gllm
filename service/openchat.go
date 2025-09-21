@@ -201,6 +201,7 @@ func (c *OpenChat) process(ag *Agent) error {
 		req := model.CreateChatCompletionRequest{
 			Model:       ag.ModelName,
 			Temperature: &ag.Temperature,
+			TopP:        &ag.TopP,
 			Messages:    messages,
 			Tools:       c.tools,
 			Thinking:    thinking,

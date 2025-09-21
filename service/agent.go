@@ -32,6 +32,8 @@ type Agent struct {
 	SystemPrompt    string
 	UserPrompt      string
 	Temperature     float32
+	TopP            float32             // Top-p sampling parameter
+	Seed            *int                // Seed for deterministic generation
 	Files           []*FileData         // Attachment files
 	NotifyChan      chan<- StreamNotify // Sub Channel to send notifications
 	DataChan        chan<- StreamData   // Sub Channel to receive streamed text data
@@ -144,26 +146,26 @@ type AgentOptions struct {
 }
 
 // validateModelConfig validates the model configuration and extracts required fields
-func validateModelConfig(modelInfo *map[string]any) (apiKey, endpoint, modelName string, temperature float32, err error) {
+func validateModelConfig(modelInfo *map[string]any) (apiKey, endpoint, modelName string, temperature float32, topP float32, seed *int, err error) {
 	// Check if ModelInfo is nil (happens when no config file exists)
 	if modelInfo == nil {
-		return "", "", "", 0, fmt.Errorf("no model configuration found. Please run 'gllm model add' to configure a model first, or use 'gllm model list' to see existing models")
+		return "", "", "", 0, 0, nil, fmt.Errorf("no model configuration found. Please run 'gllm model add' to configure a model first, or use 'gllm model list' to see existing models")
 	}
 
 	// Safely extract model configuration with type assertions
 	apiKey, ok := (*modelInfo)["key"].(string)
 	if !ok {
-		return "", "", "", 0, fmt.Errorf("invalid or missing API key in model configuration")
+		return "", "", "", 0, 0, nil, fmt.Errorf("invalid or missing API key in model configuration")
 	}
 
 	endpoint, ok = (*modelInfo)["endpoint"].(string)
 	if !ok {
-		return "", "", "", 0, fmt.Errorf("invalid or missing endpoint in model configuration")
+		return "", "", "", 0, 0, nil, fmt.Errorf("invalid or missing endpoint in model configuration")
 	}
 
 	modelName, ok = (*modelInfo)["model"].(string)
 	if !ok {
-		return "", "", "", 0, fmt.Errorf("invalid or missing model name in model configuration")
+		return "", "", "", 0, 0, nil, fmt.Errorf("invalid or missing model name in model configuration")
 	}
 
 	// Extract temperature with safe type conversion
@@ -181,12 +183,45 @@ func validateModelConfig(modelInfo *map[string]any) (apiKey, endpoint, modelName
 		temperature = 0.7
 	}
 
-	return apiKey, endpoint, modelName, temperature, nil
+	// Extract top_p with safe type conversion
+	switch tp := (*modelInfo)["top_p"].(type) {
+	case float64:
+		topP = float32(tp)
+	case int:
+		topP = float32(tp)
+	case int64:
+		topP = float32(tp)
+	case float32:
+		topP = tp
+	default:
+		// Set a default value if type is unexpected or not provided
+		topP = 1.0
+	}
+
+	// Extract seed with safe type conversion
+	switch s := (*modelInfo)["seed"].(type) {
+	case int:
+		seed = &s
+	case int64:
+		seedInt := int(s)
+		seed = &seedInt
+	case float64:
+		seedInt := int(s)
+		seed = &seedInt
+	case float32:
+		seedInt := int(s)
+		seed = &seedInt
+	default:
+		// Seed is optional, leave as nil if not provided
+		seed = nil
+	}
+
+	return apiKey, endpoint, modelName, temperature, topP, seed, nil
 }
 
 func CallAgent(op *AgentOptions) error {
 	// Validate model configuration
-	apiKey, endpoint, modelName, temperature, err := validateModelConfig(op.ModelInfo)
+	apiKey, endpoint, modelName, temperature, topP, seed, err := validateModelConfig(op.ModelInfo)
 	if err != nil {
 		return err
 	}
@@ -265,6 +300,8 @@ func CallAgent(op *AgentOptions) error {
 		SystemPrompt:  op.SysPrompt,
 		UserPrompt:    op.Prompt,
 		Temperature:   temperature,
+		TopP:          topP,
+		Seed:          seed,
 		Files:         op.Files,
 		NotifyChan:    notifyCh,
 		DataChan:      dataCh,

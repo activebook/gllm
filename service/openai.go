@@ -182,9 +182,15 @@ func (oa *OpenAI) process(ag *Agent) error {
 		req := openai.ChatCompletionRequest{
 			Model:       ag.ModelName,
 			Temperature: ag.Temperature,
+			TopP:        ag.TopP,
 			Messages:    messages,
 			Tools:       oa.tools,
 			Stream:      true,
+		}
+
+		// Add seed if provided
+		if ag.Seed != nil {
+			req.Seed = ag.Seed
 		}
 
 		// Add reasoning effort if think mode is enabled
