@@ -124,7 +124,7 @@ func (ag *Agent) Gemini2WriteFileToolCall(call *genai.FunctionCall) (*genai.Func
 	}
 
 	// Call shared implementation
-	response, err := writeFileToolCallImpl(&argsMap, &ag.ToolsUse)
+	response, err := writeFileToolCallImpl(&argsMap, &ag.ToolsUse, ag.gemini2ShowDiffConfirm, ag.gemini2CloseDiffConfirm)
 	if err != nil {
 		return nil, err
 	}

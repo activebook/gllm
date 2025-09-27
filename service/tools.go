@@ -53,7 +53,7 @@ func readFileToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	return response, nil
 }
 
-func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
+func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, showDiff func(diff string), closeDiff func()) (string, error) {
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
@@ -72,6 +72,20 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) 
 	}
 
 	if needConfirm && !toolsUse.AutoApprove {
+		// Check if file exists and read current content
+		var currentContent string
+		if _, err := os.Stat(path); err == nil {
+			// File exists, read current content for diff
+			currentData, err := os.ReadFile(path)
+			if err == nil {
+				currentContent = string(currentData)
+			}
+		}
+
+		// Show diff if we have current content
+		diff := Diff(currentContent, content, "", "", 3)
+		showDiff(diff)
+
 		// Directly prompt user for confirmation
 		confirm, err := NeedUserConfirm(fmt.Sprintf("write content to the file at path: %s", path), ToolUserConfirmPrompt)
 		if err != nil {

@@ -935,7 +935,7 @@ func (op *OpenProcessor) OpenAIReadFileToolCall(toolCall openai.ToolCall, argsMa
 }
 
 func (op *OpenProcessor) OpenAIWriteFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := writeFileToolCallImpl(argsMap, op.toolsUse)
+	response, err := writeFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
 	if err != nil {
 		return openai.ChatCompletionMessage{}, err
 	}
@@ -1253,7 +1253,7 @@ func (op *OpenProcessor) OpenChatWriteFileToolCall(toolCall *model.ToolCall, arg
 		Name:       Ptr(""),
 	}
 
-	response, err := writeFileToolCallImpl(argsMap, op.toolsUse)
+	response, err := writeFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
 	if err != nil {
 		return nil, err
 	}
