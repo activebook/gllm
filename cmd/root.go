@@ -29,7 +29,7 @@ var (
 	modelFlag        string   // gllm "What is Go?" -model(-m) gpt4o
 	attachments      []string // gllm "Summarize this" --attachment(-a) report.txt
 	sysPromptFlag    string   // gllm "Act as shell" --system(-S) shell-assistant
-	templateFlag     string   // gllm --template(-t) @coder
+	templateFlag     string   // gllm --template(-t) coder
 	searchFlag       bool     // gllm --search(-s) "What is the stock price of Tesla right now?"
 	toolsFlag        bool     // gllm --tools(-t) "Move a.txt to folder b"
 	codeFlag         bool     // gllm --code(-C) "print('Hello, World!')"
@@ -236,12 +236,13 @@ func batchAttachments(files *[]*service.FileData) {
 }
 
 func buildPrompt(prompt string, isThereAttachment bool) (string, []*service.FileData) {
-	var finalPrompt strings.Builder
+	var sb strings.Builder
 	files := []*service.FileData{}
 
-	// Add user prompt and template
-	appendText(&finalPrompt, GetEffectiveTemplate())
-	appendText(&finalPrompt, prompt)
+	// Get template content
+	templateContent := GetEffectiveTemplate()
+	appendText(&sb, templateContent)
+	appendText(&sb, prompt)
 
 	if isThereAttachment {
 		// Process attachments
@@ -249,10 +250,22 @@ func buildPrompt(prompt string, isThereAttachment bool) (string, []*service.File
 	} else {
 		// No attachments specified, try stdin
 		stdinContent := readStdin()
-		appendText(&finalPrompt, stdinContent)
+		if len(stdinContent) > 0 {
+			appendText(&sb, stdinContent)
+		}
 	}
 
-	return finalPrompt.String(), files
+	// Process @ references in prompt
+	finalPrompt := sb.String()
+	atRefProcessor := service.NewAtRefProcessor()
+	processedPrompt, err := atRefProcessor.ProcessText(finalPrompt)
+	if err != nil {
+		service.Warnf("Error processing @ references in prompt: %v", err)
+		// Continue with original prompt if processing fails
+		processedPrompt = finalPrompt
+	}
+
+	return processedPrompt, files
 }
 
 func processQuery(prompt string, files []*service.FileData) {

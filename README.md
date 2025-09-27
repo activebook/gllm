@@ -20,6 +20,7 @@
 - **Token Usage Tracking**: Monitor your token consumption.
 - **Configuration Management**: Easily manage models, templates, system prompts, and search engines.
 - **Agent Management**: Create, configure, and switch between different AI assistant profiles with custom models, tools, and settings.
+- **@ Reference Support**: Reference files and directories directly in prompts using @ syntax for seamless context inclusion.
 - **Version Control**: Easily track and update your `gllm` setup.
 
 ---
@@ -67,6 +68,13 @@ go build -o gllm
   gllm "Who is the current POTUS?" -s
   ```
   ![Search Screenshot](screenshots/search.png)
+
+- **Reference files in prompts:**
+  ```sh
+  gllm "Give me an overview of the project structure: @cmd/ and @service/"
+  gllm "I'm considering refactoring this code. Analyze the current structure and suggest improvements: @service/agent.go @service/openai.go"
+  gllm "Document this new feature based on the code: @service/atref.go and @test/test_atref.go"
+  ```
 
 ### Interactive Chat
 

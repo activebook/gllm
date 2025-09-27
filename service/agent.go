@@ -454,10 +454,10 @@ func CallAgent(op *AgentOptions) error {
 				proceedCh <- true
 			case StatusFunctionCalling:
 				ag.WriteFunctionCall(notify.Data)
-				ag.StartIndicator("Function Calling...")
+				// ag.StartIndicator("Function Calling...")
 				proceedCh <- true
 			case StatusFunctionCallingOver:
-				ag.StopIndicator()
+				// ag.StopIndicator()
 				proceedCh <- true
 			case StatusDiffConfirm:
 				ag.WriteDiffConfirm(notify.Data)
