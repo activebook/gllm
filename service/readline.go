@@ -7,7 +7,12 @@ import (
 	"github.com/chzyer/readline"
 )
 
-func NeedUserConfirm(prompt string) (bool, error) {
+func NeedUserConfirm(info string, prompt string) (bool, error) {
+	// Output the info message if provided
+	if len(strings.TrimSpace(info)) > 0 {
+		fmt.Println(info)
+	}
+
 	// Set the prompt question
 	rl, err := readline.New(prompt)
 	if err != nil {

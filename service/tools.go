@@ -72,9 +72,14 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) 
 	}
 
 	if needConfirm && !toolsUse.AutoApprove {
-		// Response with a prompt to let user confirm
-		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("write to file %s", path), fmt.Sprintf("write content to the file at path: %s", path))
-		return outStr, nil
+		// Directly prompt user for confirmation
+		confirm, err := NeedUserConfirm(fmt.Sprintf("write content to the file at path: %s", path), ToolUserConfirmPrompt)
+		if err != nil {
+			return "", err
+		}
+		if !confirm {
+			return fmt.Sprintf("Operation cancelled by user: write to file %s", path), nil
+		}
 	}
 
 	// Create directory if it doesn't exist
@@ -146,9 +151,14 @@ func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse)
 	}
 
 	if needConfirm && !toolsUse.AutoApprove {
-		// Response with a prompt to let user confirm
-		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("delete file %s", path), fmt.Sprintf("delete the file at path: %s", path))
-		return outStr, nil
+		// Directly prompt user for confirmation
+		confirm, err := NeedUserConfirm(fmt.Sprintf("delete the file at path: %s", path), ToolUserConfirmPrompt)
+		if err != nil {
+			return "", err
+		}
+		if !confirm {
+			return fmt.Sprintf("Operation cancelled by user: delete file %s", path), nil
+		}
 	}
 
 	// Delete the file
@@ -174,9 +184,14 @@ func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *Tool
 	}
 
 	if needConfirm && !toolsUse.AutoApprove {
-		// Response with a prompt to let user confirm
-		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("delete directory %s", path), fmt.Sprintf("delete the directory at path: %s and all its contents", path))
-		return outStr, nil
+		// Directly prompt user for confirmation
+		confirm, err := NeedUserConfirm(fmt.Sprintf("delete the directory at path: %s and all its contents", path), ToolUserConfirmPrompt)
+		if err != nil {
+			return "", err
+		}
+		if !confirm {
+			return fmt.Sprintf("Operation cancelled by user: delete directory %s", path), nil
+		}
 	}
 
 	// Delete the directory
@@ -207,9 +222,14 @@ func moveToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (stri
 	}
 
 	if needConfirm && !toolsUse.AutoApprove {
-		// Response with a prompt to let user confirm
-		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("move %s to %s", source, destination), fmt.Sprintf("move the file or directory from %s to %s", source, destination))
-		return outStr, nil
+		// Directly prompt user for confirmation
+		confirm, err := NeedUserConfirm(fmt.Sprintf("move the file or directory from %s to %s", source, destination), ToolUserConfirmPrompt)
+		if err != nil {
+			return "", err
+		}
+		if !confirm {
+			return fmt.Sprintf("Operation cancelled by user: move %s to %s", source, destination), nil
+		}
 	}
 
 	// Move/rename the file or directory
@@ -363,13 +383,19 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (str
 		needConfirm = false
 	}
 	if needConfirm && !toolsUse.AutoApprove {
-		// Response with a prompt to let user confirm
+		// Directly prompt user for confirmation
 		descStr, ok := (*argsMap)["purpose"].(string)
 		if !ok {
-			return "", fmt.Errorf("purpose not found in arguments")
+			//return "", fmt.Errorf("purpose not found in arguments")
+			descStr = ""
 		}
-		outStr := fmt.Sprintf(ToolRespConfirmShell, cmdStr, descStr)
-		return outStr, nil
+		confirm, err := NeedUserConfirm(fmt.Sprintf(ToolRespConfirmShell, cmdStr, descStr), ToolUserConfirmPrompt)
+		if err != nil {
+			return "", err
+		}
+		if !confirm {
+			return fmt.Sprintf("Operation cancelled by user: shell command '%s'", cmdStr), nil
+		}
 	}
 
 	var errStr string
@@ -684,7 +710,7 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, s
 		showDiff(diff)
 
 		// Response with a prompt to let user confirm
-		confirm, err := NeedUserConfirm(ToolRespConfirmEdityFile)
+		confirm, err := NeedUserConfirm("", ToolUserConfirmPrompt)
 		closeDiff() // Close the diff
 		if err != nil {
 			return "", err
@@ -722,9 +748,14 @@ func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (stri
 	}
 
 	if needConfirm && !toolsUse.AutoApprove {
-		// Response with a prompt to let user confirm
-		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("copy %s to %s", source, destination), fmt.Sprintf("copy the file or directory from %s to %s", source, destination))
-		return outStr, nil
+		// Directly prompt user for confirmation
+		confirm, err := NeedUserConfirm(fmt.Sprintf("copy the file or directory from %s to %s", source, destination), ToolUserConfirmPrompt)
+		if err != nil {
+			return "", err
+		}
+		if !confirm {
+			return fmt.Sprintf("Operation cancelled by user: copy %s to %s", source, destination), nil
+		}
 	}
 
 	// Copy the file or directory

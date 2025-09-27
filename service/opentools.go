@@ -33,16 +33,7 @@ type OpenFunctionDefinition struct {
 
 const (
 	// ToolRespConfirmShell is the template for the response to the user before executing a command.
-	ToolRespConfirmShell = "Based on your request, I've prepared the following command to execute on your system:\n\n" +
-		"```\n%s\n```\n\n" +
-		"This command will %s\n\n" +
-		`**Check:** 
-- First, Proceed with caution. Check whether this command may make irreversible changes or affect critical parts of your system. 
-- Second, Ensure that the command is safe and does not contain any malicious or harmful actions.
-- Third, If you deem it's safe, execute the command. If not, let user to choose whether to proceed or modify the command.
-Such as:
-Would you like me to run this command for you? Please confirm with 'yes', 'proceed', or provide alternative instructions.
-`
+	ToolRespConfirmShell = "```\n%s\n```\n\n%s"
 
 	// ToolRespShellOutput is the template for the response to the user after executing a command.
 	ToolRespShellOutput = `shell executed: %s
@@ -50,21 +41,10 @@ Status:
 %s
 %s`
 
-	// ToolRespConfirmFileOp is the template for the response to the user before performing file operations.
-	ToolRespConfirmFileOp = "Based on your request, I'm about to perform the following file operation:\n\n" +
-		"```\n%s\n```\n\n" +
-		"This operation will %s\n\n" +
-		`**Check:**
-- First, Proceed with caution. Check whether this operation may make irreversible changes or affect critical parts of your system.
-- Second, Ensure that the operation is safe and does not contain any malicious or harmful actions.
-- Third, If you deem it's safe, execute the operation. If not, let user to choose whether to proceed or modify the operation.
-Such as:
-Would you like me to proceed with this operation? Please confirm with 'yes', 'proceed', or provide alternative instructions.
-`
+	ToolUserConfirmPrompt = "Apply this change? (Yes/No): "
 
 	// ToolRespConfirmEdityFile is the template for the response to the user before modifying a file, including the diff.
-	ToolRespConfirmEdityFile = "Apply this change? (Yes/No): "
-	ToolRespDiscardEditFile  = "Based on your request, the OPERATION is CANCELLED: " +
+	ToolRespDiscardEditFile = "Based on your request, the OPERATION is CANCELLED: " +
 		"Cancel edit file: %s\n" +
 		"The user has explicitly declined to apply these file edits. The file will remain unchanged. Do not proceed with any file modifications or ask for further confirmation without explicit new user instruction."
 )
