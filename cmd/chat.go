@@ -600,10 +600,20 @@ func (ci *ChatInfo) printModeStatus() {
 }
 
 func (ci *ChatInfo) callAgent(input string) {
+	var sb strings.Builder
+	appendText(&sb, GetEffectiveTemplate())
+	appendText(&sb, input)
 
-	var finalPrompt strings.Builder
-	appendText(&finalPrompt, GetEffectiveTemplate())
-	appendText(&finalPrompt, input)
+	// Process @ references in prompt
+	prompt := sb.String()
+	atRefProcessor := service.NewAtRefProcessor()
+	processedPrompt, err := atRefProcessor.ProcessText(prompt)
+	if err != nil {
+		service.Warnf("Error processing @ references in prompt: %v", err)
+		// Continue with original prompt if processing fails
+		processedPrompt = prompt
+	}
+
 	_, modelInfo := GetEffectiveModel()
 	sys_prompt := GetEffectiveSystemPrompt()
 
@@ -631,7 +641,7 @@ func (ci *ChatInfo) callAgent(input string) {
 	includeMarkdown := IncludeMarkdown()
 
 	op := service.AgentOptions{
-		Prompt:           finalPrompt.String(),
+		Prompt:           processedPrompt,
 		SysPrompt:        sys_prompt,
 		Files:            ci.Files,
 		ModelInfo:        &modelInfo,
@@ -648,7 +658,7 @@ func (ci *ChatInfo) callAgent(input string) {
 		ConvoName:        convoName,
 	}
 
-	err := service.CallAgent(&op)
+	err = service.CallAgent(&op)
 	if err != nil {
 		service.Errorf("%v", err)
 		return
