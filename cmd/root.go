@@ -29,7 +29,7 @@ var (
 	modelFlag        string   // gllm "What is Go?" -model(-m) gpt4o
 	attachments      []string // gllm "Summarize this" --attachment(-a) report.txt
 	sysPromptFlag    string   // gllm "Act as shell" --system(-S) shell-assistant
-	templateFlag     string   // gllm --template(-t) @coder
+	templateFlag     string   // gllm --template(-t) coder
 	searchFlag       bool     // gllm --search(-s) "What is the stock price of Tesla right now?"
 	toolsFlag        bool     // gllm --tools(-t) "Move a.txt to folder b"
 	codeFlag         bool     // gllm --code(-C) "print('Hello, World!')"
