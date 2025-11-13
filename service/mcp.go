@@ -341,7 +341,8 @@ func (mc *MCPClient) GetTools(session *MCPSession) (*[]MCPTool, error) {
 	var mcpTools []MCPTool
 	for _, tool := range tools.Tools {
 		params := make(map[string]string)
-		for k, v := range tool.InputSchema.Properties {
+		schema := tool.InputSchema.(*jsonschema.Schema)
+		for k, v := range schema.Properties {
 			// Extract meaningful schema information instead of using String()
 			var schemaDesc string
 			if v.Type != "" {
@@ -369,7 +370,7 @@ func (mc *MCPClient) GetTools(session *MCPSession) (*[]MCPTool, error) {
 			Name:        tool.Name,
 			Description: tool.Description,
 			Parameters:  params,
-			Properties:  tool.InputSchema.Properties,
+			Properties:  schema.Properties,
 		})
 	}
 	return &mcpTools, nil
