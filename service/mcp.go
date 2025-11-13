@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -341,7 +342,26 @@ func (mc *MCPClient) GetTools(session *MCPSession) (*[]MCPTool, error) {
 	var mcpTools []MCPTool
 	for _, tool := range tools.Tools {
 		params := make(map[string]string)
-		for k, v := range tool.InputSchema.Properties {
+
+		// Convert InputSchema from any to *jsonschema.Schema
+		var schema *jsonschema.Schema
+		if s, ok := tool.InputSchema.(*jsonschema.Schema); ok {
+			schema = s
+		} else if m, ok := tool.InputSchema.(map[string]interface{}); ok {
+			// Convert map to JSON and then to Schema
+			data, err := json.Marshal(m)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal input schema: %v", err)
+			}
+			schema = &jsonschema.Schema{}
+			if err := json.Unmarshal(data, schema); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal input schema: %v", err)
+			}
+		} else {
+			return nil, fmt.Errorf("unsupported InputSchema type: %T", tool.InputSchema)
+		}
+
+		for k, v := range schema.Properties {
 			// Extract meaningful schema information instead of using String()
 			var schemaDesc string
 			if v.Type != "" {
@@ -369,7 +389,7 @@ func (mc *MCPClient) GetTools(session *MCPSession) (*[]MCPTool, error) {
 			Name:        tool.Name,
 			Description: tool.Description,
 			Parameters:  params,
-			Properties:  tool.InputSchema.Properties,
+			Properties:  schema.Properties,
 		})
 	}
 	return &mcpTools, nil
