@@ -142,7 +142,7 @@ const (
 	_gllmContinuePrompt = ">> "
 	_gllmConfirmPrompt  = "\033[96mEnter\033[0m to send (\033[96mCtrl+C/Ctrl+D\033[0m to discard) "
 	_gllmFarewell       = "Session ended."
-	_gllmTempFile       = "gllm-edit-*.tmp"
+	_gllmTempFile       = ".gllm-edit-*.tmp"
 )
 
 func init() {

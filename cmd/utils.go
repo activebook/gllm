@@ -7,8 +7,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"os"            // Make sure this is imported
-	"path/filepath" // Make sure this is imported
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -147,12 +147,31 @@ func validFilePath(filename string, force_overwritten bool) error {
 }
 
 func createTempFile(pattern string) (string, error) {
+	// Try default temp directory first
 	tempFile, err := os.CreateTemp("", pattern)
-	if err != nil {
-		return "", err
+	if err == nil {
+		return tempFile.Name(), tempFile.Close()
 	}
 
-	return tempFile.Name(), tempFile.Close()
+	// Fallback 1: User's home directory
+	if homeDir, homeErr := os.UserHomeDir(); homeErr == nil {
+		tempFile, err := os.CreateTemp(homeDir, pattern)
+		if err == nil {
+			return tempFile.Name(), tempFile.Close()
+		}
+	}
+
+	// Fallback 2: Current working directory
+	cwd, cwdErr := os.Getwd()
+	if cwdErr == nil {
+		tempFile, err := os.CreateTemp(cwd, pattern)
+		if err == nil {
+			return tempFile.Name(), tempFile.Close()
+		}
+	}
+
+	// If all fallbacks fail, return the original error
+	return "", err
 }
 
 func StartsWith(s string, prefix string) bool {
