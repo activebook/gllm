@@ -112,3 +112,37 @@ func FormatMinutesSeconds(d time.Duration) string {
 }
 
 func Ptr[T any](t T) *T { return &t }
+
+// thinkTagRegex matches <think>...</think> tags, including multiline content
+// Using (?s) flag to make . match newlines
+var thinkTagRegex = regexp.MustCompile(`(?s)<think>(.*?)</think>`)
+
+// ExtractThinkTags extracts thinking content from <think>...</think> tags.
+// Some providers (like MiniMax, some Qwen endpoints) embed reasoning content
+// in <think> tags within the regular content field instead of using a separate
+// reasoning_content field.
+//
+// Returns:
+//   - thinking: the extracted thinking content (empty if no tags found)
+//   - cleaned: the content with <think> tags removed
+func ExtractThinkTags(content string) (thinking, cleaned string) {
+	matches := thinkTagRegex.FindAllStringSubmatch(content, -1)
+	if len(matches) == 0 {
+		return "", content
+	}
+
+	// Collect all thinking content
+	var thinkingParts []string
+	for _, match := range matches {
+		if len(match) > 1 && match[1] != "" {
+			thinkingParts = append(thinkingParts, strings.TrimSpace(match[1]))
+		}
+	}
+
+	// Remove all <think> tags from content
+	cleaned = thinkTagRegex.ReplaceAllString(content, "")
+	cleaned = strings.TrimSpace(cleaned)
+
+	thinking = strings.Join(thinkingParts, "\n")
+	return thinking, cleaned
+}
