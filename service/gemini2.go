@@ -165,11 +165,6 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	// so gemini model would fast load the cached history KV
 	// it will only consume tokens on new input
 	messages, _ := ag.Convo.GetMessages().([]*genai.Content)
-	chat, err := ga.client.Chats.Create(ga.ctx, ag.ModelName, &config, messages)
-	if err != nil {
-		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create chat: %v", err)}, nil)
-		return err
-	}
 
 	// Signal that streaming has started
 	// Wait for the main goroutine to tell sub-goroutine to proceed
@@ -182,38 +177,66 @@ func (ag *Agent) GenerateGemini2Stream() error {
 
 	// Use maxRecursions from LangLogic
 	maxRecursions := ag.MaxRecursions
-
 	for i := 0; i < maxRecursions; i++ {
-		funcCalls, resp, err := ag.processGemini2Stream(ga.ctx, chat, streamParts, &references, &queries)
+		// 1. Construct Input Content from streamParts
+		inputParts := make([]*genai.Part, len(*streamParts))
+		hasFuncResponse := false
+		for idx, p := range *streamParts {
+			partCopy := p
+			inputParts[idx] = &partCopy
+			if p.FunctionResponse != nil {
+				hasFuncResponse = true
+			}
+		}
+
+		role := genai.RoleUser
+		if hasFuncResponse {
+			// function response
+			// This is the crucial part
+			// there is no function role, but it's a function response
+			// The producer of the content.
+			// Must be either 'user' or 'model'.
+			// Useful to set for multi-turn conversations,
+			// otherwise can be left blank or unset.
+			role = genai.RoleUser
+		}
+
+		inputContent := &genai.Content{
+			Role:  role,
+			Parts: inputParts,
+		}
+
+		// 2. Prepare messages for this call
+		// We need to pass the full history including the current input
+		callMessages := append(messages, inputContent)
+
+		// 3. Call API
+		modelContent, resp, err := ag.processGemini2Stream(ga.ctx, ga.client, &config, callMessages, &references, &queries)
 		if err != nil {
 			return err
 		}
 		// Record token usage
-		// The final response contains the token usage metainfo
 		ag.addUpGemini2TokenUsage(resp)
 
-		// No furtheer calls
-		if len(*funcCalls) == 0 {
-			break
-		}
-		// reconstruct the function call
-		// Although i think this is a bug in the gemini2 api
-		// we can safely reconstruct the function call part, because it's a funcCall part
-		lastContent := chat.History(true)[len(chat.History(true))-1]
-		if lastContent != nil && len(lastContent.Parts) == 0 {
-			// ** If we dont' keep the funcCall Name, the function call part would be disposed in chat history **
-			// I think it's a bug in the gemini2 api
-			// ** It will generate a invalid empty parameter erro in the chat history **
-			// So we must reconstruct the function call part
-			lastContent.Parts = []*genai.Part{}
-			for _, funcCall := range *funcCalls {
-				callPart := genai.Part{FunctionCall: funcCall}
-				lastContent.Parts = append(lastContent.Parts, &callPart)
+		// 4. Update History
+		messages = append(messages, inputContent)
+		messages = append(messages, modelContent)
+
+		// Check for function calls in the model content
+		funcCalls := []*genai.FunctionCall{}
+		for _, part := range modelContent.Parts {
+			if part.FunctionCall != nil {
+				funcCalls = append(funcCalls, part.FunctionCall)
 			}
 		}
 
+		// No further calls
+		if len(funcCalls) == 0 {
+			break
+		}
+
 		streamParts = &[]genai.Part{}
-		for _, funcCall := range *funcCalls {
+		for _, funcCall := range funcCalls {
 
 			// Skip if not our expected function
 			// Because some model made up function name
@@ -246,7 +269,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	}
 
 	// Save the conversation history(curated)
-	ag.Convo.SetMessages(chat.History(true))
+	ag.Convo.SetMessages(messages)
 	err = ag.Convo.Save()
 	if err != nil {
 		return fmt.Errorf("failed to save conversation: %v", err)
@@ -261,18 +284,23 @@ func (ag *Agent) GenerateGemini2Stream() error {
 }
 
 func (ag *Agent) processGemini2Stream(ctx context.Context,
-	chat *genai.Chat, parts *[]genai.Part,
+	client *genai.Client, config *genai.GenerateContentConfig,
+	messages []*genai.Content,
 	refs *[]map[string]interface{},
-	queries *[]string) (*[]*genai.FunctionCall, *genai.GenerateContentResponse, error) {
+	queries *[]string) (*genai.Content, *genai.GenerateContentResponse, error) {
 
 	// Stream the response
 	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusProcessing}, ag.ProceedChan)
-	iter := chat.SendMessageStream(ctx, *parts...)
+	iter := client.Models.GenerateContentStream(ctx, ag.ModelName, messages, config)
 	// Wait for the main goroutine to tell sub-goroutine to proceed
 	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
 
-	funcCalls := []*genai.FunctionCall{}
+	modelContent := &genai.Content{
+		Role:  genai.RoleModel,
+		Parts: []*genai.Part{},
+	}
 	var finalResp *genai.GenerateContentResponse
+
 	for resp, err := range iter {
 		if err != nil {
 			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}, nil)
@@ -283,19 +311,16 @@ func (ag *Agent) processGemini2Stream(ctx context.Context,
 		for _, candidate := range resp.Candidates {
 			// Process content
 			for _, part := range candidate.Content.Parts {
+				// Accumulate parts for history ONLY if they have content
+				// The API returns Error 400 if we send back a part with no initialized 'data' field
+				if part.Text != "" || part.FunctionCall != nil || part.FunctionResponse != nil ||
+					part.InlineData != nil || part.FileData != nil ||
+					part.ExecutableCode != nil || part.CodeExecutionResult != nil {
+					modelContent.Parts = append(modelContent.Parts, part)
+				}
+
 				// Record function call, but don't process here
 				if part.FunctionCall != nil {
-					funcCalls = append(funcCalls, part.FunctionCall)
-					// If we keep the name, we could keep the funcCall
-					// But we must erase the name when we actually call that function
-					// Otherelse it will generate rudandent error
-					// But, if we don't keep the funcCall name
-					// It will dispose the funcCall, I think this is a bug!!!
-					// So we need reconstruct the funcCall
-					//part.Text = funcCall.Name
-
-					// function call wouldn't have text
-					// so pass here
 					continue
 				}
 
@@ -332,7 +357,7 @@ func (ag *Agent) processGemini2Stream(ctx context.Context,
 		// It has usage metadata
 		finalResp = resp
 	}
-	return &funcCalls, finalResp, nil
+	return modelContent, finalResp, nil
 }
 
 func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
