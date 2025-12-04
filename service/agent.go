@@ -321,7 +321,8 @@ func CallAgent(op *AgentOptions) error {
 	}
 
 	// Check if the endpoint is compatible with OpenAI
-	provider := DetectModelProvider(ag.EndPoint)
+	// Use dual detection: endpoint first, then model name patterns
+	provider := DetectModelProvider(ag.EndPoint, ag.ModelName)
 
 	// Construct conversation manager
 	cm, err := ConstructConversationManager(op.ConvoName, provider)

@@ -196,8 +196,9 @@ func buildChatInfo(files []*service.FileData) *ChatInfo {
 	}
 
 	// Construct conversation manager
+	// Use dual detection: endpoint first, then model name patterns
 	_, modelInfo := GetEffectiveModel()
-	provider := service.DetectModelProvider(modelInfo["endpoint"].(string))
+	provider := service.DetectModelProvider(modelInfo["endpoint"].(string), modelInfo["model"].(string))
 	cm, err := service.ConstructConversationManager(convoName, provider)
 	if err != nil {
 		service.Errorf("Error constructing conversation manager: %v\n", err)

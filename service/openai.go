@@ -373,10 +373,25 @@ func (oa *OpenAI) processStream(stream *openai.ChatCompletionStream) (openai.Cha
 	// Set the content of the assistant message
 	content := contentBuffer.String()
 	if content != "" {
-		if !strings.HasSuffix(content, "\n") {
-			content = content + "\n"
+		// Extract <think> tags from content if present
+		// Some providers embed reasoning in <think>...</think> tags instead of
+		// using a separate reasoning_content field
+		if thinkContent, cleanedContent := ExtractThinkTags(content); thinkContent != "" {
+			// Prepend extracted thinking to existing reasoning content
+			if reasoning_content != "" {
+				assistantMessage.ReasoningContent = thinkContent + "\n" + reasoning_content
+			} else {
+				assistantMessage.ReasoningContent = thinkContent
+			}
+			content = cleanedContent
 		}
-		assistantMessage.Content = content
+
+		if content != "" {
+			if !strings.HasSuffix(content, "\n") {
+				content = content + "\n"
+			}
+			assistantMessage.Content = content
+		}
 	}
 
 	// Convert tool calls map to slice

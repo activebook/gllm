@@ -45,18 +45,50 @@ var providerDomains = map[string]ModelProvider{
 	"deepseek.com":     ModelOpenChat,
 }
 
-func DetectModelProvider(endPoint string) ModelProvider {
-	if endPoint == "" {
+// Model name patterns for Chinese models (used when endpoint doesn't match)
+var modelPatterns = map[string]ModelProvider{
+	"qwen":     ModelOpenChat, // Alibaba Qwen models
+	"deepseek": ModelOpenChat, // DeepSeek models
+	"minimax":  ModelOpenChat, // MiniMax models
+	"kimi":     ModelOpenChat, // Moonshot Kimi models
+	"moonshot": ModelOpenChat, // Moonshot models
+	"glm":      ModelOpenChat, // Zhipu GLM models
+	"chatglm":  ModelOpenChat, // Zhipu ChatGLM models
+	"ernie":    ModelOpenChat, // Baidu ERNIE models
+	"hunyuan":  ModelOpenChat, // Tencent Hunyuan models
+	"doubao":   ModelOpenChat, // ByteDance Doubao models
+	"skylark":  ModelOpenChat, // ByteDance Skylark models
+	"abab":     ModelOpenChat, // MiniMax ABAB models
+	"yi-":      ModelOpenChat, // 01.AI Yi models (with hyphen to avoid false matches)
+	"yi_":      ModelOpenChat, // 01.AI Yi models (with underscore)
+}
+
+// DetectModelProvider detects the model provider based on endpoint and model name.
+// It first checks the endpoint domain, then falls back to model name patterns.
+// This dual detection handles Chinese models hosted on US platforms (AWS, CoreWeave, etc.)
+func DetectModelProvider(endPoint string, modelName ...string) ModelProvider {
+	if endPoint == "" && len(modelName) == 0 {
 		return ModelUnknown
 	}
 
 	// Normalize endpoint to lowercase for case-insensitive matching
-	endPoint = strings.ToLower(endPoint)
+	endPointLower := strings.ToLower(endPoint)
 
-	// Check for exact matches first (more specific)
+	// Check endpoint domain first (more specific)
 	for domain, provider := range providerDomains {
-		if strings.Contains(endPoint, domain) {
+		if strings.Contains(endPointLower, domain) {
 			return provider
+		}
+	}
+
+	// If endpoint didn't match, try model name patterns
+	// This handles Chinese models hosted on non-Chinese platforms
+	if len(modelName) > 0 && modelName[0] != "" {
+		modelNameLower := strings.ToLower(modelName[0])
+		for pattern, provider := range modelPatterns {
+			if strings.Contains(modelNameLower, pattern) {
+				return provider
+			}
 		}
 	}
 
