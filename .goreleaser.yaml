@@ -39,3 +39,58 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+
+# ---- HOMEBREW INTEGRATION ----
+brews:
+  - name: gllm # Name of the formula file (gllm.rb)
+    # Repository details for your Homebrew tap
+    repository:
+      owner: activebook # Your GitHub username/org
+      name: homebrew-gllm # The name of your tap repo (e.g., homebrew-gllm)
+      # Optional: Branch to push to (defaults to 'main' or 'master')
+      # branch: main
+      # Optional: Token to push to the tap repository
+      # Set GITHUB_TOKEN environment variable for this. It needs repo scope.
+      # token: "{{ .Env.GITHUB_TOKEN }}"
+
+    # GoReleaser will automatically set homepage, url, sha256, and version.
+    # You can override or add fields:
+    description: "`gllm` is a powerful command-line tool designed to interact seamlessly with various Large Language Models (LLMs). Configure your API keys, set your preferred models, and start chatting or executing commands effortlessly."
+    license: "Apache-2.0" # e.g., MIT
+
+    # Optional: Add dependencies
+    # dependencies:
+    #   - name: "bash"
+    #   - name: "zsh"
+    #     type: "optional"
+
+    # Optional: Specify installation steps if default isn't enough
+    # (Usually not needed when GoReleaser handles binaries)
+    # install: |
+    #   bin.install "gllm"
+    #   # Add commands to install other things like man pages, completions, etc.
+    #   # man1.install "man/gllm.1"
+    #   # bash_completion.install "completions/gllm.bash" => "gllm"
+
+    # Optional: Add test block
+    test: |
+      system "#{bin}/gllm --version"
+
+    # Commit message customization
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+
+# Optional: Scoop integration (for Windows users)
+# scoop:
+#   bucket:
+#     owner: your-github-username
+#     name: scoop-bucket
+#   commit_author:
+#     name: goreleaserbot
+#     email: bot@goreleaser.com
+#   commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
+#   homepage: "https://github.com/your-username/gllm"
+#   description: "Description of your CLI app gllm."
+#   license: YOUR_LICENSE
