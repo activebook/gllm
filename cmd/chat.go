@@ -505,44 +505,45 @@ func (ci *ChatInfo) processSingleModeInput(line string) {
 }
 
 func (ci *ChatInfo) processMultiModeInput(line string) {
-	const debounceDelay = 300 * time.Millisecond
+	const debounceDelay = 100 * time.Millisecond
 
-	// Check if we just showed preview and this input arrived instantly (buffered paste)
-	if !ci.previewShownTime.IsZero() {
-		elapsed := time.Since(ci.previewShownTime)
-		// If input arrived < 100ms after preview, it was likely buffered during the sleep
-		if elapsed < 100*time.Millisecond {
-			// Cancel confirmation mode!
-			ci.WaitingForConfirmation = false
-			ci.previewShownTime = time.Time{} // Reset
-
-			// Add the missing empty line that triggered the preview
-			ci.InputLines = append(ci.InputLines, "")
-
-			// Fall through to add the current line
-			fmt.Println("...continuing paste...")
-		} else {
-			ci.previewShownTime = time.Time{} // Reset
-		}
-	}
+	// fmt.Println("Processing multi mode input:", line)
 
 	// Multi mode: accumulate lines
 	if line == "" {
+		// If we have accumulated lines
 		if len(ci.InputLines) > 0 {
-			// Empty line with content - sleep to debounce
-			time.Sleep(debounceDelay)
+			// Check if this empty line arrived instantly (buffered paste)
+			elapsed := time.Since(ci.lastEmptyLineTime)
+			// fmt.Println("Elapsed time since last empty line:", elapsed)
+			// If input arrived < 100ms after preview, it was likely buffered during the sleep
+			if elapsed < debounceDelay {
+				// Cancel confirmation mode!
+				ci.WaitingForConfirmation = false
+				ci.lastEmptyLineTime = time.Now()
 
-			// Show preview
-			ci.showPreview()
-			ci.WaitingForConfirmation = true
-			ci.previewShownTime = time.Now()
+				// Add the missing empty line that triggered the preview
+				ci.InputLines = append(ci.InputLines, "")
+			} else {
+				// Empty line with content - sleep to debounce
+				time.Sleep(debounceDelay)
+
+				// Show preview
+				ci.showPreview()
+				ci.WaitingForConfirmation = true
+				ci.lastEmptyLineTime = time.Time{} // Reset to zero
+			}
+		} else {
+			// Reset the timer
+			ci.lastEmptyLineTime = time.Now()
 		}
-		// No content yet, just ignore empty line
-		return
-	}
+	} else {
+		// Reset the timer
+		ci.lastEmptyLineTime = time.Now()
 
-	// Non-empty line: add to accumulation
-	ci.InputLines = append(ci.InputLines, line)
+		// Non-empty line: add to accumulation
+		ci.InputLines = append(ci.InputLines, line)
+	}
 }
 
 func (ci *ChatInfo) handleEditorCommand() {
