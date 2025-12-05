@@ -2,14 +2,19 @@
 
 # A robust script to automate the release process.
 #
+# Usage: ./build/release.sh [version]
+# Example: ./build/release.sh v1.13.0
+#          ./build/release.sh (auto-suggests next patch version)
+#
 # This script will:
 # 1. Perform pre-flight checks (dependencies, git status).
-# 2. Determine the version from cmd/version.go.
-# 3. Generate a changelog since the last tag.
-# 4. Optionally run in --dry-run mode.
-# 5. Prompt for final confirmation, showing the changelog.
-# 6. Create and push a git tag.
-# 7. Run goreleaser to publish the release.
+# 2. Determine the target version (argument or auto-suggestion).
+# 3. Validate the version (must be > latest tag).
+# 4. Generate a changelog since the last tag.
+# 5. Optionally run in --dry-run mode.
+# 6. Prompt for final confirmation, showing the changelog.
+# 7. Create and push a git tag.
+# 8. Run goreleaser to publish the release.
 #
 # It also includes two helper modes:
 # --cleanup: Interactively deletes a release to recover from a failure.
@@ -23,16 +28,57 @@ set -e
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 PROJECT_ROOT=$(dirname "$SCRIPT_DIR")
 
-# The Go file containing the version string, now using an absolute path.
-VERSION_FILE="$PROJECT_ROOT/cmd/version.go"
+# --- Helper Functions ---
+
+# Function to increment semantic version (patch level)
+increment_version() {
+  local v=$1
+  if [[ $v =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+    local major="${BASH_REMATCH[1]}"
+    local minor="${BASH_REMATCH[2]}"
+    local patch="${BASH_REMATCH[3]}"
+    echo "v$major.$minor.$((patch + 1))"
+  else
+    echo ""
+  fi
+}
+
+# Function to compare versions
+# Returns 0 if v1 < v2, 1 otherwise
+version_lt() {
+    local v1=${1#v}
+    local v2=${2#v}
+    if [ "$v1" = "$v2" ]; then
+        return 1
+    fi
+    local IFS=.
+    local i ver1=($v1) ver2=($v2)
+    # fill empty fields in ver1 with zeros
+    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++)); do
+        ver1[i]=0
+    done
+    for ((i=0; i<${#ver1[@]}; i++)); do
+        if [[ -z ${ver2[i]} ]]; then
+            # fill empty fields in ver2 with zeros
+            ver2[i]=0
+        fi
+        if ((10#${ver1[i]} < 10#${ver2[i]})); then
+            return 0
+        fi
+        if ((10#${ver1[i]} > 10#${ver2[i]})); then
+            return 1
+        fi
+    done
+    return 1
+}
 
 # --- Mode Selection ---
 
 # Cleanup Mode
 if [ "$1" == "--cleanup" ]; then
-  VERSION=$(grep 'const version' "$VERSION_FILE" | sed -E 's/.*"([^"]+)".*/\1/')
+  read -p "Enter the version to cleanup (e.g., v1.13.0): " VERSION
   if [ -z "$VERSION" ]; then
-    echo "Error: Could not find version in $VERSION_FILE"
+    echo "Error: Version is required."
     exit 1
   fi
 
@@ -96,10 +142,16 @@ fi
 
 # --- Initial Setup for Release ---
 DRY_RUN=false
-if [ "$1" == "--dry-run" ]; then
-  DRY_RUN=true
-  echo "Running in --dry-run mode. No changes will be made."
-fi
+VERSION=""
+
+# Parse arguments
+for arg in "$@"; do
+  if [ "$arg" == "--dry-run" ]; then
+    DRY_RUN=true
+  elif [[ "$arg" == v* ]]; then
+    VERSION="$arg"
+  fi
+done
 
 # Source environment variables from .env file located in the same directory as the script
 if [ -f "$(dirname "$0")/.env" ]; then
@@ -136,30 +188,47 @@ if ! git diff-index --quiet HEAD --; then
   exit 1
 fi
 
-echo "All checks passed. Proceeding with release..."
+echo "All checks passed."
 
-# --- Release Steps ---
-# 1. Extract version from the Go file
-VERSION=$(grep 'const version' "$VERSION_FILE" | sed -E 's/.*"([^"]+)".*/\1/')
+# --- Version Determination & Validation ---
+
+# Get the latest tag
+LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+echo "Latest version: $LATEST_TAG"
 
 if [ -z "$VERSION" ]; then
-  echo "Error: Could not find version in $VERSION_FILE"
-  exit 1
+  # Auto-suggest next version
+  SUGGESTED_VERSION=$(increment_version "$LATEST_TAG")
+  
+  if [ -z "$SUGGESTED_VERSION" ]; then
+      # Fallback if increment fails (e.g. non-standard tag format)
+      SUGGESTED_VERSION="v0.0.1"
+  fi
+
+  echo "No version provided."
+  read -p "Enter version to release (default: $SUGGESTED_VERSION): " USER_INPUT
+  VERSION="${USER_INPUT:-$SUGGESTED_VERSION}"
 fi
 
-echo "Version found: $VERSION"
-
-# 2. Check if the tag already exists
-if git rev-parse "$VERSION" >/dev/null 2>&1; then
-  echo "Error: Git tag '$VERSION' already exists. Please update the version in '$VERSION_FILE' before releasing."
-  exit 1
+# Validate Version
+if [ "$VERSION" == "$LATEST_TAG" ]; then
+    echo "Error: Version $VERSION already exists."
+    exit 1
 fi
+
+# Check if VERSION < LATEST_TAG
+if version_lt "$VERSION" "$LATEST_TAG"; then
+    echo "Error: Proposed version $VERSION is older than the latest version $LATEST_TAG."
+    exit 1
+fi
+
+echo "Target Version: $VERSION"
+
+# --- Release Steps ---
 
 # 3. Generate changelog from commits since the last tag
-LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 CHANGELOG=""
-
-if [ -n "$LATEST_TAG" ]; then
+if [ "$LATEST_TAG" != "v0.0.0" ]; then
   echo "Generating changelog from commits since tag: $LATEST_TAG"
   CHANGELOG=$(git log --pretty=format:"- %s" "$LATEST_TAG"..HEAD)
 else

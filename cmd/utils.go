@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/activebook/gllm/service"
-	"github.com/chzyer/readline"
+	"github.com/ergochat/readline"
 	"github.com/spf13/viper"
 )
 

@@ -153,23 +153,25 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 			ci.setOutputFile(filename)
 		}
 
-	case "/mode":
-		if len(parts) < 2 {
-			fmt.Printf("Current input mode: %s\n", ci.InputMode)
+	case "/single":
+		// Switch to single-line mode
+		if err := SetEffectiveChatMode("single"); err != nil {
+			service.Errorf("Failed to save chat mode: %v\n", err)
 			return
 		}
-		mode := strings.TrimSpace(parts[1])
-		if mode == "single" || mode == "multi" {
-			if err := SetEffectiveChatMode(mode); err != nil {
-				service.Errorf("Failed to save chat mode: %v\n", err)
-				return
-			}
-			ci.InputMode = mode
-			fmt.Printf("Switched to %s mode\n", mode)
-			ci.printModeStatus()
-		} else {
-			fmt.Println("Invalid mode. Use 'single' or 'multi'")
+		ci.InputMode = "single"
+		fmt.Println("Switched to single-line mode")
+		ci.printModeStatus()
+
+	case "/multi":
+		// Switch to multi-line mode
+		if err := SetEffectiveChatMode("multi"); err != nil {
+			service.Errorf("Failed to save chat mode: %v\n", err)
+			return
 		}
+		ci.InputMode = "multi"
+		fmt.Println("Switched to multi-line mode")
+		ci.printModeStatus()
 
 	case "/info", "/i":
 		// Show current model and conversation stats
@@ -191,7 +193,8 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /info, /i - Show current settings")
 	fmt.Println("  /history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)")
 	fmt.Println("  /markdown, /m [on|off] - Switch whether to render markdown or not")
-	fmt.Println("  /mode single|multi - Switch input mode (chat(*) single, chat(#) multi - press Enter on empty line to submit)")
+	fmt.Println("  /single - Switch to single-line mode (submit on Enter)")
+	fmt.Println("  /multi - Switch to multi-line mode (preview on empty line, confirm to send)")
 	fmt.Println("  /attach, /a <filename> - Attach a file to the conversation")
 	fmt.Println("  /detach, /d <filename|all> - Detach a file from the conversation")
 	fmt.Println("  /template, /p \"<tmpl|name>\" - Change the template")
@@ -425,4 +428,30 @@ func (ci *ChatInfo) setOutputFile(path string) {
 		ci.outputFile = filename
 		fmt.Printf("Output file set to: %s\n", filename)
 	}
+}
+
+// showPreview displays accumulated multiline input before submission (like editor flow)
+func (ci *ChatInfo) showPreview() {
+	if len(ci.InputLines) == 0 {
+		return
+	}
+
+	// Calculate separator width
+	termWidth := service.GetTerminalWidth()
+	if termWidth <= 0 {
+		termWidth = 80
+	}
+	separatorWidth := (termWidth * 3) / 4
+	if separatorWidth < 40 {
+		separatorWidth = 40
+	}
+
+	separator := strings.Repeat("═", separatorWidth)
+	lineNumColor := color.New(color.FgYellow).SprintFunc()
+
+	fmt.Println(separator)
+	for i, line := range ci.InputLines {
+		fmt.Printf("%s %s\n", lineNumColor(fmt.Sprintf("%3d:", i+1)), line)
+	}
+	fmt.Println()
 }

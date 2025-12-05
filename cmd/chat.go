@@ -8,9 +8,10 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/activebook/gllm/service"
-	"github.com/chzyer/readline"
+	"github.com/ergochat/readline"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -178,6 +179,7 @@ type ChatInfo struct {
 	InputMode              string
 	InputLines             []string
 	WaitingForConfirmation bool
+	lastEmptyLineTime      time.Time // When the last input was received
 }
 
 func buildChatInfo(files []*service.FileData) *ChatInfo {
@@ -222,7 +224,7 @@ func buildChatInfo(files []*service.FileData) *ChatInfo {
 func (ci *ChatInfo) printWelcome() {
 	fmt.Println("Welcome to GLLM Interactive Chat")
 	fmt.Println("Type '/exit' or '/quit' to end the session, or '/help' for commands")
-	fmt.Println("Use '/mode single|multi' to switch chat mode")
+	fmt.Println("Use '/single' or '/multi' to switch input mode")
 	fmt.Println("Use '/' for commands")
 	fmt.Println("Use '!' for exec local commands")
 	fmt.Println("Use Ctrl+C/Ctrl+D to exit")
@@ -298,6 +300,7 @@ func (ci *ChatInfo) startREPL() {
 
 		// Handle special prefixes
 		// Don't process commands/shell commands in the middle multi inputs
+		// Exception: /preview and /pv are allowed during multi-input to check accumulated content
 		if !ci.WaitingForConfirmation && !haveMultiInputs {
 			if ci.startWithInnerCommand(line) {
 				// / for inner commands
@@ -483,7 +486,7 @@ func (ci *ChatInfo) processSingleModeInput(line string) {
 		return
 	}
 
-	// End of input: combine accumulated lines if any
+	// End of line continuation: combine accumulated lines if any
 	if len(ci.InputLines) > 0 {
 		ci.InputLines = append(ci.InputLines, line)
 		input := strings.Join(ci.InputLines, "\n")
@@ -500,16 +503,40 @@ func (ci *ChatInfo) processSingleModeInput(line string) {
 }
 
 func (ci *ChatInfo) processMultiModeInput(line string) {
-	// Multi mode: accumulate lines, submit on empty line
+	const debounceDelay = 100 * time.Millisecond
+
+	// Multi mode: accumulate lines
 	if line == "" {
+		// If we have accumulated lines
 		if len(ci.InputLines) > 0 {
-			// Submit accumulated input
-			input := strings.Join(ci.InputLines, "\n")
-			ci.resetInputState()
-			ci.callAgent(input)
-			return
+			// Check if this empty line arrived instantly (buffered paste)
+			elapsed := time.Since(ci.lastEmptyLineTime)
+
+			// If input arrived < 100ms after preview, it was likely buffered during the sleep
+			if elapsed < debounceDelay {
+				// Cancel confirmation mode!
+				ci.WaitingForConfirmation = false
+				ci.lastEmptyLineTime = time.Now()
+
+				// Add the missing empty line that triggered the preview
+				ci.InputLines = append(ci.InputLines, "")
+			} else {
+				// Empty line with content - sleep to debounce
+				time.Sleep(debounceDelay)
+
+				// Show preview
+				ci.showPreview()
+				ci.WaitingForConfirmation = true
+				ci.lastEmptyLineTime = time.Time{} // Reset to zero
+			}
+		} else {
+			// Reset the timer
+			ci.lastEmptyLineTime = time.Now()
 		}
 	} else {
+		// Reset the timer
+		ci.lastEmptyLineTime = time.Now()
+
 		// Non-empty line: add to accumulation
 		ci.InputLines = append(ci.InputLines, line)
 	}
@@ -552,17 +579,11 @@ func (ci *ChatInfo) handleEditorCommand() {
 	}
 
 	lines := strings.Split(content, "\n")
-
 	ci.InputLines = lines
 	ci.WaitingForConfirmation = true
 
-	// Display edited content
-	separator := strings.Repeat("═", (service.GetTerminalWidth()*3)/4)
-	fmt.Println(separator)
-	for i, line := range lines {
-		fmt.Printf("%d: %s\n", i+1, line)
-	}
-	fmt.Println()
+	// Use shared preview display
+	ci.showPreview()
 }
 
 func (ci *ChatInfo) processEditorInput() {
@@ -596,7 +617,7 @@ func (ci *ChatInfo) printModeStatus() {
 	} else {
 		color.New(color.FgGreen, color.Bold).Printf("Multi-line mode: ")
 		color.New(color.FgCyan).Printf("chat(#)> ")
-		color.New(color.FgYellow).Println("- Press Enter to add lines, press Enter on empty line to submit")
+		color.New(color.FgYellow).Println("- Enter lines, empty line to preview & confirm")
 	}
 }
 
