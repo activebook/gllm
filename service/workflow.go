@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/chzyer/readline"
+	"github.com/ergochat/readline"
 )
 
 type WorkflowAgentType string

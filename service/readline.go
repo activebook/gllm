@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/chzyer/readline"
+	"github.com/ergochat/readline"
 )
 
 func NeedUserConfirm(info string, prompt string) (bool, error) {
