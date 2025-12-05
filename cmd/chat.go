@@ -179,9 +179,7 @@ type ChatInfo struct {
 	InputMode              string
 	InputLines             []string
 	WaitingForConfirmation bool
-	pendingEmptyLine       bool      // Track if we're waiting for debounce
-	lastEmptyLineTime      time.Time // When the empty line was received
-	previewShownTime       time.Time // When preview was shown (for buffered paste detection)
+	lastEmptyLineTime      time.Time // When the last input was received
 }
 
 func buildChatInfo(files []*service.FileData) *ChatInfo {
@@ -507,15 +505,13 @@ func (ci *ChatInfo) processSingleModeInput(line string) {
 func (ci *ChatInfo) processMultiModeInput(line string) {
 	const debounceDelay = 100 * time.Millisecond
 
-	// fmt.Println("Processing multi mode input:", line)
-
 	// Multi mode: accumulate lines
 	if line == "" {
 		// If we have accumulated lines
 		if len(ci.InputLines) > 0 {
 			// Check if this empty line arrived instantly (buffered paste)
 			elapsed := time.Since(ci.lastEmptyLineTime)
-			// fmt.Println("Elapsed time since last empty line:", elapsed)
+
 			// If input arrived < 100ms after preview, it was likely buffered during the sleep
 			if elapsed < debounceDelay {
 				// Cancel confirmation mode!
@@ -611,7 +607,6 @@ func (ci *ChatInfo) handleEditor() {
 func (ci *ChatInfo) resetInputState() {
 	ci.InputLines = nil
 	ci.WaitingForConfirmation = false
-	ci.pendingEmptyLine = false
 }
 
 func (ci *ChatInfo) printModeStatus() {
