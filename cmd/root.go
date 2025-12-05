@@ -83,7 +83,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 
 			// print version
 			if len(args) == 0 && versionFlag {
-				fmt.Printf("%s %s\n", cmd.CommandPath(), version)
+				fmt.Printf("%s\n", version)
 				return
 			}
 
