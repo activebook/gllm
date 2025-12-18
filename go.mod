@@ -8,7 +8,7 @@ require (
 	github.com/charmbracelet/glamour v0.10.0
 	github.com/ergochat/readline v0.1.3
 	github.com/fatih/color v1.18.0
-	github.com/google/jsonschema-go v0.4.0
+	github.com/google/jsonschema-go v0.4.1
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/modelcontextprotocol/go-sdk v1.1.0
 	github.com/pmezard/go-difflib v1.0.0
@@ -17,7 +17,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/volcengine/volcengine-go-sdk v1.1.54
-	google.golang.org/api v0.257.0
+	google.golang.org/api v0.258.0
 	google.golang.org/genai v1.40.0
 )
 
