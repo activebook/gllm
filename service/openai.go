@@ -178,6 +178,16 @@ func (oa *OpenAI) process(ag *Agent) error {
 		// Get all history messages
 		messages, _ := ag.Convo.GetMessages().([]openai.ChatCompletionMessage)
 
+		// Apply context window management
+		// This ensures we don't exceed the model's context window
+		cm := NewContextManagerForModel(ag.ModelName, StrategyTruncateOldest)
+		messages, truncated := cm.PrepareOpenAIMessages(messages)
+		if truncated {
+			ag.Warn("Context trimmed to fit model limits")
+			// Update the conversation with truncated messages
+			ag.Convo.SetMessages(messages)
+		}
+
 		// Create the request
 		req := openai.ChatCompletionRequest{
 			Model:       ag.ModelName,

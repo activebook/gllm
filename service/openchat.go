@@ -197,6 +197,17 @@ func (c *OpenChat) process(ag *Agent) error {
 		}
 		// Get all history messages
 		messages, _ := ag.Convo.GetMessages().([]*model.ChatCompletionMessage)
+
+		// Apply context window management
+		// This ensures we don't exceed the model's context window
+		cm := NewContextManagerForModel(ag.ModelName, StrategyTruncateOldest)
+		messages, truncated := cm.PrepareOpenChatMessages(messages)
+		if truncated {
+			ag.Warn("Context trimmed to fit model limits")
+			// Update the conversation with truncated messages
+			ag.Convo.SetMessages(messages)
+		}
+
 		// Create the request with thinking mode
 		req := model.CreateChatCompletionRequest{
 			Model:       ag.ModelName,

@@ -29,6 +29,15 @@ var providerDomains = map[string]ModelProvider{
 	"codestral":   ModelMistral,
 	"magistral":   ModelMistral,
 
+	// Explicit OpenAI domains
+	"openai.com":       ModelOpenAI,
+	"api.openai.com":   ModelOpenAI,
+	"azure.com":        ModelOpenAI,
+	"azure-api.net":    ModelOpenAI,
+	"openai.azure.com": ModelOpenAI,
+	"modelscope.ai":    ModelOpenAI,
+	"zenmux.ai":        ModelOpenAI,
+
 	// Chinese/Other domains
 	".cn":              ModelOpenChat,
 	"aliyuncs.com":     ModelOpenChat,
@@ -43,12 +52,17 @@ var providerDomains = map[string]ModelProvider{
 	"minimax.com":      ModelOpenChat,
 	"baidu.com":        ModelOpenChat,
 	"deepseek.com":     ModelOpenChat,
+	"modelscope.cn":    ModelOpenChat,
 }
 
 // Model name patterns for Chinese models (used when endpoint doesn't match)
 var modelPatterns = map[string]ModelProvider{
 	"qwen":     ModelOpenChat, // Alibaba Qwen models
 	"deepseek": ModelOpenChat, // DeepSeek models
+	"xiaomi":   ModelOpenChat, // Xiaom models
+	"mimo":     ModelOpenChat, // Xiaom models
+	"meituan":  ModelOpenChat, // Meituan Longcat models
+	"longcat":  ModelOpenChat, // Meituan Longcat models
 	"minimax":  ModelOpenChat, // MiniMax models
 	"kimi":     ModelOpenChat, // Moonshot Kimi models
 	"moonshot": ModelOpenChat, // Moonshot models
@@ -58,6 +72,8 @@ var modelPatterns = map[string]ModelProvider{
 	"hunyuan":  ModelOpenChat, // Tencent Hunyuan models
 	"doubao":   ModelOpenChat, // ByteDance Doubao models
 	"skylark":  ModelOpenChat, // ByteDance Skylark models
+	"kat-":     ModelOpenChat, // Kuaishou Kat models (with hyphen to avoid false matches)
+	"kat_":     ModelOpenChat, // Kuaishou Kat models (with underscore)
 	"abab":     ModelOpenChat, // MiniMax ABAB models
 	"yi-":      ModelOpenChat, // 01.AI Yi models (with hyphen to avoid false matches)
 	"yi_":      ModelOpenChat, // 01.AI Yi models (with underscore)
