@@ -5,6 +5,7 @@ import (
 
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
+	"google.golang.org/genai"
 )
 
 func TestNewContextManager(t *testing.T) {
@@ -487,5 +488,90 @@ func TestOpenChatPreserveMultiSystemMessages(t *testing.T) {
 	expectedContent := sys1 + "\n" + sys2 + "\n" + sys3
 	if *result[0].Content.StringValue != expectedContent {
 		t.Errorf("System content mismatch.\nGot: %q\nWant: %q", *result[0].Content.StringValue, expectedContent)
+	}
+}
+
+// =============================================================================
+// Gemini Context Tests
+// =============================================================================
+
+func TestPrepareGeminiMessages(t *testing.T) {
+	ClearTokenCache()
+	cm := &ContextManager{
+		MaxInputTokens: 50,
+		Strategy:       StrategyTruncateOldest,
+		BufferPercent:  0.8,
+	}
+
+	messages := []*genai.Content{
+		{Parts: []*genai.Part{{Text: "This is message 1 with enough content to consume tokens"}}},
+		{Parts: []*genai.Part{{Text: "This is message 2 with enough content to consume tokens"}}},
+		{Parts: []*genai.Part{{Text: "This is message 3 with enough content to consume tokens"}}},
+		{Parts: []*genai.Part{{Text: "This is message 4 with enough content to consume tokens"}}},
+		{Parts: []*genai.Part{{Text: "This is message 5 with enough content to consume tokens"}}},
+	}
+
+	result, truncated := cm.PrepareGeminiMessages(messages, "System Prompt")
+
+	if !truncated {
+		t.Error("Expected truncation")
+	}
+	if len(result) >= len(messages) {
+		t.Errorf("Expected fewer messages, got %d", len(result))
+	}
+}
+
+func TestGeminiToolPairRemoval(t *testing.T) {
+	ClearTokenCache()
+	cm := &ContextManager{
+		MaxInputTokens: 30, // Force truncation
+		Strategy:       StrategyTruncateOldest,
+		BufferPercent:  0.8,
+	}
+
+	messages := []*genai.Content{
+		{Parts: []*genai.Part{{Text: "User question"}}}, // Should be removed
+		{ // Tool Call
+			Parts: []*genai.Part{
+				{FunctionCall: &genai.FunctionCall{Name: "search", Args: map[string]interface{}{"q": "foo"}}},
+			},
+		},
+		{ // Tool Response
+			Parts: []*genai.Part{
+				{FunctionResponse: &genai.FunctionResponse{Name: "search", Response: map[string]interface{}{"res": "bar"}}},
+			},
+		},
+		{Parts: []*genai.Part{{Text: "Final answer"}}},
+	}
+
+	result, truncated := cm.PrepareGeminiMessages(messages, "")
+
+	if !truncated {
+		t.Error("Expected truncation")
+	}
+
+	// Because tokens are low, "User question" should be removed.
+	// The tool pair occupies tokens. If we remove tool pair, we lose context.
+	// But "User question" is oldest.
+	// Let's see if we retain the pair.
+	// Assuming "Final answer" + Pair fits? Maybe not.
+	// If User question removed -> fine.
+	// If Pair removed -> Both must go.
+
+	hasCall := false
+	hasResp := false
+	for _, msg := range result {
+		for _, p := range msg.Parts {
+			if p.FunctionCall != nil {
+				hasCall = true
+			}
+			if p.FunctionResponse != nil {
+				hasResp = true
+			}
+		}
+	}
+
+	if hasCall != hasResp {
+		t.Error("Tool pair broken: hasCall =", hasCall, " hasResp =", hasResp)
 	}
 }

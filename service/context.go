@@ -3,6 +3,7 @@ package service
 import (
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
+	"google.golang.org/genai"
 )
 
 // TruncationStrategy defines how to handle context overflow
@@ -406,4 +407,184 @@ func GetCurrentTokenCount(messages []openai.ChatCompletionMessage) int {
 // GetCurrentTokenCountOpenChat returns the current token count for OpenChat messages
 func GetCurrentTokenCountOpenChat(messages []*model.ChatCompletionMessage) int {
 	return EstimateOpenChatMessagesTokens(messages)
+}
+
+// =============================================================================
+// Gemini Message Handling
+// =============================================================================
+
+// PrepareGeminiMessages processes messages to fit within context window limits.
+func (cm *ContextManager) PrepareGeminiMessages(messages []*genai.Content, systemPrompt string) ([]*genai.Content, bool) {
+	if cm.Strategy == StrategyNone {
+		return messages, false
+	}
+
+	// Calculate tokens for system prompt (passed separately)
+	sysTokens := 0
+	if systemPrompt != "" {
+		sysTokens = EstimateTokens(systemPrompt) + MessageOverheadTokens
+	}
+
+	currentTokens := cm.estimateGeminiMessagesWithCache(messages) + sysTokens
+	if currentTokens <= cm.MaxInputTokens {
+		return messages, false
+	}
+
+	return cm.truncateGeminiMessages(messages, sysTokens)
+}
+
+func (cm *ContextManager) estimateGeminiMessagesWithCache(messages []*genai.Content) int {
+	cache := GetGlobalTokenCache()
+	total := 0
+	for _, msg := range messages {
+		total += cache.GetOrComputeGeminiTokens(msg)
+	}
+	return total + 3 // priming
+}
+
+func (cm *ContextManager) truncateGeminiMessages(messages []*genai.Content, sysTokens int) ([]*genai.Content, bool) {
+	if len(messages) == 0 {
+		return messages, false
+	}
+
+	availableTokens := cm.MaxInputTokens - sysTokens
+
+	// Build token cache
+	cache := GetGlobalTokenCache()
+	tokenCounts := make([]int, len(messages))
+	historyTokens := 0
+	for i, msg := range messages {
+		tokenCounts[i] = cache.GetOrComputeGeminiTokens(msg)
+		historyTokens += tokenCounts[i]
+	}
+
+	truncated := false
+	for historyTokens > availableTokens && len(messages) > 0 {
+		removed := false
+		for i := 0; i < len(messages); i++ {
+			// Check tool pair
+			pairIndices := cm.findToolPairGemini(messages, i)
+			if len(pairIndices) > 0 {
+				// Remove pair (highest index first)
+				tokensRemoved := 0
+				for j := len(pairIndices) - 1; j >= 0; j-- {
+					idx := pairIndices[j]
+					if idx < len(tokenCounts) {
+						tokensRemoved += tokenCounts[idx]
+						messages = append(messages[:idx], messages[idx+1:]...)
+						tokenCounts = append(tokenCounts[:idx], tokenCounts[idx+1:]...)
+					}
+				}
+				historyTokens -= tokensRemoved
+				truncated = true
+				removed = true
+				break
+			}
+
+			// Regular message
+			if !cm.isGeminiToolMessage(messages[i]) {
+				historyTokens -= tokenCounts[i]
+				messages = append(messages[:i], messages[i+1:]...)
+				tokenCounts = append(tokenCounts[:i], tokenCounts[i+1:]...)
+				truncated = true
+				removed = true
+				break
+			}
+		}
+
+		if !removed {
+			break
+		}
+	}
+
+	return messages, truncated
+}
+
+func (cm *ContextManager) isGeminiToolMessage(msg *genai.Content) bool {
+	if msg == nil {
+		return false
+	}
+	for _, part := range msg.Parts {
+		if part.FunctionCall != nil || part.FunctionResponse != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func (cm *ContextManager) findToolPairGemini(messages []*genai.Content, index int) []int {
+	msg := messages[index]
+	if msg == nil {
+		return nil
+	}
+
+	// Check if message contains function response
+	var responseName string
+	for _, part := range msg.Parts {
+		if part.FunctionResponse != nil {
+			responseName = part.FunctionResponse.Name
+			break
+		}
+	}
+
+	// If it's a response, find its call (search backwards)
+	if responseName != "" {
+		for i := index - 1; i >= 0; i-- {
+			for _, part := range messages[i].Parts {
+				if part.FunctionCall != nil && part.FunctionCall.Name == responseName {
+					return cm.gatherToolPairGemini(messages, i)
+				}
+			}
+		}
+	}
+
+	// Check if message contains function call
+	hasCall := false
+	for _, part := range msg.Parts {
+		if part.FunctionCall != nil {
+			hasCall = true
+			break
+		}
+	}
+
+	if hasCall {
+		return cm.gatherToolPairGemini(messages, index)
+	}
+
+	return nil
+}
+
+func (cm *ContextManager) gatherToolPairGemini(messages []*genai.Content, callIndex int) []int {
+	indices := []int{callIndex}
+	callMsg := messages[callIndex]
+	if callMsg == nil {
+		return indices
+	}
+
+	// Identify call names
+	callNames := make(map[string]bool)
+	for _, part := range callMsg.Parts {
+		if part.FunctionCall != nil {
+			callNames[part.FunctionCall.Name] = true
+		}
+	}
+
+	// Find responses
+	for j := callIndex + 1; j < len(messages); j++ {
+		msg := messages[j]
+		if msg == nil {
+			continue
+		}
+		for _, part := range msg.Parts {
+			if part.FunctionResponse != nil && callNames[part.FunctionResponse.Name] {
+				indices = append(indices, j)
+			}
+		}
+	}
+	return indices
+}
+
+// GetCurrentTokenCountGemini returns the current token count for Gemini messages
+func GetCurrentTokenCountGemini(messages []*genai.Content) int {
+	return EstimateGeminiMessagesTokens(messages)
 }

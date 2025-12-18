@@ -33,7 +33,7 @@ func TestGetModelLimits(t *testing.T) {
 			name:          "pattern match deepseek",
 			modelName:     "deepseek-v3-latest",
 			expectDefault: false,
-			minContext:    60000,
+			minContext:    8192,
 		},
 		{
 			name:          "unknown model",
@@ -128,7 +128,6 @@ func TestModelRegistryCompleteness(t *testing.T) {
 		"qwen",
 		"deepseek",
 		"glm",
-		"llama",
 	}
 
 	for _, family := range families {

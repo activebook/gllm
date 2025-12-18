@@ -6,6 +6,7 @@ import (
 
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
+	"google.golang.org/genai"
 )
 
 // =============================================================================
@@ -133,6 +134,23 @@ func GetOpenChatMessageKey(msg *model.ChatCompletionMessage) string {
 	return string(data)
 }
 
+// GetGeminiMessageKey generates a cache key for a Gemini message.
+func GetGeminiMessageKey(msg *genai.Content) string {
+	if msg == nil {
+		return ""
+	}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		content := ""
+		// concatenate all parts.text
+		for _, part := range msg.Parts {
+			content += part.Text
+		}
+		return string(msg.Role) + "|" + content
+	}
+	return string(data)
+}
+
 // =============================================================================
 // Global Token Cache Instance
 // =============================================================================
@@ -175,6 +193,20 @@ func (tc *TokenCache) GetOrComputeOpenChatTokens(msg *model.ChatCompletionMessag
 		return count
 	}
 	count := EstimateOpenChatMessageTokens(msg)
+	tc.Set(key, count)
+	return count
+}
+
+// GetOrComputeGeminiTokens retrieves cached tokens or computes and caches them for Gemini.
+func (tc *TokenCache) GetOrComputeGeminiTokens(msg *genai.Content) int {
+	if msg == nil {
+		return 0
+	}
+	key := GetGeminiMessageKey(msg)
+	if count, found := tc.Get(key); found {
+		return count
+	}
+	count := EstimateGeminiMessageTokens(msg)
 	tc.Set(key, count)
 	return count
 }

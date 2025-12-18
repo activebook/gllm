@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 
 	openai "github.com/sashabaranov/go-openai"
-	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
+	openchat "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
+	"google.golang.org/genai"
 )
 
 // Token estimation constants
@@ -151,7 +152,8 @@ func EstimateOpenAIMessageTokens(msg openai.ChatCompletionMessage) int {
 			case openai.ChatMessagePartTypeImageURL:
 				// Images typically cost 765-1105 tokens depending on size
 				// Use a conservative estimate
-				tokens += 1000
+				tokens += EstimateTokens(part.ImageURL.URL)
+				tokens += EstimateTokens(string(part.ImageURL.Detail))
 			}
 		}
 	}
@@ -174,7 +176,7 @@ func EstimateOpenAIMessageTokens(msg openai.ChatCompletionMessage) int {
 }
 
 // EstimateOpenChatMessageTokens estimates tokens for an OpenChat (Volcengine) message.
-func EstimateOpenChatMessageTokens(msg *model.ChatCompletionMessage) int {
+func EstimateOpenChatMessageTokens(msg *openchat.ChatCompletionMessage) int {
 	if msg == nil {
 		return 0
 	}
@@ -192,10 +194,11 @@ func EstimateOpenChatMessageTokens(msg *model.ChatCompletionMessage) int {
 					tokens += EstimateTokens(part.Text)
 				}
 				if part.ImageURL != nil {
-					tokens += 1000 // Image token estimate
+					tokens += EstimateTokens(part.ImageURL.URL)
+					tokens += EstimateTokens(string(part.ImageURL.Detail))
 				}
 				if part.VideoURL != nil {
-					tokens += 1000 // Video token estimate
+					tokens += EstimateTokens(part.VideoURL.URL)
 				}
 			}
 		}
@@ -225,6 +228,51 @@ func EstimateOpenChatMessageTokens(msg *model.ChatCompletionMessage) int {
 	return tokens
 }
 
+// EstimateGeminiMessageTokens estimates tokens for a Gemini content message.
+func EstimateGeminiMessageTokens(msg *genai.Content) int {
+	if msg == nil {
+		return 0
+	}
+
+	tokens := MessageOverheadTokens
+
+	for _, part := range msg.Parts {
+		// Text content
+		if part.Text != "" {
+			tokens += EstimateTokens(part.Text)
+		}
+
+		// Function call
+		if part.FunctionCall != nil {
+			tokens += ToolCallOverhead
+			tokens += EstimateTokens(part.FunctionCall.Name)
+			// Arguments are a map[string]interface{}, convert to JSON string to estimate
+			tokens += EstimateJSONTokens(part.FunctionCall.Args)
+		}
+
+		// Function response
+		if part.FunctionResponse != nil {
+			tokens += ToolCallOverhead
+			tokens += EstimateTokens(part.FunctionResponse.Name)
+			tokens += EstimateJSONTokens(part.FunctionResponse.Response)
+		}
+
+		// Inline data (images/files)
+		if part.InlineData != nil {
+			tokens += int(float64(len(part.InlineData.Data)) / 3.5)
+			tokens += EstimateTokens(part.InlineData.MIMEType)
+		}
+
+		// File data (images/files via URI)
+		if part.FileData != nil {
+			tokens += EstimateTokens(part.FileData.FileURI)
+			tokens += EstimateTokens(part.FileData.MIMEType)
+		}
+	}
+
+	return tokens
+}
+
 // EstimateOpenAIMessagesTokens estimates total tokens for a slice of OpenAI messages.
 func EstimateOpenAIMessagesTokens(messages []openai.ChatCompletionMessage) int {
 	total := 0
@@ -236,11 +284,21 @@ func EstimateOpenAIMessagesTokens(messages []openai.ChatCompletionMessage) int {
 }
 
 // EstimateOpenChatMessagesTokens estimates total tokens for a slice of OpenChat messages.
-func EstimateOpenChatMessagesTokens(messages []*model.ChatCompletionMessage) int {
+func EstimateOpenChatMessagesTokens(messages []*openchat.ChatCompletionMessage) int {
 	total := 0
 	for _, msg := range messages {
 		total += EstimateOpenChatMessageTokens(msg)
 	}
+	return total + 3
+}
+
+// EstimateGeminiMessagesTokens estimates total tokens for a slice of Gemini messages.
+func EstimateGeminiMessagesTokens(messages []*genai.Content) int {
+	total := 0
+	for _, msg := range messages {
+		total += EstimateGeminiMessageTokens(msg)
+	}
+	// Add base overhead
 	return total + 3
 }
 
