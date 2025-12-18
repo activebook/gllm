@@ -169,6 +169,10 @@ type OpenChat struct {
 }
 
 func (c *OpenChat) process(ag *Agent) error {
+	// Context Management
+	truncated := false
+	cm := NewContextManagerForModel(ag.ModelName, StrategyTruncateOldest)
+
 	// For some models, there isn't thinking property
 	// So we need to check whether to add it or not
 	thinkProperty := true
@@ -200,8 +204,7 @@ func (c *OpenChat) process(ag *Agent) error {
 
 		// Apply context window management
 		// This ensures we don't exceed the model's context window
-		cm := NewContextManagerForModel(ag.ModelName, StrategyTruncateOldest)
-		messages, truncated := cm.PrepareOpenChatMessages(messages)
+		messages, truncated = cm.PrepareOpenChatMessages(messages, c.tools)
 		if truncated {
 			ag.Warn("Context trimmed to fit model limits")
 			// Update the conversation with truncated messages

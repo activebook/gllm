@@ -21,6 +21,7 @@ const (
 	CharsPerTokenJapanese = 2.0 // 3 bytes / 2.0 = 1.5 tokens/char
 	CharsPerTokenKorean   = 2.0 // 3 bytes / 2.0 = 1.5 tokens/char
 	CharsPerTokenCode     = 3.5 // Tuned: Code is dense. 3.5 chars/token.
+	CharsPerTokenJSON     = 3.7 // JSON: Typically 3.5-4 characters per token. Tuned: 3.7 chars/token.
 	CharsPerTokenDefault  = 4.0 // Default fallback
 	MessageOverheadTokens = 3   // Standard overhead per message (<|start|>role and <|end|>)
 	ToolCallOverhead      = 24  // Reduced from 100 to 24 (closer to reality for JSON overhead)
@@ -280,7 +281,7 @@ func EstimateOpenAIMessagesTokens(messages []openai.ChatCompletionMessage) int {
 		total += EstimateOpenAIMessageTokens(msg)
 	}
 	// Add base overhead for the conversation
-	return total + 3 // Every conversation has 3 extra tokens for priming
+	return total + MessageOverheadTokens // Every conversation has 3 extra tokens for priming
 }
 
 // EstimateOpenChatMessagesTokens estimates total tokens for a slice of OpenChat messages.
@@ -289,7 +290,7 @@ func EstimateOpenChatMessagesTokens(messages []*openchat.ChatCompletionMessage) 
 	for _, msg := range messages {
 		total += EstimateOpenChatMessageTokens(msg)
 	}
-	return total + 3
+	return total + MessageOverheadTokens
 }
 
 // EstimateGeminiMessagesTokens estimates total tokens for a slice of Gemini messages.
@@ -299,7 +300,7 @@ func EstimateGeminiMessagesTokens(messages []*genai.Content) int {
 		total += EstimateGeminiMessageTokens(msg)
 	}
 	// Add base overhead
-	return total + 3
+	return total + MessageOverheadTokens
 }
 
 // EstimateJSONTokens estimates tokens for arbitrary JSON data.
@@ -310,5 +311,29 @@ func EstimateJSONTokens(data interface{}) int {
 		return 0
 	}
 	// JSON typically has slightly higher token density due to punctuation
-	return int(float64(len(bytes)) / 3.5)
+	return int(float64(len(bytes)) / CharsPerTokenJSON)
+}
+
+// EstimateGeminiToolTokens estimates tokens for a slice of Gemini tools
+func EstimateGeminiToolTokens(tools []*genai.Tool) int {
+	if len(tools) == 0 {
+		return 0
+	}
+	return EstimateJSONTokens(tools)
+}
+
+// EstimateOpenAIToolTokens estimates tokens for a slice of OpenAI tools
+func EstimateOpenAIToolTokens(tools []openai.Tool) int {
+	if len(tools) == 0 {
+		return 0
+	}
+	return EstimateJSONTokens(tools)
+}
+
+// EstimateOpenChatToolTokens estimates tokens for a slice of OpenChat tools
+func EstimateOpenChatToolTokens(tools []*openchat.Tool) int {
+	if len(tools) == 0 {
+		return 0
+	}
+	return EstimateJSONTokens(tools)
 }

@@ -52,7 +52,7 @@ func TestPrepareOpenAIMessagesNoTruncation(t *testing.T) {
 		{Role: openai.ChatMessageRoleAssistant, Content: "Hi there!"},
 	}
 
-	result, truncated := cm.PrepareOpenAIMessages(messages)
+	result, truncated := cm.PrepareOpenAIMessages(messages, nil)
 
 	if truncated {
 		t.Error("Expected no truncation for small messages")
@@ -79,7 +79,7 @@ func TestPrepareOpenAIMessagesWithTruncation(t *testing.T) {
 		{Role: openai.ChatMessageRoleAssistant, Content: "This is response two with some content."},
 	}
 
-	result, truncated := cm.PrepareOpenAIMessages(messages)
+	result, truncated := cm.PrepareOpenAIMessages(messages, nil)
 
 	if !truncated {
 		t.Error("Expected truncation for messages exceeding limit")
@@ -112,7 +112,7 @@ func TestPrepareOpenAIMessagesWithStrategyNone(t *testing.T) {
 		{Role: openai.ChatMessageRoleUser, Content: "Hello, this is a relatively long message."},
 	}
 
-	result, truncated := cm.PrepareOpenAIMessages(messages)
+	result, truncated := cm.PrepareOpenAIMessages(messages, nil)
 
 	// With StrategyNone, no truncation should occur
 	if truncated {
@@ -153,7 +153,7 @@ func TestToolPairRemoval(t *testing.T) {
 		{Role: openai.ChatMessageRoleUser, Content: "Thanks! What about tomorrow?"},
 	}
 
-	result, truncated := cm.PrepareOpenAIMessages(messages)
+	result, truncated := cm.PrepareOpenAIMessages(messages, nil)
 
 	if !truncated {
 		t.Error("Expected truncation to occur")
@@ -215,7 +215,7 @@ func TestPreserveMultiSystemMessages(t *testing.T) {
 
 	// Should preserve all system messages by merging them into one
 	// Msg A, B, C, D likely dropped to fit 40 tokens
-	result, truncated := cm.PrepareOpenAIMessages(messages)
+	result, truncated := cm.PrepareOpenAIMessages(messages, nil)
 
 	if !truncated {
 		t.Error("Expected truncation")
@@ -283,7 +283,7 @@ func TestPrepareOpenChatMessagesNoTruncation(t *testing.T) {
 		},
 	}
 
-	result, truncated := cm.PrepareOpenChatMessages(messages)
+	result, truncated := cm.PrepareOpenChatMessages(messages, nil)
 
 	if truncated {
 		t.Error("Expected no truncation for small messages")
@@ -336,7 +336,7 @@ func TestPrepareOpenChatMessagesWithTruncation(t *testing.T) {
 		},
 	}
 
-	result, truncated := cm.PrepareOpenChatMessages(messages)
+	result, truncated := cm.PrepareOpenChatMessages(messages, nil)
 
 	if !truncated {
 		t.Error("Expected truncation for messages exceeding limit")
@@ -408,7 +408,7 @@ func TestOpenChatToolPairRemoval(t *testing.T) {
 		},
 	}
 
-	result, truncated := cm.PrepareOpenChatMessages(messages)
+	result, truncated := cm.PrepareOpenChatMessages(messages, nil)
 
 	if !truncated {
 		t.Error("Expected truncation to occur")
@@ -466,7 +466,7 @@ func TestOpenChatPreserveMultiSystemMessages(t *testing.T) {
 	}
 
 	// Should preserve all system messages by merging them into one
-	result, _ := cm.PrepareOpenChatMessages(messages)
+	result, _ := cm.PrepareOpenChatMessages(messages, nil)
 
 	// Should have exactly 1 system message now (consolidated)
 	systemCount := 0
@@ -498,26 +498,36 @@ func TestOpenChatPreserveMultiSystemMessages(t *testing.T) {
 func TestPrepareGeminiMessages(t *testing.T) {
 	ClearTokenCache()
 	cm := &ContextManager{
-		MaxInputTokens: 50,
+		MaxInputTokens: 200, // Large enough for all
 		Strategy:       StrategyTruncateOldest,
 		BufferPercent:  0.8,
 	}
 
 	messages := []*genai.Content{
-		{Parts: []*genai.Part{{Text: "This is message 1 with enough content to consume tokens"}}},
-		{Parts: []*genai.Part{{Text: "This is message 2 with enough content to consume tokens"}}},
-		{Parts: []*genai.Part{{Text: "This is message 3 with enough content to consume tokens"}}},
-		{Parts: []*genai.Part{{Text: "This is message 4 with enough content to consume tokens"}}},
-		{Parts: []*genai.Part{{Text: "This is message 5 with enough content to consume tokens"}}},
+		{Parts: []*genai.Part{{Text: "This is message 1"}}},
+		{Parts: []*genai.Part{{Text: "This is message 2"}}},
+		{Parts: []*genai.Part{{Text: "This is message 3"}}},
+		{Parts: []*genai.Part{{Text: "This is message 4"}}},
+		{Parts: []*genai.Part{{Text: "This is message 5"}}},
 	}
 
-	result, truncated := cm.PrepareGeminiMessages(messages, "System Prompt")
+	// 1. No truncation needed
+	result, truncated := cm.PrepareGeminiMessages(messages, "System Prompt", nil)
+	if truncated {
+		t.Errorf("Expected no truncation, but got truncated")
+	}
+	if len(result) != len(messages) {
+		t.Errorf("Expected all messages, got %d", len(result))
+	}
 
+	// 2. Truncation needed (Low MaxTokens)
+	cm.MaxInputTokens = 30 // Should drop some messages
+	result, truncated = cm.PrepareGeminiMessages(messages, "System Prompt", nil)
 	if !truncated {
 		t.Error("Expected truncation")
 	}
 	if len(result) >= len(messages) {
-		t.Errorf("Expected fewer messages, got %d", len(result))
+		t.Errorf("Expected fewer than %d messages, got %d", len(messages), len(result))
 	}
 }
 
@@ -544,7 +554,7 @@ func TestGeminiToolPairRemoval(t *testing.T) {
 		{Parts: []*genai.Part{{Text: "Final answer"}}},
 	}
 
-	result, truncated := cm.PrepareGeminiMessages(messages, "")
+	result, truncated := cm.PrepareGeminiMessages(messages, "", nil)
 
 	if !truncated {
 		t.Error("Expected truncation")

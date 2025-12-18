@@ -60,8 +60,8 @@ func TestGetModelLimits(t *testing.T) {
 			limits := GetModelLimits(tt.modelName)
 
 			if tt.expectDefault {
-				if limits != DefaultLimits {
-					t.Errorf("GetModelLimits(%q) should return DefaultLimits", tt.modelName)
+				if limits != DefaultLimitsModern {
+					t.Errorf("GetModelLimits(%q) should return DefaultLimitsModern", tt.modelName)
 				}
 			} else {
 				if limits.ContextWindow < tt.minContext {

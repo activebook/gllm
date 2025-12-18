@@ -167,6 +167,10 @@ type OpenAI struct {
 }
 
 func (oa *OpenAI) process(ag *Agent) error {
+	// Context Management
+	truncated := false
+	cm := NewContextManagerForModel(ag.ModelName, StrategyTruncateOldest)
+
 	// Recursively process the conversation
 	// Because the model can call tools multiple times
 	i := 0
@@ -175,13 +179,12 @@ func (oa *OpenAI) process(ag *Agent) error {
 		//Debugf("Processing conversation at times: %d\n", i)
 		oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusProcessing}, oa.op.proceed)
 
-		// Get all history messages
+		// Get all history messages - MUST be inside loop to pick up newly pushed messages
 		messages, _ := ag.Convo.GetMessages().([]openai.ChatCompletionMessage)
 
 		// Apply context window management
 		// This ensures we don't exceed the model's context window
-		cm := NewContextManagerForModel(ag.ModelName, StrategyTruncateOldest)
-		messages, truncated := cm.PrepareOpenAIMessages(messages)
+		messages, truncated = cm.PrepareOpenAIMessages(messages, oa.tools)
 		if truncated {
 			ag.Warn("Context trimmed to fit model limits")
 			// Update the conversation with truncated messages

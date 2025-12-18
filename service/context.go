@@ -1,6 +1,8 @@
 package service
 
 import (
+	"strings"
+
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"google.golang.org/genai"
@@ -52,21 +54,26 @@ func NewContextManagerForModel(modelName string, strategy TruncationStrategy) *C
 
 // PrepareOpenAIMessages processes messages to fit within context window limits.
 // Returns the processed messages and a boolean indicating if truncation occurred.
-func (cm *ContextManager) PrepareOpenAIMessages(messages []openai.ChatCompletionMessage) ([]openai.ChatCompletionMessage, bool) {
+// PrepareOpenAIMessages processes messages to fit within context window limits.
+// Returns the processed messages and a boolean indicating if truncation occurred.
+func (cm *ContextManager) PrepareOpenAIMessages(messages []openai.ChatCompletionMessage, tools []openai.Tool) ([]openai.ChatCompletionMessage, bool) {
 	if cm.Strategy == StrategyNone || len(messages) == 0 {
 		return messages, false
 	}
 
+	// Estimate tool tokens
+	toolTokens := EstimateOpenAIToolTokens(tools)
+
 	// Calculate current token usage using cache
-	currentTokens := cm.estimateOpenAIMessagesWithCache(messages)
-	// Test Only
-	// fmt.Println("Token count: ", currentTokens, " MaxInputTokens: ", cm.MaxInputTokens)
+	currentTokens := cm.estimateOpenAIMessagesWithCache(messages) + toolTokens
+	// Test Only(Remove only mannually)
+	logger.Debugln("Token count: ", currentTokens, " MaxInputTokens: ", cm.MaxInputTokens)
 	if currentTokens <= cm.MaxInputTokens {
 		return messages, false
 	}
 
 	// Need to truncate
-	return cm.truncateOpenAIMessages(messages)
+	return cm.truncateOpenAIMessages(messages, toolTokens)
 }
 
 // estimateOpenAIMessagesWithCache uses global cache for token estimation
@@ -76,12 +83,12 @@ func (cm *ContextManager) estimateOpenAIMessagesWithCache(messages []openai.Chat
 	for _, msg := range messages {
 		total += cache.GetOrComputeOpenAITokens(msg)
 	}
-	return total + 3 // priming tokens
+	return total + MessageOverheadTokens // priming tokens
 }
 
 // truncateOpenAIMessages removes oldest messages while preserving critical ones.
 // Removes tool call/response pairs together.
-func (cm *ContextManager) truncateOpenAIMessages(messages []openai.ChatCompletionMessage) ([]openai.ChatCompletionMessage, bool) {
+func (cm *ContextManager) truncateOpenAIMessages(messages []openai.ChatCompletionMessage, toolTokens int) ([]openai.ChatCompletionMessage, bool) {
 	if len(messages) == 0 {
 		return messages, false
 	}
@@ -102,7 +109,10 @@ func (cm *ContextManager) truncateOpenAIMessages(messages []openai.ChatCompletio
 	// Consolidate all current system-level instructions into ONE system message
 	if len(systemMsgs) > 1 {
 		for i := 1; i < len(systemMsgs); i++ {
-			systemMsgs[0].Content += "\n" + systemMsgs[i].Content
+			// Bugfixed: Don't include duplicate system messages
+			if !strings.Contains(systemMsgs[0].Content, systemMsgs[i].Content) {
+				systemMsgs[0].Content += "\n" + systemMsgs[i].Content
+			}
 		}
 		// Place it at the start (models pay most attention here)
 		systemMsgs = systemMsgs[:1]
@@ -112,7 +122,7 @@ func (cm *ContextManager) truncateOpenAIMessages(messages []openai.ChatCompletio
 	systemTokens := cm.estimateOpenAIMessagesWithCache(systemMsgs)
 
 	// Available tokens for non-system messages
-	availableTokens := cm.MaxInputTokens - systemTokens
+	availableTokens := cm.MaxInputTokens - systemTokens - toolTokens
 
 	// Build token cache for non-system messages (array indexed)
 	cache := GetGlobalTokenCache()
@@ -221,21 +231,24 @@ func (cm *ContextManager) gatherToolPairOpenAI(messages []openai.ChatCompletionM
 // =============================================================================
 
 // PrepareOpenChatMessages processes messages to fit within context window limits for OpenChat format.
-func (cm *ContextManager) PrepareOpenChatMessages(messages []*model.ChatCompletionMessage) ([]*model.ChatCompletionMessage, bool) {
+func (cm *ContextManager) PrepareOpenChatMessages(messages []*model.ChatCompletionMessage, tools []*model.Tool) ([]*model.ChatCompletionMessage, bool) {
 	if cm.Strategy == StrategyNone || len(messages) == 0 {
 		return messages, false
 	}
 
+	// Estimate tool tokens
+	toolTokens := EstimateOpenChatToolTokens(tools)
+
 	// Calculate current token usage using cache
-	currentTokens := cm.estimateOpenChatMessagesWithCache(messages)
+	currentTokens := cm.estimateOpenChatMessagesWithCache(messages) + toolTokens
 	// Test Only
-	// fmt.Println("Token count: ", currentTokens, " MaxInputTokens: ", cm.MaxInputTokens)
+	logger.Debugln("Token count: ", currentTokens, " MaxInputTokens: ", cm.MaxInputTokens)
 	if currentTokens <= cm.MaxInputTokens {
 		return messages, false
 	}
 
 	// Need to truncate
-	return cm.truncateOpenChatMessages(messages)
+	return cm.truncateOpenChatMessages(messages, toolTokens)
 }
 
 // estimateOpenChatMessagesWithCache uses global cache for token estimation
@@ -248,12 +261,12 @@ func (cm *ContextManager) estimateOpenChatMessagesWithCache(messages []*model.Ch
 		}
 		total += cache.GetOrComputeOpenChatTokens(msg)
 	}
-	return total + 3 // priming tokens
+	return total + MessageOverheadTokens // priming tokens
 }
 
 // truncateOpenChatMessages removes oldest messages while preserving critical ones.
 // Removes tool call/response pairs together.
-func (cm *ContextManager) truncateOpenChatMessages(messages []*model.ChatCompletionMessage) ([]*model.ChatCompletionMessage, bool) {
+func (cm *ContextManager) truncateOpenChatMessages(messages []*model.ChatCompletionMessage, toolTokens int) ([]*model.ChatCompletionMessage, bool) {
 	if len(messages) == 0 {
 		return messages, false
 	}
@@ -280,7 +293,11 @@ func (cm *ContextManager) truncateOpenChatMessages(messages []*model.ChatComplet
 
 		for i := 1; i < len(systemMsgs); i++ {
 			if systemMsgs[i].Content != nil && systemMsgs[i].Content.StringValue != nil {
-				combinedContent += "\n" + *systemMsgs[i].Content.StringValue
+				newSys := *systemMsgs[i].Content.StringValue
+				// Bugfixed: Don't include duplicate system messages
+				if !strings.Contains(combinedContent, newSys) {
+					combinedContent += "\n" + newSys
+				}
 			}
 		}
 
@@ -296,7 +313,7 @@ func (cm *ContextManager) truncateOpenChatMessages(messages []*model.ChatComplet
 
 	// Calculate system message tokens
 	systemTokens := cm.estimateOpenChatMessagesWithCache(systemMsgs)
-	availableTokens := cm.MaxInputTokens - systemTokens
+	availableTokens := cm.MaxInputTokens - systemTokens - toolTokens
 
 	// Build token cache for non-system messages
 	cache := GetGlobalTokenCache()
@@ -414,7 +431,7 @@ func GetCurrentTokenCountOpenChat(messages []*model.ChatCompletionMessage) int {
 // =============================================================================
 
 // PrepareGeminiMessages processes messages to fit within context window limits.
-func (cm *ContextManager) PrepareGeminiMessages(messages []*genai.Content, systemPrompt string) ([]*genai.Content, bool) {
+func (cm *ContextManager) PrepareGeminiMessages(messages []*genai.Content, systemPrompt string, tools []*genai.Tool) ([]*genai.Content, bool) {
 	if cm.Strategy == StrategyNone {
 		return messages, false
 	}
@@ -425,12 +442,20 @@ func (cm *ContextManager) PrepareGeminiMessages(messages []*genai.Content, syste
 		sysTokens = EstimateTokens(systemPrompt) + MessageOverheadTokens
 	}
 
-	currentTokens := cm.estimateGeminiMessagesWithCache(messages) + sysTokens
+	// Calculate tool tokens to reserve space
+	toolTokens := EstimateGeminiToolTokens(tools)
+
+	// Add tool tokens to the total overhead
+	totalOverhead := sysTokens + toolTokens
+
+	currentTokens := cm.estimateGeminiMessagesWithCache(messages) + totalOverhead
+	// Test Only
+	logger.Debugln("Token count: ", currentTokens, " MaxInputTokens: ", cm.MaxInputTokens)
 	if currentTokens <= cm.MaxInputTokens {
 		return messages, false
 	}
 
-	return cm.truncateGeminiMessages(messages, sysTokens)
+	return cm.truncateGeminiMessages(messages, totalOverhead)
 }
 
 func (cm *ContextManager) estimateGeminiMessagesWithCache(messages []*genai.Content) int {
@@ -439,15 +464,15 @@ func (cm *ContextManager) estimateGeminiMessagesWithCache(messages []*genai.Cont
 	for _, msg := range messages {
 		total += cache.GetOrComputeGeminiTokens(msg)
 	}
-	return total + 3 // priming
+	return total + MessageOverheadTokens // priming
 }
 
-func (cm *ContextManager) truncateGeminiMessages(messages []*genai.Content, sysTokens int) ([]*genai.Content, bool) {
+func (cm *ContextManager) truncateGeminiMessages(messages []*genai.Content, totalOverhead int) ([]*genai.Content, bool) {
 	if len(messages) == 0 {
 		return messages, false
 	}
 
-	availableTokens := cm.MaxInputTokens - sysTokens
+	availableTokens := cm.MaxInputTokens - totalOverhead
 
 	// Build token cache
 	cache := GetGlobalTokenCache()

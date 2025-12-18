@@ -66,7 +66,8 @@ var DefaultModelLimits = map[string]ModelLimits{
 	/*
 	 * Minimax Models
 	 */
-	"minimax-m2": {ContextWindow: 200000, MaxOutputTokens: 8192},
+	// "minimax-m2": {ContextWindow: 200000, MaxOutputTokens: 8192},
+	"minimax-m2": {ContextWindow: 8192, MaxOutputTokens: 0},
 	"minimax-m1": {ContextWindow: 1000000, MaxOutputTokens: 8192},
 
 	/*
@@ -191,28 +192,28 @@ var DefaultModelLimits = map[string]ModelLimits{
 	"hunyuan":              {ContextWindow: 128000, MaxOutputTokens: 4096},
 
 	// Other Models(legacy)
-	// "llama-3.3-70b":  {ContextWindow: 128000, MaxOutputTokens: 8192},
-	// "llama-3.2":      {ContextWindow: 128000, MaxOutputTokens: 8192},
-	// "llama-3.1":      {ContextWindow: 128000, MaxOutputTokens: 8192},
-	// "mixtral-8x7b":   {ContextWindow: 32768, MaxOutputTokens: 4096},
-	// "mixtral-8x22b":  {ContextWindow: 65536, MaxOutputTokens: 4096},
-	// "yi-large":       {ContextWindow: 32768, MaxOutputTokens: 4096},
-	// "yi-lightning":   {ContextWindow: 16384, MaxOutputTokens: 4096},
-	// "command-r-plus": {ContextWindow: 128000, MaxOutputTokens: 4096},
-	// "command-r":      {ContextWindow: 128000, MaxOutputTokens: 4096},
+	// I don't think we need support for these models
+	// model improvements are so fast that legacy models are not useful
 }
 
 // DefaultLimits is the fallback for unknown models
-var DefaultLimits = ModelLimits{
-	ContextWindow:   32000, // Conservative default
+var DefaultLimitsLegacy = ModelLimits{
+	// Conservative default for older generation models
+	ContextWindow:   32000,
 	MaxOutputTokens: 4096,
+}
+
+var DefaultLimitsModern = ModelLimits{
+	// Default for modern generation models
+	ContextWindow:   128000,
+	MaxOutputTokens: 8192,
 }
 
 // GetModelLimits retrieves the limits for a given model name.
 // It performs exact match first, then pattern matching, then returns defaults.
 func GetModelLimits(modelName string) ModelLimits {
 	if modelName == "" {
-		return DefaultLimits
+		return DefaultLimitsModern
 	}
 
 	modelNameLower := strings.ToLower(modelName)
@@ -230,7 +231,7 @@ func GetModelLimits(modelName string) ModelLimits {
 	}
 
 	// Return defaults for unknown models
-	return DefaultLimits
+	return DefaultLimitsModern
 }
 
 // MaxInputTokens calculates the maximum input tokens with a safety buffer.

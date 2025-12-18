@@ -162,6 +162,10 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	// it will only consume tokens on new input
 	messages, _ := ag.Convo.GetMessages().([]*genai.Content)
 
+	// Context Management
+	truncated := false
+	cm := NewContextManagerForModel(ag.ModelName, StrategyTruncateOldest)
+
 	// Signal that streaming has started
 	// Wait for the main goroutine to tell sub-goroutine to proceed
 	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusProcessing}, ag.ProceedChan)
@@ -208,9 +212,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 
 		// Context Management
 		// Directly truncate on the messages
-		var truncated bool
-		cm := NewContextManagerForModel(ag.ModelName, StrategyTruncateOldest)
-		messages, truncated = cm.PrepareGeminiMessages(messages, ag.SystemPrompt)
+		messages, truncated = cm.PrepareGeminiMessages(messages, ag.SystemPrompt, config.Tools)
 		if truncated {
 			// Notify user or log that truncation happened
 			ag.Warn("Context trimmed to fit model limits")
