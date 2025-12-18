@@ -153,7 +153,7 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 			ci.setOutputFile(filename)
 		}
 
-	case "/single":
+	case "/single", "/*":
 		// Switch to single-line mode
 		if err := SetEffectiveChatMode("single"); err != nil {
 			service.Errorf("Failed to save chat mode: %v\n", err)
@@ -163,7 +163,7 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		fmt.Println("Switched to single-line mode")
 		ci.printModeStatus()
 
-	case "/multi":
+	case "/multi", "/#":
 		// Switch to multi-line mode
 		if err := SetEffectiveChatMode("multi"); err != nil {
 			service.Errorf("Failed to save chat mode: %v\n", err)
@@ -193,8 +193,8 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /info, /i - Show current settings")
 	fmt.Println("  /history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)")
 	fmt.Println("  /markdown, /m [on|off] - Switch whether to render markdown or not")
-	fmt.Println("  /single - Switch to single-line mode (submit on Enter)")
-	fmt.Println("  /multi - Switch to multi-line mode (preview on empty line, confirm to send)")
+	fmt.Println("  /single, /* - Switch to single-line mode (submit on Enter)")
+	fmt.Println("  /multi, /# - Switch to multi-line mode (preview on empty line, confirm to send)")
 	fmt.Println("  /attach, /a <filename> - Attach a file to the conversation")
 	fmt.Println("  /detach, /d <filename|all> - Detach a file from the conversation")
 	fmt.Println("  /template, /p \"<tmpl|name>\" - Change the template")

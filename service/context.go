@@ -215,6 +215,8 @@ func (cm *ContextManager) PrepareOpenChatMessages(messages []*model.ChatCompleti
 
 	// Calculate current token usage using cache
 	currentTokens := cm.estimateOpenChatMessagesWithCache(messages)
+	// Test Only
+	// fmt.Println("Token count: ", currentTokens, " MaxInputTokens: ", cm.MaxInputTokens)
 	if currentTokens <= cm.MaxInputTokens {
 		return messages, false
 	}
