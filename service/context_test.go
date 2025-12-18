@@ -129,7 +129,7 @@ func TestToolPairRemoval(t *testing.T) {
 
 	// Create a context manager with small limit to force truncation
 	cm := &ContextManager{
-		MaxInputTokens: 100, // Very small to force removal
+		MaxInputTokens: 40, // Reduced to force removal
 		Strategy:       StrategyTruncateOldest,
 		BufferPercent:  0.8,
 	}
@@ -187,35 +187,63 @@ func TestToolPairRemoval(t *testing.T) {
 	}
 }
 
-func TestPreserveSystemMessage(t *testing.T) {
+func TestPreserveMultiSystemMessages(t *testing.T) {
+	// Clear cache
+	ClearTokenCache()
+
 	cm := &ContextManager{
-		MaxInputTokens: 30, // Force truncation
+		MaxInputTokens: 40, // Force truncation (reduced from 60)
 		Strategy:       StrategyTruncateOldest,
 		BufferPercent:  0.8,
 	}
 
-	systemContent := "Important system instructions"
+	sys1 := "System message 1 (Identity)"
+	sys2 := "System message 2 (Intermediate)"
+	sys3 := "System message 3 (Current Task)"
+
 	messages := []openai.ChatCompletionMessage{
-		{Role: openai.ChatMessageRoleSystem, Content: systemContent},
-		{Role: openai.ChatMessageRoleUser, Content: "Message 1"},
-		{Role: openai.ChatMessageRoleUser, Content: "Message 2"},
-		{Role: openai.ChatMessageRoleUser, Content: "Message 3"},
+		{Role: openai.ChatMessageRoleSystem, Content: sys1},
+		{Role: openai.ChatMessageRoleUser, Content: "Msg A"},
+		{Role: openai.ChatMessageRoleAssistant, Content: "Msg B"},
+		{Role: openai.ChatMessageRoleSystem, Content: sys2},
+		{Role: openai.ChatMessageRoleUser, Content: "Msg C"},
+		{Role: openai.ChatMessageRoleAssistant, Content: "Msg D"},
+		{Role: openai.ChatMessageRoleSystem, Content: sys3},
+		{Role: openai.ChatMessageRoleUser, Content: "Msg E"},
 	}
 
-	result, _ := cm.PrepareOpenAIMessages(messages)
+	// Should preserve sys1 (first) and sys3 (last), but drop sys2 if needed
+	// Msg A, B, C, D likely dropped to fit 60 tokens
+	result, truncated := cm.PrepareOpenAIMessages(messages)
 
-	// System message should always be first
-	if len(result) == 0 {
-		t.Fatal("Result should not be empty")
+	if !truncated {
+		t.Error("Expected truncation")
 	}
 
-	if result[0].Role != openai.ChatMessageRoleSystem {
-		t.Error("First message should be system message")
+	if len(result) < 2 {
+		t.Fatal("Result too short, should have at least 2 system messages")
 	}
 
-	if result[0].Content != systemContent {
-		t.Errorf("System content = %q, want %q", result[0].Content, systemContent)
+	// First message must be sys1
+	if result[0].Content != sys1 {
+		t.Errorf("First message should be first system message. Got: %s", result[0].Content)
 	}
+
+	// Find if sys3 is present (searching backwards is safer as it might be near end)
+	foundLastSys := false
+	for _, msg := range result {
+		if msg.Content == sys3 {
+			foundLastSys = true
+			break
+		}
+	}
+	if !foundLastSys {
+		t.Error("Last system message (sys3) was incorrectly truncated")
+	}
+
+	// Check if sys2 is gone (it should be the first candidate for removal among sys msgs, though user msgs go first)
+	// With 60 tokens, it's tight.
+	// Let's verify we kept the Identity and Current Task.
 }
 
 // =============================================================================
@@ -335,7 +363,7 @@ func TestOpenChatToolPairRemoval(t *testing.T) {
 	ClearTokenCache()
 
 	cm := &ContextManager{
-		MaxInputTokens: 100, // Very small to force removal
+		MaxInputTokens: 40, // Reduced to force removal
 		Strategy:       StrategyTruncateOldest,
 		BufferPercent:  0.8,
 	}
@@ -417,59 +445,48 @@ func TestOpenChatToolPairRemoval(t *testing.T) {
 	}
 }
 
-func TestOpenChatPreserveSystemMessage(t *testing.T) {
+func TestOpenChatPreserveMultiSystemMessages(t *testing.T) {
 	ClearTokenCache()
 
 	cm := &ContextManager{
-		MaxInputTokens: 30, // Force truncation
+		MaxInputTokens: 60, // Force truncation
 		Strategy:       StrategyTruncateOldest,
 		BufferPercent:  0.8,
 	}
 
-	systemContent := "Important system instructions"
+	sys1 := "System message 1 (Identity)"
+	sys2 := "System message 2 (Intermediate)"
+	sys3 := "System message 3 (Current Task)"
+
 	messages := []*model.ChatCompletionMessage{
-		{
-			Role: model.ChatMessageRoleSystem,
-			Content: &model.ChatCompletionMessageContent{
-				StringValue: strPtr(systemContent),
-			},
-		},
-		{
-			Role: model.ChatMessageRoleUser,
-			Content: &model.ChatCompletionMessageContent{
-				StringValue: strPtr("Message 1"),
-			},
-		},
-		{
-			Role: model.ChatMessageRoleUser,
-			Content: &model.ChatCompletionMessageContent{
-				StringValue: strPtr("Message 2"),
-			},
-		},
-		{
-			Role: model.ChatMessageRoleUser,
-			Content: &model.ChatCompletionMessageContent{
-				StringValue: strPtr("Message 3"),
-			},
-		},
+		{Role: model.ChatMessageRoleSystem, Content: &model.ChatCompletionMessageContent{StringValue: strPtr(sys1)}},
+		{Role: model.ChatMessageRoleUser, Content: &model.ChatCompletionMessageContent{StringValue: strPtr("Msg A")}},
+		{Role: model.ChatMessageRoleSystem, Content: &model.ChatCompletionMessageContent{StringValue: strPtr(sys2)}},
+		{Role: model.ChatMessageRoleUser, Content: &model.ChatCompletionMessageContent{StringValue: strPtr("Msg B")}},
+		{Role: model.ChatMessageRoleSystem, Content: &model.ChatCompletionMessageContent{StringValue: strPtr(sys3)}},
+		{Role: model.ChatMessageRoleUser, Content: &model.ChatCompletionMessageContent{StringValue: strPtr("Msg C")}},
 	}
 
 	result, _ := cm.PrepareOpenChatMessages(messages)
 
-	// System message should always be first
-	if len(result) == 0 {
-		t.Fatal("Result should not be empty")
+	if len(result) < 2 {
+		t.Fatal("Result too short, should have at least 2 system messages")
 	}
 
-	if result[0].Role != model.ChatMessageRoleSystem {
-		t.Error("First message should be system message")
+	// First message must be sys1
+	if *result[0].Content.StringValue != sys1 {
+		t.Errorf("First message should be first system message. Got: %s", *result[0].Content.StringValue)
 	}
 
-	if result[0].Content != nil && result[0].Content.StringValue != nil {
-		if *result[0].Content.StringValue != systemContent {
-			t.Errorf("System content = %q, want %q", *result[0].Content.StringValue, systemContent)
+	// Find if sys3 is present
+	foundLastSys := false
+	for _, msg := range result {
+		if *msg.Content.StringValue == sys3 {
+			foundLastSys = true
+			break
 		}
-	} else {
-		t.Error("System message content should not be nil")
+	}
+	if !foundLastSys {
+		t.Error("Last system message (sys3) was incorrectly truncated")
 	}
 }

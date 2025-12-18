@@ -141,6 +141,8 @@ var DefaultModelLimits = map[string]ModelLimits{
 	"gemini-3-pro-preview":       {ContextWindow: 1048576, MaxOutputTokens: 65536},
 	"gemini-3-flash-preview":     {ContextWindow: 1048576, MaxOutputTokens: 65536},
 	"gemini-3-pro-image-preview": {ContextWindow: 65536, MaxOutputTokens: 32768},
+	"gemini-flash-latest":        {ContextWindow: 1048576, MaxOutputTokens: 65536},
+	"gemini-flash-lite-latest":   {ContextWindow: 1048576, MaxOutputTokens: 65536},
 	"gemini-2.5-pro":             {ContextWindow: 1048576, MaxOutputTokens: 65536},
 	"gemini-2.5-flash":           {ContextWindow: 1048576, MaxOutputTokens: 65536},
 	"gemini-2.5-flash-lite":      {ContextWindow: 1048576, MaxOutputTokens: 65536},

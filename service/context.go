@@ -85,16 +85,23 @@ func (cm *ContextManager) truncateOpenAIMessages(messages []openai.ChatCompletio
 		return messages, false
 	}
 
-	// Identify system messages (always keep first system message)
+	// Identify system messages to preserve (First and Last)
 	var systemMsgs []openai.ChatCompletionMessage
 	var nonSystemMsgs []openai.ChatCompletionMessage
 
-	for i, msg := range messages {
-		if msg.Role == openai.ChatMessageRoleSystem && i == 0 {
+	// Triage messages to system and non-system
+	for _, msg := range messages {
+		if msg.Role == openai.ChatMessageRoleSystem {
 			systemMsgs = append(systemMsgs, msg)
 		} else {
 			nonSystemMsgs = append(nonSystemMsgs, msg)
 		}
+	}
+
+	// Keep the first system message (Identity/Base)
+	// AND keep the last system message (Current Instruction/Update)
+	if len(systemMsgs) > 1 {
+		systemMsgs = []openai.ChatCompletionMessage{systemMsgs[0], systemMsgs[len(systemMsgs)-1]}
 	}
 
 	// Calculate system message tokens (these are always kept)
@@ -247,16 +254,23 @@ func (cm *ContextManager) truncateOpenChatMessages(messages []*model.ChatComplet
 		return messages, false
 	}
 
-	// Identify system messages
+	// Identify system messages to preserve (First and Last)
 	var systemMsgs []*model.ChatCompletionMessage
 	var nonSystemMsgs []*model.ChatCompletionMessage
 
-	for i, msg := range messages {
-		if msg.Role == model.ChatMessageRoleSystem && i == 0 {
+	// Triage messages to system and non-system
+	for _, msg := range messages {
+		if msg.Role == model.ChatMessageRoleSystem {
 			systemMsgs = append(systemMsgs, msg)
 		} else {
 			nonSystemMsgs = append(nonSystemMsgs, msg)
 		}
+	}
+
+	// Keep the first system message (Identity/Base)
+	// AND keep the last system message (Current Instruction/Update)
+	if len(systemMsgs) > 1 {
+		systemMsgs = []*model.ChatCompletionMessage{systemMsgs[0], systemMsgs[len(systemMsgs)-1]}
 	}
 
 	// Calculate system message tokens
