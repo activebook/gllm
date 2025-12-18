@@ -58,6 +58,8 @@ func (cm *ContextManager) PrepareOpenAIMessages(messages []openai.ChatCompletion
 
 	// Calculate current token usage using cache
 	currentTokens := cm.estimateOpenAIMessagesWithCache(messages)
+	// Test Only
+	// fmt.Println("Token count: ", currentTokens, " MaxInputTokens: ", cm.MaxInputTokens)
 	if currentTokens <= cm.MaxInputTokens {
 		return messages, false
 	}

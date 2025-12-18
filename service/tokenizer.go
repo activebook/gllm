@@ -8,20 +8,21 @@ import (
 )
 
 // Token estimation constants
-// These are based on empirical analysis of various tokenizers:
-// - OpenAI's tiktoken: ~4 characters per token for English
-// - Chinese text: ~1.5 characters per token
-// - Japanese/Korean: ~2 characters per token
-// - Code: ~3 characters per token (more symbols/keywords)
+// These are refined based on modern tokenizer behavior (cl100k_base, qwen, etc.):
+//   - English: ~4 chars/token (ASCII)
+//   - Chinese: ~0.6-2.0 tokens/char (Qwen is efficient, OpenAI is 2.0).
+//     We use 2.5 bytes/token => ~1.2 tokens/char as a balanced estimate.
+//   - Japanese/Korean: ~1.5 tokens/char. 3 bytes/char / 2.0 => 1.5 tokens/char.
+//   - Tool Calls: JSON structure overhead is small (~20 tokens), not 100.
 const (
 	CharsPerTokenEnglish  = 4.0 // Average for English text
-	CharsPerTokenChinese  = 1.5 // Average for Chinese text (CJK ideographs)
-	CharsPerTokenJapanese = 2.0 // Average for Japanese (mix of kanji + kana)
-	CharsPerTokenKorean   = 2.0 // Average for Korean (Hangul syllables)
-	CharsPerTokenCode     = 3.0 // Average for code
+	CharsPerTokenChinese  = 2.5 // Tuned: 3 bytes/char / 2.5 = 1.2 tokens/char (balanced)
+	CharsPerTokenJapanese = 2.0 // 3 bytes / 2.0 = 1.5 tokens/char
+	CharsPerTokenKorean   = 2.0 // 3 bytes / 2.0 = 1.5 tokens/char
+	CharsPerTokenCode     = 3.5 // Tuned: Code is dense. 3.5 chars/token.
 	CharsPerTokenDefault  = 4.0 // Default fallback
-	MessageOverheadTokens = 4   // Overhead per message (role, formatting)
-	ToolCallOverhead      = 100 // Approximate tokens for tool call metadata
+	MessageOverheadTokens = 3   // Standard overhead per message (<|start|>role and <|end|>)
+	ToolCallOverhead      = 24  // Reduced from 100 to 24 (closer to reality for JSON overhead)
 )
 
 // EstimateTokens provides fast character-based estimation for text.
@@ -133,9 +134,6 @@ func contains(s, substr string) bool {
 func EstimateOpenAIMessageTokens(msg openai.ChatCompletionMessage) int {
 	tokens := MessageOverheadTokens
 
-	// Role token
-	tokens += 1
-
 	// Content tokens
 	tokens += EstimateTokens(msg.Content)
 
@@ -182,9 +180,6 @@ func EstimateOpenChatMessageTokens(msg *model.ChatCompletionMessage) int {
 	}
 
 	tokens := MessageOverheadTokens
-
-	// Role token
-	tokens += 1
 
 	// Content tokens
 	if msg.Content != nil {
