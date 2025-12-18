@@ -98,10 +98,13 @@ func (cm *ContextManager) truncateOpenAIMessages(messages []openai.ChatCompletio
 		}
 	}
 
-	// Keep the first system message (Identity/Base)
-	// AND keep the last system message (Current Instruction/Update)
+	// Consolidate all current system-level instructions into ONE system message
 	if len(systemMsgs) > 1 {
-		systemMsgs = []openai.ChatCompletionMessage{systemMsgs[0], systemMsgs[len(systemMsgs)-1]}
+		for i := 1; i < len(systemMsgs); i++ {
+			systemMsgs[0].Content += "\n" + systemMsgs[i].Content
+		}
+		// Place it at the start (models pay most attention here)
+		systemMsgs = systemMsgs[:1]
 	}
 
 	// Calculate system message tokens (these are always kept)
@@ -267,10 +270,27 @@ func (cm *ContextManager) truncateOpenChatMessages(messages []*model.ChatComplet
 		}
 	}
 
-	// Keep the first system message (Identity/Base)
-	// AND keep the last system message (Current Instruction/Update)
+	// Consolidate all current system-level instructions into ONE system message
 	if len(systemMsgs) > 1 {
-		systemMsgs = []*model.ChatCompletionMessage{systemMsgs[0], systemMsgs[len(systemMsgs)-1]}
+		var combinedContent string
+		if systemMsgs[0].Content != nil && systemMsgs[0].Content.StringValue != nil {
+			combinedContent = *systemMsgs[0].Content.StringValue
+		}
+
+		for i := 1; i < len(systemMsgs); i++ {
+			if systemMsgs[i].Content != nil && systemMsgs[i].Content.StringValue != nil {
+				combinedContent += "\n" + *systemMsgs[i].Content.StringValue
+			}
+		}
+
+		// Update the first message with consolidated content
+		if systemMsgs[0].Content == nil {
+			systemMsgs[0].Content = &model.ChatCompletionMessageContent{}
+		}
+		systemMsgs[0].Content.StringValue = &combinedContent
+
+		// Place it at the start (models pay most attention here)
+		systemMsgs = systemMsgs[:1]
 	}
 
 	// Calculate system message tokens

@@ -212,38 +212,35 @@ func TestPreserveMultiSystemMessages(t *testing.T) {
 		{Role: openai.ChatMessageRoleUser, Content: "Msg E"},
 	}
 
-	// Should preserve sys1 (first) and sys3 (last), but drop sys2 if needed
-	// Msg A, B, C, D likely dropped to fit 60 tokens
+	// Should preserve all system messages by merging them into one
+	// Msg A, B, C, D likely dropped to fit 40 tokens
 	result, truncated := cm.PrepareOpenAIMessages(messages)
 
 	if !truncated {
 		t.Error("Expected truncation")
 	}
 
-	if len(result) < 2 {
-		t.Fatal("Result too short, should have at least 2 system messages")
-	}
-
-	// First message must be sys1
-	if result[0].Content != sys1 {
-		t.Errorf("First message should be first system message. Got: %s", result[0].Content)
-	}
-
-	// Find if sys3 is present (searching backwards is safer as it might be near end)
-	foundLastSys := false
+	// Should have exactly 1 system message now (consolidated)
+	systemCount := 0
 	for _, msg := range result {
-		if msg.Content == sys3 {
-			foundLastSys = true
-			break
+		if msg.Role == openai.ChatMessageRoleSystem {
+			systemCount++
 		}
 	}
-	if !foundLastSys {
-		t.Error("Last system message (sys3) was incorrectly truncated")
+	if systemCount != 1 {
+		t.Errorf("Expected exactly 1 system message, got %d", systemCount)
 	}
 
-	// Check if sys2 is gone (it should be the first candidate for removal among sys msgs, though user msgs go first)
-	// With 60 tokens, it's tight.
-	// Let's verify we kept the Identity and Current Task.
+	// First message must be the consolidated system message
+	if result[0].Role != openai.ChatMessageRoleSystem {
+		t.Error("First message should be system message")
+	}
+
+	// Content should contain all 3 system messages
+	expectedContent := sys1 + "\n" + sys2 + "\n" + sys3
+	if result[0].Content != expectedContent {
+		t.Errorf("System content mismatch.\nGot: %q\nWant: %q", result[0].Content, expectedContent)
+	}
 }
 
 // =============================================================================
@@ -449,7 +446,7 @@ func TestOpenChatPreserveMultiSystemMessages(t *testing.T) {
 	ClearTokenCache()
 
 	cm := &ContextManager{
-		MaxInputTokens: 60, // Force truncation
+		MaxInputTokens: 20, // Force truncation (reduced to ensure trigger)
 		Strategy:       StrategyTruncateOldest,
 		BufferPercent:  0.8,
 	}
@@ -467,26 +464,28 @@ func TestOpenChatPreserveMultiSystemMessages(t *testing.T) {
 		{Role: model.ChatMessageRoleUser, Content: &model.ChatCompletionMessageContent{StringValue: strPtr("Msg C")}},
 	}
 
+	// Should preserve all system messages by merging them into one
 	result, _ := cm.PrepareOpenChatMessages(messages)
 
-	if len(result) < 2 {
-		t.Fatal("Result too short, should have at least 2 system messages")
-	}
-
-	// First message must be sys1
-	if *result[0].Content.StringValue != sys1 {
-		t.Errorf("First message should be first system message. Got: %s", *result[0].Content.StringValue)
-	}
-
-	// Find if sys3 is present
-	foundLastSys := false
+	// Should have exactly 1 system message now (consolidated)
+	systemCount := 0
 	for _, msg := range result {
-		if *msg.Content.StringValue == sys3 {
-			foundLastSys = true
-			break
+		if msg.Role == model.ChatMessageRoleSystem {
+			systemCount++
 		}
 	}
-	if !foundLastSys {
-		t.Error("Last system message (sys3) was incorrectly truncated")
+	if systemCount != 1 {
+		t.Errorf("Expected exactly 1 system message, got %d", systemCount)
+	}
+
+	// First message must be the consolidated system message
+	if result[0].Role != model.ChatMessageRoleSystem {
+		t.Error("First message should be system message")
+	}
+
+	// Content should contain all 3 system messages
+	expectedContent := sys1 + "\n" + sys2 + "\n" + sys3
+	if *result[0].Content.StringValue != expectedContent {
+		t.Errorf("System content mismatch.\nGot: %q\nWant: %q", *result[0].Content.StringValue, expectedContent)
 	}
 }
