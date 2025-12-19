@@ -89,7 +89,8 @@ brews:
 
 # Optional: Scoop integration (for Windows users)
 scoops:
-  - bucket:
+  - name: gllm
+    bucket:
       owner: activebook  # Your GitHub username/org
       name: scoop-gllm   # Name of your Scoop bucket repo (create this repo if it doesn't exist)
     commit_author:
