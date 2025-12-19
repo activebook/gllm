@@ -224,7 +224,7 @@ func buildChatInfo(files []*service.FileData) *ChatInfo {
 func (ci *ChatInfo) printWelcome() {
 	fmt.Println("Welcome to GLLM Interactive Chat")
 	fmt.Println("Type '/exit' or '/quit' to end the session, or '/help' for commands")
-	fmt.Println("Use '/single' or '/multi' to switch input mode")
+	fmt.Println("Use '/single','/*' or '/multi','/#' to switch input mode")
 	fmt.Println("Use '/' for commands")
 	fmt.Println("Use '!' for exec local commands")
 	fmt.Println("Use Ctrl+C/Ctrl+D to exit")

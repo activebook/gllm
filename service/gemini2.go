@@ -159,12 +159,12 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	}
 
 	// Create a chat session - this is the important part
-	// Within the chat session(multi-turn conversation)
-	// we still need to sent the entire history to the model
-	// but it won't consume tokens, because it was cached in local and remote server
-	// so gemini model would fast load the cached history KV
 	// it will only consume tokens on new input
 	messages, _ := ag.Convo.GetMessages().([]*genai.Content)
+
+	// Context Management
+	truncated := false
+	cm := NewContextManagerForModel(ag.ModelName, StrategyTruncateOldest)
 
 	// Signal that streaming has started
 	// Wait for the main goroutine to tell sub-goroutine to proceed
@@ -178,7 +178,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	// Use maxRecursions from LangLogic
 	maxRecursions := ag.MaxRecursions
 	for i := 0; i < maxRecursions; i++ {
-		// 1. Construct Input Content from streamParts
+		// Construct Input Content from streamParts
 		inputParts := make([]*genai.Part, len(*streamParts))
 		hasFuncResponse := false
 		for idx, p := range *streamParts {
@@ -206,20 +206,30 @@ func (ag *Agent) GenerateGemini2Stream() error {
 			Parts: inputParts,
 		}
 
-		// 2. Prepare messages for this call
+		// Prepare messages for this call
 		// We need to pass the full history including the current input
-		callMessages := append(messages, inputContent)
+		messages = append(messages, inputContent)
 
-		// 3. Call API
-		modelContent, resp, err := ag.processGemini2Stream(ga.ctx, ga.client, &config, callMessages, &references, &queries)
+		// Context Management
+		// Directly truncate on the messages
+		Debugf("Context messages: [%d]", len(messages))
+		messages, truncated = cm.PrepareGeminiMessages(messages, ag.SystemPrompt, config.Tools)
+		if truncated {
+			// Notify user or log that truncation happened
+			ag.Warn("Context trimmed to fit model limits")
+			Debugf("Context messages after truncation: [%d]", len(messages))
+		}
+
+		// Call API
+		modelContent, resp, err := ag.processGemini2Stream(ga.ctx, ga.client, &config, messages, &references, &queries)
 		if err != nil {
 			return err
 		}
 		// Record token usage
 		ag.addUpGemini2TokenUsage(resp)
 
-		// 4. Update History
-		messages = append(messages, inputContent)
+		// Update History
+		// messages already has inputContent from pre-API append
 		messages = append(messages, modelContent)
 
 		// Check for function calls in the model content

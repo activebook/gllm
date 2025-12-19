@@ -270,7 +270,10 @@ func SetEffectiveSystemPrompt(sys string) error {
 
 // New helper function to get the effective system prompt based on config
 func GetEffectiveSystemPrompt() string {
-	return plainSystemPrompt
+	if plainSystemPrompt != "" {
+		return plainSystemPrompt
+	}
+	return viper.GetString("agent.system_prompt")
 }
 
 func init() {
