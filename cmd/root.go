@@ -54,8 +54,36 @@ Configure your API keys and preferred models, then start chatting or executing c
 		// This ensures setupLogging runs *after* flags are parsed and *after* initConfig
 		// PersistentPreRunE is usually a good place for things that need flags/config
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// You could put setupLogging() here if it depended on flags directly
-			// in ways not handled by OnInitialize. For now, initConfig is fine.
+			// This ensures setupLogging runs *after* flags are parsed and *after* initConfig
+
+			// Check if we are running a help/version command or init itself
+			if cmd.Name() == "help" || cmd.Name() == "init" || cmd.Name() == "version" || versionFlag {
+				return nil
+			}
+
+			// Check if config file is loaded
+			if viper.ConfigFileUsed() == "" {
+				// Config missing!
+				// Ask user if they want to setup
+				fmt.Println("Configuration file not found.")
+				// We can't use 'huh' here easily without importing it, but since we are in 'cmd', we can call RunInitWizard
+				// But we need to ask permission first?
+				// Let's call RunInitWizard directly which has a "Welcome" note.
+				// Or ask for confirmation first.
+
+				// Standard simple confirm before launching full TUI
+				fmt.Print("Would you like to run the setup wizard now? [Y/n]: ")
+				var response string
+				fmt.Scanln(&response) // Simple scan
+				response = strings.ToLower(strings.TrimSpace(response))
+
+				if response == "" || response == "y" || response == "yes" {
+					return RunInitWizard()
+				}
+
+				return fmt.Errorf("configuration required to proceed. Run 'gllm init' to setup")
+			}
+
 			return nil
 		},
 		Run: func(cmd *cobra.Command, args []string) {

@@ -12,6 +12,7 @@ import (
 // These are refined based on modern tokenizer behavior (cl100k_base, qwen, etc.):
 //   - English: ~4 chars/token (ASCII)
 //   - Chinese: ~0.6-2.0 tokens/char (Qwen is efficient, OpenAI is 2.0).
+//     due to the different tokenization methods used by different models, the conversion ratios can vary
 //     We use 2.5 bytes/token => ~1.2 tokens/char as a balanced estimate.
 //   - Japanese/Korean: ~1.5 tokens/char. 3 bytes/char / 2.0 => 1.5 tokens/char.
 //   - Tool Calls: JSON structure overhead is small (~20 tokens), not 100.
