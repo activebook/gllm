@@ -79,7 +79,7 @@ func TestDetectModelProvider(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := DetectModelProvider(tt.endpoint)
+			result := DetectModelProvider(tt.endpoint, "")
 			if result != tt.expected {
 				t.Errorf("DetectModelProvider(%q) = %v, want %v", tt.endpoint, result, tt.expected)
 			}
@@ -127,7 +127,7 @@ func BenchmarkDetectModelProvider(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for _, endpoint := range endpoints {
-			DetectModelProvider(endpoint)
+			DetectModelProvider(endpoint, "")
 		}
 	}
 }

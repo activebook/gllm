@@ -24,10 +24,12 @@ var DefaultModelLimits = map[string]ModelLimits{
 	"qwen3-32b":                      {ContextWindow: 40000, MaxOutputTokens: 8192},
 	"qwen3-coder-480b-a35b-instruct": {ContextWindow: 262000, MaxOutputTokens: 8192},
 	"qwen3-coder-plus":               {ContextWindow: 128000, MaxOutputTokens: 8192},
-	"qwen3-max":                      {ContextWindow: 256000, MaxOutputTokens: 8192},
-	"qwen3-max-preview":              {ContextWindow: 256000, MaxOutputTokens: 8192},
+	"qwen3-max":                      {ContextWindow: 256000, MaxOutputTokens: 65536},
+	"qwen3-max-preview":              {ContextWindow: 256000, MaxOutputTokens: 65536},
 	"qwen3-next-80b-a3b-instruct":    {ContextWindow: 131072, MaxOutputTokens: 8192},
 	"qwen3-next-80b-a3b-thinking":    {ContextWindow: 131072, MaxOutputTokens: 8192},
+	"qwen3-vl-plus":                  {ContextWindow: 256000, MaxOutputTokens: 32768},
+	"qwen3-vl-flash":                 {ContextWindow: 256000, MaxOutputTokens: 32768},
 	"qwen-max-2025-01-25":            {ContextWindow: 128000, MaxOutputTokens: 8192},
 	"qwen-turbo":                     {ContextWindow: 1000000, MaxOutputTokens: 8192},
 	"qwen-vl-max-2025-01-25":         {ContextWindow: 128000, MaxOutputTokens: 8192},
@@ -104,9 +106,9 @@ var DefaultModelLimits = map[string]ModelLimits{
 	/*
 	 * zAI Models
 	 */
-	"glm-4.6":     {ContextWindow: 200000, MaxOutputTokens: 8192},
-	"glm-4.5":     {ContextWindow: 131000, MaxOutputTokens: 8192},
-	"glm-4.5-air": {ContextWindow: 131000, MaxOutputTokens: 8192},
+	"glm-4.6":     {ContextWindow: 200000, MaxOutputTokens: 16384},
+	"glm-4.5":     {ContextWindow: 131000, MaxOutputTokens: 16384},
+	"glm-4.5-air": {ContextWindow: 131000, MaxOutputTokens: 16384},
 
 	// OpenAI Models
 	"gpt-5.2":       {ContextWindow: 400000, MaxOutputTokens: 128000},
@@ -173,6 +175,7 @@ var DefaultModelLimits = map[string]ModelLimits{
 	"qwen2.5-vl-7b-instruct":  {ContextWindow: 128000, MaxOutputTokens: 32768},
 	"qwen-plus":               {ContextWindow: 1000000, MaxOutputTokens: 32768},
 	"qwen-plus-latest":        {ContextWindow: 1000000, MaxOutputTokens: 32768},
+	"qwen-flash":              {ContextWindow: 1000000, MaxOutputTokens: 32768},
 	"qwen-max":                {ContextWindow: 32768, MaxOutputTokens: 8192},
 	"qwen-max-latest":         {ContextWindow: 131072, MaxOutputTokens: 8192},
 	"qwen-coder-plus":         {ContextWindow: 131072, MaxOutputTokens: 8192},
