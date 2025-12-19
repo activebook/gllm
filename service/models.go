@@ -73,16 +73,16 @@ var DefaultModelLimits = map[string]ModelLimits{
 	/*
 	 * Minimax Models
 	 */
-	// "minimax-m2": {ContextWindow: 200000, MaxOutputTokens: 8192},
-	"minimax-m2": {ContextWindow: 8192, MaxOutputTokens: 0},
+	"minimax-m2": {ContextWindow: 200000, MaxOutputTokens: 8192},
 	"minimax-m1": {ContextWindow: 1000000, MaxOutputTokens: 8192},
 
 	/*
 	 * Moonshot-Kimi Models
 	 */
-	"kimi-k2":          {ContextWindow: 128000, MaxOutputTokens: 8192},
 	"kimi-k2-0905":     {ContextWindow: 256000, MaxOutputTokens: 8192},
 	"kimi-k2-thinking": {ContextWindow: 256000, MaxOutputTokens: 8192},
+	"kimi-k2-turbo":    {ContextWindow: 256000, MaxOutputTokens: 8192},
+	"kimi-k2":          {ContextWindow: 128000, MaxOutputTokens: 8192},
 
 	/*
 	 * OpenAI Models
@@ -94,7 +94,7 @@ var DefaultModelLimits = map[string]ModelLimits{
 	 * xAI Models
 	 */
 	"grok-code-fast-1": {ContextWindow: 256000, MaxOutputTokens: 8192},
-	"grok-4.1-fast":    {ContextWindow: 2000000, MaxOutputTokens: 8192},
+	"grok-4-1-fast":    {ContextWindow: 2000000, MaxOutputTokens: 8192},
 	"grok-4-fast":      {ContextWindow: 2000000, MaxOutputTokens: 8192},
 	"grok-4":           {ContextWindow: 256000, MaxOutputTokens: 8192},
 
@@ -169,6 +169,8 @@ var DefaultModelLimits = map[string]ModelLimits{
 	"pixtral-large":        {ContextWindow: 128000, MaxOutputTokens: 8192},
 
 	// Chinese Models - DeepSeek
+	"deepseek-chat":     {ContextWindow: 128000, MaxOutputTokens: 8192},
+	"deepseek-reasoner": {ContextWindow: 128000, MaxOutputTokens: 32768},
 
 	// Chinese Models - Alibaba Qwen
 	"qwen2.5-vl-72b-instruct": {ContextWindow: 128000, MaxOutputTokens: 32768},
