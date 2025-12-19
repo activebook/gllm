@@ -88,14 +88,14 @@ brews:
     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
 
 # Optional: Scoop integration (for Windows users)
-scoop:
-  bucket:
-    owner: activebook  # Your GitHub username/org
-    name: scoop-gllm   # Name of your Scoop bucket repo (create this repo if it doesn't exist)
-  commit_author:
-    name: goreleaserbot
-    email: bot@goreleaser.com
-  commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
-  homepage: "https://github.com/activebook/gllm"
-  description: "`gllm` is a powerful command-line tool designed to interact seamlessly with various Large Language Models (LLMs). Configure your API keys, set your preferred models, and start chatting or executing commands effortlessly."
-  license: "Apache-2.0"
+scoops:
+  - bucket:
+      owner: activebook  # Your GitHub username/org
+      name: scoop-gllm   # Name of your Scoop bucket repo (create this repo if it doesn't exist)
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
+    homepage: "https://github.com/activebook/gllm"
+    description: "`gllm` is a powerful command-line tool designed to interact seamlessly with various Large Language Models (LLMs). Configure your API keys, set your preferred models, and start chatting or executing commands effortlessly."
+    license: "Apache-2.0"
