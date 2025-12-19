@@ -82,7 +82,7 @@ var modelPatterns = map[string]ModelProvider{
 // DetectModelProvider detects the model provider based on endpoint and model name.
 // It first checks the endpoint domain, then falls back to model name patterns.
 // This dual detection handles Chinese models hosted on US platforms (AWS, CoreWeave, etc.)
-func DetectModelProvider(endPoint string, modelName ...string) ModelProvider {
+func DetectModelProvider(endPoint string, modelName string) ModelProvider {
 	if endPoint == "" && len(modelName) == 0 {
 		return ModelUnknown
 	}
@@ -93,20 +93,23 @@ func DetectModelProvider(endPoint string, modelName ...string) ModelProvider {
 	// Check endpoint domain first (more specific)
 	for domain, provider := range providerDomains {
 		if strings.Contains(endPointLower, domain) {
+			Debugf("Model Provider[%s] - Model[%s]\n", provider, modelName)
 			return provider
 		}
 	}
 
 	// If endpoint didn't match, try model name patterns
 	// This handles Chinese models hosted on non-Chinese platforms
-	if len(modelName) > 0 && modelName[0] != "" {
-		modelNameLower := strings.ToLower(modelName[0])
+	if modelName != "" {
+		modelNameLower := strings.ToLower(modelName)
 		for pattern, provider := range modelPatterns {
 			if strings.Contains(modelNameLower, pattern) {
+				Debugf("Model Provider[%s] - Model[%s]\n", provider, modelName)
 				return provider
 			}
 		}
 	}
 
+	Debugf("Model Provider[%s] - Model[%s]\n", ModelOpenAICompatible, modelName)
 	return ModelOpenAICompatible
 }

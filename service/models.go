@@ -35,12 +35,15 @@ var DefaultModelLimits = map[string]ModelLimits{
 	/*
 	 * ByteDance Models
 	 */
+	"doubao-seed‑1-8":          {ContextWindow: 256000, MaxOutputTokens: 65536},
+	"doubao‑seed-1-6":          {ContextWindow: 256000, MaxOutputTokens: 32768},
+	"doubao-seed-1.6":          {ContextWindow: 256000, MaxOutputTokens: 32768},
+	"doubao-seed-1.6-flash":    {ContextWindow: 256000, MaxOutputTokens: 32768},
+	"doubao-seed-1.6-thinking": {ContextWindow: 256000, MaxOutputTokens: 32768},
 	"doubao-1.5-pro-32k":       {ContextWindow: 128000, MaxOutputTokens: 8192},
 	"doubao-1.5-thinking-pro":  {ContextWindow: 128000, MaxOutputTokens: 8192},
 	"doubao-1.5-vision-pro":    {ContextWindow: 128000, MaxOutputTokens: 8192},
-	"doubao-seed-1.6":          {ContextWindow: 256000, MaxOutputTokens: 8192},
-	"doubao-seed-1.6-flash":    {ContextWindow: 256000, MaxOutputTokens: 8192},
-	"doubao-seed-1.6-thinking": {ContextWindow: 256000, MaxOutputTokens: 8192},
+	"doubao-1-5":               {ContextWindow: 128000, MaxOutputTokens: 16384},
 
 	/*
 	 * DeepSeek Models
@@ -51,9 +54,11 @@ var DefaultModelLimits = map[string]ModelLimits{
 	"deepseek-v3.2-251201":            {ContextWindow: 128000, MaxOutputTokens: 8192},
 	"deepseek-v3.2-exp":               {ContextWindow: 128000, MaxOutputTokens: 8192},
 	"deepseek-v3.2-exp-thinking":      {ContextWindow: 128000, MaxOutputTokens: 8192},
+	"deepseek-v3-2":                   {ContextWindow: 128000, MaxOutputTokens: 32768},
+	"deepseek-v3-1":                   {ContextWindow: 128000, MaxOutputTokens: 32768},
 	"deepseek-r1":                     {ContextWindow: 80000, MaxOutputTokens: 8192},
 	"deepseek-r1-0528":                {ContextWindow: 80000, MaxOutputTokens: 8192},
-	"deepseek-v3":                     {ContextWindow: 8192, MaxOutputTokens: 8192},
+	"deepseek-v3":                     {ContextWindow: 128000, MaxOutputTokens: 16384},
 	"deepseek-v3.1":                   {ContextWindow: 128000, MaxOutputTokens: 8192},
 	"deepseek-v3-0324":                {ContextWindow: 128000, MaxOutputTokens: 8192},
 
@@ -176,7 +181,6 @@ var DefaultModelLimits = map[string]ModelLimits{
 	// Chinese Models - Moonshot Kimi
 
 	// Chinese Models - ByteDance Doubao
-	"doubao‑1.6":       {ContextWindow: 256000, MaxOutputTokens: 4096},
 	"doubao-pro":       {ContextWindow: 128000, MaxOutputTokens: 4096},
 	"doubao-lite":      {ContextWindow: 32000, MaxOutputTokens: 4096},
 	"doubao-vision":    {ContextWindow: 128000, MaxOutputTokens: 4096},
