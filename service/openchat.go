@@ -204,9 +204,11 @@ func (c *OpenChat) process(ag *Agent) error {
 
 		// Apply context window management
 		// This ensures we don't exceed the model's context window
+		Debugf("Context messages: [%d]", len(messages))
 		messages, truncated = cm.PrepareOpenChatMessages(messages, c.tools)
 		if truncated {
 			ag.Warn("Context trimmed to fit model limits")
+			Debugf("Context messages after truncation: [%d]", len(messages))
 			// Update the conversation with truncated messages
 			ag.Convo.SetMessages(messages)
 		}

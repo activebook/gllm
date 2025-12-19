@@ -212,10 +212,12 @@ func (ag *Agent) GenerateGemini2Stream() error {
 
 		// Context Management
 		// Directly truncate on the messages
+		Debugf("Context messages: [%d]", len(messages))
 		messages, truncated = cm.PrepareGeminiMessages(messages, ag.SystemPrompt, config.Tools)
 		if truncated {
 			// Notify user or log that truncation happened
 			ag.Warn("Context trimmed to fit model limits")
+			Debugf("Context messages after truncation: [%d]", len(messages))
 		}
 
 		// Call API
