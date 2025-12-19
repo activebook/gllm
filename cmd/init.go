@@ -31,11 +31,12 @@ func init() {
 // Exported so it can be called from root.go
 func RunInitWizard() error {
 	var (
-		provider string
-		endpoint string
-		apiKey   string
-		model    string
-		confirm  bool
+		provider         string
+		endpoint         string
+		apiKey           string
+		model            string
+		confirm          bool
+		selectedFeatures []string
 	)
 
 	// Group 1: Provider selection
@@ -172,6 +173,19 @@ func RunInitWizard() error {
 					return nil
 				}),
 		),
+		// Group 3: Features
+		huh.NewGroup(
+			huh.NewMultiSelect[string]().
+				Title("Agent Capabilities").
+				Description("Select features to enable").
+				Options(
+					huh.NewOption("Thinking Mode", "think").Selected(true),
+					huh.NewOption("Tools & Search", "tools").Selected(true),
+					huh.NewOption("Token Usage Stats", "usage").Selected(true),
+					huh.NewOption("Markdown Output", "markdown").Selected(true),
+				).
+				Value(&selectedFeatures),
+		),
 		huh.NewGroup(
 			huh.NewConfirm().
 				Title("Save Configuration?").
@@ -219,6 +233,20 @@ func RunInitWizard() error {
 
 	viper.Set("models", modelsMap)
 	viper.Set("agent.model", encodedAlias)
+
+	// Save agent features
+	featureMap := map[string]bool{
+		"think":    false,
+		"tools":    false,
+		"usage":    false,
+		"markdown": false,
+	}
+	for _, f := range selectedFeatures {
+		featureMap[f] = true
+	}
+	for k, v := range featureMap {
+		viper.Set("agent."+k, v)
+	}
 
 	// Save
 	if err := writeConfig(); err != nil {
