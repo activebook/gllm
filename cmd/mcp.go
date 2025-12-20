@@ -603,6 +603,33 @@ This will replace the current MCP configuration with the imported one.`,
 	},
 }
 
+var mcpPathCmd = &cobra.Command{
+	Use:   "path",
+	Short: "Show the location of the MCP configuration file",
+	Long:  `Displays the full path to the MCP configuration file. You can manually edit it and reload the available MCPs.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		// Get the MCP config path
+		configPath := service.GetMCPServersPath()
+
+		// Check if the file exists
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			// File doesn't exist, initialize with template
+			templateConfig := &service.MCPConfig{
+				MCPServers:      make(map[string]service.MCPServerConfig),
+				AllowMCPServers: []string{},
+			}
+			err := service.SaveMCPServers(templateConfig)
+			if err != nil {
+				fmt.Printf("Error initializing MCP configuration file: %v\n", err)
+				return
+			}
+			fmt.Printf("MCP configuration file initialized at: %s\n", configPath)
+		} else {
+			fmt.Printf("MCP configuration file location: %s\n", configPath)
+		}
+	},
+}
+
 func init() {
 	mcpListCmd.Flags().BoolP("all", "a", false, "List all mcp servers, including blocked ones")
 	mcpListCmd.Flags().BoolP("prompts", "p", false, "Include MCP prompts, if available")
@@ -628,6 +655,7 @@ func init() {
 	mcpCmd.AddCommand(mcpRemoveCmd)
 	mcpCmd.AddCommand(mcpExportCmd)
 	mcpCmd.AddCommand(mcpImportCmd)
+	mcpCmd.AddCommand(mcpPathCmd)
 	rootCmd.AddCommand(mcpCmd)
 }
 

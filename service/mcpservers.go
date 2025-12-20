@@ -35,7 +35,7 @@ type MCPConfig struct {
 // and initializes the MCP client with the configured servers
 func LoadMCPServers() (*MCPConfig, error) {
 	// Get the path to the MCP servers configuration file
-	configPath := getMCPServersPath()
+	configPath := GetMCPServersPath()
 
 	// Check if the configuration file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
@@ -78,7 +78,7 @@ func LoadMCPServers() (*MCPConfig, error) {
 // SaveMCPServers writes the MCP configuration to the specified JSON file
 func SaveMCPServers(config *MCPConfig) error {
 	// Get the path to the MCP servers configuration file
-	configPath := getMCPServersPath()
+	configPath := GetMCPServersPath()
 
 	// Ensure the directory exists
 	dir := filepath.Dir(configPath)
@@ -154,7 +154,8 @@ func LoadMCPServersFromPath(path string) (*MCPConfig, error) {
 	return &config, nil
 }
 
-func getMCPServersPath() string {
+// GetMCPServersPath returns the path to the MCP servers configuration file
+func GetMCPServersPath() string {
 	var err error
 	// Prefer os.UserConfigDir()
 	userConfigDir, err := os.UserConfigDir()
