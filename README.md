@@ -46,6 +46,12 @@ scoop bucket add gllm https://github.com/activebook/scoop-gllm.git
 scoop install gllm
 ```
 
+### Shell (Alpine Linux/Ubuntu/CentOS/MacOS)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/activebook/gllm/main/build/install.sh | sh
+```
+
 ### Build from Source
 
 ```sh
@@ -53,6 +59,10 @@ git clone https://github.com/activebook/gllm.git
 cd gllm
 go build -o gllm
 ```
+
+#### eg. Run on Alpine Linux
+
+![RunonLinux](screenshots/runonlinux.png)
 
 ---
 
