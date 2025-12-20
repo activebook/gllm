@@ -16,6 +16,7 @@ die() { printf >&2 "ERROR: %s\n" "$*"; exit 1; }
 warn(){ printf >&2 "WARN: %s\n" "$*"; }
 
 need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"; }
+either_cmd() { for cmd in "$@"; do command -v "$cmd" >/dev/null 2>&1 && return 0; done; die "Missing at least one of: $@"; }
 
 usage() {
   cat <<EOF
@@ -26,7 +27,7 @@ Environment overrides:
   OWNER, REPO, BIN, INSTALL_DIR, ASSET, VERSION, SKIP_VERIFY, REQUIRE_CHECKSUM
 
 Examples:
-  curl -fsSL https://raw.githubusercontent.com/$OWNER/$REPO/main/install.sh | sh
+  curl -fsSL https://raw.githubusercontent.com/$OWNER/$REPO/main/build/install.sh | sh
   sh install.sh --version v1.2.3
   sh install.sh --dir ~/.local/bin
 EOF
@@ -50,6 +51,8 @@ need_cmd mktemp
 need_cmd grep
 need_cmd awk
 need_cmd sed
+either_cmd curl wget
+either_cmd doas sudo
 
 # -------- downloader (curl preferred, wget fallback) --------
 download() {
@@ -57,7 +60,7 @@ download() {
   out="$2"
 
   if command -v curl >/dev/null 2>&1; then
-    curl -fL --retry 3 --retry-delay 1 --connect-timeout 10 -o "$out" "$url" \
+    curl --progress-bar -fL --retry 3 --retry-delay 1 --connect-timeout 10 -o "$out" "$url" \
       || die "Failed to download: $url"
   elif command -v wget >/dev/null 2>&1; then
     wget -qO "$out" "$url" || die "Failed to download: $url"
