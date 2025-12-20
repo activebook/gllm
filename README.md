@@ -62,7 +62,9 @@ go build -o gllm
 
 #### eg. Run on Alpine Linux
 
-![RunonLinux](screenshots/runonlinux.png)
+| Run on Linux | MCP Run on Linux |
+|--------------|------------------|
+| ![RunonLinux](screenshots/runonlinux.png) | ![MCPRunonLinux](screenshots/mcp_runonlinux.png) |
 
 ---
 
