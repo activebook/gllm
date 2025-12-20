@@ -89,14 +89,14 @@ sha256_check() {
 # -------- detect arch -> Go arch --------
 ARCH="$(uname -m)"
 case "$ARCH" in
-  x86_64|amd64) GOARCH="amd64" ;;
+  x86_64|amd64) GOARCH="x86_64" ;;
   aarch64|arm64) GOARCH="arm64" ;;
   *) die "Unsupported architecture: $ARCH" ;;
 esac
 
 # Default asset naming (your stated pattern)
 if [ -z "$ASSET" ]; then
-  ASSET="${BIN}_linux_${GOARCH}.tar.gz"
+  ASSET="${BIN}_Linux_${GOARCH}.tar.gz"
 fi
 
 tmpdir="$(mktemp -d)"
