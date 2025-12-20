@@ -89,17 +89,33 @@ sha256_check() {
   actual:   $actual"
 }
 
-# -------- detect arch -> Go arch --------
+# -------- detect OS and arch --------
+OS="$(uname -s)"
 ARCH="$(uname -m)"
-case "$ARCH" in
-  x86_64|amd64) GOARCH="x86_64" ;;
-  aarch64|arm64) GOARCH="arm64" ;;
-  *) die "Unsupported architecture: $ARCH" ;;
+
+case "$OS" in
+  Darwin)
+    case "$ARCH" in
+      x86_64) GOOS="Darwin"; GOARCH="x86_64" ;;
+      arm64|aarch64) GOOS="Darwin"; GOARCH="arm64" ;;
+      *) die "Unsupported architecture: $ARCH" ;;
+    esac
+    ;;
+  Linux)
+    case "$ARCH" in
+      x86_64|amd64) GOOS="Linux"; GOARCH="x86_64" ;;
+      aarch64|arm64) GOOS="Linux"; GOARCH="arm64" ;;
+      *) die "Unsupported architecture: $ARCH" ;;
+    esac
+    ;;
+  *)
+    die "Unsupported operating system: $OS"
+    ;;
 esac
 
-# Default asset naming (your stated pattern)
+# Default asset naming
 if [ -z "$ASSET" ]; then
-  ASSET="${BIN}_Linux_${GOARCH}.tar.gz"
+  ASSET="${BIN}_${GOOS}_${GOARCH}.tar.gz"
 fi
 
 tmpdir="$(mktemp -d)"
