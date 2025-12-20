@@ -244,8 +244,17 @@ func (mc *MCPClient) AddHttpServer(name string, url string, headers map[string]s
 }
 
 func (mc *MCPClient) AddStdServer(name string, cmd string, env map[string]string, cwd string, args ...string) error {
-	// Connect to a server over stdin/stdout
-	transport := &mcp.CommandTransport{Command: exec.Command(cmd, args...)}
+	// IMPORTANT: WE WRAP THE COMMAND TO FILTER NOISY STDOUT (NON-JSON OUTPUT)
+	// Run: gllm _mcp-filter -- cmd args...
+	// "--" is a common convention in Unix-like systems to prevent arguments starting with - from being misinterpreted as flags or options.
+	// Cobra handles "--" internally by stopping flag parsing when encountered and excluding it from the arguments passed to the command handler, ensuring that subsequent arguments are treated as positional regardless of leading - characters.
+
+	// Construct new args: _mcp-filter, --, cmd, args...
+	newArgs := []string{"_mcp-filter", "--", cmd}
+	newArgs = append(newArgs, args...)
+
+	// Use ExecutorPath which points to the current binary
+	transport := &mcp.CommandTransport{Command: exec.Command(ExecutorPath, newArgs...)}
 
 	// Set the environment variables
 	transport.Command.Env = os.Environ()
