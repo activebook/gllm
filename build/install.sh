@@ -188,17 +188,19 @@ fi
 
 chmod +x "$bin_path" || true
 
-# -------- install (use sudo if needed) --------
+# -------- install (use privilege escalation if needed) --------
 mkdir -p "$INSTALL_DIR" 2>/dev/null || true
 
 install_cmd="install -m 0755 \"$bin_path\" \"$INSTALL_DIR/$BIN\""
 if [ -w "$INSTALL_DIR" ] 2>/dev/null; then
   sh -c "$install_cmd" || die "Failed to install into $INSTALL_DIR"
 else
-  if command -v sudo >/dev/null 2>&1; then
+  if command -v doas >/dev/null 2>&1; then
+    doas sh -c "$install_cmd" || die "doas install failed"
+  elif command -v sudo >/dev/null 2>&1; then
     sudo sh -c "$install_cmd" || die "sudo install failed (do you have sudo rights?)"
   else
-    die "No write permission to $INSTALL_DIR and sudo is not available. Re-run as root or use --dir \$HOME/.local/bin"
+    die "No write permission to $INSTALL_DIR and no privilege escalation tool (doas/sudo) available. Re-run as root or use --dir \$HOME/.local/bin"
   fi
 fi
 
