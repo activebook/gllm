@@ -110,11 +110,11 @@ if [ "$VERSION" = "latest" ]; then
   # We use it to learn the real tag via redirect header.
   if command -v curl >/dev/null 2>&1; then
     TAG="$(curl -fsSLI "https://github.com/$OWNER/$REPO/releases/latest" \
-      | awk -F'/' 'tolower($1)=="location:"{print $NF}' \
+      | grep -i '^location:' | awk -F'/' '{print $NF}' \
       | tr -d '\r' )" || true
   elif command -v wget >/dev/null 2>&1; then
     TAG="$(wget -S -O /dev/null "https://github.com/$OWNER/$REPO/releases/latest" 2>&1 \
-      | awk -F'/' 'tolower($1)=="  location:"{print $NF}' \
+      | grep -i '^  location:' | awk -F'/' '{print $NF}' \
       | tr -d '\r' )" || true
   fi
   [ -n "$TAG" ] || die "Could not resolve latest tag from GitHub"
