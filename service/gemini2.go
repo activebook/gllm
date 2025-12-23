@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"google.golang.org/genai"
@@ -372,16 +373,22 @@ func (ag *Agent) processGemini2Stream(ctx context.Context,
 
 func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 
-	var args string
+	var filteredArgs map[string]interface{}
 	if call.Name == "edit_file" || call.Name == "write_file" {
 		// Don't show content(the modified content could be too long)
-		args = formatToolCallArguments(call.Args, []string{"content", "edits"})
+		filteredArgs = FilterToolArguments(call.Args, []string{"content", "edits"})
 	} else {
-		args = formatToolCallArguments(call.Args, []string{})
+		filteredArgs = FilterToolArguments(call.Args, []string{})
 	}
 
 	// Call function
-	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", call.Name, args)}, ag.ProceedChan)
+	// Create structured data for the UI
+	toolCallData := map[string]interface{}{
+		"function": call.Name,
+		"args":     filteredArgs,
+	}
+	jsonData, _ := json.Marshal(toolCallData)
+	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusFunctionCalling, Data: string(jsonData)}, ag.ProceedChan)
 
 	var resp *genai.FunctionResponse
 	var err error

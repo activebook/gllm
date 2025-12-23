@@ -1,7 +1,11 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 const (
@@ -559,8 +563,110 @@ func (ag *Agent) WriteDiffConfirm(text string) {
 
 func (ag *Agent) WriteFunctionCall(text string) {
 	if ag.Std != nil {
+		// Attempt to parse text as JSON
+		// The text is expected to be in format "function_name(arguments)" or just raw text
+		// But in our new implementation, we will pass a JSON string: {"function": name, "args": args}
+
+		type ToolCallData struct {
+			Function string      `json:"function"`
+			Args     interface{} `json:"args"`
+		}
+
+		var data ToolCallData
+		err := json.Unmarshal([]byte(text), &data)
+
+		var output string
+		if err == nil {
+			// Make sure we have enough space for the border
+			tcol := GetTerminalWidth() - 8
+
+			// Structured data available
+			// Use lipgloss to render
+			style := lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("63")). // Purple/Blue-ish
+				Padding(0, 1).
+				Margin(0, 1)
+
+			titleStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("86")). // Cyan
+				Bold(true)
+
+			argsStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("250")).Width(tcol) // Light Gray
+
+			var content string
+
+			// For built-in tools, we have a map of args
+			// We will try to extract purpose/description and command separately
+			if argsMap, ok := data.Args.(map[string]interface{}); ok {
+				// 1. Identify Purpose
+				// MCP tool calls may not have purpose/description
+				var purposeVal string
+				if v, ok := argsMap["purpose"].(string); ok {
+					purposeVal = v
+				}
+
+				// 2. Identify Command (everything else)
+				var commandParts []string
+
+				// Then grab any args that look like command parts
+				// keep the k=v pairs format for command
+				for k, v := range argsMap {
+					if k == "purpose" {
+						continue
+					} else if k == "need_confirm" {
+						continue
+					}
+					val := fmt.Sprintf("%s = %v", k, v)
+					commandParts = append(commandParts, val)
+				}
+
+				commandVal := strings.Join(commandParts, "\n")
+
+				// Render logic
+				// Title (Function Name) -> Cyan Bold
+				// Command -> White (With keys)
+				// Purpose -> Gray, Dim, Wrapped
+
+				cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("7")).Width(tcol)       // White
+				purposeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Width(tcol) // Grey, wrapped
+
+				var parts []string
+				parts = append(parts, titleStyle.Render(data.Function))
+
+				if commandVal != "" {
+					parts = append(parts, cmdStyle.Render(commandVal))
+				}
+
+				if purposeVal != "" {
+					parts = append(parts, purposeStyle.Render(purposeVal))
+				}
+
+				content = strings.Join(parts, "\n")
+			}
+
+			// Fallback if content is still empty
+			if content == "" {
+				// Convert Args back to string for display
+				var argsStr string
+				if s, ok := data.Args.(string); ok {
+					argsStr = s
+				} else {
+					bytes, _ := json.MarshalIndent(data.Args, "", "  ")
+					argsStr = string(bytes)
+				}
+				content = fmt.Sprintf("%s\n%s", titleStyle.Render(data.Function), argsStyle.Render(argsStr))
+			}
+
+			output = style.Render(content)
+		} else {
+			// Fallback to original text if not JSON
+			output = inCallingColor + text + resetColor
+		}
+
 		ag.Std.Writeln(resetColor)
-		ag.Std.Writeln(inCallingColor + text + resetColor)
+		ag.Std.Writeln(output)
 	}
 	if ag.OutputFile != nil {
 		ag.OutputFile.Writef("\n%s\n", text)
