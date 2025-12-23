@@ -11,6 +11,7 @@ require (
 	github.com/ergochat/readline v0.1.3
 	github.com/fatih/color v1.18.0
 	github.com/google/jsonschema-go v0.4.2
+	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/modelcontextprotocol/go-sdk v1.2.0
 	github.com/pmezard/go-difflib v1.0.0
