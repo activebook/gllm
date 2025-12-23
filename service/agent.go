@@ -577,6 +577,7 @@ func (ag *Agent) WriteFunctionCall(text string) {
 
 		var output string
 		if err == nil {
+			tcol := GetTerminalWidth()
 			// Structured data available
 			// Use lipgloss to render
 			style := lipgloss.NewStyle().
@@ -590,55 +591,42 @@ func (ag *Agent) WriteFunctionCall(text string) {
 				Bold(true)
 
 			argsStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("250")) // Light Gray
+				Foreground(lipgloss.Color("250")).Width(tcol) // Light Gray
 
 			var content string
 
+			// For built-in tools, we have a map of args
+			// We will try to extract purpose/description and command separately
 			if argsMap, ok := data.Args.(map[string]interface{}); ok {
 				// 1. Identify Purpose
+				// MCP tool calls may not have purpose/description
 				var purposeVal string
 				if v, ok := argsMap["purpose"].(string); ok {
-					purposeVal = v
-				} else if v, ok := argsMap["description"].(string); ok {
 					purposeVal = v
 				}
 
 				// 2. Identify Command (everything else)
 				var commandParts []string
 
-				// To keep it somewhat ordered or consistent, let's grab known primary keys first if they exist
-				knownKeys := []string{"command", "path", "source", "destination", "query", "url", "dir"}
-				processedKeys := make(map[string]bool)
-
-				for _, k := range knownKeys {
-					if v, ok := argsMap[k].(string); ok && v != "" {
-						commandParts = append(commandParts, v)
-						processedKeys[k] = true
-					}
-				}
-
-				// Then grab any others that were missed
+				// Then grab any args that look like command parts
+				// keep the k=v pairs format for command
 				for k, v := range argsMap {
-					if k == "purpose" || k == "description" {
+					if k == "purpose" {
 						continue
 					}
-					if processedKeys[k] {
-						continue
-					}
-					if s, ok := v.(string); ok && s != "" {
-						commandParts = append(commandParts, s)
-					}
+					val := fmt.Sprintf("%v", v)
+					commandParts = append(commandParts, k, "=", val)
 				}
 
-				commandVal := strings.Join(commandParts, " ")
+				commandVal := strings.Join(commandParts, "\n")
 
 				// Render logic
 				// Title (Function Name) -> Cyan Bold
-				// Command -> White (No keys)
+				// Command -> White (With keys)
 				// Purpose -> Gray, Dim, Wrapped
 
-				cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("7")).Bold(false)     // White
-				purposeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Width(60) // Grey, wrapped
+				cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("7")).Width(tcol)       // White
+				purposeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Width(tcol) // Grey, wrapped
 
 				var parts []string
 				parts = append(parts, titleStyle.Render(data.Function))
