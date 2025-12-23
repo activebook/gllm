@@ -22,14 +22,14 @@ type ExtractorConfig struct {
 	BoilerplateClasses []string
 }
 
-// Default configuration
+// Default configuration with modern browser headers (Chrome 131, December 2024)
 var defaultConfig = ExtractorConfig{
-	UserAgent:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-	HeaderAccept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+	UserAgent:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+	HeaderAccept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
 	Timeout:            30 * time.Second,
 	MinTextLength:      20, // Filter out very short text segments
-	BoilerplateIDs:     []string{"header", "footer", "nav", "sidebar", "menu", "comment", "related", "sharing", "social", "advertisement", "ad"},
-	BoilerplateClasses: []string{"header", "footer", "nav", "sidebar", "menu", "comment", "related", "sharing", "social", "advertisement", "ad", "cookie", "popup"},
+	BoilerplateIDs:     []string{"header", "footer", "nav", "sidebar", "menu", "comment", "related", "sharing", "social", "advertisement", "ad", "comments", "masthead", "navigation"},
+	BoilerplateClasses: []string{"header", "footer", "nav", "sidebar", "menu", "comment", "related", "sharing", "social", "advertisement", "ad", "cookie", "popup", "modal", "overlay", "banner", "notification", "cookie-consent", "gdpr", "privacy-notice", "subscribe", "newsletter", "promo", "comments", "breadcrumb", "pagination", "author-bio", "related-posts", "share-buttons", "widget"},
 }
 
 // ExtractTextFromURL fetches a URL and extracts the main text content
@@ -51,10 +51,26 @@ func ExtractTextFromURL(url string, config *ExtractorConfig) ([]string, error) {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Set common headers to mimic a real browser
+	// Set comprehensive browser headers to avoid bot detection
+	// These headers mimic a real Chrome browser request
 	req.Header.Set("User-Agent", config.UserAgent)
 	req.Header.Set("Accept", config.HeaderAccept)
-	//req.Header.Set("Accept-Language", "en-US,en;q=0.5")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
+	req.Header.Set("Connection", "keep-alive")
+	req.Header.Set("Upgrade-Insecure-Requests", "1")
+
+	// Sec-Fetch-* headers - critical for modern bot detection bypass
+	// These indicate a top-level navigation request initiated by user
+	req.Header.Set("Sec-Fetch-Dest", "document")
+	req.Header.Set("Sec-Fetch-Mode", "navigate")
+	req.Header.Set("Sec-Fetch-Site", "none")
+	req.Header.Set("Sec-Fetch-User", "?1")
+
+	// Additional security headers
+	req.Header.Set("Sec-Ch-Ua", `"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"`)
+	req.Header.Set("Sec-Ch-Ua-Mobile", "?0")
+	req.Header.Set("Sec-Ch-Ua-Platform", `"Windows"`)
 
 	// Make the request
 	resp, err := client.Do(req)
@@ -82,8 +98,11 @@ func ExtractTextFromURL(url string, config *ExtractorConfig) ([]string, error) {
 		doc.Find("." + class).Remove()
 	}
 
-	// Remove common non-content elements
-	doc.Find("script, style, noscript, iframe, svg, form, button, input").Remove()
+	// Remove common non-content elements including noise-generating tags
+	doc.Find("script, style, noscript, iframe, svg, form, button, input, nav, header, footer, aside, template, object, embed, canvas, video, audio, picture, source, track, link, meta, head, figcaption").Remove()
+
+	// Remove JSON-LD and other structured data scripts
+	doc.Find("script[type='application/ld+json'], script[type='application/json']").Remove()
 
 	// Extract the main article content
 	var textContent []string
@@ -117,12 +136,42 @@ func ExtractTextFromURL(url string, config *ExtractorConfig) ([]string, error) {
 	return textContent, nil
 }
 
+// isHiddenElement checks if an element is hidden via various HTML/CSS mechanisms
+func isHiddenElement(el *goquery.Selection) bool {
+	// Check inline style for display:none or visibility:hidden
+	if style, exists := el.Attr("style"); exists {
+		styleLower := strings.ToLower(style)
+		if strings.Contains(styleLower, "display:none") ||
+			strings.Contains(styleLower, "display: none") ||
+			strings.Contains(styleLower, "visibility:hidden") ||
+			strings.Contains(styleLower, "visibility: hidden") {
+			return true
+		}
+	}
+	// Check hidden attribute
+	if _, exists := el.Attr("hidden"); exists {
+		return true
+	}
+	// Check aria-hidden attribute
+	if ariaHidden, exists := el.Attr("aria-hidden"); exists && ariaHidden == "true" {
+		return true
+	}
+	return false
+}
+
+// skipNodeNames contains tags that should be skipped during text extraction
+var skipNodeNames = map[string]bool{
+	"script": true, "style": true, "noscript": true, "iframe": true,
+	"svg": true, "form": true, "nav": true, "header": true, "footer": true,
+	"aside": true, "template": true, "object": true, "embed": true,
+	"canvas": true, "video": true, "audio": true, "picture": true,
+}
+
 // extractTextContent recursively extracts meaningful text content
 func extractTextContent(s *goquery.Selection, results *[]string, minLength int) {
 	s.Each(func(_ int, el *goquery.Selection) {
-		// Skip hidden elements
-		if display, exists := el.Attr("style"); exists &&
-			(strings.Contains(display, "display:none") || strings.Contains(display, "display: none")) {
+		// Skip hidden elements using comprehensive detection
+		if isHiddenElement(el) {
 			return
 		}
 
@@ -138,8 +187,7 @@ func extractTextContent(s *goquery.Selection, results *[]string, minLength int) 
 		el.Children().Each(func(_ int, child *goquery.Selection) {
 			nodeName := goquery.NodeName(child)
 			// Skip elements that are likely to contain non-article content
-			if nodeName != "script" && nodeName != "style" && nodeName != "noscript" &&
-				nodeName != "iframe" && nodeName != "svg" && nodeName != "form" {
+			if !skipNodeNames[nodeName] {
 				extractTextContent(child, results, minLength)
 			}
 		})

@@ -577,7 +577,9 @@ func (ag *Agent) WriteFunctionCall(text string) {
 
 		var output string
 		if err == nil {
-			tcol := GetTerminalWidth()
+			// Make sure we have enough space for the border
+			tcol := GetTerminalWidth() - 8
+
 			// Structured data available
 			// Use lipgloss to render
 			style := lipgloss.NewStyle().

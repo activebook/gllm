@@ -2,8 +2,6 @@ package service
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 
@@ -15,7 +13,7 @@ func Diff(content1, content2, file1, file2 string, contextLines int) string {
 	// Colors
 	var red, green, cyan, dim func(string) string
 
-	if supportsTrueColor() {
+	if TerminalSupportsTrueColor() {
 		// True color: use slim background colors like VSCode
 
 		// Slight darker
@@ -121,26 +119,4 @@ func parseHunkHeader(line string, currentLineNum1, currentLineNum2 int) (int, in
 	}
 
 	return currentLineNum1, currentLineNum2
-}
-
-// GetTerminalWidth returns the width of the terminal
-// Uses tput cols command, with fallback to 80 if it fails
-func GetTerminalWidth() int {
-	cmd := exec.Command("tput", "cols")
-	output, err := cmd.Output()
-	if err != nil {
-		return 80 // fallback width
-	}
-	width, err := strconv.Atoi(strings.TrimSpace(string(output)))
-	if err != nil {
-		return 80 // fallback width
-	}
-	return width
-}
-
-// supportsTrueColor detects if the terminal supports true color (24-bit)
-// Returns true if COLORTERM is set to "truecolor" or "24bit"
-func supportsTrueColor() bool {
-	colorTerm := os.Getenv("COLORTERM")
-	return colorTerm == "truecolor" || colorTerm == "24bit"
 }
