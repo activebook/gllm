@@ -2,9 +2,7 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/sashabaranov/go-openai"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
@@ -109,29 +107,22 @@ func AvailableMCPTool(toolName string, client *MCPClient) bool {
 	return client.FindTool(toolName) != nil
 }
 
-func formatToolCallArguments(argsMap map[string]interface{}, ignoreKeys []string) string {
+func FilterToolArguments(argsMap map[string]interface{}, ignoreKeys []string) map[string]interface{} {
 	// Create a lookup map for efficient key checking
 	ignoreMap := make(map[string]bool)
 	for _, key := range ignoreKeys {
 		ignoreMap[key] = true
 	}
 
-	var argsList []string
+	result := make(map[string]interface{})
 	for k, v := range argsMap {
 		// Skip keys that are in the ignore list
 		if ignoreMap[k] {
 			continue
 		}
-
-		switch val := v.(type) {
-		case []interface{}, map[string]interface{}:
-			jsonStr, _ := json.Marshal(val)
-			argsList = append(argsList, fmt.Sprintf("%s=%s", k, string(jsonStr)))
-		default:
-			argsList = append(argsList, fmt.Sprintf("%s=%v", k, v))
-		}
+		result[k] = v
 	}
-	return strings.Join(argsList, ", ")
+	return result
 }
 
 // ToOpenAITool converts a GenericTool to an openai.Tool

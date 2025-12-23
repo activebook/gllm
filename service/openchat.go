@@ -464,19 +464,19 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		return nil, fmt.Errorf("error parsing arguments: %v", err)
 	}
 
-	var args string
+	var filteredArgs map[string]interface{}
 	if toolCall.Function.Name == "edit_file" || toolCall.Function.Name == "write_file" {
 		// Don't show content(the modified content could be too long)
-		args = formatToolCallArguments(argsMap, []string{"content", "edits"})
+		filteredArgs = FilterToolArguments(argsMap, []string{"content", "edits"})
 	} else {
-		args = formatToolCallArguments(argsMap, []string{})
+		filteredArgs = FilterToolArguments(argsMap, []string{})
 	}
 
 	// Call function
 	// Create structured data for the UI
-	toolCallData := map[string]string{
+	toolCallData := map[string]interface{}{
 		"function": toolCall.Function.Name,
-		"args":     args,
+		"args":     filteredArgs,
 	}
 	jsonData, _ := json.Marshal(toolCallData)
 	c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusFunctionCalling, Data: string(jsonData)}, c.op.proceed)
