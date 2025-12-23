@@ -613,6 +613,8 @@ func (ag *Agent) WriteFunctionCall(text string) {
 				for k, v := range argsMap {
 					if k == "purpose" {
 						continue
+					} else if k == "need_confirm" {
+						continue
 					}
 					val := fmt.Sprintf("%s = %v", k, v)
 					commandParts = append(commandParts, val)
