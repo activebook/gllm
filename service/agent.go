@@ -614,8 +614,8 @@ func (ag *Agent) WriteFunctionCall(text string) {
 					if k == "purpose" {
 						continue
 					}
-					val := fmt.Sprintf("%v", v)
-					commandParts = append(commandParts, k, "=", val)
+					val := fmt.Sprintf("%s = %v", k, v)
+					commandParts = append(commandParts, val)
 				}
 
 				commandVal := strings.Join(commandParts, "\n")
