@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"google.golang.org/genai"
@@ -381,7 +382,13 @@ func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Functi
 	}
 
 	// Call function
-	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", call.Name, args)}, ag.ProceedChan)
+	// Create structured data for the UI
+	toolCallData := map[string]string{
+		"function": call.Name,
+		"args":     args,
+	}
+	jsonData, _ := json.Marshal(toolCallData)
+	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusFunctionCalling, Data: string(jsonData)}, ag.ProceedChan)
 
 	var resp *genai.FunctionResponse
 	var err error

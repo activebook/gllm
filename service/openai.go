@@ -439,7 +439,13 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 	}
 
 	// Call function
-	oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, args)}, oa.op.proceed)
+	// Create structured data for the UI
+	toolCallData := map[string]string{
+		"function": toolCall.Function.Name,
+		"args":     args,
+	}
+	jsonData, _ := json.Marshal(toolCallData)
+	oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusFunctionCalling, Data: string(jsonData)}, oa.op.proceed)
 
 	var msg openai.ChatCompletionMessage
 	var err error

@@ -473,7 +473,13 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	}
 
 	// Call function
-	c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusFunctionCalling, Data: fmt.Sprintf("%s(%s)\n", toolCall.Function.Name, args)}, c.op.proceed)
+	// Create structured data for the UI
+	toolCallData := map[string]string{
+		"function": toolCall.Function.Name,
+		"args":     args,
+	}
+	jsonData, _ := json.Marshal(toolCallData)
+	c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusFunctionCalling, Data: string(jsonData)}, c.op.proceed)
 
 	var msg *model.ChatCompletionMessage
 	var err error

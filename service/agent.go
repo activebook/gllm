@@ -1,7 +1,10 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 const (
@@ -559,8 +562,43 @@ func (ag *Agent) WriteDiffConfirm(text string) {
 
 func (ag *Agent) WriteFunctionCall(text string) {
 	if ag.Std != nil {
+		// Attempt to parse text as JSON
+		// The text is expected to be in format "function_name(arguments)" or just raw text
+		// But in our new implementation, we will pass a JSON string: {"function": name, "args": args}
+		type ToolCallData struct {
+			Function string `json:"function"`
+			Args     string `json:"args"`
+		}
+
+		var data ToolCallData
+		err := json.Unmarshal([]byte(text), &data)
+
+		var output string
+		if err == nil {
+			// Structured data available
+			// Use lipgloss to render
+			style := lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("63")). // Purple/Blue-ish
+				Padding(0, 1).
+				Margin(0, 1)
+
+			titleStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("86")). // Cyan
+				Bold(true)
+
+			argsStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("250")) // Light Gray
+
+			content := fmt.Sprintf("%s\n%s", titleStyle.Render(data.Function), argsStyle.Render(data.Args))
+			output = style.Render(content)
+		} else {
+			// Fallback to original text if not JSON
+			output = inCallingColor + text + resetColor
+		}
+
 		ag.Std.Writeln(resetColor)
-		ag.Std.Writeln(inCallingColor + text + resetColor)
+		ag.Std.Writeln(output)
 	}
 	if ag.OutputFile != nil {
 		ag.OutputFile.Writef("\n%s\n", text)

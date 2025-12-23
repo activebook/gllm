@@ -30,15 +30,15 @@ func (tu *TokenUsage) getTokenUsageTip() string {
 		return fmt.Sprintf(
 			bbColor+"\n"+
 				"┌──────────────────────────────────────────────────────────────────────────────────────────┐\n"+
-				"│"+resetColor+cyanColor+" Token Usage"+resetColor+bbColor+"                                                                              │\n"+
+				"│"+resetColor+hiBlueColor+" Token Usage"+resetColor+bbColor+"                                                                              │\n"+
 				"│"+resetColor+" Input: %s%6d%s "+bbColor+"│"+resetColor+" Output: %s%6d%s "+bbColor+"│"+resetColor+" Cached: %s%6d %s%s "+bbColor+"│"+resetColor+" Thought: %s%6d%s "+bbColor+"│"+resetColor+" Total: %s%6d%s "+bbColor+"│"+resetColor+"\n"+bbColor+
 				"└──────────────────────────────────────────────────────────────────────────────────────────┘"+
 				resetColor,
-			cyanColor, tu.InputTokens, resetColor,
-			cyanColor, tu.OutputTokens, resetColor,
-			cyanColor, tu.CachedTokens, "("+fmt.Sprintf("%3.1f%%", cachedPercentage)+")", resetColor,
-			cyanColor, tu.ThoughtTokens, resetColor,
-			cyanColor, tu.TotalTokens, resetColor,
+			hiBlueColor, tu.InputTokens, resetColor,
+			hiBlueColor, tu.OutputTokens, resetColor,
+			hiBlueColor, tu.CachedTokens, "("+fmt.Sprintf("%3.1f%%", cachedPercentage)+")", resetColor,
+			hiBlueColor, tu.ThoughtTokens, resetColor,
+			hiBlueColor, tu.TotalTokens, resetColor,
 		)
 	}
 	return ""
@@ -62,12 +62,12 @@ func (tu *TokenUsage) getTokenUsageBox() string {
 				"└───────────────┴────────────┘"+
 				resetColor,
 			resetColor, bbColor, resetColor, bbColor,
-			resetColor, bbColor, cyanColor, tu.InputTokens, resetColor,
-			resetColor, bbColor, cyanColor, tu.OutputTokens, resetColor,
-			resetColor, bbColor, cyanColor, tu.CachedTokens, resetColor,
-			cyanColor, fmt.Sprintf("%4.1f%%", cachedPercentage), resetColor,
-			resetColor, bbColor, cyanColor, tu.ThoughtTokens, resetColor,
-			resetColor, bbColor, cyanColor, tu.TotalTokens, resetColor,
+			resetColor, bbColor, hiBlueColor, tu.InputTokens, resetColor,
+			resetColor, bbColor, hiBlueColor, tu.OutputTokens, resetColor,
+			resetColor, bbColor, hiBlueColor, tu.CachedTokens, resetColor,
+			hiBlueColor, fmt.Sprintf("%4.1f%%", cachedPercentage), resetColor,
+			resetColor, bbColor, hiBlueColor, tu.ThoughtTokens, resetColor,
+			resetColor, bbColor, hiBlueColor, tu.TotalTokens, resetColor,
 		)
 	}
 	return ""
