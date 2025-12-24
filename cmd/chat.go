@@ -259,7 +259,7 @@ func (ci *ChatInfo) startREPL() {
 	tcol := service.GetTerminalWidth() - 4
 	promptStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color("#282A2C")). // Grey background
-		Foreground(lipgloss.Color("#C3C3C3")). // White text
+		Foreground(lipgloss.Color("#cecece")). // White text
 		Padding(1, 2).Margin(0, 0, 1, 0).      // padding and margin
 		Bold(false).
 		// Align(lipgloss.Right). 	// align would break code formatting
