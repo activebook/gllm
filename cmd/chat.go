@@ -2,19 +2,17 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/activebook/gllm/service"
-	"github.com/ergochat/readline"
-	"github.com/fatih/color"
+	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // chatCmd represents the chat command
@@ -32,7 +30,6 @@ Special commands:
 /info, /i - Show current settings
 /history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)
 /markdown, /m [on|off] - Switch whether to render markdown or not
-/mode single|multi - Switch input mode (chat(*) single, chat(#) multi)
 /system, /S <@name|prompt> - change system prompt
 /tools, /t [on|off|skip|confirm] - Switch whether to use embedding tools, skip tools confirmation
 /template, /p <@name|tmpl> - change template
@@ -138,12 +135,7 @@ Special commands:
 var ()
 
 const (
-	_gllmSinglePrompt   = "\033[96mchat(*)>\033[0m "
-	_gllmMultiPrompt    = "\033[96mchat(#)>\033[0m "
-	_gllmContinuePrompt = ">> "
-	_gllmConfirmPrompt  = "\033[96mEnter\033[0m to send (\033[96mCtrl+C/Ctrl+D\033[0m to discard) "
-	_gllmFarewell       = "Session ended."
-	_gllmTempFile       = ".gllm-edit-*.tmp"
+	_gllmTempFile = ".gllm-edit-*.tmp"
 )
 
 func init() {
@@ -169,17 +161,14 @@ func init() {
 }
 
 type ChatInfo struct {
-	Model                  string
-	Provider               service.ModelProvider
-	Files                  []*service.FileData
-	Conversion             service.ConversationManager
-	QuitFlag               bool
-	maxRecursions          int
-	outputFile             string
-	InputMode              string
-	InputLines             []string
-	WaitingForConfirmation bool
-	lastEmptyLineTime      time.Time // When the last input was received
+	Model         string
+	Provider      service.ModelProvider
+	Files         []*service.FileData
+	Conversion    service.ConversationManager
+	QuitFlag      bool   // for cmd /quit or /exit
+	EditorInput   string // for /e editor edit
+	maxRecursions int
+	outputFile    string
 }
 
 func buildChatInfo(files []*service.FileData) *ChatInfo {
@@ -208,15 +197,12 @@ func buildChatInfo(files []*service.FileData) *ChatInfo {
 	}
 	mr := GetMaxRecursions()
 	ci := ChatInfo{
-		Model:                  modelInfo["model"].(string),
-		Provider:               provider,
-		Files:                  files,
-		Conversion:             cm,
-		QuitFlag:               false,
-		maxRecursions:          mr,
-		InputMode:              GetEffectiveChatMode(),
-		InputLines:             nil,
-		WaitingForConfirmation: false,
+		Model:         modelInfo["model"].(string),
+		Provider:      provider,
+		Files:         files,
+		Conversion:    cm,
+		QuitFlag:      false,
+		maxRecursions: mr,
 	}
 	return &ci
 }
@@ -224,111 +210,106 @@ func buildChatInfo(files []*service.FileData) *ChatInfo {
 func (ci *ChatInfo) printWelcome() {
 	fmt.Println("Welcome to GLLM Interactive Chat")
 	fmt.Println("Type '/exit' or '/quit' to end the session, or '/help' for commands")
-	fmt.Println("Use '/single','/*' or '/multi','/#' to switch input mode")
 	fmt.Println("Use '/' for commands")
 	fmt.Println("Use '!' for exec local commands")
-	fmt.Println("Use Ctrl+C/Ctrl+D to exit")
-	fmt.Println()
-	ci.showHelp()
-	fmt.Println()
-	ci.printModeStatus()
+	fmt.Println("Use Ctrl+C to exit")
+	// fmt.Println()
+	// ci.showHelp()
 	fmt.Println()
 }
 
-func (ci *ChatInfo) startREPL() {
-	cfg := &readline.Config{
-		Prompt: _gllmSinglePrompt,
-	}
-	rl, err := readline.NewEx(cfg)
-	if err != nil {
-		fmt.Printf("Error initializing readline: %v\n", err)
-		return
-	}
-	defer rl.Close()
+func (ci *ChatInfo) awaitChat() (string, error) {
+	var input string
 
+	// 1. Start with the default keymap
+	keyMap := huh.NewDefaultKeyMap()
+
+	// 2. Remap the Text field keys
+	// We swap 'enter' to be the submission key and 'alt+enter' for new lines
+	keyMap.Text.Submit = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "submit"))
+	// The Prev/Next keys are meant to navigate between multiple fields (like going from an Input field to a Text field to a Select field). Since there's only one field, pressing ctrl+[ or ctrl+] has nowhere to go!
+	// keyMap.Text.Prev = key.NewBinding(key.WithKeys("ctrl+["), key.WithHelp("ctrl+[", "prev"))
+	// keyMap.Text.Next = key.NewBinding(key.WithKeys("ctrl+]"), key.WithHelp("ctrl+]", "next"))
+	keyMap.Text.NewLine.SetHelp("ctrl+j", "new line")
+
+	// 3. Disable the Editor (Ctrl+E) keybinding
+	keyMap.Text.Editor = key.NewBinding(key.WithDisabled())
+
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewText().
+				Title("Chat").
+				Value(&input).
+				Placeholder("Type your message..."),
+		),
+	).WithKeyMap(keyMap) // 4. CRITICAL: Apply the keymap to the FORM level
+
+	err := form.Run()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(input), nil
+}
+
+func (ci *ChatInfo) startREPL() {
 	// Start the REPL
 	ci.printWelcome()
+
+	// Define prompt style
+	tcol := service.GetTerminalWidth() - 4
+	promptStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("#282A2C")). // Grey background
+		Foreground(lipgloss.Color("#cecece")). // White text
+		Padding(1, 2).Margin(0, 0, 1, 0).      // padding and margin
+		Bold(false).
+		// Align(lipgloss.Right). 	// align would break code formatting
+		Width(tcol) // align and width
+
 	for {
+		var input string
+		var err error
 
-		var prompt string
-		if ci.WaitingForConfirmation {
-			// Need to confirm
-			prompt = _gllmConfirmPrompt
-		} else {
-			switch ci.InputMode {
-			case "single":
-				// Single mode
-				if len(ci.InputLines) == 0 {
-					prompt = _gllmSinglePrompt
-				} else {
-					prompt = _gllmContinuePrompt
-				}
-			case "multi":
-				// Multi mode
-				if len(ci.InputLines) == 0 {
-					prompt = _gllmMultiPrompt
-				} else {
-					prompt = _gllmContinuePrompt
-				}
-			}
+		// Get user input
+		input, err = ci.awaitChat()
+		if err != nil {
+			// Handle user cancellation (Ctrl+C)
+			fmt.Println("\nSession ended.")
+			break
 		}
-		rl.SetPrompt(prompt)
-
-		// In the middle of processing multi-line input
-		// Single("\") or Multi
-		haveMultiInputs := (len(ci.InputLines) > 0)
-
-		line, err := rl.Readline()
-		if err != nil { // Handle EOF or other errors
-			// Handle Ctrl+C and Handle Ctrl+D
-			if err == readline.ErrInterrupt || err == io.EOF {
-				if ci.WaitingForConfirmation || haveMultiInputs {
-					// Discard multiline or editor content
-					ci.resetInputState()
-					continue
-				} else {
-					// Quit
-					fmt.Println("\n" + _gllmFarewell)
-					break
-				}
-			}
-			fmt.Printf("Error reading line: %v\n", err)
+		if input == "" {
 			continue
 		}
 
-		line = strings.TrimSpace(line)
-
-		// Handle special prefixes
-		// Don't process commands/shell commands in the middle multi inputs
-		// Exception: /preview and /pv are allowed during multi-input to check accumulated content
-		if !ci.WaitingForConfirmation && !haveMultiInputs {
-			if ci.startWithInnerCommand(line) {
-				// / for inner commands
-				ci.handleCommand(line)
-				if ci.QuitFlag {
-					break
-				}
-				continue
-			} else if ci.startWithLocalCommand(line) {
-				// ! for shell commands
-				ci.executeShellCommand(line[1:])
+		// Handle inner commands
+		if ci.startWithInnerCommand(input) {
+			// Reset editor input
+			ci.EditorInput = ""
+			// Handle inner command
+			ci.handleCommand(input)
+			if ci.QuitFlag {
+				break
+			}
+			fmt.Println()
+			// If editor input is not empty, use it as input
+			if ci.EditorInput != "" {
+				input = ci.EditorInput
+			} else {
 				continue
 			}
 		}
 
-		// Handle editor confirmation workflow
-		if ci.WaitingForConfirmation {
-			// we just care about the
-			ci.processEditorInput()
+		// Echo user input with style
+		fmt.Println(promptStyle.Render(input))
+
+		// Handle shell commands
+		if ci.startWithLocalCommand(input) {
+			ci.executeShellCommand(input[1:])
 			continue
-		} else {
-			switch ci.InputMode {
-			case "single":
-				ci.processSingleModeInput(line)
-			case "multi":
-				ci.processMultiModeInput(line)
-			}
 		}
+
+		// Call agent
+		ci.callAgent(input)
+		fmt.Println()
 
 		// quit chat
 		if ci.QuitFlag {
@@ -478,149 +459,6 @@ func (ci *ChatInfo) detachFiles(input string) {
 	}
 }
 
-func (ci *ChatInfo) processSingleModeInput(line string) {
-	// Single mode: process immediately, but support \ for line continuation
-	if strings.HasSuffix(line, "\\") {
-		// Line continuation: accumulate until no \
-		ci.InputLines = append(ci.InputLines, strings.TrimSuffix(line, "\\"))
-		return
-	}
-
-	// End of line continuation: combine accumulated lines if any
-	if len(ci.InputLines) > 0 {
-		ci.InputLines = append(ci.InputLines, line)
-		input := strings.Join(ci.InputLines, "\n")
-		ci.resetInputState()
-		ci.callAgent(input)
-		return
-	}
-
-	// Single line input
-	if line == "" {
-		return
-	}
-	ci.callAgent(line)
-}
-
-func (ci *ChatInfo) processMultiModeInput(line string) {
-	const debounceDelay = 100 * time.Millisecond
-
-	// Multi mode: accumulate lines
-	if line == "" {
-		// If we have accumulated lines
-		if len(ci.InputLines) > 0 {
-			// Check if this empty line arrived instantly (buffered paste)
-			elapsed := time.Since(ci.lastEmptyLineTime)
-
-			// If input arrived < 100ms after preview, it was likely buffered during the sleep
-			if elapsed < debounceDelay {
-				// Cancel confirmation mode!
-				ci.WaitingForConfirmation = false
-				ci.lastEmptyLineTime = time.Now()
-
-				// Add the missing empty line that triggered the preview
-				ci.InputLines = append(ci.InputLines, "")
-			} else {
-				// Empty line with content - sleep to debounce
-				time.Sleep(debounceDelay)
-
-				// Show preview
-				ci.showPreview()
-				ci.WaitingForConfirmation = true
-				ci.lastEmptyLineTime = time.Time{} // Reset to zero
-			}
-		} else {
-			// Reset the timer
-			ci.lastEmptyLineTime = time.Now()
-		}
-	} else {
-		// Reset the timer
-		ci.lastEmptyLineTime = time.Now()
-
-		// Non-empty line: add to accumulation
-		ci.InputLines = append(ci.InputLines, line)
-	}
-}
-
-func (ci *ChatInfo) handleEditorCommand() {
-	editor := getPreferredEditor()
-	tempFile, err := createTempFile(_gllmTempFile)
-	if err != nil {
-		service.Errorf("Failed to create temp file: %v", err)
-		return
-	}
-	defer os.Remove(tempFile)
-
-	// Open in detected editor
-	cmd := exec.Command(editor, tempFile)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	fmt.Printf("Opening in %s...\n", editor)
-	if err := cmd.Run(); err != nil {
-		service.Errorf("Editor failed: %v", err)
-		return
-	}
-
-	// Read back edited content
-	recv, err := os.ReadFile(tempFile)
-	if err != nil {
-		service.Errorf("Failed to read edited content: %v", err)
-		return
-	}
-
-	content := string(recv)
-	content = strings.Trim(content, " \n")
-	if len(content) == 0 {
-		ci.resetInputState()
-		fmt.Println("No content.")
-		return
-	}
-
-	lines := strings.Split(content, "\n")
-	ci.InputLines = lines
-	ci.WaitingForConfirmation = true
-
-	// Use shared preview display
-	ci.showPreview()
-}
-
-func (ci *ChatInfo) processEditorInput() {
-	// User pressed Enter - send content
-	input := strings.Join(ci.InputLines, "\n")
-	ci.resetInputState()
-	ci.callAgent(input)
-}
-
-func (ci *ChatInfo) handleEditor() {
-	// No arguments - check if preferred editor is set
-	if getPreferredEditor() == "" {
-		// No preferred editor set, show list
-		listAvailableEditors()
-	} else {
-		// Preferred editor set, open it
-		ci.handleEditorCommand()
-	}
-}
-
-func (ci *ChatInfo) resetInputState() {
-	ci.InputLines = nil
-	ci.WaitingForConfirmation = false
-}
-
-func (ci *ChatInfo) printModeStatus() {
-	if ci.InputMode == "single" {
-		color.New(color.FgGreen, color.Bold).Printf("Single-line mode: ")
-		color.New(color.FgCyan).Printf("chat(*)> ")
-		color.New(color.FgYellow).Println("- Press Enter to submit immediately")
-	} else {
-		color.New(color.FgGreen, color.Bold).Printf("Multi-line mode: ")
-		color.New(color.FgCyan).Printf("chat(#)> ")
-		color.New(color.FgYellow).Println("- Enter lines, empty line to preview & confirm")
-	}
-}
-
 func (ci *ChatInfo) callAgent(input string) {
 	var sb strings.Builder
 	appendText(&sb, GetEffectiveTemplate())
@@ -699,7 +537,6 @@ func (ci *ChatInfo) callAgent(input string) {
 	// Reset the template
 	SetEffectiveTemplate("")
 	// Reset the input lines
-	ci.resetInputState()
 }
 
 func (ci *ChatInfo) executeShellCommand(command string) {
@@ -734,26 +571,4 @@ func (ci *ChatInfo) executeShellCommand(command string) {
 		fmt.Printf(cmdOutputColor+"%s\n"+resetColor, output)
 	}
 	fmt.Print(resetColor) // Reset color after command output
-}
-
-// GetEffectiveChatMode returns the chat input mode to use
-func GetEffectiveChatMode() string {
-	mode := viper.GetString("chat.mode")
-	if mode == "" {
-		mode = "single" // Default to multi mode
-	}
-	return mode
-}
-
-// SetEffectiveChatMode sets the chat input mode
-func SetEffectiveChatMode(mode string) error {
-	if mode != "single" && mode != "multi" {
-		return fmt.Errorf("invalid chat mode: %s (must be 'single' or 'multi')", mode)
-	}
-
-	viper.Set("chat.mode", mode)
-	if err := writeConfig(); err != nil {
-		return fmt.Errorf("failed to save chat mode: %w", err)
-	}
-	return nil
 }

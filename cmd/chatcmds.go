@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -22,7 +23,7 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	switch command {
 	case "/exit", "/quit":
 		ci.QuitFlag = true
-		fmt.Println("Exiting chat session")
+		fmt.Println("Session Ended")
 		return
 
 	case "/help", "/?":
@@ -153,26 +154,6 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 			ci.setOutputFile(filename)
 		}
 
-	case "/single", "/*":
-		// Switch to single-line mode
-		if err := SetEffectiveChatMode("single"); err != nil {
-			service.Errorf("Failed to save chat mode: %v\n", err)
-			return
-		}
-		ci.InputMode = "single"
-		fmt.Println("Switched to single-line mode")
-		ci.printModeStatus()
-
-	case "/multi", "/#":
-		// Switch to multi-line mode
-		if err := SetEffectiveChatMode("multi"); err != nil {
-			service.Errorf("Failed to save chat mode: %v\n", err)
-			return
-		}
-		ci.InputMode = "multi"
-		fmt.Println("Switched to multi-line mode")
-		ci.printModeStatus()
-
 	case "/info", "/i":
 		// Show current model and conversation stats
 		ci.showInfo()
@@ -193,8 +174,6 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /info, /i - Show current settings")
 	fmt.Println("  /history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)")
 	fmt.Println("  /markdown, /m [on|off] - Switch whether to render markdown or not")
-	fmt.Println("  /single, /* - Switch to single-line mode (submit on Enter)")
-	fmt.Println("  /multi, /# - Switch to multi-line mode (preview on empty line, confirm to send)")
 	fmt.Println("  /attach, /a <filename> - Attach a file to the conversation")
 	fmt.Println("  /detach, /d <filename|all> - Detach a file from the conversation")
 	fmt.Println("  /template, /p \"<tmpl|name>\" - Change the template")
@@ -430,28 +409,52 @@ func (ci *ChatInfo) setOutputFile(path string) {
 	}
 }
 
-// showPreview displays accumulated multiline input before submission (like editor flow)
-func (ci *ChatInfo) showPreview() {
-	if len(ci.InputLines) == 0 {
+func (ci *ChatInfo) handleEditor() {
+	// No arguments - check if preferred editor is set
+	if getPreferredEditor() == "" {
+		// No preferred editor set, show list
+		listAvailableEditors()
+	} else {
+		// Preferred editor set, open it
+		ci.handleEditorCommand()
+	}
+}
+
+func (ci *ChatInfo) handleEditorCommand() {
+	editor := getPreferredEditor()
+	tempFile, err := createTempFile(_gllmTempFile)
+	if err != nil {
+		service.Errorf("Failed to create temp file: %v", err)
+		return
+	}
+	defer os.Remove(tempFile)
+
+	// Open in detected editor
+	cmd := exec.Command(editor, tempFile)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	fmt.Printf("Opening in %s...\n", editor)
+	if err := cmd.Run(); err != nil {
+		service.Errorf("Editor failed: %v", err)
 		return
 	}
 
-	// Calculate separator width
-	termWidth := service.GetTerminalWidth()
-	if termWidth <= 0 {
-		termWidth = 80
-	}
-	separatorWidth := (termWidth * 3) / 4
-	if separatorWidth < 40 {
-		separatorWidth = 40
+	// Read back edited content
+	recv, err := os.ReadFile(tempFile)
+	if err != nil {
+		service.Errorf("Failed to read edited content: %v", err)
+		return
 	}
 
-	separator := strings.Repeat("═", separatorWidth)
-	lineNumColor := color.New(color.FgYellow).SprintFunc()
-
-	fmt.Println(separator)
-	for i, line := range ci.InputLines {
-		fmt.Printf("%s %s\n", lineNumColor(fmt.Sprintf("%3d:", i+1)), line)
+	content := string(recv)
+	content = strings.Trim(content, " \n")
+	if len(content) == 0 {
+		fmt.Println("No content.")
+		return
 	}
-	fmt.Println()
+
+	// Set editor input
+	ci.EditorInput = content
 }
