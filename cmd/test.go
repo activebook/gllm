@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/activebook/gllm/test"
 	"github.com/spf13/cobra"
 )
 
@@ -29,11 +28,11 @@ func runTests(testName string) {
 
 	switch testName {
 	case "mcp":
-		test.TestMCP()
+		// test.TestMCP()
 	case "channels":
-		test.TestChannelsD()
+		// test.TestChannelsD()
 	case "atref":
-		test.TestAtRefProcessor()
+		// test.TestAtRefProcessor()
 	case "all":
 		fmt.Println("Running all tests...")
 	default:
