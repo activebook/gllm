@@ -2,13 +2,22 @@ package service
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
+	"time"
+)
+
+// Tool robustness constants
+const (
+	DefaultShellTimeout = 60 * time.Second
+	MaxFileSize         = 20 * 1024 * 1024 // 20MB
 )
 
 // Tool implementation functions
@@ -28,6 +37,16 @@ func readFileToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 		if lineNumBool, ok := lineNumValue.(bool); ok {
 			includeLineNumbers = lineNumBool
 		}
+	}
+
+	// Check file size before reading
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return fmt.Sprintf("Error accessing file %s: %v", path, err), nil
+	}
+	if fileInfo.Size() > MaxFileSize {
+		return fmt.Sprintf("Error: File %s is too large (%d bytes, max allowed: %d bytes / %.1f MB). Consider reading specific portions or using shell commands like 'head' or 'tail'.",
+			path, fileInfo.Size(), MaxFileSize, float64(MaxFileSize)/(1024*1024)), nil
 	}
 
 	// Read the file
@@ -141,10 +160,35 @@ func listDirectoryToolCallImpl(argsMap *map[string]interface{}) (string, error) 
 	var result strings.Builder
 	result.WriteString(fmt.Sprintf("Contents of directory %s:\n", path))
 	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			// If we can't get info, just show the name
+			if entry.IsDir() {
+				result.WriteString(fmt.Sprintf("[DIR]  %s\n", entry.Name()))
+			} else {
+				result.WriteString(fmt.Sprintf("[FILE] %s\n", entry.Name()))
+			}
+			continue
+		}
+
 		if entry.IsDir() {
-			result.WriteString(fmt.Sprintf("[DIR]  %s\n", entry.Name()))
+			result.WriteString(fmt.Sprintf("[DIR]  %-40s  %s\n",
+				entry.Name(), info.ModTime().Format("2006-01-02 15:04")))
 		} else {
-			result.WriteString(fmt.Sprintf("[FILE] %s\n", entry.Name()))
+			// Format file size
+			size := info.Size()
+			var sizeStr string
+			if size < 1024 {
+				sizeStr = fmt.Sprintf("%d B", size)
+			} else if size < 1024*1024 {
+				sizeStr = fmt.Sprintf("%.1f KB", float64(size)/1024)
+			} else if size < 1024*1024*1024 {
+				sizeStr = fmt.Sprintf("%.1f MB", float64(size)/(1024*1024))
+			} else {
+				sizeStr = fmt.Sprintf("%.1f GB", float64(size)/(1024*1024*1024))
+			}
+			result.WriteString(fmt.Sprintf("[FILE] %-40s  %8s  %s\n",
+				entry.Name(), sizeStr, info.ModTime().Format("2006-01-02 15:04")))
 		}
 	}
 
@@ -266,18 +310,57 @@ func searchFilesToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 		return "", fmt.Errorf("pattern not found in arguments")
 	}
 
-	// Search for files matching the pattern
-	fullPattern := filepath.Join(directory, pattern)
-	matches, err := filepath.Glob(fullPattern)
-	if err != nil {
-		return fmt.Sprintf("Error searching for files with pattern %s: %v", fullPattern, err), nil
+	// Check if recursive search is requested
+	recursive := false
+	if recursiveValue, exists := (*argsMap)["recursive"]; exists {
+		if recursiveBool, ok := recursiveValue.(bool); ok {
+			recursive = recursiveBool
+		}
+	}
+
+	var matches []string
+	var err error
+
+	if recursive {
+		// Recursive search using filepath.WalkDir
+		err = filepath.WalkDir(directory, func(path string, d os.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return nil // Skip inaccessible paths
+			}
+			if d.IsDir() {
+				return nil // Skip directories themselves
+			}
+			// Match the filename against the pattern
+			matched, matchErr := filepath.Match(pattern, filepath.Base(path))
+			if matchErr != nil {
+				return nil // Skip invalid patterns for this file
+			}
+			if matched {
+				matches = append(matches, path)
+			}
+			return nil
+		})
+		if err != nil {
+			return fmt.Sprintf("Error walking directory %s: %v", directory, err), nil
+		}
+	} else {
+		// Non-recursive search using filepath.Glob
+		fullPattern := filepath.Join(directory, pattern)
+		matches, err = filepath.Glob(fullPattern)
+		if err != nil {
+			return fmt.Sprintf("Error searching for files with pattern %s: %v", fullPattern, err), nil
+		}
 	}
 
 	var result strings.Builder
+	searchMode := "non-recursive"
+	if recursive {
+		searchMode = "recursive"
+	}
 	if len(matches) == 0 {
-		result.WriteString(fmt.Sprintf("No files found in %s matching pattern %s\n", directory, pattern))
+		result.WriteString(fmt.Sprintf("No files found in %s matching pattern '%s' (%s search)\n", directory, pattern, searchMode))
 	} else {
-		result.WriteString(fmt.Sprintf("Files found in %s matching pattern %s:\n", directory, pattern))
+		result.WriteString(fmt.Sprintf("Files found in %s matching pattern '%s' (%s search, %d results):\n", directory, pattern, searchMode, len(matches)))
 		for _, match := range matches {
 			result.WriteString(fmt.Sprintf("- %s\n", match))
 		}
@@ -297,6 +380,36 @@ func searchTextInFileToolCallImpl(argsMap *map[string]interface{}) (string, erro
 		return "", fmt.Errorf("text not found in arguments")
 	}
 
+	// Check if case-insensitive search is requested
+	caseInsensitive := false
+	if ciValue, exists := (*argsMap)["case_insensitive"]; exists {
+		if ciBool, ok := ciValue.(bool); ok {
+			caseInsensitive = ciBool
+		}
+	}
+
+	// Check if regex search is requested
+	useRegex := false
+	if regexValue, exists := (*argsMap)["regex"]; exists {
+		if regexBool, ok := regexValue.(bool); ok {
+			useRegex = regexBool
+		}
+	}
+
+	// Prepare regex pattern if needed
+	var regexPattern *regexp.Regexp
+	if useRegex {
+		patternStr := searchText
+		if caseInsensitive {
+			patternStr = "(?i)" + patternStr
+		}
+		var err error
+		regexPattern, err = regexp.Compile(patternStr)
+		if err != nil {
+			return fmt.Sprintf("Invalid regex pattern '%s': %v", searchText, err), nil
+		}
+	}
+
 	// Open the file
 	file, err := os.Open(path)
 	if err != nil {
@@ -310,12 +423,34 @@ func searchTextInFileToolCallImpl(argsMap *map[string]interface{}) (string, erro
 	lineNum := 0
 	foundCount := 0
 
-	result.WriteString(fmt.Sprintf("Search results for '%s' in %s:\n", searchText, path))
+	// Build search mode description
+	var searchMode string
+	if useRegex && caseInsensitive {
+		searchMode = "regex, case-insensitive"
+	} else if useRegex {
+		searchMode = "regex"
+	} else if caseInsensitive {
+		searchMode = "case-insensitive"
+	} else {
+		searchMode = "exact match"
+	}
+
+	result.WriteString(fmt.Sprintf("Search results for '%s' in %s (%s):\n", searchText, path, searchMode))
 
 	for scanner.Scan() {
 		lineNum++
 		line := scanner.Text()
-		if strings.Contains(line, searchText) {
+
+		var matched bool
+		if useRegex {
+			matched = regexPattern.MatchString(line)
+		} else if caseInsensitive {
+			matched = strings.Contains(strings.ToLower(line), strings.ToLower(searchText))
+		} else {
+			matched = strings.Contains(line, searchText)
+		}
+
+		if matched {
 			foundCount++
 			result.WriteString(fmt.Sprintf("Line %d: %s\n", lineNum, line))
 		}
@@ -365,6 +500,18 @@ func readMultipleFilesToolCallImpl(argsMap *map[string]interface{}) (string, err
 	for _, path := range paths {
 		result.WriteString(fmt.Sprintf("--- File: %s ---\n", path))
 
+		// Check file size before reading
+		fileInfo, err := os.Stat(path)
+		if err != nil {
+			result.WriteString(fmt.Sprintf("Error accessing file %s: %v\n\n", path, err))
+			continue
+		}
+		if fileInfo.Size() > MaxFileSize {
+			result.WriteString(fmt.Sprintf("Skipped: File is too large (%d bytes, max allowed: %d bytes / %.1f MB)\n\n",
+				fileInfo.Size(), MaxFileSize, float64(MaxFileSize)/(1024*1024)))
+			continue
+		}
+
 		content, err := os.ReadFile(path)
 		if err != nil {
 			result.WriteString(fmt.Sprintf("Error reading file %s: %v\n\n", path, err))
@@ -396,6 +543,15 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (str
 		// there is no need_confirm parameter, so we assume it's false
 		needConfirm = false
 	}
+
+	// Get timeout from arguments, default to DefaultShellTimeout
+	timeout := DefaultShellTimeout
+	if timeoutValue, exists := (*argsMap)["timeout"]; exists {
+		if timeoutFloat, ok := timeoutValue.(float64); ok && timeoutFloat > 0 {
+			timeout = time.Duration(timeoutFloat) * time.Second
+		}
+	}
+
 	if needConfirm && !toolsUse.AutoApprove {
 		// Directly prompt user for confirmation
 		descStr, ok := (*argsMap)["purpose"].(string)
@@ -414,22 +570,31 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (str
 
 	var errStr string
 
-	// Do the real command
-	var out []byte
-	var err error
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	// Do the real command with timeout
+	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		out, err = exec.Command("cmd", "/C", cmdStr).CombinedOutput()
+		cmd = exec.CommandContext(ctx, "cmd", "/C", cmdStr)
 	} else {
-		out, err = exec.Command("sh", "-c", cmdStr).CombinedOutput()
+		cmd = exec.CommandContext(ctx, "sh", "-c", cmdStr)
 	}
+
+	out, err := cmd.CombinedOutput()
 
 	// Handle command exec failed
 	if err != nil {
-		var exitCode int
-		if exitError, ok := err.(*exec.ExitError); ok {
-			exitCode = exitError.ExitCode()
+		if ctx.Err() == context.DeadlineExceeded {
+			errStr = fmt.Sprintf("Command timed out after %v", timeout)
+		} else {
+			var exitCode int
+			if exitError, ok := err.(*exec.ExitError); ok {
+				exitCode = exitError.ExitCode()
+			}
+			errStr = fmt.Sprintf("Command failed with exit code %d: %v", exitCode, err)
 		}
-		errStr = fmt.Sprintf("Command failed with exit code %d: %v", exitCode, err)
 	}
 
 	// Output the result
@@ -695,8 +860,11 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, s
 	}
 	content := string(originalContent)
 
-	// Apply all search-replace operations
+	// Apply all search-replace operations and track which ones didn't match
 	modifiedContent := content
+	var notFound []string
+	var applied int
+
 	for _, editInterface := range editsInterface {
 		editMap, ok := editInterface.(map[string]interface{})
 		if !ok {
@@ -713,8 +881,32 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, s
 			replaceText = "" // Default to empty string for deletions
 		}
 
+		// Check if the search text exists in the content
+		if !strings.Contains(modifiedContent, searchText) {
+			// Truncate long search text for display
+			displayText := searchText
+			if len(displayText) > 50 {
+				displayText = displayText[:50] + "..."
+			}
+			notFound = append(notFound, displayText)
+			continue
+		}
+
 		// Apply the search-replace operation
 		modifiedContent = strings.ReplaceAll(modifiedContent, searchText, replaceText)
+		applied++
+	}
+
+	// If no edits were applied, return a warning
+	if applied == 0 && len(notFound) > 0 {
+		var result strings.Builder
+		result.WriteString(fmt.Sprintf("Warning: No edits were applied to %s.\n", path))
+		result.WriteString("The following search patterns were not found:\n")
+		for _, text := range notFound {
+			result.WriteString(fmt.Sprintf("  - \"%s\"\n", text))
+		}
+		result.WriteString("\nPlease verify the search text matches exactly (including whitespace and line endings).")
+		return result.String(), nil
 	}
 
 	// If confirmation is needed, show the diff and ask the user
@@ -740,7 +932,16 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, s
 		return fmt.Sprintf("Error writing file %s: %v", path, err), nil
 	}
 
-	return fmt.Sprintf("Successfully edited file %s", path), nil
+	// Build success message
+	var result strings.Builder
+	result.WriteString(fmt.Sprintf("Successfully edited file %s (%d edit(s) applied)", path, applied))
+	if len(notFound) > 0 {
+		result.WriteString(fmt.Sprintf("\nWarning: %d search pattern(s) were not found:", len(notFound)))
+		for _, text := range notFound {
+			result.WriteString(fmt.Sprintf("\n  - \"%s\"", text))
+		}
+	}
+	return result.String(), nil
 }
 
 func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
@@ -815,13 +1016,19 @@ func copyFileOrDir(src, dst string) error {
 	}
 }
 
-// Helper function to copy a single file
+// Helper function to copy a single file (preserves permissions)
 func copyFile(src, dst string) error {
 	sourceFile, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer sourceFile.Close()
+
+	// Get source file info for permissions
+	srcInfo, err := sourceFile.Stat()
+	if err != nil {
+		return err
+	}
 
 	// Create destination directory if it doesn't exist
 	dstDir := filepath.Dir(dst)
@@ -836,16 +1043,11 @@ func copyFile(src, dst string) error {
 	defer destinationFile.Close()
 
 	// Copy file contents
-	_, err = sourceFile.Seek(0, 0)
-	if err != nil {
-		return err
-	}
-
-	_, err = destinationFile.Seek(0, 0)
-	if err != nil {
-		return err
-	}
-
 	_, err = destinationFile.ReadFrom(sourceFile)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Preserve the source file's permissions
+	return os.Chmod(dst, srcInfo.Mode())
 }
