@@ -11,6 +11,7 @@ import (
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -164,7 +165,8 @@ type ChatInfo struct {
 	Provider      service.ModelProvider
 	Files         []*service.FileData
 	Conversion    service.ConversationManager
-	QuitFlag      bool
+	QuitFlag      bool   // for cmd /quit or /exit
+	EditorInput   string // for /e editor edit
 	maxRecursions int
 	outputFile    string
 }
@@ -216,56 +218,88 @@ func (ci *ChatInfo) printWelcome() {
 	fmt.Println()
 }
 
+func (ci *ChatInfo) awaitChat() (string, error) {
+	var input string
+
+	// 1. Start with the default keymap
+	keyMap := huh.NewDefaultKeyMap()
+
+	// 2. Remap the Text field keys
+	// We swap 'enter' to be the submission key and 'alt+enter' for new lines
+	keyMap.Text.Submit = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "submit"))
+	// The Prev/Next keys are meant to navigate between multiple fields (like going from an Input field to a Text field to a Select field). Since there's only one field, pressing ctrl+[ or ctrl+] has nowhere to go!
+	// keyMap.Text.Prev = key.NewBinding(key.WithKeys("ctrl+["), key.WithHelp("ctrl+[", "prev"))
+	// keyMap.Text.Next = key.NewBinding(key.WithKeys("ctrl+]"), key.WithHelp("ctrl+]", "next"))
+	keyMap.Text.NewLine.SetHelp("ctrl+j", "new line")
+
+	// 3. Disable the Editor (Ctrl+E) keybinding
+	keyMap.Text.Editor = key.NewBinding(key.WithDisabled())
+
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewText().
+				Title("Chat").
+				Value(&input).
+				Placeholder("Type your message..."),
+		),
+	).WithKeyMap(keyMap) // 4. CRITICAL: Apply the keymap to the FORM level
+
+	err := form.Run()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(input), nil
+}
+
 func (ci *ChatInfo) startREPL() {
 	// Start the REPL
 	ci.printWelcome()
+
+	// Define prompt style
+	tcol := service.GetTerminalWidth() - 4
+	promptStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("#282A2C")). // Grey background
+		Foreground(lipgloss.Color("#C3C3C3")). // White text
+		Padding(1, 2).Margin(0, 0, 1, 0).      // padding and margin
+		Bold(false).
+		// Align(lipgloss.Right). 	// align would break code formatting
+		Width(tcol) // align and width
+
 	for {
 		var input string
+		var err error
 
-		// 1. Start with the default keymap
-		keyMap := huh.NewDefaultKeyMap()
-
-		// 2. Remap the Text field keys
-		// We swap 'enter' to be the submission key and 'alt+enter' for new lines
-		keyMap.Text.Submit = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "submit"))
-		// The Prev/Next keys are meant to navigate between multiple fields (like going from an Input field to a Text field to a Select field). Since there's only one field, pressing ctrl+[ or ctrl+] has nowhere to go!
-		// keyMap.Text.Prev = key.NewBinding(key.WithKeys("ctrl+["), key.WithHelp("ctrl+[", "prev"))
-		// keyMap.Text.Next = key.NewBinding(key.WithKeys("ctrl+]"), key.WithHelp("ctrl+]", "next"))
-		keyMap.Text.NewLine.SetHelp("ctrl+j", "new line")
-
-		// 3. Disable the Editor (Ctrl+E) keybinding
-		keyMap.Text.Editor = key.NewBinding(key.WithDisabled())
-
-		form := huh.NewForm(
-			huh.NewGroup(
-				huh.NewText().
-					Title("Chat").
-					Value(&input).
-					Placeholder("Type your message..."),
-			),
-		).WithKeyMap(keyMap) // 4. CRITICAL: Apply the keymap to the FORM level
-
-		err := form.Run()
+		// Get user input
+		input, err = ci.awaitChat()
 		if err != nil {
 			// Handle user cancellation (Ctrl+C)
 			fmt.Println("\nSession ended.")
 			break
 		}
-
-		input = strings.TrimSpace(input)
 		if input == "" {
 			continue
 		}
 
 		// Handle inner commands
 		if ci.startWithInnerCommand(input) {
+			// Reset editor input
+			ci.EditorInput = ""
+			// Handle inner command
 			ci.handleCommand(input)
 			if ci.QuitFlag {
 				break
 			}
 			fmt.Println()
-			continue
+			// If editor input is not empty, use it as input
+			if ci.EditorInput != "" {
+				input = ci.EditorInput
+			} else {
+				continue
+			}
 		}
+
+		// Echo user input with style
+		fmt.Println(promptStyle.Render(input))
 
 		// Handle shell commands
 		if ci.startWithLocalCommand(input) {
@@ -273,6 +307,7 @@ func (ci *ChatInfo) startREPL() {
 			continue
 		}
 
+		// Call agent
 		ci.callAgent(input)
 		fmt.Println()
 
@@ -421,56 +456,6 @@ func (ci *ChatInfo) detachFiles(input string) {
 
 	if !detachedAny {
 		fmt.Println("No valid detachment")
-	}
-}
-
-func (ci *ChatInfo) handleEditorCommand() {
-	editor := getPreferredEditor()
-	tempFile, err := createTempFile(_gllmTempFile)
-	if err != nil {
-		service.Errorf("Failed to create temp file: %v", err)
-		return
-	}
-	defer os.Remove(tempFile)
-
-	// Open in detected editor
-	cmd := exec.Command(editor, tempFile)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	fmt.Printf("Opening in %s...\n", editor)
-	if err := cmd.Run(); err != nil {
-		service.Errorf("Editor failed: %v", err)
-		return
-	}
-
-	// Read back edited content
-	recv, err := os.ReadFile(tempFile)
-	if err != nil {
-		service.Errorf("Failed to read edited content: %v", err)
-		return
-	}
-
-	content := string(recv)
-	content = strings.Trim(content, " \n")
-	if len(content) == 0 {
-		fmt.Println("No content.")
-		return
-	}
-
-	// Send content to agent directly
-	ci.callAgent(content)
-}
-
-func (ci *ChatInfo) handleEditor() {
-	// No arguments - check if preferred editor is set
-	if getPreferredEditor() == "" {
-		// No preferred editor set, show list
-		listAvailableEditors()
-	} else {
-		// Preferred editor set, open it
-		ci.handleEditorCommand()
 	}
 }
 

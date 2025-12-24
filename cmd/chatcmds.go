@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -406,4 +407,54 @@ func (ci *ChatInfo) setOutputFile(path string) {
 		ci.outputFile = filename
 		fmt.Printf("Output file set to: %s\n", filename)
 	}
+}
+
+func (ci *ChatInfo) handleEditor() {
+	// No arguments - check if preferred editor is set
+	if getPreferredEditor() == "" {
+		// No preferred editor set, show list
+		listAvailableEditors()
+	} else {
+		// Preferred editor set, open it
+		ci.handleEditorCommand()
+	}
+}
+
+func (ci *ChatInfo) handleEditorCommand() {
+	editor := getPreferredEditor()
+	tempFile, err := createTempFile(_gllmTempFile)
+	if err != nil {
+		service.Errorf("Failed to create temp file: %v", err)
+		return
+	}
+	defer os.Remove(tempFile)
+
+	// Open in detected editor
+	cmd := exec.Command(editor, tempFile)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	fmt.Printf("Opening in %s...\n", editor)
+	if err := cmd.Run(); err != nil {
+		service.Errorf("Editor failed: %v", err)
+		return
+	}
+
+	// Read back edited content
+	recv, err := os.ReadFile(tempFile)
+	if err != nil {
+		service.Errorf("Failed to read edited content: %v", err)
+		return
+	}
+
+	content := string(recv)
+	content = strings.Trim(content, " \n")
+	if len(content) == 0 {
+		fmt.Println("No content.")
+		return
+	}
+
+	// Set editor input
+	ci.EditorInput = content
 }

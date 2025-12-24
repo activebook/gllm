@@ -10,7 +10,7 @@
 - **Prompt Templates & System Prompts**: Manage reusable prompts and instructions.
 - **Attachment Support**: Process files, images, and URLs as part of your queries.
 - **Search Integration**: Use search engines to find the latest and most relevant information.
-- **Web Retrieval**: Extract comprehensive text content from URLs, including live websites, raw text files, and PDF documents.
+- **Web Retrieval**: Extract comprehensive text content from URLs, including websites, raw text files, and PDF documents.
 - **PDF & Image Processing**: Supports processing of PDF documents and images with capable models.
 - **Reasoning & Deep Thinking**: Generate detailed explanations, logical breakdowns, and step-by-step analysis.
 - **Markdown Support**: Renders Markdown for easy-to-read formatted output.
@@ -143,17 +143,14 @@ For longer messages or code snippets, use your preferred text editor directly in
 # In chat mode, type:
 /editor
 /e
-# Into multi-line mode, type:
-/multi
-/#
 ```
 
-#### ✨ In multi-line mode, you can copy/paste multi-line text/code
+#### ✨ In chat mode, you can copy/paste text/code
 
 **How to use:**
 
 1. Open prefered editor
-2. Compose your multi-line message
+2. Compose your message
 3. Save and exit the editor
 4. Review the content in gllm
 5. Press Enter to send or Ctrl+C to discard
