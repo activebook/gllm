@@ -31,7 +31,7 @@ type OpenFunctionDefinition struct {
 
 const (
 	// ToolRespConfirmShell is the template for the response to the user before executing a command.
-	ToolRespConfirmShell = "```\n%s\n```\n\n%s"
+	ToolRespConfirmShell = "```\n%s\n```\n%s"
 
 	// ToolRespShellOutput is the template for the response to the user after executing a command.
 	ToolRespShellOutput = `shell executed: %s
@@ -463,7 +463,7 @@ func getOpenEmbeddingTools() []*OpenTool {
 	// Search files tool
 	searchFilesFunc := OpenFunctionDefinition{
 		Name:        "search_files",
-		Description: "Search for files in a directory matching a pattern.",
+		Description: "Search for files in a directory matching a pattern. Supports recursive search through subdirectories.",
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -474,6 +474,11 @@ func getOpenEmbeddingTools() []*OpenTool {
 				"pattern": map[string]interface{}{
 					"type":        "string",
 					"description": "The pattern to match (e.g. '*.txt', 'config.*').",
+				},
+				"recursive": map[string]interface{}{
+					"type":        "boolean",
+					"description": "If true, search recursively through all subdirectories. Default is false (search only in the specified directory).",
+					"default":     false,
 				},
 			},
 			"required": []string{"directory", "pattern"},
@@ -489,7 +494,7 @@ func getOpenEmbeddingTools() []*OpenTool {
 	// Search text in file tool
 	searchTextFunc := OpenFunctionDefinition{
 		Name:        "search_text_in_file",
-		Description: "Search for specific text within a file and return matching lines with line numbers.",
+		Description: "Search for specific text within a file and return matching lines with line numbers. Supports case-insensitive and regex search.",
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -499,7 +504,17 @@ func getOpenEmbeddingTools() []*OpenTool {
 				},
 				"text": map[string]interface{}{
 					"type":        "string",
-					"description": "The text to search for.",
+					"description": "The text or pattern to search for.",
+				},
+				"case_insensitive": map[string]interface{}{
+					"type":        "boolean",
+					"description": "If true, perform case-insensitive matching. Default is false.",
+					"default":     false,
+				},
+				"regex": map[string]interface{}{
+					"type":        "boolean",
+					"description": "If true, treat the search text as a regular expression pattern. Default is false.",
+					"default":     false,
 				},
 			},
 			"required": []string{"path", "text"},
@@ -722,6 +737,11 @@ LLM should call with:
 						"This must always be true for any command that modifies or deletes data, or has any potential side effects. " +
 						"It should only be false for simple, read-only commands explicitly requested by the user in the same turn, like 'ls' or 'pwd'.",
 					"default": true,
+				},
+				"timeout": map[string]interface{}{
+					"type":        "integer",
+					"description": "Optional timeout in seconds for the command execution. Default is 60 seconds. Use a higher value for long-running commands.",
+					"default":     60,
 				},
 			},
 			"required": []string{"command", "purpose"},

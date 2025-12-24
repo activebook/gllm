@@ -43,10 +43,88 @@ func (ag *Agent) getOpenAIFilePart(file *FileData) *openai.ChatMessagePart {
 	return part
 }
 
+/*
+ * Sort the messages by order
+ * 1. System Prompt -- always at the top
+ * 2. History Prompts
+ *    - User Prompt
+ *    - Assistant Prompt
+ */
+func (ag *Agent) SortOpenAIMessagesByOrder() error {
+	// Load previous messages if any
+	err := ag.Convo.Load()
+	if err != nil {
+		// Notify error and return
+		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}, nil)
+		return err
+	}
+
+	// Get current history
+	history, _ := ag.Convo.GetMessages().([]openai.ChatCompletionMessage)
+
+	// Handle System Prompt
+	if len(history) > 0 && history[0].Role == openai.ChatMessageRoleSystem {
+		// Check for duplication
+		// If the new system prompt is not empty and not included in the old one, append it
+		if ag.SystemPrompt != "" && !strings.Contains(history[0].Content, ag.SystemPrompt) {
+			history[0].Content += "\n" + ag.SystemPrompt
+			Debugf("Modified System Prompt: %s", history[0].Content)
+		} else {
+			Debugf("Reuse System Prompt: %s", history[0].Content)
+		}
+	} else if ag.SystemPrompt != "" {
+		Debugf("New System Prompt: %s", ag.SystemPrompt)
+		// Prepend system prompt if provided
+		sysMsg := openai.ChatCompletionMessage{
+			Role:    openai.ChatMessageRoleSystem,
+			Content: ag.SystemPrompt,
+		}
+		// Always prepend system prompt at the beginning of the history
+		history = append([]openai.ChatCompletionMessage{sysMsg}, history...)
+	}
+
+	var userMessage openai.ChatCompletionMessage
+	// Add File parts if available
+	if len(ag.Files) > 0 {
+		// Add user message
+		userMessage = openai.ChatCompletionMessage{
+			Role:    openai.ChatMessageRoleUser,
+			Content: "", // Empty string for multimodal
+			MultiContent: []openai.ChatMessagePart{
+				{
+					Type: openai.ChatMessagePartTypeText,
+					Text: ag.UserPrompt,
+				},
+			},
+		}
+		// Add all files
+		for _, file := range ag.Files {
+			if file != nil {
+				part := ag.getOpenAIFilePart(file)
+				if part != nil {
+					userMessage.MultiContent = append(userMessage.MultiContent, *part)
+				}
+			}
+		}
+	} else {
+		// For text only models, add user prompt directly
+		// If use MultiContent(for multimodal), it could be error
+		userMessage = openai.ChatCompletionMessage{
+			Role:    openai.ChatMessageRoleUser,
+			Content: ag.UserPrompt, // only for text models
+		}
+	}
+	history = append(history, userMessage)
+
+	// Update the conversation with new messages
+	ag.Convo.SetMessages(history)
+	return nil
+}
+
 // GenerateOpenAIStream generates a streaming response using OpenAI API
 func (ag *Agent) GenerateOpenAIStream() error {
 
-	// 1. Initialize the Client
+	// Initialize the Client
 	ctx := context.Background()
 	// Create a client config with custom base URL
 	config := openai.DefaultConfig(ag.ApiKey)
@@ -93,63 +171,15 @@ func (ag *Agent) GenerateOpenAIStream() error {
 		op:     &op,
 	}
 
-	// 2. Prepare the Messages for Chat Completion
-	// Initialize messages slice with proper capacity
-	messages := make([]openai.ChatCompletionMessage, 0, 2)
-
-	// Only add system message if not empty
-	if ag.SystemPrompt != "" {
-		messages = append(messages, openai.ChatCompletionMessage{
-			Role:    openai.ChatMessageRoleSystem,
-			Content: ag.SystemPrompt,
-		})
+	// Prepare the Messages for Chat Completion
+	err := ag.SortOpenAIMessagesByOrder()
+	if err != nil {
+		return fmt.Errorf("error sorting messages: %v", err)
 	}
-
-	var userMessage openai.ChatCompletionMessage
-	// Add image parts if available
-	if len(ag.Files) > 0 {
-		// Add user message
-		userMessage = openai.ChatCompletionMessage{
-			Role:    openai.ChatMessageRoleUser,
-			Content: "", // Empty string for multimodal
-			MultiContent: []openai.ChatMessagePart{
-				{
-					Type: openai.ChatMessagePartTypeText,
-					Text: ag.UserPrompt,
-				},
-			},
-		}
-		// Add all files
-		for _, file := range ag.Files {
-			if file != nil {
-				part := ag.getOpenAIFilePart(file)
-				if part != nil {
-					userMessage.MultiContent = append(userMessage.MultiContent, *part)
-				}
-			}
-		}
-	} else {
-		// For text only models, add user prompt directly
-		// If use MultiContent(for multimodal), it could be error
-		userMessage = openai.ChatCompletionMessage{
-			Role:    openai.ChatMessageRoleUser,
-			Content: ag.UserPrompt, // only for text models
-		}
-	}
-	messages = append(messages, userMessage)
 
 	// Signal that streaming has started
 	// Wait for the main goroutine to tell sub-goroutine to proceed
 	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
-
-	// Load previous messages if any
-	err := ag.Convo.Load()
-	if err != nil {
-		// Notify error and return
-		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}, nil)
-		return err
-	}
-	ag.Convo.Push(messages) // Add new messages to the conversation
 
 	// Process the chat with recursive tool call handling
 	err = chat.process(ag)

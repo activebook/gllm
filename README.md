@@ -10,6 +10,7 @@
 - **Prompt Templates & System Prompts**: Manage reusable prompts and instructions.
 - **Attachment Support**: Process files, images, and URLs as part of your queries.
 - **Search Integration**: Use search engines to find the latest and most relevant information.
+- **Web Retrieval**: Extract comprehensive text content from URLs, including live websites, raw text files, and PDF documents.
 - **PDF & Image Processing**: Supports processing of PDF documents and images with capable models.
 - **Reasoning & Deep Thinking**: Generate detailed explanations, logical breakdowns, and step-by-step analysis.
 - **Markdown Support**: Renders Markdown for easy-to-read formatted output.

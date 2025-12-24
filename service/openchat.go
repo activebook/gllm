@@ -47,11 +47,95 @@ func (ag *Agent) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessag
 	return part
 }
 
+/*
+ * Sort the messages by order
+ * 1. System Prompt -- always at the top
+ * 2. History Prompts
+ *    - User Prompt
+ *    - Assistant Prompt
+ */
+func (ag *Agent) SortOpenChatMessagesByOrder() error {
+	// Load previous messages if any
+	err := ag.Convo.Load()
+	if err != nil {
+		// Notify error and return
+		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}, nil)
+		return err
+	}
+
+	// Get current history
+	history, _ := ag.Convo.GetMessages().([]*model.ChatCompletionMessage)
+
+	// Handle System Prompt
+	if len(history) > 0 && history[0].Role == model.ChatMessageRoleSystem {
+		// Check for duplication
+		currentSysContent := ""
+		if history[0].Content != nil && history[0].Content.StringValue != nil {
+			currentSysContent = *history[0].Content.StringValue
+		}
+
+		// If the new system prompt is not empty and not included in the old one, append it
+		if ag.SystemPrompt != "" && !strings.Contains(currentSysContent, ag.SystemPrompt) {
+			newContent := currentSysContent + "\n" + ag.SystemPrompt
+			history[0].Content = &model.ChatCompletionMessageContent{
+				StringValue: volcengine.String(newContent),
+			}
+			Debugf("Modified System Prompt: %s", *history[0].Content.StringValue)
+		} else {
+			Debugf("Reuse System Prompt: %s", *history[0].Content.StringValue)
+		}
+	} else if ag.SystemPrompt != "" {
+		Debugf("New System Prompt: %s", ag.SystemPrompt)
+		// Prepend system prompt
+		sysMsg := &model.ChatCompletionMessage{
+			Role: model.ChatMessageRoleSystem,
+			Content: &model.ChatCompletionMessageContent{
+				StringValue: volcengine.String(ag.SystemPrompt),
+			},
+			Name: Ptr(""),
+		}
+		// Always prepend system prompt at the beginning of the history
+		history = append([]*model.ChatCompletionMessage{sysMsg}, history...)
+	}
+
+	var userMessage *model.ChatCompletionMessage
+	// Add user message
+	userMessage = &model.ChatCompletionMessage{
+		Role: model.ChatMessageRoleUser,
+		Content: &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(ag.UserPrompt),
+		}, Name: Ptr(""),
+	}
+
+	// Add File parts if available
+	if len(ag.Files) > 0 {
+		userMessage = &model.ChatCompletionMessage{
+			Role:    model.ChatMessageRoleUser,
+			Content: &model.ChatCompletionMessageContent{ListValue: []*model.ChatCompletionMessageContentPart{}},
+			Name:    Ptr(""),
+		}
+		// Add all files
+		for _, file := range ag.Files {
+			if file != nil {
+				part := ag.getOpenChatFilePart(file)
+				if part != nil {
+					userMessage.Content.ListValue = append(userMessage.Content.ListValue, part)
+				}
+			}
+		}
+	}
+	history = append(history, userMessage)
+
+	// Update the conversation with new messages
+	ag.Convo.SetMessages(history)
+	return nil
+}
+
 // In current openchat api, we can't use cached tokens
 // The context api and response api are not available for current golang lib
 func (ag *Agent) GenerateOpenChatStream() error {
 
-	// 1. Initialize the Client
+	// Initialize the Client
 	ctx := context.Background()
 	// Create a client config with custom base URL
 	client := arkruntime.NewClientWithApiKey(
@@ -98,60 +182,15 @@ func (ag *Agent) GenerateOpenChatStream() error {
 		op:     &op,
 	}
 
-	// 2. Prepare the Messages for Chat Completion
-	// Initialize messages slice with proper capacity
-	messages := make([]*model.ChatCompletionMessage, 0, 2)
-
-	// Only add system message if not empty
-	if ag.SystemPrompt != "" {
-		messages = append(messages, &model.ChatCompletionMessage{
-			Role: model.ChatMessageRoleSystem,
-			Content: &model.ChatCompletionMessageContent{
-				StringValue: volcengine.String(ag.SystemPrompt),
-			}, Name: Ptr(""),
-		})
-	}
-
-	var userMessage *model.ChatCompletionMessage
-	// Add user message
-	userMessage = &model.ChatCompletionMessage{
-		Role: model.ChatMessageRoleUser,
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(ag.UserPrompt),
-		}, Name: Ptr(""),
-	}
-	messages = append(messages, userMessage)
-	// Add image parts if available
-	if len(ag.Files) > 0 {
-		userMessage = &model.ChatCompletionMessage{
-			Role:    model.ChatMessageRoleUser,
-			Content: &model.ChatCompletionMessageContent{ListValue: []*model.ChatCompletionMessageContentPart{}},
-			Name:    Ptr(""),
-		}
-		// Add all files
-		for _, file := range ag.Files {
-			if file != nil {
-				part := ag.getOpenChatFilePart(file)
-				if part != nil {
-					userMessage.Content.ListValue = append(userMessage.Content.ListValue, part)
-				}
-			}
-		}
-		messages = append(messages, userMessage)
+	// Prepare the Messages for Chat Completion
+	err := ag.SortOpenChatMessagesByOrder()
+	if err != nil {
+		return fmt.Errorf("error sorting messages: %v", err)
 	}
 
 	// Signal that streaming has started
 	// Wait for the main goroutine to tell sub-goroutine to proceed
 	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
-
-	// Load previous messages if any
-	err := ag.Convo.Load()
-	if err != nil {
-		// Notify error and return
-		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}, nil)
-		return err
-	}
-	ag.Convo.Push(messages) // Add new messages to the conversation
 
 	// Process the chat with recursive tool call handling
 	err = chat.process(ag)
