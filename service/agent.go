@@ -586,7 +586,7 @@ func (ag *Agent) WriteFunctionCall(text string) {
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("63")). // Purple/Blue-ish
 				Padding(0, 1).
-				Margin(0, 1)
+				Margin(0, 0)
 
 			titleStyle := lipgloss.NewStyle().
 				Foreground(lipgloss.Color("86")). // Cyan
@@ -665,7 +665,6 @@ func (ag *Agent) WriteFunctionCall(text string) {
 			output = inCallingColor + text + resetColor
 		}
 
-		ag.Std.Writeln(resetColor)
 		ag.Std.Writeln(output)
 	}
 	if ag.OutputFile != nil {
