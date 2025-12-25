@@ -18,8 +18,16 @@ import (
 // handleCommand processes chat commands
 func (ci *ChatInfo) handleCommand(cmd string) {
 	// Split the command into parts
-	parts := strings.SplitN(cmd, " ", 3)
+	// Robust parsing: find the command (first word) and the raw arguments string
+	cmd = strings.TrimSpace(cmd)
+	if cmd == "" {
+		return
+	}
+	parts := strings.Fields(cmd)
 	command := parts[0]
+	// Construct a "parts" slice that mimics the old behavior (cmd, arg1, arg2...)
+	// but mostly we just need command and "the rest"
+	// To minimize changes, we'll keep 'parts' generally available but also provide robust args parsing where needed.
 	switch command {
 	case "/exit", "/quit":
 		ci.QuitFlag = true
@@ -98,6 +106,14 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		}
 		mcp := strings.TrimSpace(parts[1])
 		ci.setUseMCP(mcp)
+
+	case "/memory", "/y":
+		if len(parts) < 2 {
+			memoryListCmd.Run(memoryListCmd, []string{})
+			return
+		}
+		args := parts[1:]
+		ci.handleMemory(args)
 
 	case "/think", "/T":
 		if len(parts) < 2 {
@@ -182,6 +198,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /search, /s \"<engine>[on|off]\" - Change the search engine, or switch on/off")
 	fmt.Println("  /tools, /t \"[on|off|skip|confirm]\" - Switch whether to use embedding tools, skip tools confirmation")
 	fmt.Println("  /mcp \"[on|off|list]\" - Switch whether to use MCP servers, or list available servers")
+	fmt.Println("  /memory, /y \"[list|add|clear]\" - Manage long-term cross-session memory")
 	fmt.Println("  /reference, /r \"<num>\" - Change the search link reference count")
 	fmt.Println("  /usage, /u \"[on|off]\" - Switch whether to show token usage information")
 	fmt.Println("  /editor, /e <editor>|list - Open external editor for multi-line input")
@@ -381,6 +398,31 @@ func (ci *ChatInfo) setUseMCP(useMCP string) {
 		mcpListCmd.Run(mcpListCmd, []string{})
 	default:
 		mcpCmd.Run(mcpCmd, []string{})
+	}
+}
+
+// handleMemory handles memory commands in the REPL
+func (ci *ChatInfo) handleMemory(args []string) {
+	// Simple argument parsing logic
+	// If it starts with "list", "clear", run those commands
+	// If it starts with "add", treat the rest as the memory content
+	subcmd := strings.TrimSpace(args[0])
+	switch subcmd {
+	case "list", "ls":
+		memoryListCmd.Run(memoryListCmd, []string{})
+	case "clear":
+		memoryClearCmd.Run(memoryClearCmd, []string{})
+	case "add":
+		if len(args) < 2 {
+			fmt.Println("Usage: memory add <content>")
+			return
+		}
+		content := strings.TrimSpace(strings.Join(args[1:], " "))
+		content = strings.Trim(content, "\"") // Remove surrounding quotes if present
+		memoryAddCmd.Run(memoryAddCmd, []string{content})
+	default:
+		// Default to base command which shows help/status
+		memoryListCmd.Run(memoryListCmd, []string{})
 	}
 }
 

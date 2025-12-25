@@ -36,7 +36,6 @@ or use 'memory path' to see where the memory file is located.`,
 
 		fmt.Println(cmd.Long)
 		fmt.Println(strings.Repeat("-", 50))
-		fmt.Printf("Memory file: %s\n", service.GetMemoryPath())
 		fmt.Printf("Saved memories: %s\n", memoryHeaderColor(fmt.Sprintf("%d", len(memories))))
 
 		if len(memories) > 0 {
@@ -57,7 +56,11 @@ var memoryListCmd = &cobra.Command{
 	Use:     "list",
 	Aliases: []string{"ls", "show", "pr"},
 	Short:   "List all saved memories",
-	Long:    `Display all memories currently saved in the memory file.`,
+	Long: `Display all memories currently saved in the memory file.
+
+Example:
+  gllm memory list
+  gllm memory list --verbose`,
 	Run: func(cmd *cobra.Command, args []string) {
 		memories, err := service.LoadMemory()
 		if err != nil {
@@ -82,8 +85,10 @@ var memoryListCmd = &cobra.Command{
 			} else {
 				// Truncate long memories for display
 				displayMemory := memory
-				if len(memory) > 80 {
+				if !verbose && len(memory) > 80 {
 					displayMemory = memory[:77] + "..."
+				} else {
+					displayMemory = memory
 				}
 				fmt.Printf("%d. %s\n", i+1, memoryItemColor(displayMemory))
 			}

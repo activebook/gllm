@@ -36,6 +36,7 @@ Special commands:
 /think, /T [on|off] - Switch whether to use deep think mode
 /search, /s <search_engine> [on|off] - select a search engine to use, or switch on/off
 /mcp [on|off|list] - Switch whether to use MCP servers, list available servers
+/memory, /y [list|add|clear] - Manage long-term cross-session memory
 /reference, /r <num> - change link reference count
 /usage, /u [on|off] - Switch whether to show token usage information
 /editor, /e <editor>|list - Open external editor for multi-line input
