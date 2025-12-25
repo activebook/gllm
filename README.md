@@ -198,7 +198,7 @@ For a more interactive experience, you can use the `chat` command to enter a rea
 
 ---
 
-## 💾 Memory Management
+## Memory Management
 
 `gllm` can remember important facts about you across sessions, making conversations more personalized and contextual.
 
@@ -222,9 +222,7 @@ Memories are automatically injected into the system prompt, so the LLM will reme
 # Start a conversation - the LLM will automatically consider your memories
 $ gllm chat
 > Remember this: I work primarily with Go and Docker
-
-# The LLM will respond considering your memories about preferring Go
-# and your microservices context
+> Forget this: I love dark jokes
 ```
 
 You can manually edit this file or use the `gllm memory path` command to find it.
