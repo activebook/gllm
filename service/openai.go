@@ -497,6 +497,8 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 		"search_files":        oa.op.OpenAISearchFilesToolCall,
 		"search_text_in_file": oa.op.OpenAISearchTextInFileToolCall,
 		"read_multiple_files": oa.op.OpenAIReadMultipleFilesToolCall,
+		"list_memory":         oa.op.OpenAIListMemoryToolCall,
+		"save_memory":         oa.op.OpenAISaveMemoryToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {

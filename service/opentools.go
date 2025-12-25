@@ -63,6 +63,8 @@ var (
 		"search_text_in_file",
 		"read_multiple_files",
 		"web_fetch",
+		"list_memory",
+		"save_memory",
 	}
 	searchTools = []string{
 		"web_search",
@@ -691,6 +693,58 @@ func getOpenEmbeddingTools() []*OpenTool {
 
 	tools = append(tools, &copyTool)
 
+	// list_memory tool
+	listMemoryFunc := OpenFunctionDefinition{
+		Name:        "list_memory",
+		Description: "List all saved user memories and preferences. Use this to check what the user has asked you to remember before making updates.",
+		Parameters: map[string]interface{}{
+			"type":       "object",
+			"properties": map[string]interface{}{},
+			"required":   []string{},
+		},
+	}
+	listMemoryTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &listMemoryFunc,
+	}
+
+	tools = append(tools, &listMemoryTool)
+
+	// save_memory tool
+	saveMemoryFunc := OpenFunctionDefinition{
+		Name: "save_memory",
+		Description: `Update user memories. Use this when the user says things like "remember this", "forget this", "don't remember", etc.
+
+IMPORTANT: Always call list_memory FIRST to see current memories before using this tool.
+
+This tool replaces ALL memories with the content you provide. You should:
+1. Call list_memory to get current memories
+2. Decide what to add, remove, or update based on user's request
+3. Rephrase user's request into clear, helpful memory statements
+4. Call this tool with the complete new memory list
+
+For example, if user says "remember I know golang", you might save:
+"User is proficient in Go programming and prefers Go code examples"
+
+To clear all memories, pass an empty string.`,
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"memories": map[string]interface{}{
+					"type":        "string",
+					"description": "The complete new memory content. Each memory should be on its own line, starting with '- '. Pass empty string to clear all memories.",
+				},
+			},
+			"required": []string{"memories"},
+		},
+	}
+	saveMemoryTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &saveMemoryFunc,
+	}
+
+	tools = append(tools, &saveMemoryTool)
+
 	return tools
 }
 
@@ -1184,6 +1238,34 @@ func (op *OpenProcessor) OpenAIMCPToolCall(toolCall openai.ToolCall, argsMap *ma
 	}, nil
 }
 
+func (op *OpenProcessor) OpenAIListMemoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+	// Call shared implementation (no args needed)
+	response, err := listMemoryToolCallImpl()
+	if err != nil {
+		return openai.ChatCompletionMessage{}, err
+	}
+
+	return openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Content:    response,
+	}, nil
+}
+
+func (op *OpenProcessor) OpenAISaveMemoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+	// Call shared implementation
+	response, err := saveMemoryToolCallImpl(argsMap)
+	if err != nil {
+		return openai.ChatCompletionMessage{}, err
+	}
+
+	return openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Content:    response,
+	}, nil
+}
+
 func (op *OpenProcessor) OpenChatMCPToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	if op.mcpClient == nil {
 		return nil, fmt.Errorf("MCP client not initialized")
@@ -1519,6 +1601,42 @@ func (op *OpenProcessor) OpenChatCopyToolCall(toolCall *model.ToolCall, argsMap 
 		return nil, err
 	}
 
+	toolMessage.Content = &model.ChatCompletionMessageContent{
+		StringValue: volcengine.String(response),
+	}
+	return &toolMessage, nil
+}
+
+func (op *OpenProcessor) OpenChatListMemoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	// Call shared implementation (no args needed)
+	response, err := listMemoryToolCallImpl()
+	if err != nil {
+		return nil, err
+	}
+
+	toolMessage := model.ChatCompletionMessage{
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Name:       Ptr(toolCall.Function.Name),
+	}
+	toolMessage.Content = &model.ChatCompletionMessageContent{
+		StringValue: volcengine.String(response),
+	}
+	return &toolMessage, nil
+}
+
+func (op *OpenProcessor) OpenChatSaveMemoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	// Call shared implementation
+	response, err := saveMemoryToolCallImpl(argsMap)
+	if err != nil {
+		return nil, err
+	}
+
+	toolMessage := model.ChatCompletionMessage{
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Name:       Ptr(toolCall.Function.Name),
+	}
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(response),
 	}

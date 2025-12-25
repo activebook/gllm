@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/activebook/gllm/service"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -269,11 +270,26 @@ func SetEffectiveSystemPrompt(sys string) error {
 }
 
 // New helper function to get the effective system prompt based on config
+// Memory content is automatically appended to the base system prompt
 func GetEffectiveSystemPrompt() string {
+	var sysPrompt string
 	if plainSystemPrompt != "" {
-		return plainSystemPrompt
+		sysPrompt = plainSystemPrompt
+	} else {
+		sysPrompt = viper.GetString("agent.system_prompt")
 	}
-	return viper.GetString("agent.system_prompt")
+
+	// Get memory content and append if not empty
+	memoryContent := service.GetMemoryContent()
+	if memoryContent != "" {
+		if sysPrompt != "" {
+			sysPrompt = sysPrompt + "\n\n" + memoryContent
+		} else {
+			sysPrompt = memoryContent
+		}
+	}
+
+	return sysPrompt
 }
 
 func init() {

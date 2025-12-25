@@ -508,3 +508,47 @@ func (ag *Agent) gemini2CloseDiffConfirm() {
 	// Confirm diff is over
 	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusDiffConfirmOver}, ag.ProceedChan)
 }
+
+func (ag *Agent) Gemini2ListMemoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+	resp := genai.FunctionResponse{
+		ID:   call.ID,
+		Name: call.Name,
+	}
+
+	// Call shared implementation (no args needed)
+	response, err := listMemoryToolCallImpl()
+	if err != nil {
+		return nil, err
+	}
+
+	resp.Response = map[string]any{
+		"output": response,
+		"error":  "",
+	}
+	return &resp, nil
+}
+
+func (ag *Agent) Gemini2SaveMemoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+	resp := genai.FunctionResponse{
+		ID:   call.ID,
+		Name: call.Name,
+	}
+
+	// Convert genai.FunctionCall.Args to map[string]interface{}
+	argsMap := make(map[string]interface{})
+	for k, v := range call.Args {
+		argsMap[k] = v
+	}
+
+	// Call shared implementation
+	response, err := saveMemoryToolCallImpl(&argsMap)
+	if err != nil {
+		return nil, err
+	}
+
+	resp.Response = map[string]any{
+		"output": response,
+		"error":  "",
+	}
+	return &resp, nil
+}

@@ -1051,3 +1051,51 @@ func copyFile(src, dst string) error {
 	// Preserve the source file's permissions
 	return os.Chmod(dst, srcInfo.Mode())
 }
+
+// listMemoryToolCallImpl handles the list_memory tool call
+func listMemoryToolCallImpl() (string, error) {
+	memories, err := LoadMemory()
+	if err != nil {
+		return fmt.Sprintf("Error loading memories: %v", err), nil
+	}
+
+	if len(memories) == 0 {
+		return "No memories saved. The user has not asked you to remember anything yet.", nil
+	}
+
+	var result strings.Builder
+	result.WriteString(fmt.Sprintf("Current saved memories (%d items):\n\n", len(memories)))
+	for i, memory := range memories {
+		result.WriteString(fmt.Sprintf("%d. %s\n", i+1, memory))
+	}
+
+	return result.String(), nil
+}
+
+// saveMemoryToolCallImpl handles the save_memory tool call
+// Simplified design: takes complete memory content and replaces all memories
+func saveMemoryToolCallImpl(argsMap *map[string]interface{}) (string, error) {
+	memories, ok := (*argsMap)["memories"].(string)
+	if !ok {
+		return "", fmt.Errorf("memories parameter not found in arguments")
+	}
+
+	// Empty string means clear all memories
+	if strings.TrimSpace(memories) == "" {
+		err := ClearMemory()
+		if err != nil {
+			return fmt.Sprintf("Error clearing memories: %v", err), nil
+		}
+		return "Successfully cleared all memories", nil
+	}
+
+	// Replace all memories with new content
+	err := ReplaceAllMemories(memories)
+	if err != nil {
+		return fmt.Sprintf("Error updating memories: %v", err), nil
+	}
+
+	// Count how many memories were saved
+	savedMemories, _ := LoadMemory()
+	return fmt.Sprintf("Successfully updated memories (%d items saved)", len(savedMemories)), nil
+}

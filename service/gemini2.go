@@ -409,6 +409,8 @@ func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Functi
 		"read_multiple_files": ag.Gemini2ReadMultipleFilesToolCall,
 		"web_fetch":           ag.Gemini2WebFetchToolCall,
 		"edit_file":           ag.Gemini2EditFileToolCall,
+		"list_memory":         ag.Gemini2ListMemoryToolCall,
+		"save_memory":         ag.Gemini2SaveMemoryToolCall,
 	}
 
 	if handler, ok := toolHandlers[call.Name]; ok {

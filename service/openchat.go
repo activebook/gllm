@@ -540,6 +540,8 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		"search_files":        c.op.OpenChatSearchFilesToolCall,
 		"search_text_in_file": c.op.OpenChatSearchTextInFileToolCall,
 		"read_multiple_files": c.op.OpenChatReadMultipleFilesToolCall,
+		"list_memory":         c.op.OpenChatListMemoryToolCall,
+		"save_memory":         c.op.OpenChatSaveMemoryToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {
