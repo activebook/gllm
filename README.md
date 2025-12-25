@@ -21,6 +21,7 @@
 - **Token Usage Tracking**: Monitor your token consumption.
 - **Configuration Management**: Easily manage models, templates, system prompts, and search engines.
 - **Agent Management**: Create, configure, and switch between different AI assistant profiles with custom models, tools, and settings.
+- **Memory Management**: Remember important facts about you across sessions for personalized responses.
 - **@ Reference Support**: Reference files and directories directly in prompts using @ syntax for seamless context inclusion.
 - **Version Control**: Easily track and update your `gllm` setup.
 
@@ -194,6 +195,41 @@ For a more interactive experience, you can use the `chat` command to enter a rea
   ```
 
   Within the chat, the conversation history is automatically maintained.
+
+---
+
+## 💾 Memory Management
+
+`gllm` can remember important facts about you across sessions, making conversations more personalized and contextual.
+
+### Memory Commands
+
+```sh
+gllm memory
+gllm memory add "I prefer Go over Python"
+gllm memory list
+gllm memory clear --force  # Skip confirmation
+gllm memory path
+```
+
+### How Memory Works in Conversations
+
+Memories are automatically injected into the system prompt, so the LLM will remember your preferences and context across all conversations:
+
+**Example:**
+
+```sh
+# Start a conversation - the LLM will automatically consider your memories
+$ gllm chat
+> Remember this: I work primarily with Go and Docker
+
+# The LLM will respond considering your memories about preferring Go
+# and your microservices context
+```
+
+You can manually edit this file or use the `gllm memory path` command to find it.
+
+---
 
 ### File Attachments
 
