@@ -713,18 +713,16 @@ func getOpenEmbeddingTools() []*OpenTool {
 	// save_memory tool
 	saveMemoryFunc := OpenFunctionDefinition{
 		Name: "save_memory",
-		Description: `Update user memories. Use this when the user says things like "remember this", "forget this", "don't remember", etc.
+		Description: `Update long-term user memories.
 
-IMPORTANT: Always call list_memory FIRST to see current memories before using this tool.
+CRITICAL: Do NOT use this tool for conversation history, trivial facts, or immediate context.
+Only use this tool when the user EXPLICITLY asks to "remember" or "save" a preference/fact for FUTURE sessions.
 
 This tool replaces ALL memories with the content you provide. You should:
-1. Call list_memory to get current memories
-2. Decide what to add, remove, or update based on user's request
-3. Rephrase user's request into clear, helpful memory statements
-4. Call this tool with the complete new memory list
-
-For example, if user says "remember I know golang", you might save:
-"User is proficient in Go programming and prefers Go code examples"
+1. Call list_memory to get current memories.
+2. Decide what to add/update based on the user's explicit request.
+3. Rephrase the request into a clear, standalone statement (e.g., "User prefers Go over Python").
+4. Call this tool with the complete new memory list.
 
 To clear all memories, pass an empty string.`,
 		Parameters: map[string]interface{}{
