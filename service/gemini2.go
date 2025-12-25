@@ -26,6 +26,9 @@ func (ag *Agent) getGemini2FilePart(file *FileData) genai.Part {
 	case IsAudioMIMEType(mimeType):
 		// Handle audio files.
 		return genai.Part{InlineData: &genai.Blob{Data: data, MIMEType: mimeType}}
+	case IsVideoMIMEType(mimeType):
+		// Handle video files.
+		return genai.Part{InlineData: &genai.Blob{Data: data, MIMEType: mimeType}}
 	case IsTextMIMEType(mimeType):
 		// Handle plain text files.
 		return genai.Part{Text: string(data)}

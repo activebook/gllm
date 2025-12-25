@@ -45,6 +45,7 @@ func NewContextManager(limits ModelLimits, strategy TruncationStrategy) *Context
 // NewContextManagerForModel creates a context manager by looking up the model name
 func NewContextManagerForModel(modelName string, strategy TruncationStrategy) *ContextManager {
 	limits := GetModelLimits(modelName)
+	Debugf("Context Quota: modelName=%s, limits=%v, strategy=%s", modelName, limits, strategy)
 	return NewContextManager(limits, strategy)
 }
 

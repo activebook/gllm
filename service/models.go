@@ -37,8 +37,8 @@ var DefaultModelLimits = map[string]ModelLimits{
 	/*
 	 * ByteDance Models
 	 */
-	"doubao-seed‑1-8":          {ContextWindow: 256000, MaxOutputTokens: 65536},
-	"doubao‑seed-1-6":          {ContextWindow: 256000, MaxOutputTokens: 32768},
+	"doubao-seed-1-8":          {ContextWindow: 256000, MaxOutputTokens: 65536},
+	"doubao-seed-1-6":          {ContextWindow: 256000, MaxOutputTokens: 32768},
 	"doubao-seed-1.6":          {ContextWindow: 256000, MaxOutputTokens: 32768},
 	"doubao-seed-1.6-flash":    {ContextWindow: 256000, MaxOutputTokens: 32768},
 	"doubao-seed-1.6-thinking": {ContextWindow: 256000, MaxOutputTokens: 32768},
