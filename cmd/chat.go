@@ -182,13 +182,45 @@ func buildChatInfo(files []*service.FileData) *ChatInfo {
 }
 
 func (ci *ChatInfo) printWelcome() {
-	fmt.Println("Welcome to GLLM Interactive Chat")
-	fmt.Println("Type '/exit' or '/quit' to end the session, or '/help' for commands")
-	fmt.Println("Use '/' for commands")
-	fmt.Println("Use '!' for exec local commands")
-	fmt.Println("Use Ctrl+C to exit")
-	// fmt.Println()
-	// ci.showHelp()
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("5")). // Purple
+		MarginTop(1).
+		MarginBottom(1).
+		Padding(0, 0)
+
+	contentStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("7")). // White/Light gray
+		Padding(0, 2)
+
+	hintStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("8")). // Dark gray
+		Italic(true)
+
+	borderStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("6")). // Cyan
+		Padding(1)
+
+	welcomeText := "Welcome to GLLM Interactive Chat"
+	instructions := []string{
+		"• Type '/exit' or '/quit' to end the session",
+		"• Type '/help' for a list of available commands",
+		"• Use '/' for commands and '!' for local shell commands",
+		"• Use Ctrl+C to exit at any time",
+	}
+
+	header := headerStyle.Render(welcomeText)
+	content := contentStyle.Render(strings.Join(instructions, "\n"))
+
+	banner := borderStyle.Render(lipgloss.JoinVertical(
+		lipgloss.Center,
+		header,
+		content,
+	))
+
+	fmt.Println(banner)
+	fmt.Println(hintStyle.Padding(0, 2).Render("Type your message below and press Enter to send."))
 	fmt.Println()
 }
 

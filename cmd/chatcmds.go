@@ -213,10 +213,10 @@ func (ci *ChatInfo) showInfo() {
 	printSection("TEMPLATE")
 	fmt.Printf("%s\n", GetEffectiveTemplate())
 
-	// Memory section
-	printSection("Memory")
-	memoryListCmd.Run(memoryListCmd, []string{})
-	w.Flush()
+	// Memory section (included in system prompt)
+	// printSection("Memory")
+	// memoryListCmd.Run(memoryListCmd, []string{})
+	// w.Flush()
 
 	// Search Engines section
 	printSection("Search Engines")
