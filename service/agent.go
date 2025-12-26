@@ -88,7 +88,7 @@ func constructSearchEngine(searchEngine *map[string]any) *SearchEngine {
 		if references, ok := (*searchEngine)["references"]; ok {
 			se.MaxReferences = references.(int)
 		} else {
-			se.MaxReferences = 5
+			se.MaxReferences = 10
 		}
 	}
 

@@ -823,3 +823,11 @@ func printAgentConfigDetails(agent map[string]interface{}) {
 		fmt.Printf("  Max Recursions: 10\n")
 	}
 }
+
+func GetMaxRecursions() int {
+	maxRecursions := GetAgentInt("max_recursions")
+	if maxRecursions <= 0 {
+		maxRecursions = 10 // Default value
+	}
+	return maxRecursions
+}
