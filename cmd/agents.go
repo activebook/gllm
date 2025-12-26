@@ -202,6 +202,7 @@ var agentAddCmd = &cobra.Command{
 			huh.NewGroup(
 				huh.NewSelect[string]().
 					Title("System Prompt").
+					Description("The system prompt to use for agent responses").
 					Options(sysPromptOptions...).
 					Value(&sysPrompt),
 			),
@@ -215,6 +216,7 @@ var agentAddCmd = &cobra.Command{
 			huh.NewGroup(
 				huh.NewSelect[string]().
 					Title("Template").
+					Description("The template to use for agent responses").
 					Options(templateOptions...).
 					Value(&template),
 			),
@@ -228,6 +230,7 @@ var agentAddCmd = &cobra.Command{
 			huh.NewGroup(
 				huh.NewSelect[string]().
 					Title("Search Engine").
+					Description("The search engine to use for web search capabilities").
 					Options(searchOptions...).
 					Value(&search),
 			),
@@ -244,6 +247,7 @@ var agentAddCmd = &cobra.Command{
 			huh.NewGroup(
 				huh.NewInput().
 					Title("Max Recursions").
+					Description("The maximum number of Model calling recursions allowed").
 					Value(&maxRecursions),
 			),
 		).Run()
@@ -327,6 +331,11 @@ var agentSetCmd = &cobra.Command{
 		if len(args) > 0 {
 			name = args[0]
 		} else {
+			// Default to current agent
+			current := service.GetCurrentAgentName()
+			if current != "" {
+				name = current
+			}
 			// Select agent
 			agents, err := service.GetAllAgents()
 			if err != nil || len(agents) == 0 {
@@ -335,8 +344,6 @@ var agentSetCmd = &cobra.Command{
 			}
 
 			var options []huh.Option[string]
-			// Find active agent to put on top or mark?
-			activeAgent := service.GetCurrentAgentName()
 
 			sortedNames := make([]string, 0, len(agents))
 			for n := range agents {
@@ -345,11 +352,7 @@ var agentSetCmd = &cobra.Command{
 			sort.Strings(sortedNames)
 
 			for _, n := range sortedNames {
-				display := n
-				if n == activeAgent {
-					display = n + " (active)"
-				}
-				options = append(options, huh.NewOption(display, n))
+				options = append(options, huh.NewOption(n, n))
 			}
 
 			err = huh.NewSelect[string]().
@@ -467,6 +470,7 @@ var agentSetCmd = &cobra.Command{
 			huh.NewGroup(
 				huh.NewSelect[string]().
 					Title("System Prompt").
+					Description("The system prompt to use for agent responses").
 					Options(sysPromptOptions...).
 					Value(&sysPrompt),
 			),
@@ -480,6 +484,7 @@ var agentSetCmd = &cobra.Command{
 			huh.NewGroup(
 				huh.NewSelect[string]().
 					Title("Template").
+					Description("The template to use for agent responses").
 					Options(templateOptions...).
 					Value(&template),
 			),
@@ -493,6 +498,7 @@ var agentSetCmd = &cobra.Command{
 			huh.NewGroup(
 				huh.NewSelect[string]().
 					Title("Search Engine").
+					Description("The search engine to use for web search capabilities").
 					Options(searchOptions...).
 					Value(&search),
 			),
@@ -506,6 +512,7 @@ var agentSetCmd = &cobra.Command{
 			huh.NewGroup(
 				huh.NewInput().
 					Title("Max Recursions").
+					Description("The maximum number of Model calling recursions allowed").
 					Value(&maxRecursions),
 			),
 		).Run()
@@ -642,6 +649,11 @@ tools, search settings, and other preferences to match the selected agent.`,
 		if len(args) > 0 {
 			name = args[0]
 		} else {
+			// Default to current agent
+			current := service.GetCurrentAgentName()
+			if current != "" {
+				name = current
+			}
 			// Interactive select
 			agents, err := service.GetAllAgents()
 			if err != nil || len(agents) == 0 {
@@ -650,7 +662,6 @@ tools, search settings, and other preferences to match the selected agent.`,
 			}
 
 			var options []huh.Option[string]
-			activeAgent := service.GetCurrentAgentName()
 
 			sortedNames := make([]string, 0, len(agents))
 			for n := range agents {
@@ -659,11 +670,7 @@ tools, search settings, and other preferences to match the selected agent.`,
 			sort.Strings(sortedNames)
 
 			for _, n := range sortedNames {
-				display := n
-				if n == activeAgent {
-					display = n + " (active)"
-				}
-				options = append(options, huh.NewOption(display, n))
+				options = append(options, huh.NewOption(n, n))
 			}
 
 			err = huh.NewSelect[string]().

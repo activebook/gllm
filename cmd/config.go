@@ -368,6 +368,7 @@ func init() {
 var configMaxRecursionsCmd = &cobra.Command{
 	Use:     "max-recursions [value]",
 	Aliases: []string{"mr"},
+	Hidden:  true,
 	Short:   "Get or set the maximum number of Model calling recursions allowed",
 	Long: `Get or set the maximum number of Model calling recursions allowed in the application.
 
@@ -437,9 +438,10 @@ If a value is provided, it sets the new maximum recursions value.`,
 
 // configSetCmd represents the command to set configuration values
 var configSetCmd = &cobra.Command{
-	Use:   "set",
-	Short: "Set a configuration value",
-	Long:  `Set a configuration value that will persist across sessions.`,
+	Use:    "set",
+	Short:  "Set a configuration value",
+	Long:   `Set a configuration value that will persist across sessions.`,
+	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) != 2 {
 			service.Errorf("Usage: gllm config set <key> <value>\n")
