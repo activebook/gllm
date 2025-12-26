@@ -219,8 +219,6 @@ var configPrintCmd = &cobra.Command{
 			fmt.Printf("%s\n", sectionColor(fullTitle))
 		}
 
-		printSection("CONFIGURATION SUMMARY")
-
 		// Models section
 		printSection("Models")
 		modelListCmd.Run(modelListCmd, []string{})

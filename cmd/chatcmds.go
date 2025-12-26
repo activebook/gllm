@@ -7,12 +7,23 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-
 	"text/tabwriter"
 
 	"github.com/activebook/gllm/service"
 	"github.com/fatih/color"
+	"github.com/spf13/cobra"
 )
+
+// runCommand executes a command with arguments
+func runCommand(cmd *cobra.Command, args []string) {
+	if cmd.RunE != nil {
+		if err := cmd.RunE(cmd, args); err != nil {
+			service.Errorf("%v\n", err)
+		}
+	} else if cmd.Run != nil {
+		cmd.Run(cmd, args)
+	}
+}
 
 // handleCommand processes chat commands
 func (ci *ChatInfo) handleCommand(cmd string) {
@@ -39,7 +50,6 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	case "/history", "/h":
 		num := 20
 		chars := 200
-		// Parse arguments
 		if len(parts) > 1 {
 			if n, err := strconv.Atoi(parts[1]); err == nil && n > 0 {
 				num = n
@@ -52,84 +62,51 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		}
 		ci.showHistory(num, chars)
 
-	case "/markdown", "/m":
-		if len(parts) < 2 {
-			markdownCmd.Run(markdownCmd, []string{})
-			return
-		}
-		mark := strings.TrimSpace(parts[1])
-		SwitchMarkdown(mark)
-
 	case "/clear", "/reset":
 		ci.clearContext()
 
+	case "/model", "/m":
+		runCommand(modelCmd, parts[1:])
+
+	case "/agent", "/g":
+		runCommand(agentCmd, parts[1:])
+
 	case "/template", "/p":
-		if len(parts) < 2 {
-			templateListCmd.Run(templateListCmd, []string{})
-			return
-		}
-		// Join all remaining parts as they might contain spaces
-		tmpl := strings.Join(parts[1:], " ")
-		tmpl = strings.TrimSpace(tmpl)
-		ci.setTemplate(tmpl)
+		runCommand(templateCmd, parts[1:])
 
 	case "/system", "/S":
-		if len(parts) < 2 {
-			systemListCmd.Run(systemListCmd, []string{})
-			return
-		}
-		sysPrompt := strings.Join(parts[1:], " ")
-		sysPrompt = strings.TrimSpace(sysPrompt)
-		ci.setSystem(sysPrompt)
+		runCommand(systemCmd, parts[1:])
 
 	case "/search", "/s":
-		if len(parts) < 2 {
-			searchCmd.Run(searchCmd, []string{})
-			return
-		}
-		engine := strings.TrimSpace(parts[1])
-		ci.setSearchEngine(engine)
+		runCommand(searchCmd, parts[1:])
 
 	case "/tools", "/t":
-		if len(parts) < 2 {
-			toolsCmd.Run(toolsCmd, []string{})
-			return
-		}
-		tools := strings.TrimSpace(parts[1])
-		ci.setUseTools(tools)
+		runCommand(toolsCmd, parts[1:])
 
 	case "/mcp":
-		if len(parts) < 2 {
-			mcpCmd.Run(mcpCmd, []string{})
-			return
-		}
-		mcp := strings.TrimSpace(parts[1])
-		ci.setUseMCP(mcp)
+		runCommand(mcpCmd, parts[1:])
 
 	case "/memory", "/y":
-		if len(parts) < 2 {
-			memoryListCmd.Run(memoryListCmd, []string{})
-			return
-		}
-		args := parts[1:]
-		ci.handleMemory(args)
+		runCommand(memoryCmd, parts[1:])
+
+	case "/convo", "/c":
+		runCommand(convoCmd, parts[1:])
 
 	case "/think", "/T":
-		if len(parts) < 2 {
-			thinkCmd.Run(thinkCmd, []string{})
-			return
-		} else {
-			mode := strings.TrimSpace(parts[1])
-			SwitchThinkMode(mode)
-		}
+		runCommand(thinkCmd, parts[1:])
 
 	case "/usage", "/u":
+		runCommand(usageCmd, parts[1:])
+
+	case "/markdown", "/k":
+		runCommand(markdownCmd, parts[1:])
+
+	case "/editor", "/e":
 		if len(parts) < 2 {
-			usageCmd.Run(usageCmd, []string{})
+			ci.handleEditor()
 			return
 		}
-		usage := strings.TrimSpace(parts[1])
-		SwitchUsageMetainfo(usage)
+		runCommand(editorCmd, parts[1:])
 
 	case "/attach", "/a":
 		if len(parts) < 2 {
@@ -145,31 +122,12 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		}
 		ci.detachFiles(cmd)
 
-	case "/editor", "/e":
-		if len(parts) < 2 {
-			ci.handleEditor()
-			return
-		}
-		arg := strings.TrimSpace(parts[1])
-		editorCmd.Run(editorCmd, []string{arg})
-
-	case "/output", "/o":
-		if len(parts) < 2 {
-			ci.setOutputFile("")
-		} else {
-			filename := strings.TrimSpace(parts[1])
-			ci.setOutputFile(filename)
-		}
-
 	case "/info", "/i":
-		// Show current model and conversation stats
 		ci.showInfo()
 
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 	}
-
-	// Continue the REPL
 }
 
 // showHelp displays available chat commands
@@ -179,21 +137,23 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /clear, /reset - Clear conversation history")
 	fmt.Println("  /help, /? - Show this help message")
 	fmt.Println("  /info, /i - Show current settings")
-	fmt.Println("  /history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)")
-	fmt.Println("  /markdown, /m [on|off] - Switch whether to render markdown or not")
-	fmt.Println("  /attach, /a <filename> - Attach a file to the conversation")
-	fmt.Println("  /detach, /d <filename|all> - Detach a file from the conversation")
-	fmt.Println("  /template, /p \"<tmpl|name>\" - Change the template")
-	fmt.Println("  /system /S \"<prompt|name>\" - Change the system prompt")
-	fmt.Println("  /think, /T \"[on|off]\" - Switch whether to use deep think mode")
-	fmt.Println("  /search, /s \"<engine>\" - Change the search engine")
-	fmt.Println("  /tools, /t \"[on|off|skip|confirm]\" - Switch whether to use embedding tools, skip tools confirmation")
-	fmt.Println("  /mcp \"[on|off|list]\" - Switch whether to use MCP servers, or list available servers")
-	fmt.Println("  /memory, /y \"[list|add|clear]\" - Manage long-term cross-session memory")
-	fmt.Println("  /usage, /u \"[on|off]\" - Switch whether to show token usage information")
-	fmt.Println("  /editor, /e <editor>|list - Open external editor for multi-line input")
-	fmt.Println("  /output, /o <filename> [off] - Save to output file for model responses")
-	fmt.Println("  !<command> - Execute a shell command directly (e.g. !ls -la)")
+	fmt.Println("  /history, /h [num] [chars] - Show recent conversation history")
+	fmt.Println("  /model, /m [subcmd] - Manage models (list, switch, add, etc.)")
+	fmt.Println("  /agent, /g [subcmd] - Manage agents (list, switch, add, etc.)")
+	fmt.Println("  /template, /p [subcmd] - Manage templates (list, switch, add, etc.)")
+	fmt.Println("  /system, /S [subcmd] - Manage system prompts (list, switch, add, etc.)")
+	fmt.Println("  /search, /s [subcmd] - Manage search engines (list, switch, etc.)")
+	fmt.Println("  /tools, /t [on|off|skip|confirm] - Manage embedding tools")
+	fmt.Println("  /mcp [subcmd] - Manage MCP servers (on, off, list, etc.)")
+	fmt.Println("  /memory, /y [subcmd] - Manage memory (list, add, clear)")
+	fmt.Println("  /convo, /c [subcmd] - Manage conversations (list, info, remove, etc.)")
+	fmt.Println("  /think, /T [on|off] - Switch deep think mode")
+	fmt.Println("  /usage, /u [on|off] - Switch token usage display")
+	fmt.Println("  /markdown, /k [on|off] - Switch markdown rendering")
+	fmt.Println("  /editor, /e [subcmd] - Manage editor or open for multi-line input")
+	fmt.Println("  /attach, /a <file> - Attach a file")
+	fmt.Println("  /detach, /d <file|all> - Detach a file")
+	fmt.Println("  !<command> - Execute a shell command")
 }
 
 // showInfo displays current chat settings and information
@@ -298,119 +258,6 @@ func (ci *ChatInfo) clearContext() {
 	// Empty attachments
 	ci.Files = []*service.FileData{}
 	fmt.Printf("Context cleared.\n")
-}
-
-// setTemplate sets the conversation template
-func (ci *ChatInfo) setTemplate(template string) {
-	err := templateSwitchCmd.RunE(templateSwitchCmd, []string{template})
-	if err != nil {
-		service.Errorf("Error setting template: %v\n", err)
-		return
-	}
-}
-
-// setSystem sets the system prompt
-func (ci *ChatInfo) setSystem(system string) {
-	err := systemSwitchCmd.RunE(systemSwitchCmd, []string{system})
-	if err != nil {
-		service.Errorf("Error setting system prompt: %v\n", err)
-		return
-	}
-}
-
-// setSearchEngine sets the search engine
-func (ci *ChatInfo) setSearchEngine(engine string) {
-	err := searchSwitchCmd.RunE(searchSwitchCmd, []string{engine})
-	if err != nil {
-		service.Errorf("Error setting search engine: %v\n", err)
-		return
-	}
-}
-
-// setUseTools sets the tools usage mode
-func (ci *ChatInfo) setUseTools(useTools string) {
-	switch useTools {
-	// Set useTools on or off
-	case "on":
-		SwitchUseTools(useTools)
-	case "off":
-		SwitchUseTools(useTools)
-
-		// Set whether or not to skip tools confirmation
-	case "confirm":
-		confirmToolsFlag = false
-		fmt.Print("Tool operations would need confirmation\n")
-	case "skip":
-		confirmToolsFlag = true
-		fmt.Print("Tool confirmation would skip\n")
-
-	default:
-		toolsCmd.Run(toolsCmd, nil)
-	}
-}
-
-// setUseMCP sets the MCP usage mode
-func (ci *ChatInfo) setUseMCP(useMCP string) {
-	switch useMCP {
-	case "on":
-		SwitchMCP(useMCP)
-	case "off":
-		SwitchMCP(useMCP)
-	case "list":
-		mcpListCmd.Run(mcpListCmd, []string{})
-	default:
-		mcpCmd.Run(mcpCmd, []string{})
-	}
-}
-
-// handleMemory handles memory commands in the REPL
-func (ci *ChatInfo) handleMemory(args []string) {
-	// Simple argument parsing logic
-	// If it starts with "list", "clear", run those commands
-	// If it starts with "add", treat the rest as the memory content
-	subcmd := strings.TrimSpace(args[0])
-	switch subcmd {
-	case "list", "ls":
-		memoryListCmd.Run(memoryListCmd, []string{})
-	case "clear":
-		memoryClearCmd.Run(memoryClearCmd, []string{})
-	case "add":
-		if len(args) < 2 {
-			fmt.Println("Usage: memory add <content>")
-			return
-		}
-		content := strings.TrimSpace(strings.Join(args[1:], " "))
-		content = strings.Trim(content, "\"") // Remove surrounding quotes if present
-		memoryAddCmd.Run(memoryAddCmd, []string{content})
-	default:
-		// Default to base command which shows help/status
-		memoryListCmd.Run(memoryListCmd, []string{})
-	}
-}
-
-// setOutputFile sets the output file for responses
-func (ci *ChatInfo) setOutputFile(path string) {
-	switch path {
-	case "":
-		if ci.outputFile == "" {
-			fmt.Println("No output file is currently set")
-		} else {
-			fmt.Printf("Current output file: %s\n", ci.outputFile)
-		}
-	case "off":
-		ci.outputFile = ""
-		fmt.Println("No output file")
-	default:
-		filename := strings.TrimSpace(path)
-		err := validFilePath(filename, false)
-		if err != nil {
-			service.Warnf("%v", err)
-			return
-		}
-		// If we get here, the file can be created/overwritten
-		ci.outputFile = filename
-		fmt.Printf("Output file set to: %s\n", filename)
-	}
 }
 
 func (ci *ChatInfo) handleEditor() {

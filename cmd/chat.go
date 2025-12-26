@@ -20,29 +20,7 @@ var chatCmd = &cobra.Command{
 	Short: "Start an interactive chat session (REPL)",
 	Long: `Start an interactive chat session with the configured LLM.
 This provides a Read-Eval-Print-Loop (REPL) interface where you can
-have a continuous conversation with the model.
-
-Special commands:
-/exit, /quit - Exit the chat session
-/clear, /reset - Clear context
-/help, /? - Show available commands
-/info, /i - Show current settings
-/history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)
-/markdown, /m [on|off] - Switch whether to render markdown or not
-/system, /S <@name|prompt> - change system prompt
-/tools, /t [on|off|skip|confirm] - Switch whether to use embedding tools, skip tools confirmation
-/template, /p <@name|tmpl> - change template
-/think, /T [on|off] - Switch whether to use deep think mode
-/search, /s <search_engine> [on|off] - select a search engine to use, or switch on/off
-/mcp [on|off|list] - Switch whether to use MCP servers, list available servers
-/memory, /y [list|add|clear] - Manage long-term cross-session memory
-/reference, /r <num> - change link reference count
-/usage, /u [on|off] - Switch whether to show token usage information
-/editor, /e <editor>|list - Open external editor for multi-line input
-/attach, /a <filename> - Attach a file to the chat session
-/detach, /d <filename> - Detach a file to the chat session
-/output, /o <filename> [off] - Save to output file for model responses
-!<command> - Execute a shell command directly`,
+have a continuous conversation with the model.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Create an indeterminate progress bar
 		indicator := service.NewIndicator("Processing...")
