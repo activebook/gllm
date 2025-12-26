@@ -820,7 +820,7 @@ func printAgentConfigDetails(agent map[string]interface{}, spaceholder string) {
 	if maxRecursions, exists := agent["max_recursions"]; exists {
 		fmt.Printf("%sMax Recursions: %v\n", spaceholder, maxRecursions)
 	} else {
-		fmt.Printf("%sMax Recursions: 10\n", spaceholder)
+		fmt.Printf("%sMax Recursions: 0\n", spaceholder)
 	}
 }
 

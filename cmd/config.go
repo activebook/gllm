@@ -288,10 +288,16 @@ var configPrintCmd = &cobra.Command{
 		ListAllTools()
 		w.Flush()
 
-		// Default Agent section
-		printSection("Default Agent")
-		agentConfig := service.GetCurrentAgentConfig()
-		printAgentConfigDetails(agentConfig, "")
+		// Current Agent section
+		printSection("Current Agent")
+		agentName := service.GetCurrentAgentName()
+		// Verify agent exists
+		agentConfig, err := service.GetAgent(agentName)
+		if err != nil {
+			fmt.Println("No current agent configured yet.")
+		} else {
+			printAgentConfigDetails(agentConfig, "")
+		}
 		w.Flush()
 
 		// All Agents section
@@ -299,17 +305,18 @@ var configPrintCmd = &cobra.Command{
 		// List all agents
 		agents, err := service.GetAllAgents()
 		if err != nil {
-			fmt.Printf("No agents configured yet. Use 'gllm agent add' to create one.\n")
-		}
-		// Display agents in a clean, simple list
-		// Get agent names and sort them
-		names := make([]string, 0, len(agents))
-		for name := range agents {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		for _, name := range names {
-			fmt.Printf("%s\n", name)
+			fmt.Println("No agents configured yet.")
+		} else {
+			// Display agents in a clean, simple list
+			// Get agent names and sort them
+			names := make([]string, 0, len(agents))
+			for name := range agents {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+			for _, name := range names {
+				fmt.Printf("%s\n", name)
+			}
 		}
 		w.Flush()
 
