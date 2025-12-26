@@ -10,13 +10,9 @@ import (
 
 	openai "github.com/sashabaranov/go-openai"
 	//"github.com/google/generative-ai-go/genai"
-	"github.com/spf13/viper"
+
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 )
-
-func shouldSaveSearchResults() bool {
-	return viper.GetBool("search_engines.results.save")
-}
 
 // ConversationManager is an interface for handling conversation history
 type ConversationManager interface {
@@ -188,15 +184,14 @@ func (c *OpenChatConversation) Save() error {
 		return nil
 	}
 
-	if !shouldSaveSearchResults() {
-		// Most major systems (including ChatGPT and Google's Gemini) indeed discard search results between turns
-		// Clear content for tool messages before saving
-		empty := ""
-		for _, msg := range c.Messages {
-			if msg.Role == model.ChatMessageRoleTool {
-				//msg.Content = nil // or "" if Content is a string
-				msg.Content = &model.ChatCompletionMessageContent{StringValue: &empty}
-			}
+	// Most major systems (including ChatGPT and Google's Gemini) discard search results between turns
+	// Always clear content for tool messages before saving to save tokens
+	// Keep the "record" of the tool call (e.g., call_id: 123, tool: google_search) but drop the "body" of the result.
+	empty := ""
+	for _, msg := range c.Messages {
+		if msg.Role == model.ChatMessageRoleTool {
+			//msg.Content = nil // or "" if Content is a string
+			msg.Content = &model.ChatCompletionMessageContent{StringValue: &empty}
 		}
 	}
 
@@ -299,15 +294,14 @@ func (c *OpenAIConversation) Save() error {
 		return nil
 	}
 
-	if !shouldSaveSearchResults() {
-		// Most major systems (including ChatGPT and Google's Gemini) indeed discard search results between turns
-		// Clear content for tool messages before saving
-		empty := ""
-		for i := range c.Messages {
-			msg := c.Messages[i]
-			if msg.Role == openai.ChatMessageRoleTool {
-				msg.Content = empty
-			}
+	// Most major systems (including ChatGPT and Google's Gemini) discard search results between turns
+	// Always clear content for tool messages before saving to save tokens
+	// Keep the "record" of the tool call (e.g., call_id: 123, tool: google_search) but drop the "body" of the result.
+	empty := ""
+	for i := range c.Messages {
+		msg := &c.Messages[i]
+		if msg.Role == openai.ChatMessageRoleTool {
+			msg.Content = empty
 		}
 	}
 
@@ -353,271 +347,6 @@ func (c *OpenAIConversation) Clear() error {
 	c.Messages = []openai.ChatCompletionMessage{}
 	return c.BaseConversation.Clear()
 }
-
-/*
- * Google Gemini Conversation
- */
-// GeminiConversation manages conversations for Google's Gemini model
-// type GeminiConversation struct {
-// 	BaseConversation
-// 	History []*genai.Content
-// }
-
-// var geminiInstance *GeminiConversation
-// var geminiOnce sync.Once
-
-// // NewGeminiConversation creates or returns the singleton instance
-// func NewGeminiConversation(title string, shouldLoad bool) *GeminiConversation {
-// 	geminiOnce.Do(func() {
-// 		geminiInstance = &GeminiConversation{
-// 			BaseConversation: BaseConversation{
-// 				Name:       GetDefaultConvoName(),
-// 				ShouldLoad: shouldLoad,
-// 			},
-// 			History: []*genai.Content{},
-// 		}
-// 		if shouldLoad {
-// 			if title == "" {
-// 				title = GetDefaultConvoName()
-// 			} else {
-// 				// check if it's an index
-// 				index, err := strconv.Atoi(title)
-// 				if err == nil {
-// 					// It's an index, resolve to conversation name using your sorted list logic
-// 					convos, err := ListSortedConvos(GetConvoDir())
-// 					if err != nil {
-// 						// handle error
-// 						Warnf("Failed to resolve conversation index: %v", err)
-// 						Warnf("Using default conversation")
-// 						title = GetDefaultConvoName()
-// 					}
-// 					if index < 1 || index > len(convos) {
-// 						// handle out of range
-// 						Warnf("Conversation index out of range: %d", index)
-// 						Warnf("Using default conversation")
-// 						title = GetDefaultConvoName()
-// 					} else {
-// 						title = convos[index-1].Name
-// 					}
-// 				}
-// 			}
-// 			geminiInstance.Name = title
-// 			sanitized := GetSanitizeTitle(geminiInstance.Name)
-// 			geminiInstance.SetPath(sanitized)
-// 		}
-// 	})
-// 	return geminiInstance
-// }
-
-// // GetGeminiConversation returns the singleton instance
-// func GetGeminiConversation() *GeminiConversation {
-// 	if geminiInstance == nil {
-// 		return NewGeminiConversation("", false)
-// 	}
-// 	return geminiInstance
-// }
-
-// // PushContent adds a content item to the history
-// func (g *GeminiConversation) PushContent(content *genai.Content) {
-// 	g.History = append(g.History, content)
-// }
-
-// // PushContents adds multiple content items to the history
-// func (g *GeminiConversation) PushContents(contents []*genai.Content) {
-// 	g.History = append(g.History, contents...)
-// }
-
-// // Custom types for marshaling/unmarshaling Gemini content
-// type SerializablePart struct {
-// 	Type     string                 `json:"type"`
-// 	Text     string                 `json:"text,omitempty"`
-// 	MIMEType string                 `json:"mime_type,omitempty"` // For blobs
-// 	Data     string                 `json:"data,omitempty"`      // Base64 encoded for blobs
-// 	Name     string                 `json:"name,omitempty"`      // For function calls
-// 	Args     map[string]interface{} `json:"args,omitempty"`      // For function calls
-// 	Language int32                  `json:"language,omitempty"`  // For executable code
-// 	Code     string                 `json:"code,omitempty"`      // For executable code
-// 	Outcome  int32                  `json:"outcome,omitempty"`   // For code execution result
-// 	Output   string                 `json:"output,omitempty"`
-// }
-
-// type SerializableContent struct {
-// 	Role  string             `json:"role"`
-// 	Parts []SerializablePart `json:"parts"`
-// }
-
-// // serializeHistory converts Gemini content to JSON-serializable format
-// func (g *GeminiConversation) serializeHistory(history []*genai.Content) ([]byte, error) {
-// 	var serializableHistory []SerializableContent
-// 	for _, content := range history {
-// 		sc := SerializableContent{
-// 			Role: content.Role,
-// 		}
-
-// 		for _, part := range content.Parts {
-// 			var sp SerializablePart
-
-// 			switch v := part.(type) {
-// 			case genai.Text:
-// 				sp.Type = "text"
-// 				sp.Text = string(v)
-
-// 			case genai.Blob:
-// 				sp.Type = "blob"
-// 				sp.MIMEType = v.MIMEType
-// 				sp.Data = base64.StdEncoding.EncodeToString(v.Data)
-
-// 			case *genai.Blob:
-// 				sp.Type = "blob"
-// 				sp.MIMEType = v.MIMEType
-// 				sp.Data = base64.StdEncoding.EncodeToString(v.Data)
-
-// 			case genai.FunctionCall:
-// 				sp.Type = "function_call"
-// 				sp.Name = v.Name
-// 				sp.Args = v.Args
-
-// 			case *genai.FunctionCall:
-// 				sp.Type = "function_call"
-// 				sp.Name = v.Name
-// 				sp.Args = v.Args
-
-// 			case genai.FunctionResponse:
-// 				sp.Type = "function_response"
-// 				sp.Name = v.Name
-// 				if shouldSaveSearchResults() {
-// 					// Most major systems (including ChatGPT and Google's Gemini) indeed discard search results between turns
-// 					sp.Args = v.Response
-// 				}
-
-// 			case *genai.FunctionResponse:
-// 				sp.Type = "function_response"
-// 				sp.Name = v.Name
-// 				if shouldSaveSearchResults() {
-// 					// Most major systems (including ChatGPT and Google's Gemini) indeed discard search results between turns
-// 					sp.Args = v.Response
-// 				}
-
-// 			case genai.ExecutableCode:
-// 				sp.Type = "executable_code"
-// 				sp.Code = v.Code
-// 				sp.Language = int32(v.Language)
-
-// 			case genai.CodeExecutionResult:
-// 				sp.Type = "code_execution_result"
-// 				sp.Outcome = int32(v.Outcome)
-// 				sp.Output = v.Output
-
-// 			default:
-// 				return nil, fmt.Errorf("unsupported part type: %T", part)
-// 			}
-
-// 			sc.Parts = append(sc.Parts, sp)
-// 		}
-
-// 		serializableHistory = append(serializableHistory, sc)
-// 	}
-
-// 	return json.MarshalIndent(serializableHistory, "", "  ")
-// }
-
-// // deserializeHistory converts JSON data back to Gemini content
-// func (g *GeminiConversation) deserializeHistory(data []byte) ([]*genai.Content, error) {
-// 	var serializableHistory []SerializableContent
-// 	if err := json.Unmarshal(data, &serializableHistory); err != nil {
-// 		return nil, err
-// 	}
-// 	if len(serializableHistory) > 0 {
-// 		if serializableHistory[0].Parts == nil {
-// 			return nil, fmt.Errorf("invalid conversation format: isn't a compatible format. '%s'", g.Path)
-// 		}
-// 	}
-
-// 	var history []*genai.Content
-// 	for _, sc := range serializableHistory {
-// 		content := &genai.Content{
-// 			Role: sc.Role,
-// 		}
-
-// 		for _, part := range sc.Parts {
-// 			switch part.Type {
-// 			case "text":
-// 				content.Parts = append(content.Parts, genai.Text(part.Text))
-
-// 			case "blob":
-// 				data, err := base64.StdEncoding.DecodeString(part.Data)
-// 				if err != nil {
-// 					return nil, err
-// 				}
-// 				content.Parts = append(content.Parts, &genai.Blob{
-// 					MIMEType: part.MIMEType,
-// 					Data:     data,
-// 				})
-
-// 			case "function_call":
-// 				content.Parts = append(content.Parts, &genai.FunctionCall{
-// 					Name: part.Name,
-// 					Args: part.Args,
-// 				})
-
-// 			case "function_response":
-// 				content.Parts = append(content.Parts, &genai.FunctionResponse{
-// 					Name:     part.Name,
-// 					Response: part.Args,
-// 				})
-
-// 			case "executable_code":
-// 				content.Parts = append(content.Parts, &genai.ExecutableCode{
-// 					Code:     part.Code,
-// 					Language: genai.ExecutableCodeLanguage(part.Language),
-// 				})
-
-// 			case "code_execution_result":
-// 				content.Parts = append(content.Parts, &genai.CodeExecutionResult{
-// 					Outcome: genai.CodeExecutionResultOutcome(part.Outcome),
-// 					Output:  part.Output,
-// 				})
-
-// 			default:
-// 				return nil, fmt.Errorf("unsupported part type: %s", part.Type)
-// 			}
-// 		}
-
-// 		history = append(history, content)
-// 	}
-
-// 	return history, nil
-// }
-
-// // Save persists the Gemini conversation to disk
-// func (g *GeminiConversation) Save() error {
-// 	if !g.ShouldLoad || len(g.History) == 0 {
-// 		return nil
-// 	}
-
-// 	data, err := g.serializeHistory(g.History)
-// 	if err != nil {
-// 		return fmt.Errorf("failed to serialize conversation: %w", err)
-// 	}
-
-// 	return g.writeFile(data)
-// }
-
-// // Load retrieves the Gemini conversation from disk
-// func (g *GeminiConversation) Load() error {
-// 	data, err := g.readFile()
-// 	if err != nil || data == nil {
-// 		return err
-// 	}
-
-// 	history, err := g.deserializeHistory(data)
-// 	if err != nil {
-// 		return fmt.Errorf("failed to deserialize conversation: %w", err)
-// 	}
-
-// 	g.History = history
-// 	return nil
-// }
 
 /*
  * Get the sorted list of conversations in the given directory

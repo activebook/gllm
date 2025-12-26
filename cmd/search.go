@@ -16,7 +16,7 @@ var searchCmd = &cobra.Command{
 	Use:   "search",
 	Short: "Configure and manage search engines globally",
 	Long: `Configure API keys and settings for various search engines used with gllm.
-You can switch on/off whether to use search engines.`,
+You can switch to use which search engine.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
 		defaultEngine := GetAgentString("search")
@@ -257,53 +257,6 @@ var searchListCmd = &cobra.Command{
 	},
 }
 
-var searchSaveCmd = &cobra.Command{
-	Use:    "save [on|off]",
-	Hidden: true,
-	Short:  "Enable or disable saving search results",
-	Long: `Enable or disable saving search results to conversation history.
-Keep in mind:
-  When set on, the search result is saved into the conversation context before continuing with the LLM step,
-  it could consume more tokens and could potentially exceed the maximum context length of the LLM.
-  If you want to keep them for future LLM turns or debugging or you know exactly what you want, set it on.
-  Otherelse, you should set it to off.
-`,
-	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) != 1 {
-			fmt.Println("Usage: gllm search save [on|off]")
-			var res string
-			rs := viper.GetBool("search_engines.results.save")
-			switch rs {
-			case true:
-				res = switchOnColor + "on" + resetColor
-			case false:
-				res = switchOffColor + "off" + resetColor
-			}
-			fmt.Printf("Current search result saving status: %s\n", res)
-			return
-		}
-		mode := strings.ToLower(args[0])
-		switch mode {
-		case "on":
-			viper.Set("search_engines.results.save", true)
-			if err := viper.WriteConfig(); err != nil {
-				service.Errorf("Error saving configuration: %s\n", err)
-				return
-			}
-			fmt.Println("Saving of search results is: " + switchOnColor + "on" + resetColor)
-		case "off":
-			viper.Set("search_engines.results.save", false)
-			if err := viper.WriteConfig(); err != nil {
-				service.Errorf("Error saving configuration: %s\n", err)
-				return
-			}
-			fmt.Println("Saving of search results is: " + switchOffColor + "off" + resetColor)
-		default:
-			fmt.Println("Usage: gllm search save [on|off]")
-		}
-	},
-}
-
 // maskAPIKey returns a masked version of the API key for display
 func maskAPIKey(key string) string {
 	return key
@@ -413,7 +366,6 @@ func GetEffectiveSearchEngine() (name string, info map[string]any) {
 		if engineConfig, ok := enginesMap[defaultName]; ok {
 			// Convert the map[string]interface{} to map[string]string
 			if configMap, ok := engineConfig.(map[string]interface{}); ok {
-				configMap["name"] = defaultName
 				return defaultName, configMap
 			}
 			service.Warnf("Warning: Default Search Engine '%s' has invalid configuration format", defaultName)
@@ -433,7 +385,6 @@ func init() {
 
 	// Add subcommands to search command
 	searchCmd.AddCommand(searchListCmd)
-	searchCmd.AddCommand(searchSaveCmd)
 	searchCmd.AddCommand(searchSwitchCmd)
 	searchCmd.AddCommand(searchSetCmd)
 }
