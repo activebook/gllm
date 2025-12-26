@@ -33,38 +33,51 @@ You can switch on/off whether to use search engines.`,
 
 // searchSwitchCmd represents the command to switch search engine
 var searchSwitchCmd = &cobra.Command{
-	Use:     "switch",
+	Use:     "switch [ENGINE]",
 	Aliases: []string{"sw"},
 	Short:   "Switch the active search engine",
 	Long:    `Switch the search engine used by the current agent. Options: google, bing, tavily, none.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var engine string
 
-		// Map display names to values
-		options := []huh.Option[string]{
-			huh.NewOption("Google", service.GoogleSearchEngine),
-			huh.NewOption("Bing", service.BingSearchEngine),
-			huh.NewOption("Tavily", service.TavilySearchEngine),
-			huh.NewOption("None (Disable Search)", service.NoneSearchEngine),
-		}
-
-		// Default to current
-		current := GetAgentString("search")
-		if current == "" {
-			engine = service.NoneSearchEngine
+		// Check if engine name provided as argument
+		if len(args) > 0 {
+			provided := strings.ToLower(args[0])
+			switch provided {
+			case service.GoogleSearchEngine, service.BingSearchEngine, service.TavilySearchEngine, service.NoneSearchEngine:
+				engine = provided
+			case "":
+				engine = service.NoneSearchEngine
+			default:
+				return fmt.Errorf("invalid search engine '%s'. Valid options: google, bing, tavily, none", args[0])
+			}
 		} else {
-			engine = current
-		}
+			// Map display names to values
+			options := []huh.Option[string]{
+				huh.NewOption("Google", service.GoogleSearchEngine),
+				huh.NewOption("Bing", service.BingSearchEngine),
+				huh.NewOption("Tavily", service.TavilySearchEngine),
+				huh.NewOption("None (Disable Search)", service.NoneSearchEngine),
+			}
 
-		// Interactive select
-		err := huh.NewSelect[string]().
-			Title("Switch Search Engine").
-			Description("Select the search engine to use for the current agent").
-			Options(options...).
-			Value(&engine).
-			Run()
-		if err != nil {
-			return nil
+			// Default to current
+			current := GetAgentString("search")
+			if current == "" {
+				engine = service.NoneSearchEngine
+			} else {
+				engine = current
+			}
+
+			// Interactive select
+			err := huh.NewSelect[string]().
+				Title("Switch Search Engine").
+				Description("Select the search engine to use for the current agent").
+				Options(options...).
+				Value(&engine).
+				Run()
+			if err != nil {
+				return nil
+			}
 		}
 
 		if err := SetAgentValue("search", engine); err != nil {
