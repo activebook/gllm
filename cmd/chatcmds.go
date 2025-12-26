@@ -342,11 +342,27 @@ func (ci *ChatInfo) setSystem(system string) {
 // setSearchEngine sets the search engine
 func (ci *ChatInfo) setSearchEngine(engine string) {
 	switch engine {
-	case "on":
-		searchOnCmd.Run(searchCmd, []string{})
 	case "off":
-		searchOffCmd.Run(searchCmd, []string{})
+		// Disable search
+		if err := SetAgentValue("search", service.NoneSearchEngine); err != nil {
+			service.Errorf("Error saving configuration: %s\n", err)
+		} else {
+			fmt.Println("Search engine disabled.")
+		}
+	case "on":
+		// Enable default search (google) if none set
+		current := GetEffectSearchEngineName()
+		if current == "" || current == service.NoneSearchEngine {
+			if err := SetAgentValue("search", service.GoogleSearchEngine); err != nil {
+				service.Errorf("Error saving configuration: %s\n", err)
+			} else {
+				fmt.Printf("Search engine enabled (set to %s).\n", service.GoogleSearchEngine)
+			}
+		} else {
+			fmt.Printf("Search engine is already enabled (%s).\n", current)
+		}
 	default:
+		// Switch to specified engine
 		succeed := SetEffectSearchEngineName(engine)
 		if succeed {
 			fmt.Printf("Switched to search engine: %s\n", GetEffectSearchEngineName())
