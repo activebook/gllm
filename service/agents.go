@@ -65,6 +65,15 @@ func GetAllAgents() (map[string]AgentConfig, error) {
 	for name, config := range agentsMap {
 		if configMap, ok := config.(map[string]interface{}); ok {
 			agents[name] = configMap
+		} else if configMap, ok := config.(AgentConfig); ok {
+			agents[name] = configMap
+		} else if configMap, ok := config.(map[interface{}]interface{}); ok {
+			// Handle map[interface{}]interface{} if viper returns it
+			converted := make(map[string]interface{})
+			for k, v := range configMap {
+				converted[fmt.Sprint(k)] = v
+			}
+			agents[name] = converted
 		}
 	}
 	return agents, nil
@@ -81,9 +90,15 @@ func GetAgent(name string) (AgentConfig, error) {
 		if configMap, ok := config.(map[string]interface{}); ok {
 			return configMap, nil
 		}
-		// Try manual conversion if needed (e.g. for map[interface{}]interface{})
 		if configMap, ok := config.(AgentConfig); ok {
 			return configMap, nil
+		}
+		if configMap, ok := config.(map[interface{}]interface{}); ok {
+			converted := make(map[string]interface{})
+			for k, v := range configMap {
+				converted[fmt.Sprint(k)] = v
+			}
+			return converted, nil
 		}
 
 		return nil, fmt.Errorf("invalid agent configuration for '%s' (type %T)", name, config)

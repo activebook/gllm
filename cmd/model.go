@@ -784,7 +784,18 @@ func GetAllModels() (map[string]string, error) {
 	for _, k := range keys {
 		decodedName := decodeModelName(k)
 		v := modelsMap[k]
-		if configMap, ok := v.(map[string]interface{}); ok {
+		var configMap map[string]interface{}
+
+		if cm, ok := v.(map[string]interface{}); ok {
+			configMap = cm
+		} else if cm, ok := v.(map[interface{}]interface{}); ok {
+			configMap = make(map[string]interface{})
+			for k, v := range cm {
+				configMap[fmt.Sprint(k)] = v
+			}
+		}
+
+		if configMap != nil {
 			// Convert the inner map to a string representation
 			var pairs []string
 			for k, v := range configMap {
@@ -793,7 +804,7 @@ func GetAllModels() (map[string]string, error) {
 			sort.Strings(pairs)
 			models[decodedName] = strings.Join(pairs, "\n")
 		} else {
-			return nil, fmt.Errorf("invalid model configuration for '%s'", decodedName)
+			return nil, fmt.Errorf("invalid model configuration for '%s' (type %T)", decodedName, v)
 		}
 	}
 	return models, nil
