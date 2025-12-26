@@ -244,7 +244,9 @@ func getCurrentAgentConfig() AgentConfig {
 			config["name"] = agentName
 			// Ensure we have resolved reference values locally for this session if needed
 			// But for a pure config object, we return as is. The consuming code might need resolution.
-			return resolveAgentConfig(config)
+			// We already resolve system_prompt and template in other places (GetEffectiveSystemPrompt and GetEffectiveTemplate)
+			// return resolveAgentConfig(config)
+			return AgentConfig(config)
 		}
 		// If agent not found, fall back to empty or default
 	} else if agentMap, ok := agentVal.(map[string]interface{}); ok {
@@ -263,6 +265,7 @@ func getCurrentAgentConfig() AgentConfig {
 }
 
 // resolveAgentConfig resolves lazy references in the configuration
+// legacy
 func resolveAgentConfig(config AgentConfig) AgentConfig {
 	resolved := make(AgentConfig)
 	for k, v := range config {

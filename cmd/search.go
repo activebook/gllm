@@ -284,7 +284,7 @@ var searchListCmd = &cobra.Command{
 		googleKey := viper.GetString("search_engines.google.key")
 		googleCx := viper.GetString("search_engines.google.cx")
 		if googleKey != "" {
-			fmt.Println("Google Custom Search:")
+			fmt.Println("Google Search:")
 			fmt.Printf("  API Key: %s\n", maskAPIKey(googleKey))
 			fmt.Printf("  CX: %s\n", maskAPIKey(googleCx))
 			fmt.Println("  DeepDive limit: ", viper.GetInt("search_engines.google.deep_dive"))

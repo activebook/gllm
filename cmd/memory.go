@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/service"
+	"github.com/charmbracelet/huh"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
@@ -105,9 +106,32 @@ Examples:
   gllm memory add "I prefer Go over Python"
   gllm memory add "Always use dark mode themes"
   gllm memory add "My project uses PostgreSQL"`,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		memory := args[0]
+		var memory string
+		if len(args) > 0 {
+			memory = args[0]
+		} else {
+			// Interactive mode
+			err := huh.NewForm(
+				huh.NewGroup(
+					huh.NewText().
+						Title("New Memory").
+						Description("Enter information you want gllm to remember across sessions.").
+						Value(&memory).
+						Lines(5).
+						Validate(func(s string) error {
+							if strings.TrimSpace(s) == "" {
+								return fmt.Errorf("memory content cannot be empty")
+							}
+							return nil
+						}),
+				),
+			).WithKeyMap(GetHuhKeyMap()).Run()
+			if err != nil {
+				return
+			}
+		}
 
 		if strings.TrimSpace(memory) == "" {
 			service.Errorf("Memory content cannot be empty\n")
@@ -149,12 +173,17 @@ Example:
 			}
 
 			fmt.Printf("This will delete %d memories. This cannot be undone.\n", len(memories))
-			fmt.Print("Are you sure? [y/N]: ")
-			var response string
-			fmt.Scanln(&response)
 
-			response = strings.ToLower(strings.TrimSpace(response))
-			if response != "y" && response != "yes" {
+			var confirm bool
+			err = huh.NewConfirm().
+				Title("Are you sure you want to clear all memories?").
+				Affirmative("Yes, delete all").
+				Value(&confirm).
+				Run()
+			if err != nil {
+				return
+			}
+			if !confirm {
 				fmt.Println("Operation cancelled.")
 				return
 			}

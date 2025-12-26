@@ -8,6 +8,7 @@ import (
 
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -37,6 +38,8 @@ var systemListCmd = &cobra.Command{
 	Short:   "List all saved system prompt names",
 	Run: func(cmd *cobra.Command, args []string) {
 		sys_prompts := viper.GetStringMapString("system_prompts")
+		activeSystem := GetAgentString("system_prompt")
+		highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
 
 		if len(sys_prompts) == 0 {
 			fmt.Println("No system prompts defined yet. Use 'gllm system add'.")
@@ -45,27 +48,41 @@ var systemListCmd = &cobra.Command{
 
 		verbose, _ := cmd.Flags().GetBool("verbose")
 
+		// Sort keys for consistent output
+		names := make([]string, 0, len(sys_prompts))
+		for name := range sys_prompts {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+
 		if verbose {
-			names := make([]string, 0, len(sys_prompts))
-			for name := range sys_prompts {
-				names = append(names, name)
-			}
-			sort.Strings(names)
 			fmt.Println("Available system prompts (with details):")
 			for _, name := range names {
-				fmt.Printf(" %s\n %s\n\n", name, sys_prompts[name])
+				prefix := "  "
+				pname := name
+				if name == activeSystem {
+					prefix = highlightColor("* ")
+					pname = highlightColor(name)
+				}
+				fmt.Printf("%s%s\n %s\n\n", prefix, pname, sys_prompts[name])
 			}
 		} else {
 			fmt.Println("Available system prompts:")
-			// Sort keys for consistent output
-			names := make([]string, 0, len(sys_prompts))
-			for name := range sys_prompts {
-				names = append(names, name)
-			}
-			sort.Strings(names)
 			for _, name := range names {
-				fmt.Printf(" %s\n", name)
+				prefix := "  "
+				pname := name
+				if name == activeSystem {
+					prefix = highlightColor("* ")
+					pname = highlightColor(name)
+				}
+				fmt.Printf("%s%s\n", prefix, pname)
 			}
+		}
+
+		if activeSystem != "" {
+			fmt.Println("\n(*) Indicates the current system prompt.")
+		} else {
+			fmt.Println("\nNo system prompt selected. Use 'gllm system switch <name>' to select one.")
 		}
 	},
 }
@@ -346,8 +363,14 @@ var systemSwitchCmd = &cobra.Command{
 			// Add "None" option
 			options = append(options, huh.NewOption("None", ""))
 
+			highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
+
 			for _, n := range names {
-				options = append(options, huh.NewOption(n, n))
+				label := n
+				if n == currentName {
+					label = highlightColor(n + " (active)")
+				}
+				options = append(options, huh.NewOption(label, n))
 			}
 
 			// Pre-select if matches?
