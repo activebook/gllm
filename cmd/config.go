@@ -212,7 +212,6 @@ var configPrintCmd = &cobra.Command{
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
 		sectionColor := color.New(color.FgCyan, color.Bold).SprintFunc()
-		headerColor := color.New(color.FgYellow, color.Bold).SprintFunc()
 
 		printSection := func(title string) {
 			fmt.Println()
@@ -235,18 +234,12 @@ var configPrintCmd = &cobra.Command{
 
 		// System Prompts section
 		printSection("System Prompts")
-		sysPrompts := GetAllSystemPrompts()
-		fmt.Fprintln(w, headerColor(" NAME ")+"\t"+headerColor(" CONTENT "))
-		fmt.Fprintln(w, headerColor("------")+"\t"+headerColor("---------"))
-		fmt.Fprintf(w, "%v\n", sysPrompts)
+		systemListCmd.Run(systemListCmd, []string{})
 		w.Flush()
 
 		// Templates section
 		printSection("Templates")
-		templates := GetAllTemplates()
-		fmt.Fprintln(w, headerColor(" NAME ")+"\t"+headerColor(" CONTENT "))
-		fmt.Fprintln(w, headerColor("------")+"\t"+headerColor("---------"))
-		fmt.Fprintf(w, "%v\n", templates)
+		templateListCmd.Run(templateListCmd, []string{})
 		w.Flush()
 
 		// Search Engines section
