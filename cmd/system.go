@@ -154,7 +154,7 @@ Example:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name string
 		sys_prompts := viper.GetStringMapString("system_prompts")
-		if sys_prompts == nil || len(sys_prompts) == 0 {
+		if len(sys_prompts) == 0 {
 			return fmt.Errorf("there is no system prompt yet, use 'add' first")
 		}
 

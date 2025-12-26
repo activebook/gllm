@@ -192,7 +192,7 @@ Example:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name string
 		templates := viper.GetStringMapString("templates")
-		if templates == nil || len(templates) == 0 {
+		if len(templates) == 0 {
 			return fmt.Errorf("there is no template prompt yet, use 'add' first")
 		}
 
