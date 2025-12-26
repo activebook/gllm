@@ -447,7 +447,7 @@ func toInt(s string) int {
 func GetEffectiveSearchEngine() (name string, info map[string]any) {
 	defaultName := GetAgentString("search")
 	enginesMap := viper.GetStringMap("search_engines")
-	if defaultName != "" {
+	if defaultName != "" && defaultName != service.NoneSearchEngine {
 		if engineConfig, ok := enginesMap[defaultName]; ok {
 			// Convert the map[string]interface{} to map[string]string
 			if configMap, ok := engineConfig.(map[string]interface{}); ok {

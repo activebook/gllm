@@ -12,7 +12,6 @@ import (
 
 	"github.com/activebook/gllm/service"
 	"github.com/fatih/color"
-	"github.com/spf13/viper"
 )
 
 // handleCommand processes chat commands
@@ -187,7 +186,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /template, /p \"<tmpl|name>\" - Change the template")
 	fmt.Println("  /system /S \"<prompt|name>\" - Change the system prompt")
 	fmt.Println("  /think, /T \"[on|off]\" - Switch whether to use deep think mode")
-	fmt.Println("  /search, /s \"<engine>[on|off]\" - Change the search engine, or switch on/off")
+	fmt.Println("  /search, /s \"<engine>\" - Change the search engine")
 	fmt.Println("  /tools, /t \"[on|off|skip|confirm]\" - Switch whether to use embedding tools, skip tools confirmation")
 	fmt.Println("  /mcp \"[on|off|list]\" - Switch whether to use MCP servers, or list available servers")
 	fmt.Println("  /memory, /y \"[list|add|clear]\" - Manage long-term cross-session memory")
@@ -290,17 +289,8 @@ func (ci *ChatInfo) showHistory(num int, chars int) {
 
 // clearContext clears the conversation context
 func (ci *ChatInfo) clearContext() {
-	// Reset all settings
-	viper.Set("agent.system_prompt", "")
-	viper.Set("agent.template", "")
-	viper.Set("agent.search", "")
-	err := viper.WriteConfig()
-	if err != nil {
-		service.Errorf("Error clearing context: %v\n", err)
-		return
-	}
 	// Empty the conversation history
-	err = ci.Conversion.Clear()
+	err := ci.Conversion.Clear()
 	if err != nil {
 		service.Errorf("Error clearing context: %v\n", err)
 		return
@@ -312,52 +302,28 @@ func (ci *ChatInfo) clearContext() {
 
 // setTemplate sets the conversation template
 func (ci *ChatInfo) setTemplate(template string) {
-	if err := SetEffectiveTemplate(template); err != nil {
-		service.Warnf("%v", err)
-		fmt.Println("Ignore template prompt")
-	} else {
-		fmt.Printf("Switched to template: %s\n", template)
+	err := templateSwitchCmd.RunE(templateSwitchCmd, []string{template})
+	if err != nil {
+		service.Errorf("Error setting template: %v\n", err)
+		return
 	}
 }
 
 // setSystem sets the system prompt
 func (ci *ChatInfo) setSystem(system string) {
-	if err := SetEffectiveSystemPrompt(system); err != nil {
-		service.Warnf("%v", err)
-		fmt.Println("Ignore system prompt")
-	} else {
-		fmt.Printf("Switched to system prompt: %s\n", system)
+	err := systemSwitchCmd.RunE(systemSwitchCmd, []string{system})
+	if err != nil {
+		service.Errorf("Error setting system prompt: %v\n", err)
+		return
 	}
 }
 
 // setSearchEngine sets the search engine
 func (ci *ChatInfo) setSearchEngine(engine string) {
-	switch engine {
-	case "off":
-		// Disable search
-		if err := SetAgentValue("search", service.NoneSearchEngine); err != nil {
-			service.Errorf("Error saving configuration: %s\n", err)
-		} else {
-			fmt.Println("Search engine disabled.")
-		}
-	case "on":
-		// Enable default search (google) if none set
-		current := GetEffectSearchEngineName()
-		if current == "" || current == service.NoneSearchEngine {
-			if err := SetAgentValue("search", service.GoogleSearchEngine); err != nil {
-				service.Errorf("Error saving configuration: %s\n", err)
-			} else {
-				fmt.Printf("Search engine enabled (set to %s).\n", service.GoogleSearchEngine)
-			}
-		} else {
-			fmt.Printf("Search engine is already enabled (%s).\n", current)
-		}
-	default:
-		// Switch to specified engine
-		succeed := SetEffectSearchEngineName(engine)
-		if succeed {
-			fmt.Printf("Switched to search engine: %s\n", GetEffectSearchEngineName())
-		}
+	err := searchSwitchCmd.RunE(searchSwitchCmd, []string{engine})
+	if err != nil {
+		service.Errorf("Error setting search engine: %v\n", err)
+		return
 	}
 }
 
