@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/service"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -26,11 +27,7 @@ var systemCmd = &cobra.Command{
 	// },
 	// Suggest showing help if 'gllm config' is run without subcommand
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Manage system prompts here (e.g., add, list, remove)")
-		// Example: Access a viper setting for prompts (maybe a map or slice)
-		// prompts := viper.Get("prompts")
-		// fmt.Printf("Current prompts (from config): %v\n", prompts)
-		cmd.Help() // Show help for now
+		systemListCmd.Run(cmd, args)
 	},
 }
 
@@ -83,15 +80,55 @@ Example:
 		name, _ := cmd.Flags().GetString("name")
 		content, _ := cmd.Flags().GetString("content")
 
+		// Interactive mode if flags are missing
+		if name == "" || content == "" {
+			form := huh.NewForm(
+				huh.NewGroup(
+					huh.NewInput().
+						Title("Name").
+						Value(&name).
+						Validate(func(str string) error {
+							if str == "" {
+								return fmt.Errorf("name is required")
+							}
+							sys_prompts := viper.GetStringMapString("system_prompts")
+							if _, exists := sys_prompts[str]; exists {
+								return fmt.Errorf("system prompt '%s' already exists", str)
+							}
+							return nil
+						}),
+					huh.NewText().
+						Title("Content").
+						Value(&content).
+						Lines(5).
+						Validate(func(str string) error {
+							if str == "" {
+								return fmt.Errorf("content is required")
+							}
+							return nil
+						}),
+				),
+			).WithKeyMap(GetHuhKeyMap())
+			err := form.Run()
+			if err != nil {
+				return nil // User cancelled
+			}
+		}
+
 		sys_prompts := viper.GetStringMapString("system_prompts")
 		// Initialize map if it doesn't exist
 		if sys_prompts == nil {
 			sys_prompts = make(map[string]string)
 		}
 
+		// Double check existence if passed via flags (interactive validation handles it above)
 		if _, exists := sys_prompts[name]; exists {
-			// Maybe add an --overwrite flag later? For now, error out.
-			return fmt.Errorf("system prompt named '%s' already exists. Use 'remove' first or choose a different name", name)
+			// If name was passed via flag and exists (not caught by interactive because form didn't run or didn't validate initial value? huh validates initial?)
+			// Huh validates initial value ONLY if modified or we force it? Actually simpler to just check again or rely on form.
+			// The form validation handles the interactive case. For flag case:
+			if cmd.Flags().Changed("name") {
+				return fmt.Errorf("system prompt named '%s' already exists", name)
+			}
 		}
 
 		sys_prompts[name] = content
@@ -108,29 +145,71 @@ Example:
 }
 
 var systemSetCmd = &cobra.Command{
-	Use:   "set",
+	Use:   "set [NAME]",
 	Short: "Set a named system prompt",
 	Long: `Sets a new system prompt with a specific name and content.
 Example:
-  gllm system set coder --content "You are an expert Go programmer"`,
-	Args: cobra.ExactArgs(1), // Requires exactly one argument (the name)
+  gllm system set coder --content "You are an expert Go programmer"
+  gllm system set (opens selection)`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		name := args[0]
-
+		var name string
 		sys_prompts := viper.GetStringMapString("system_prompts")
-		// Initialize map if it doesn't exist
-		if sys_prompts == nil {
+		if sys_prompts == nil || len(sys_prompts) == 0 {
 			return fmt.Errorf("there is no system prompt yet, use 'add' first")
 		}
 
-		if _, exists := sys_prompts[name]; exists {
-			if content, err := cmd.Flags().GetString("content"); err == nil {
-				sys_prompts[name] = content
-			}
+		if len(args) > 0 {
+			name = args[0]
 		} else {
+			// Select prompt
+			var options []huh.Option[string]
+			for n := range sys_prompts {
+				options = append(options, huh.NewOption(n, n))
+			}
+			// Sort options by keys is handled by huh? No, we should sort.
+			// Sort names first
+			var names []string
+			for n := range sys_prompts {
+				names = append(names, n)
+			}
+			sort.Strings(names)
+			options = make([]huh.Option[string], len(names))
+			for i, n := range names {
+				options[i] = huh.NewOption(n, n)
+			}
+
+			err := huh.NewSelect[string]().
+				Title("Select System Prompt to Edit").
+				Options(options...).
+				Value(&name).
+				Run()
+			if err != nil {
+				return nil
+			}
+		}
+
+		if _, exists := sys_prompts[name]; !exists {
 			return fmt.Errorf("system prompt named '%s' not found", name)
 		}
 
+		content, _ := cmd.Flags().GetString("content")
+		// If content flag not changed, show form with existing content
+		if !cmd.Flags().Changed("content") {
+			content = sys_prompts[name]
+			err := huh.NewForm(
+				huh.NewGroup(
+					huh.NewText().
+						Title("Content").
+						Value(&content).
+						Lines(10),
+				),
+			).WithKeyMap(GetHuhKeyMap()).Run()
+			if err != nil {
+				return nil
+			}
+		}
+
+		sys_prompts[name] = content
 		viper.Set("system_prompts", sys_prompts)
 
 		// Write the config file
@@ -139,9 +218,6 @@ Example:
 		}
 
 		fmt.Printf("System prompt '%s' set successfully.\n", name)
-		fmt.Println("---")
-		fmt.Printf("content: %s\n", sys_prompts[name])
-		fmt.Println("---")
 		return nil
 	},
 }
@@ -166,13 +242,40 @@ var systemInfoCmd = &cobra.Command{
 }
 
 var systemRemoveCmd = &cobra.Command{
-	Use:     "remove NAME",
+	Use:     "remove [NAME]",
 	Aliases: []string{"rm"},
 	Short:   "Remove a named system prompt",
-	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		name := args[0]
 		sys_prompts := viper.GetStringMapString("system_prompts")
+		if len(sys_prompts) == 0 {
+			fmt.Println("No system prompts to remove.")
+			return nil
+		}
+
+		var name string
+		if len(args) > 0 {
+			name = args[0]
+		} else {
+			// Select prompt to remove
+			var names []string
+			for n := range sys_prompts {
+				names = append(names, n)
+			}
+			sort.Strings(names)
+			var options []huh.Option[string]
+			for _, n := range names {
+				options = append(options, huh.NewOption(n, n))
+			}
+
+			err := huh.NewSelect[string]().
+				Title("Select System Prompt to Remove").
+				Options(options...).
+				Value(&name).
+				Run()
+			if err != nil {
+				return nil
+			}
+		}
 
 		if _, exists := sys_prompts[name]; !exists {
 			cmd.SilenceUsage = true // Don't show usage for this error
@@ -181,6 +284,22 @@ var systemRemoveCmd = &cobra.Command{
 				return nil
 			}
 			return fmt.Errorf("system prompt named '%s' not found", name)
+		}
+
+		// Confirm
+		if !cmd.Flags().Changed("force") {
+			var confirm bool
+			err := huh.NewConfirm().
+				Title(fmt.Sprintf("Are you sure you want to remove '%s'?", name)).
+				Value(&confirm).
+				Run()
+			if err != nil {
+				return nil
+			}
+			if !confirm {
+				fmt.Println("Operation cancelled.")
+				return nil
+			}
 		}
 
 		// Delete the prompt
@@ -193,6 +312,69 @@ var systemRemoveCmd = &cobra.Command{
 		}
 
 		fmt.Printf("System prompt '%s' removed successfully.\n", name)
+		return nil
+	},
+}
+
+var systemSwitchCmd = &cobra.Command{
+	Use:     "switch [NAME]",
+	Aliases: []string{"sw", "select"},
+	Short:   "Switch to a different system prompt",
+	Long:    `Switch the current agent's system prompt to the specified one.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		var name string
+		if len(args) > 0 {
+			name = args[0]
+		} else {
+			// Get options
+			sys_prompts := viper.GetStringMapString("system_prompts")
+			if len(sys_prompts) == 0 {
+				fmt.Println("No system prompts found.")
+				return nil
+			}
+
+			// Get current
+			currentName := GetAgentString("system_prompt")
+
+			var options []huh.Option[string]
+			var names []string
+			for n := range sys_prompts {
+				names = append(names, n)
+			}
+			sort.Strings(names)
+
+			// Add "None" option
+			options = append(options, huh.NewOption("None", ""))
+
+			for _, n := range names {
+				options = append(options, huh.NewOption(n, n))
+			}
+
+			// Pre-select if matches?
+			// huh select value expects the pointer to contain the default.
+
+			name = currentName // Pre-fill with current
+
+			err := huh.NewSelect[string]().
+				Title("Select System Prompt").
+				Options(options...).
+				Value(&name).
+				Run()
+			if err != nil {
+				return nil
+			}
+		}
+
+		// Update agent config
+		if err := SetAgentValue("system_prompt", name); err != nil {
+			return fmt.Errorf("failed to switch system prompt: %w", err)
+		}
+
+		if name == "" {
+			fmt.Println("System prompt disabled.")
+		} else {
+			fmt.Printf("Switched system prompt to '%s'.\n", name)
+		}
 		return nil
 	},
 }
@@ -211,12 +393,17 @@ gllm system clear --force`,
 		force, _ := cmd.Flags().GetBool("force")
 
 		if !force {
-			fmt.Print("Are you sure you want to clear all system prompts? This cannot be undone. [y/N]: ")
-			var response string
-			fmt.Scanln(&response)
-
-			response = strings.ToLower(strings.TrimSpace(response))
-			if response != "y" && response != "yes" {
+			var confirm bool
+			err := huh.NewConfirm().
+				Title("Are you sure you want to clear ALL system prompts? This cannot be undone.").
+				Affirmative("Yes, delete all").
+				Negative("Cancel").
+				Value(&confirm).
+				Run()
+			if err != nil {
+				return nil
+			}
+			if !confirm {
 				fmt.Println("Operation cancelled.")
 				return nil
 			}
@@ -305,6 +492,7 @@ func init() {
 	systemCmd.AddCommand(systemListCmd)
 	systemCmd.AddCommand(systemAddCmd)
 	systemCmd.AddCommand(systemSetCmd)
+	systemCmd.AddCommand(systemSwitchCmd)
 	systemCmd.AddCommand(systemInfoCmd)
 	systemCmd.AddCommand(systemRemoveCmd)
 	systemCmd.AddCommand(systemClearCmd)
@@ -315,8 +503,8 @@ func init() {
 	systemAddCmd.Flags().StringP("name", "n", "", "Name for the new system prompt (required)")
 	systemAddCmd.Flags().StringP("content", "c", "", "Content/text of the new system prompt (required)")
 	// Mark flags as required - Cobra will handle error messages if they are missing
-	systemAddCmd.MarkFlagRequired("name")
-	systemAddCmd.MarkFlagRequired("content")
+	// systemAddCmd.MarkFlagRequired("name")
+	// systemAddCmd.MarkFlagRequired("content")
 	systemSetCmd.Flags().StringP("content", "c", defaultSystemPromptContent, "Content/text of the system prompt")
 
 	// Add flags for other prompt commands if needed in the future

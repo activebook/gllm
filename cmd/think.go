@@ -12,7 +12,7 @@ var thinkCmd = &cobra.Command{
 	Long:  `Deep think mode enhances the model's reasoning capabilities.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
-		fmt.Println("-------------------------------------------")
+		fmt.Println()
 
 		// Show current status
 		enabled := IsThinkEnabled()

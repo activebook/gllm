@@ -278,7 +278,7 @@ var searchListCmd = &cobra.Command{
 	Long:    `Display details for all configured search engines.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Configured Search Engines:")
-		fmt.Println("-------------------------")
+		fmt.Println()
 
 		// Google
 		googleKey := viper.GetString("search_engines.google.key")
@@ -317,7 +317,7 @@ var searchListCmd = &cobra.Command{
 			fmt.Println("Use 'gllm search [engine] --key YOUR_KEY' to configure.")
 		}
 
-		fmt.Println("-------------------------")
+		fmt.Println()
 
 		// Update the list command to show default status
 		// In the listCmd.Run function, add:

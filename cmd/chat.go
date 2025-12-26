@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/activebook/gllm/service"
-	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -220,20 +219,6 @@ func (ci *ChatInfo) printWelcome() {
 func (ci *ChatInfo) awaitChat() (string, error) {
 	var input string
 
-	// 1. Start with the default keymap
-	keyMap := huh.NewDefaultKeyMap()
-
-	// 2. Remap the Text field keys
-	// We swap 'enter' to be the submission key and 'alt+enter' for new lines
-	keyMap.Text.Submit = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "submit"))
-	// The Prev/Next keys are meant to navigate between multiple fields (like going from an Input field to a Text field to a Select field). Since there's only one field, pressing ctrl+[ or ctrl+] has nowhere to go!
-	// keyMap.Text.Prev = key.NewBinding(key.WithKeys("ctrl+["), key.WithHelp("ctrl+[", "prev"))
-	// keyMap.Text.Next = key.NewBinding(key.WithKeys("ctrl+]"), key.WithHelp("ctrl+]", "next"))
-	keyMap.Text.NewLine.SetHelp("ctrl+j", "new line")
-
-	// 3. Disable the Editor (Ctrl+E) keybinding
-	keyMap.Text.Editor = key.NewBinding(key.WithDisabled())
-
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewText().
@@ -241,7 +226,7 @@ func (ci *ChatInfo) awaitChat() (string, error) {
 				Value(&input).
 				Placeholder("Type your message..."),
 		),
-	).WithKeyMap(keyMap) // 4. CRITICAL: Apply the keymap to the FORM level
+	).WithKeyMap(GetHuhKeyMap()) // 4. CRITICAL: Apply the keymap to the FORM level
 
 	err := form.Run()
 	if err != nil {

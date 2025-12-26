@@ -20,7 +20,7 @@ var usageCmd = &cobra.Command{
 When Usage is switched off, the output will not include any token usage metainfo.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
-		fmt.Println("-------------------------------------------")
+		fmt.Println()
 		fmt.Print("Usage output is currently switched: ")
 		usage := GetAgentBool("usage")
 		if usage {

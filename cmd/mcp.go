@@ -16,7 +16,7 @@ var mcpCmd = &cobra.Command{
 Switch on/off to enable/disable all mcp servers`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
-		fmt.Println("-------------------------------------------")
+		fmt.Println()
 		fmt.Print("MCP is currently: ")
 		enabled := GetAgentBool("mcp")
 		if enabled {

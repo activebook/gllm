@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/activebook/gllm/service"
+	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/huh"
 	"github.com/ergochat/readline"
 	"github.com/spf13/viper"
 )
@@ -268,4 +270,24 @@ func SetAgentValue(key string, value interface{}) error {
 	}
 
 	return nil
+}
+
+// GetHuhKeyMap returns a custom keymap for huh forms
+// Specifically disables the Editor key binding for Text fields as it interferes with input
+func GetHuhKeyMap() *huh.KeyMap {
+	// 1. Start with the default keymap
+	keyMap := huh.NewDefaultKeyMap()
+
+	// 2. Remap the Text field keys
+	// We swap 'enter' to be the submission key and 'alt+enter' for new lines
+	keyMap.Text.Submit = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "submit"))
+	// The Prev/Next keys are meant to navigate between multiple fields (like going from an Input field to a Text field to a Select field). Since there's only one field, pressing ctrl+[ or ctrl+] has nowhere to go!
+	// keyMap.Text.Prev = key.NewBinding(key.WithKeys("ctrl+["), key.WithHelp("ctrl+[", "prev"))
+	// keyMap.Text.Next = key.NewBinding(key.WithKeys("ctrl+]"), key.WithHelp("ctrl+]", "next"))
+	keyMap.Text.NewLine.SetHelp("ctrl+j", "new line")
+
+	// 3. Disable the Editor (Ctrl+E) keybinding
+	keyMap.Text.Editor = key.NewBinding(key.WithDisabled())
+
+	return keyMap
 }

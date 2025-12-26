@@ -14,7 +14,7 @@ var toolsCmd = &cobra.Command{
 Switch on/off to enable/disable all embedding tools`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
-		fmt.Println("-------------------------------------------")
+		fmt.Println()
 		ListAllTools()
 	},
 }

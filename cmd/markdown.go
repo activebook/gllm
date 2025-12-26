@@ -34,7 +34,7 @@ var markdownCmd = &cobra.Command{
 When Markdown is switched off, the output will not include any Markdown formatting.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
-		fmt.Println("-------------------------------------------")
+		fmt.Println()
 		fmt.Print("Markdown output is currently switched: ")
 		mark := GetAgentBool("markdown")
 		if mark {
