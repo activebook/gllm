@@ -70,7 +70,7 @@ different AI assistant setups with different models, tools, and settings.`,
 		if len(currentConfig) > 0 {
 			fmt.Println("Current agent configuration:")
 			fmt.Println("============================")
-			printAgentConfigDetails(currentConfig)
+			printAgentConfigDetails(currentConfig, "  ")
 			fmt.Println()
 		} else {
 			fmt.Println("No current agent configuration found.")
@@ -723,7 +723,7 @@ var agentInfoCmd = &cobra.Command{
 		fmt.Println("==========================")
 
 		// Display configuration using the same formatting as add/set commands
-		printAgentConfigDetails(agentConfig)
+		printAgentConfigDetails(agentConfig, "  ")
 	},
 }
 
@@ -745,13 +745,13 @@ func init() {
 }
 
 // printAgentConfigDetails prints the agent details in a formatted way
-func printAgentConfigDetails(agent map[string]interface{}) {
+func printAgentConfigDetails(agent map[string]interface{}, spaceholder string) {
 	if name, exists := agent["name"]; exists {
-		fmt.Printf("  Name: %s\n", name)
+		fmt.Printf("%sName: %s\n", spaceholder, name)
 	}
 
 	if model, exists := agent["model"]; exists {
-		fmt.Printf("  Model: %s\n", decodeModelName(model.(string)))
+		fmt.Printf("%sModel: %s\n", spaceholder, decodeModelName(model.(string)))
 	}
 
 	if system, exists := agent["system_prompt"]; exists {
@@ -760,15 +760,15 @@ func printAgentConfigDetails(agent map[string]interface{}) {
 			resolvedSysPrompt := service.ResolveSystemPromptReference(sysPromptStr)
 			// Truncate if too long?
 			if len(resolvedSysPrompt) > 50 {
-				fmt.Printf("  System Prompt: %s...\n", resolvedSysPrompt[:47])
+				fmt.Printf("%sSystem Prompt: %s...\n", spaceholder, resolvedSysPrompt[:47])
 			} else {
-				fmt.Printf("  System Prompt: %s\n", resolvedSysPrompt)
+				fmt.Printf("%sSystem Prompt: %s\n", spaceholder, resolvedSysPrompt)
 			}
 		} else {
-			fmt.Printf("  System Prompt: \n")
+			fmt.Printf("%sSystem Prompt: \n", spaceholder)
 		}
 	} else {
-		fmt.Printf("  System Prompt: \n")
+		fmt.Printf("%sSystem Prompt: \n", spaceholder)
 	}
 
 	if template, exists := agent["template"]; exists {
@@ -776,51 +776,51 @@ func printAgentConfigDetails(agent map[string]interface{}) {
 			// Resolve template reference for display (don't modify stored config)
 			resolvedTemplate := service.ResolveTemplateReference(templateStr)
 			if len(resolvedTemplate) > 50 {
-				fmt.Printf("  Template: %s...\n", resolvedTemplate[:47])
+				fmt.Printf("%sTemplate: %s...\n", spaceholder, resolvedTemplate[:47])
 			} else {
-				fmt.Printf("  Template: %s\n", resolvedTemplate)
+				fmt.Printf("%sTemplate: %s\n", spaceholder, resolvedTemplate)
 			}
 		} else {
-			fmt.Printf("  Template: \n")
+			fmt.Printf("%sTemplate: \n", spaceholder)
 		}
 	} else {
-		fmt.Printf("  Template: \n")
+		fmt.Printf("%sTemplate: \n", spaceholder)
 	}
 
 	if search, exists := agent["search"]; exists {
-		fmt.Printf("  Search: %s\n", search)
+		fmt.Printf("%sSearch: %s\n", spaceholder, search)
 	} else {
-		fmt.Printf("  Search: \n")
+		fmt.Printf("%sSearch: \n", spaceholder)
 	}
 
 	if mcp, exists := agent["mcp"]; exists {
-		fmt.Printf("  MCP: %v\n", mcp)
+		fmt.Printf("%sMCP: %v\n", spaceholder, mcp)
 	} else {
-		fmt.Printf("  MCP: false\n")
+		fmt.Printf("%sMCP: false\n", spaceholder)
 	}
 
 	if usage, exists := agent["usage"]; exists {
-		fmt.Printf("  Usage: %v\n", usage)
+		fmt.Printf("%sUsage: %v\n", spaceholder, usage)
 	} else {
-		fmt.Printf("  Usage: false\n")
+		fmt.Printf("%sUsage: false\n", spaceholder)
 	}
 
 	if markdown, exists := agent["markdown"]; exists {
-		fmt.Printf("  Markdown: %v\n", markdown)
+		fmt.Printf("%sMarkdown: %v\n", spaceholder, markdown)
 	} else {
-		fmt.Printf("  Markdown: false\n")
+		fmt.Printf("%sMarkdown: false\n", spaceholder)
 	}
 
 	if think, exists := agent["think"]; exists {
-		fmt.Printf("  Think: %v\n", think)
+		fmt.Printf("%sThink: %v\n", spaceholder, think)
 	} else {
-		fmt.Printf("  Think: false\n")
+		fmt.Printf("%sThink: false\n", spaceholder)
 	}
 
 	if maxRecursions, exists := agent["max_recursions"]; exists {
-		fmt.Printf("  Max Recursions: %v\n", maxRecursions)
+		fmt.Printf("%sMax Recursions: %v\n", spaceholder, maxRecursions)
 	} else {
-		fmt.Printf("  Max Recursions: 10\n")
+		fmt.Printf("%sMax Recursions: 10\n", spaceholder)
 	}
 }
 

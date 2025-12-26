@@ -285,62 +285,31 @@ var configPrintCmd = &cobra.Command{
 
 		// Plugins section
 		printSection("Tools")
-		fmt.Fprintln(w, headerColor(" Tool ")+"\t"+headerColor(" Enabled "))
-		fmt.Fprintln(w, headerColor("------")+"\t"+headerColor("----------"))
-
-		toolsEnabled := AreToolsEnabled()
-		toolsStatus := highlightColor("Yes")
-		if !toolsEnabled {
-			toolsStatus = color.New(color.FgRed, color.Bold).Sprint("No")
-		}
-		for _, tool := range service.GetAllEmbeddingTools() {
-			fmt.Fprintf(w, "%s\t%s\n", keyColor(tool), toolsStatus)
-		}
-		toolsEnabled = IsSearchEnabled()
-		if !toolsEnabled {
-			toolsStatus = color.New(color.FgRed, color.Bold).Sprint("No")
-		}
-		for _, tool := range service.GetAllSearchTools() {
-			fmt.Fprintf(w, "%s\t%s\n", keyColor(tool), toolsStatus)
-		}
+		ListAllTools()
 		w.Flush()
 
-		// Default Configuration section
-		printSection("Default Configuration")
-
-		mark := IncludeMarkdown()
-		fmt.Printf("\n%s: %v\n", keyColor("Markdown Format"), mark)
-
-		// Display max recursions value
-		maxRecursions := viper.GetInt("agent.max_recursions")
-		if maxRecursions <= 0 {
-			maxRecursions = 10 // Default value
-		}
-		fmt.Printf("%s: %d\n", keyColor("Max Recursions"), maxRecursions)
-
-		modelName, modelInfo := GetEffectiveModel()
-		fmt.Printf("\n%s: %v\n", keyColor("Default Model"), highlightColor(modelName))
-		fmt.Fprintln(w, headerColor(" PROPERTY ")+"\t"+headerColor(" VALUE "))
-		fmt.Fprintln(w, headerColor("----------")+"\t"+headerColor("-------"))
-		for property, value := range modelInfo {
-			fmt.Fprintf(w, "%s\t%s\n", keyColor(property), (fmt.Sprintf("%v", value)))
-		}
+		// Default Agent section
+		printSection("Default Agent")
+		agentConfig := service.GetCurrentAgentConfig()
+		printAgentConfigDetails(agentConfig, "")
 		w.Flush()
 
-		searchName, searchEngine := GetEffectiveSearchEngine()
-		fmt.Printf("\n%s: %v\n", keyColor("Default Search Engine"), highlightColor(searchName))
-		fmt.Fprintln(w, headerColor(" PROPERTY ")+"\t"+headerColor(" VALUE "))
-		fmt.Fprintln(w, headerColor("----------")+"\t"+headerColor("-------"))
-		pairs := []struct{ k, v string }{}
-		for property, value := range searchEngine {
-			pairs = append(pairs, struct{ k, v string }{
-				keyColor(property),
-				(fmt.Sprintf("%v", value)),
-			})
+		// All Agents section
+		printSection("All Agents")
+		// List all agents
+		agents, err := service.GetAllAgents()
+		if err != nil {
+			fmt.Printf("No agents configured yet. Use 'gllm agent add' to create one.\n")
 		}
-		sort.Slice(pairs, func(i, j int) bool { return pairs[i].k > pairs[j].k })
-		for _, pair := range pairs {
-			fmt.Fprintf(w, "%s\t%s\n", pair.k, pair.v)
+		// Display agents in a clean, simple list
+		// Get agent names and sort them
+		names := make([]string, 0, len(agents))
+		for name := range agents {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			fmt.Printf("%s\n", name)
 		}
 		w.Flush()
 
