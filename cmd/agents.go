@@ -51,11 +51,6 @@ var agentListCmd = &cobra.Command{
 			}
 			fmt.Printf("%s%s\n", prefix, name)
 		}
-
-		if len(names) > 0 {
-			fmt.Println("\nUse 'gllm agent switch' to change agents interactively.")
-			fmt.Println("Use 'gllm agent info <name>' to see agent details.")
-		}
 	},
 }
 

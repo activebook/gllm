@@ -124,14 +124,6 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 			SwitchThinkMode(mode)
 		}
 
-	case "/reference", "/r":
-		if len(parts) < 2 {
-			fmt.Println("Please specify a number")
-			return
-		}
-		count := strings.TrimSpace(parts[1])
-		ci.setReferences(count)
-
 	case "/usage", "/u":
 		if len(parts) < 2 {
 			usageCmd.Run(usageCmd, []string{})
@@ -199,7 +191,6 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /tools, /t \"[on|off|skip|confirm]\" - Switch whether to use embedding tools, skip tools confirmation")
 	fmt.Println("  /mcp \"[on|off|list]\" - Switch whether to use MCP servers, or list available servers")
 	fmt.Println("  /memory, /y \"[list|add|clear]\" - Manage long-term cross-session memory")
-	fmt.Println("  /reference, /r \"<num>\" - Change the search link reference count")
 	fmt.Println("  /usage, /u \"[on|off]\" - Switch whether to show token usage information")
 	fmt.Println("  /editor, /e <editor>|list - Open external editor for multi-line input")
 	fmt.Println("  /output, /o <filename> [off] - Save to output file for model responses")
@@ -368,17 +359,6 @@ func (ci *ChatInfo) setSearchEngine(engine string) {
 			fmt.Printf("Switched to search engine: %s\n", GetEffectSearchEngineName())
 		}
 	}
-}
-
-// setReferences sets the reference count
-func (ci *ChatInfo) setReferences(count string) {
-	num, err := strconv.Atoi(count)
-	if err != nil {
-		fmt.Println("Invalid number")
-		return
-	}
-	referenceFlag = num
-	fmt.Printf("Reference count set to %d\n", num)
 }
 
 // setUseTools sets the tools usage mode

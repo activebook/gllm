@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"text/tabwriter"
 
@@ -214,8 +213,6 @@ var configPrintCmd = &cobra.Command{
 
 		sectionColor := color.New(color.FgCyan, color.Bold).SprintFunc()
 		headerColor := color.New(color.FgYellow, color.Bold).SprintFunc()
-		highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
-		keyColor := color.New(color.FgMagenta, color.Bold).SprintFunc()
 
 		printSection := func(title string) {
 			fmt.Println()
@@ -233,22 +230,8 @@ var configPrintCmd = &cobra.Command{
 
 		// Models section
 		printSection("Models")
-		models, err := GetAllModels()
-		if err != nil {
-			service.Errorf("Error retrieving models: %s\n", err)
-		} else {
-			fmt.Fprintln(w, headerColor(" MODEL ")+"\t"+headerColor(" SETTINGS "))
-			fmt.Fprintln(w, headerColor("-------")+"\t"+headerColor("----------"))
-			defaultName := GetEffectModelName()
-			for name, settings := range models {
-				if name == defaultName {
-					fmt.Fprintf(w, "%s\t%v\n", highlightColor("*"+name+"*"), settings)
-				} else {
-					fmt.Fprintf(w, "%s\t%v\n", keyColor(name), settings)
-				}
-			}
-			w.Flush()
-		}
+		modelListCmd.Run(modelListCmd, []string{})
+		w.Flush()
 
 		// System Prompts section
 		printSection("System Prompts")
@@ -268,19 +251,7 @@ var configPrintCmd = &cobra.Command{
 
 		// Search Engines section
 		printSection("Search Engines")
-		searchEngines := GetAllSearchEngines()
-		fmt.Fprintln(w, headerColor(" Search ")+"\t"+headerColor(" SETTINGS "))
-		fmt.Fprintln(w, headerColor("-------")+"\t"+headerColor("----------"))
-		defaultSearch := GetEffectSearchEngineName()
-		for name, settings := range searchEngines {
-			coloredName := name
-			if name == defaultSearch {
-				coloredName = highlightColor("*" + name + "*")
-			} else {
-				coloredName = keyColor(name)
-			}
-			fmt.Fprintf(w, "%s\t%s\n", coloredName, (fmt.Sprintf("%v", settings)))
-		}
+		searchListCmd.Run(searchListCmd, []string{})
 		w.Flush()
 
 		// Plugins section
@@ -289,35 +260,8 @@ var configPrintCmd = &cobra.Command{
 		w.Flush()
 
 		// Current Agent section
-		printSection("Current Agent")
-		agentName := service.GetCurrentAgentName()
-		// Verify agent exists
-		agentConfig, err := service.GetAgent(agentName)
-		if err != nil {
-			fmt.Println("No current agent configured yet.")
-		} else {
-			printAgentConfigDetails(agentConfig, "")
-		}
-		w.Flush()
-
-		// All Agents section
-		printSection("All Agents")
-		// List all agents
-		agents, err := service.GetAllAgents()
-		if err != nil {
-			fmt.Println("No agents configured yet.")
-		} else {
-			// Display agents in a clean, simple list
-			// Get agent names and sort them
-			names := make([]string, 0, len(agents))
-			for name := range agents {
-				names = append(names, name)
-			}
-			sort.Strings(names)
-			for _, name := range names {
-				fmt.Printf("%s\n", name)
-			}
-		}
+		printSection("Agents")
+		agentCmd.Run(agentCmd, []string{})
 		w.Flush()
 
 		fmt.Println(color.New(color.FgCyan, color.Bold).Sprint(strings.Repeat("=", 50)))

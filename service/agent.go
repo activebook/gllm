@@ -80,13 +80,30 @@ func constructSearchEngine(searchEngine *map[string]any) *SearchEngine {
 		} else {
 			se.CxKey = ""
 		}
+		// Handle DeepDive (int)
 		if deepDive, ok := (*searchEngine)["deep_dive"]; ok {
-			se.DeepDive = deepDive.(bool)
+			switch v := deepDive.(type) {
+			case int:
+				se.DeepDive = v
+			case float64:
+				se.DeepDive = int(v)
+			case int64:
+				se.DeepDive = int(v)
+			}
 		} else {
-			se.DeepDive = false
+			se.DeepDive = 0 // Default
 		}
+
+		// Handle MaxReferences (int)
 		if references, ok := (*searchEngine)["references"]; ok {
-			se.MaxReferences = references.(int)
+			switch v := references.(type) {
+			case int:
+				se.MaxReferences = v
+			case float64:
+				se.MaxReferences = int(v)
+			case int64:
+				se.MaxReferences = int(v)
+			}
 		} else {
 			se.MaxReferences = 10
 		}

@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 
+	"strconv"
+
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -123,6 +125,16 @@ var searchSetCmd = &cobra.Command{
 		case service.GoogleSearchEngine:
 			key := viper.GetString("search_engines.google.key")
 			cx := viper.GetString("search_engines.google.cx")
+			dd := viper.GetInt("search_engines.google.deep_dive")
+			mr := viper.GetInt("search_engines.google.references")
+			if dd == 0 {
+				dd = 3 // default
+			}
+			if mr == 0 {
+				mr = 5 // default
+			}
+			ddStr := fmt.Sprintf("%d", dd)
+			mrStr := fmt.Sprintf("%d", mr)
 
 			err := huh.NewForm(
 				huh.NewGroup(
@@ -138,6 +150,16 @@ var searchSetCmd = &cobra.Command{
 						Title("Search Engine ID (CX)").
 						Description("CX ID from Programmable Search Engine").
 						Value(&cx),
+					huh.NewInput().
+						Title("Deep Dive limit").
+						Description("Number of links to fetch content from (default: 3)").
+						Value(&ddStr).
+						Validate(validateInt),
+					huh.NewInput().
+						Title("Max References").
+						Description("Number of references to display (default: 5)").
+						Value(&mrStr).
+						Validate(validateInt),
 				),
 			).Run()
 			if err != nil {
@@ -146,9 +168,21 @@ var searchSetCmd = &cobra.Command{
 
 			viper.Set("search_engines.google.key", key)
 			viper.Set("search_engines.google.cx", cx)
+			viper.Set("search_engines.google.deep_dive", toInt(ddStr))
+			viper.Set("search_engines.google.references", toInt(mrStr))
 
 		case service.BingSearchEngine:
 			key := viper.GetString("search_engines.bing.key")
+			dd := viper.GetInt("search_engines.bing.deep_dive")
+			mr := viper.GetInt("search_engines.bing.references")
+			if dd == 0 {
+				dd = 3
+			}
+			if mr == 0 {
+				mr = 5
+			}
+			ddStr := fmt.Sprintf("%d", dd)
+			mrStr := fmt.Sprintf("%d", mr)
 
 			err := huh.NewForm(
 				huh.NewGroup(
@@ -160,6 +194,16 @@ var searchSetCmd = &cobra.Command{
 						Description("API Key for Bing Search (via SerpAPI)").
 						Value(&key).
 						EchoMode(huh.EchoModePassword),
+					huh.NewInput().
+						Title("Deep Dive limit").
+						Description("Number of links to fetch content from (default: 3)").
+						Value(&ddStr).
+						Validate(validateInt),
+					huh.NewInput().
+						Title("Max References").
+						Description("Number of references to display (default: 5)").
+						Value(&mrStr).
+						Validate(validateInt),
 				),
 			).Run()
 			if err != nil {
@@ -167,9 +211,21 @@ var searchSetCmd = &cobra.Command{
 			}
 
 			viper.Set("search_engines.bing.key", key)
+			viper.Set("search_engines.bing.deep_dive", toInt(ddStr))
+			viper.Set("search_engines.bing.references", toInt(mrStr))
 
 		case service.TavilySearchEngine:
 			key := viper.GetString("search_engines.tavily.key")
+			dd := viper.GetInt("search_engines.tavily.deep_dive")
+			mr := viper.GetInt("search_engines.tavily.references")
+			if dd == 0 {
+				dd = 3
+			}
+			if mr == 0 {
+				mr = 5
+			}
+			ddStr := fmt.Sprintf("%d", dd)
+			mrStr := fmt.Sprintf("%d", mr)
 
 			err := huh.NewForm(
 				huh.NewGroup(
@@ -181,6 +237,16 @@ var searchSetCmd = &cobra.Command{
 						Description("API Key from Tavily").
 						Value(&key).
 						EchoMode(huh.EchoModePassword),
+					huh.NewInput().
+						Title("Deep Dive limit").
+						Description("Number of links to fetch content from (default: 3)").
+						Value(&ddStr).
+						Validate(validateInt),
+					huh.NewInput().
+						Title("Max References").
+						Description("Number of references to display (default: 5)").
+						Value(&mrStr).
+						Validate(validateInt),
 				),
 			).Run()
 			if err != nil {
@@ -188,6 +254,8 @@ var searchSetCmd = &cobra.Command{
 			}
 
 			viper.Set("search_engines.tavily.key", key)
+			viper.Set("search_engines.tavily.deep_dive", toInt(ddStr))
+			viper.Set("search_engines.tavily.references", toInt(mrStr))
 
 		default:
 			return fmt.Errorf("unknown search engine: %s", engine)
@@ -219,6 +287,8 @@ var searchListCmd = &cobra.Command{
 			fmt.Println("Google Custom Search:")
 			fmt.Printf("  API Key: %s\n", maskAPIKey(googleKey))
 			fmt.Printf("  CX: %s\n", maskAPIKey(googleCx))
+			fmt.Println("  DeepDive limit: ", viper.GetInt("search_engines.google.deep_dive"))
+			fmt.Println("  Max References: ", viper.GetInt("search_engines.google.references"))
 			fmt.Println("  Quota: 100 searches per day (free tier)")
 		}
 
@@ -227,6 +297,8 @@ var searchListCmd = &cobra.Command{
 		if tavilyKey != "" {
 			fmt.Println("Tavily Search:")
 			fmt.Printf("  API Key: %s\n", maskAPIKey(tavilyKey))
+			fmt.Println("  DeepDive limit: ", viper.GetInt("search_engines.tavily.deep_dive"))
+			fmt.Println("  Max References: ", viper.GetInt("search_engines.tavily.references"))
 			fmt.Println("  Quota: 1000 searches per month (free tier)")
 		}
 
@@ -235,6 +307,8 @@ var searchListCmd = &cobra.Command{
 		if bingKey != "" {
 			fmt.Println("Bing Search:")
 			fmt.Printf("  API Key: %s\n", maskAPIKey(bingKey))
+			fmt.Println("  DeepDive limit: ", viper.GetInt("search_engines.bing.deep_dive"))
+			fmt.Println("  Max References: ", viper.GetInt("search_engines.bing.references"))
 			fmt.Println("  Quota: 100 searches per month (free tier) - SerpAPI")
 		}
 
@@ -355,8 +429,20 @@ func GetSearchEngineInfo(name string) map[string]any {
 		resultMap["name"] = name
 		return resultMap
 	}
-
 	return nil
+}
+
+func validateInt(s string) error {
+	_, err := strconv.Atoi(s)
+	if err != nil {
+		return fmt.Errorf("must be a valid number")
+	}
+	return nil
+}
+
+func toInt(s string) int {
+	v, _ := strconv.Atoi(s)
+	return v
 }
 
 func GetEffectiveSearchEngine() (name string, info map[string]any) {

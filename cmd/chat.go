@@ -156,8 +156,6 @@ func init() {
 	chatCmd.Flags().BoolVarP(&thinkFlag, "think", "T", false, "Enable or disable deep think mode for the chat session")
 	chatCmd.Flags().BoolVarP(&mcpFlag, "mcp", "", false, "Enable or disable MCP servers for the chat session")
 	chatCmd.Flags().Lookup("search").NoOptDefVal = service.GetDefaultSearchEngineName()
-	chatCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
-	chatCmd.Flags().BoolVar(&deepDiveFlag, "deep-dive", false, "Enable deep dive search to fetch all links from search results")
 	chatCmd.Flags().BoolVarP(&confirmToolsFlag, "confirm-tools", "", false, "Skip confirmation for tool operations")
 }
 
@@ -486,10 +484,6 @@ func (ci *ChatInfo) callAgent(input string) {
 	var searchEngine map[string]any
 	if searchFlag || toolsFlag {
 		_, searchEngine = GetEffectiveSearchEngine()
-		if searchEngine != nil {
-			searchEngine["deep_dive"] = deepDiveFlag   // Add deep dive flag to search engine settings
-			searchEngine["references"] = referenceFlag // Add references flag to search engine settings
-		}
 	}
 
 	// check if think flag is set
