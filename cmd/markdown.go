@@ -28,8 +28,9 @@ func init() {
 }
 
 var markdownCmd = &cobra.Command{
-	Use:   "markdown",
-	Short: "Whether to include Markdown formatting in the output",
+	Use:     "markdown",
+	Aliases: []string{"md"}, // Optional alias
+	Short:   "Whether to include Markdown formatting in the output",
 	Long: `When Markdown is switched on, the output will include a Markdown-formatted version.
 When Markdown is switched off, the output will not include any Markdown formatting.`,
 	Run: func(cmd *cobra.Command, args []string) {

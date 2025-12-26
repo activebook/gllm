@@ -65,8 +65,9 @@ var agentListCmd = &cobra.Command{
 }
 
 var agentCmd = &cobra.Command{
-	Use:   "agent",
-	Short: "Manage agent configurations",
+	Use:     "agent",
+	Aliases: []string{"ag"}, // Optional alias
+	Short:   "Manage agent configurations",
 	Long: `Manage agent configurations that allow you to quickly switch between
 different AI assistant setups with different models, tools, and settings.`,
 	Run: func(cmd *cobra.Command, args []string) {

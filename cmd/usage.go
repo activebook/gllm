@@ -14,8 +14,9 @@ func init() {
 }
 
 var usageCmd = &cobra.Command{
-	Use:   "usage",
-	Short: "Whether to include token usage metainfo in the output",
+	Use:     "usage",
+	Aliases: []string{"ua"}, // Optional alias
+	Short:   "Whether to include token usage metainfo in the output",
 	Long: `When Usage is switched on, the output will include token usage metainfo.
 When Usage is switched off, the output will not include any token usage metainfo.`,
 	Run: func(cmd *cobra.Command, args []string) {
