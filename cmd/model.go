@@ -72,7 +72,7 @@ var modelCmd = &cobra.Command{
 	Long:    `The 'gllm model' command allows you to manage your configured large language models(llms).`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Simply delegate to the list command for consistency
-		modelListCmd.Run(cmd, args)
+		modelListCmd.Run(modelListCmd, args)
 	},
 }
 

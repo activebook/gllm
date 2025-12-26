@@ -82,7 +82,7 @@ different AI assistant setups with different models, tools, and settings.`,
 		}
 
 		// Then show the list of available agents
-		agentListCmd.Run(cmd, args)
+		agentListCmd.Run(agentListCmd, args)
 	},
 }
 

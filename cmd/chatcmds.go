@@ -14,8 +14,41 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// contains checks if a slice contains a string
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
 // runCommand executes a command with arguments
 func runCommand(cmd *cobra.Command, args []string) {
+	if len(args) == 0 {
+		// No arguments, call the command directly
+		if cmd.RunE != nil {
+			if err := cmd.RunE(cmd, args); err != nil {
+				service.Errorf("%v\n", err)
+			}
+		} else if cmd.Run != nil {
+			cmd.Run(cmd, args)
+		}
+		return
+	}
+
+	// Find subcommand
+	subName := args[0]
+	for _, sub := range cmd.Commands() {
+		if sub.Name() == subName || (len(sub.Aliases) > 0 && contains(sub.Aliases, subName)) {
+			// Recurse with the subcommand and remaining args
+			runCommand(sub, args[1:])
+			return
+		}
+	}
+
+	// No subcommand found, call on current cmd with all args
 	if cmd.RunE != nil {
 		if err := cmd.RunE(cmd, args); err != nil {
 			service.Errorf("%v\n", err)
