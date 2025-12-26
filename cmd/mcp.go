@@ -68,7 +68,7 @@ var mcpListCmd = &cobra.Command{
 		}
 
 		fmt.Println("Available MCP Servers:")
-		fmt.Println("====================")
+		fmt.Println()
 
 		for _, server := range servers {
 			status := switchOffColor + "Blocked" + resetColor

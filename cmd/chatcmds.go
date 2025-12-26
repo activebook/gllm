@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"text/tabwriter"
 
 	"github.com/activebook/gllm/service"
@@ -194,36 +195,15 @@ func (ci *ChatInfo) showInfo() {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
 	sectionColor := color.New(color.FgCyan, color.Bold).SprintFunc()
-	headerColor := color.New(color.FgYellow, color.Bold).SprintFunc()
-	highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
 	keyColor := color.New(color.FgMagenta, color.Bold).SprintFunc()
 
 	printSection := func(title string) {
 		fmt.Println()
 		fullTitle := fmt.Sprintf("=== %s ===", strings.ToUpper(title))
-		lineWidth := 50
-		padding := (lineWidth - len(fullTitle)) / 2
-		if padding < 0 {
-			padding = 0
-		}
-		fmt.Printf("%s%s\n", strings.Repeat(" ", padding), sectionColor(fullTitle))
-		fmt.Println(color.New(color.FgCyan).Sprint(strings.Repeat("-", lineWidth)))
+		fmt.Printf("%s\n", sectionColor(fullTitle))
 	}
 
 	printSection("CURRENT SETTINGS")
-
-	// Basic settings
-	fmt.Fprintln(w, headerColor(" SETTING ")+"\t"+headerColor(" VALUE "))
-	fmt.Fprintln(w, headerColor("---------")+"\t"+headerColor("-------"))
-	fmt.Fprintf(w, "%s\t%s\n", keyColor("Model"), highlightColor(ci.Model))
-	fmt.Fprintf(w, "%s\t%s\n", keyColor("Search Engine"), highlightColor(GetEffectSearchEngineName()))
-	fmt.Fprintf(w, "%s\t%t\n", keyColor("Deep Think"), IsThinkEnabled())
-	fmt.Fprintf(w, "%s\t%t\n", keyColor("Embedding Tools"), AreToolsEnabled())
-	fmt.Fprintf(w, "%s\t%t\n", keyColor("MCP Servers"), AreMCPServersEnabled())
-	fmt.Fprintf(w, "%s\t%t\n", keyColor("Markdown"), IncludeMarkdown())
-	fmt.Fprintf(w, "%s\t%t\n", keyColor("Usage Metainfo"), IncludeUsageMetainfo())
-	fmt.Fprintf(w, "%s\t%s\n", keyColor("Output File"), ci.outputFile)
-	w.Flush()
 
 	// System prompt
 	printSection("SYSTEM PROMPT")
@@ -232,6 +212,26 @@ func (ci *ChatInfo) showInfo() {
 	// Template
 	printSection("TEMPLATE")
 	fmt.Printf("%s\n", GetEffectiveTemplate())
+
+	// Memory section
+	printSection("Memory")
+	memoryListCmd.Run(memoryListCmd, []string{})
+	w.Flush()
+
+	// Search Engines section
+	printSection("Search Engines")
+	searchListCmd.Run(searchListCmd, []string{})
+	w.Flush()
+
+	// Plugins section
+	printSection("Tools")
+	ListAllTools()
+	w.Flush()
+
+	// Current Agent section
+	printSection("Agents")
+	agentCmd.Run(agentCmd, []string{})
+	w.Flush()
 
 	// Attachments
 	printSection("ATTACHMENTS")
@@ -341,4 +341,137 @@ func (ci *ChatInfo) handleEditorCommand() {
 
 	// Set editor input
 	ci.EditorInput = content
+}
+
+func (ci *ChatInfo) addAttachFiles(input string) {
+	// Normalize input by replacing /attach with /a
+	input = strings.ReplaceAll(input, "/attach ", "/a ")
+
+	// Split input into tokens
+	tokens := strings.Fields(input)
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	for i := 0; i < len(tokens); i++ {
+		if tokens[i] == "/a" {
+			if i+1 < len(tokens) {
+				// Check if there's a file path after /a
+				filePath := tokens[i+1]
+				i++ // Skip the file path token
+
+				wg.Add(1)
+				go func(filePath string) {
+					defer wg.Done()
+
+					// Verify file exists and is not a directory
+					if !checkIsLink(filePath) {
+						fileInfo, err := os.Stat(filePath)
+						if err != nil {
+							if os.IsNotExist(err) {
+								service.Errorf("File not found: %s\n", filePath)
+							} else {
+								service.Errorf("Error accessing file %s: %v\n", filePath, err)
+							}
+							return
+						}
+						if fileInfo.IsDir() {
+							service.Errorf("Cannot attach directory: %s\n", filePath)
+							return
+						}
+					}
+					// Check if file is already attached
+					mu.Lock()
+					found := false
+					for _, file := range ci.Files {
+						if file.Path() == filePath {
+							found = true
+							break
+						}
+					}
+					mu.Unlock()
+					// If file is already attached, skip processing
+					if found {
+						service.Warnf("File already attached: %s", filePath)
+						return
+					}
+
+					// Process the attachment
+					file := processAttachment(filePath)
+					if file == nil {
+						service.Errorf("Error loading attachment: %s\n", filePath)
+						return
+					}
+
+					// Append the file to the list of attachments
+					mu.Lock()
+					ci.Files = append(ci.Files, file)
+					mu.Unlock()
+					fmt.Printf("Attachment loaded: %s\n", filePath)
+				}(filePath)
+			} else {
+				fmt.Println("Please specify a file path after /a")
+			}
+		}
+		// Ignore other tokens
+	}
+	wg.Wait()
+
+	if len(ci.Files) == 0 {
+		fmt.Println("No attachments were loaded")
+	}
+}
+
+func (ci *ChatInfo) detachFiles(input string) {
+	// Normalize input by replacing /detach with /d
+	input = strings.ReplaceAll(input, "/detach ", "/d ")
+
+	// Handle "all" case
+	if strings.Contains(input, "/d all") || strings.Contains(input, "/detach all") {
+		if len(ci.Files) == 0 {
+			fmt.Println("No attachments to detach")
+			return
+		}
+		ci.Files = []*service.FileData{}
+		fmt.Println("Detached all attachments")
+		return
+	}
+
+	// Split input into tokens
+	tokens := strings.Fields(input)
+
+	// Process detach commands
+	detachedAny := false
+	for i := 0; i < len(tokens); i++ {
+		if tokens[i] == "/d" {
+			// Check if there's a file path after /d
+			if i+1 >= len(tokens) {
+				fmt.Println("Please specify a file path after /d")
+				continue
+			}
+
+			// Get the file path (next token)
+			filePath := tokens[i+1]
+			i++ // Skip the file path token
+
+			// Find and detach the file
+			found := false
+			for j, file := range ci.Files {
+				if file.Path() == filePath {
+					ci.Files = append(ci.Files[:j], ci.Files[j+1:]...)
+					fmt.Printf("Detached: %s\n", filePath)
+					detachedAny = true
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				fmt.Printf("Attachment not found: %s\n", filePath)
+			}
+		}
+	}
+
+	if !detachedAny {
+		fmt.Println("No valid detachment")
+	}
 }
