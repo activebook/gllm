@@ -322,7 +322,6 @@ var searchListCmd = &cobra.Command{
 		// Update the list command to show default status
 		// In the listCmd.Run function, add:
 		defaultEngine := GetAgentString("search")
-		fmt.Println()
 		if defaultEngine != "" {
 			fmt.Printf("Current search engine set to %s\n", switchOnColor+defaultEngine+resetColor)
 		} else {

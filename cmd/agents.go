@@ -8,6 +8,7 @@ import (
 
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -32,7 +33,6 @@ var agentListCmd = &cobra.Command{
 		}
 
 		fmt.Println("Available agents:")
-		fmt.Println("=================")
 
 		// Get agent names and sort them
 		names := make([]string, 0, len(agents))
@@ -43,13 +43,23 @@ var agentListCmd = &cobra.Command{
 
 		activeAgent := service.GetCurrentAgentName()
 
+		highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
 		// Display agents in a clean, simple list
 		for _, name := range names {
+			// change color for selected agent
 			prefix := "  "
 			if name == activeAgent {
-				prefix = "* "
+				prefix = highlightColor("* ")
+				name = highlightColor(name)
 			}
 			fmt.Printf("%s%s\n", prefix, name)
+		}
+
+		if activeAgent != "" {
+			fmt.Println("\n(*) Indicates the current agent.")
+		} else {
+			fmt.Println("\nNo agent selected. Use 'gllm agent switch <name>' to select one.")
+			fmt.Println("The first available agent will be used if needed.")
 		}
 	},
 }
@@ -64,7 +74,6 @@ different AI assistant setups with different models, tools, and settings.`,
 		currentConfig := service.GetCurrentAgentConfig()
 		if len(currentConfig) > 0 {
 			fmt.Println("Current agent configuration:")
-			fmt.Println("============================")
 			printAgentConfigDetails(currentConfig, "  ")
 			fmt.Println()
 		} else {

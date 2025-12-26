@@ -216,13 +216,7 @@ var configPrintCmd = &cobra.Command{
 		printSection := func(title string) {
 			fmt.Println()
 			fullTitle := fmt.Sprintf("=== %s ===", strings.ToUpper(title))
-			lineWidth := 50
-			padding := (lineWidth - len(fullTitle)) / 2
-			if padding < 0 {
-				padding = 0
-			}
-			fmt.Printf("%s%s\n", strings.Repeat(" ", padding), sectionColor(fullTitle))
-			fmt.Println(color.New(color.FgCyan).Sprint(strings.Repeat("-", lineWidth)))
+			fmt.Printf("%s\n", sectionColor(fullTitle))
 		}
 
 		printSection("CONFIGURATION SUMMARY")
@@ -242,6 +236,11 @@ var configPrintCmd = &cobra.Command{
 		templateListCmd.Run(templateListCmd, []string{})
 		w.Flush()
 
+		// Memory section
+		printSection("Memory")
+		memoryListCmd.Run(memoryListCmd, []string{})
+		w.Flush()
+
 		// Search Engines section
 		printSection("Search Engines")
 		searchListCmd.Run(searchListCmd, []string{})
@@ -256,8 +255,6 @@ var configPrintCmd = &cobra.Command{
 		printSection("Agents")
 		agentCmd.Run(agentCmd, []string{})
 		w.Flush()
-
-		fmt.Println(color.New(color.FgCyan, color.Bold).Sprint(strings.Repeat("=", 50)))
 	},
 }
 

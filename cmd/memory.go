@@ -35,7 +35,7 @@ or use 'memory path' to see where the memory file is located.`,
 		}
 
 		fmt.Println(cmd.Long)
-		fmt.Println(strings.Repeat("-", 50))
+		fmt.Println()
 		fmt.Printf("Saved memories: %s\n", memoryHeaderColor(fmt.Sprintf("%d", len(memories))))
 
 		if len(memories) > 0 {
@@ -77,7 +77,7 @@ Example:
 		verbose, _ := cmd.Flags().GetBool("verbose")
 
 		fmt.Printf("%s (%d items):\n", memoryHeaderColor("Saved Memories"), len(memories))
-		fmt.Println(strings.Repeat("-", 40))
+		fmt.Println()
 
 		for i, memory := range memories {
 			if verbose {
