@@ -5,7 +5,6 @@ import (
 
 	"github.com/activebook/gllm/service"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 const (
@@ -37,7 +36,7 @@ When Markdown is switched off, the output will not include any Markdown formatti
 		fmt.Println(cmd.Long)
 		fmt.Println("-------------------------------------------")
 		fmt.Print("Markdown output is currently switched: ")
-		mark := viper.GetBool("agent.markdown")
+		mark := GetAgentBool("markdown")
 		if mark {
 			fmt.Println(switchOnColor + "on" + resetColor)
 		} else {
@@ -50,10 +49,7 @@ var markdownOnCmd = &cobra.Command{
 	Use:   "on",
 	Short: "Switch markdown output on",
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("agent.markdown", true)
-
-		// Write the config file
-		if err := writeConfig(); err != nil {
+		if err := SetAgentValue("markdown", true); err != nil {
 			service.Errorf("failed to save markdown format output: %w", err)
 			return
 		}
@@ -66,10 +62,7 @@ var markdownOffCmd = &cobra.Command{
 	Use:   "off",
 	Short: "Switch markdown output off",
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("agent.markdown", false)
-
-		// Write the config file
-		if err := writeConfig(); err != nil {
+		if err := SetAgentValue("markdown", false); err != nil {
 			service.Errorf("failed to save markdown format output: %w", err)
 			return
 		}
@@ -90,6 +83,6 @@ func SwitchMarkdown(s string) {
 }
 
 func IncludeMarkdown() bool {
-	mark := viper.GetBool("agent.markdown")
+	mark := GetAgentBool("markdown")
 	return mark
 }

@@ -5,7 +5,6 @@ import (
 
 	"github.com/activebook/gllm/service"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var toolsCmd = &cobra.Command{
@@ -24,8 +23,7 @@ var toolsOnCmd = &cobra.Command{
 	Use:   "on",
 	Short: "Enable all embedding tools",
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("agent.tools", true)
-		err := writeConfig()
+		err := SetAgentValue("tools", true)
 		if err != nil {
 			fmt.Printf("Error writing config: %v\n", err)
 			return
@@ -39,8 +37,7 @@ var toolsOffCmd = &cobra.Command{
 	Use:   "off",
 	Short: "Disable all embedding tools",
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("agent.tools", false)
-		err := writeConfig()
+		err := SetAgentValue("tools", false)
 		if err != nil {
 			fmt.Printf("Error writing config: %v\n", err)
 			return
@@ -57,7 +54,7 @@ func init() {
 }
 
 func AreToolsEnabled() bool {
-	enabled := viper.GetBool("agent.tools")
+	enabled := GetAgentBool("tools")
 	return enabled
 }
 

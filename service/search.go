@@ -50,6 +50,7 @@ const (
 	BingSearchEngine   = "bing"
 	TavilySearchEngine = "tavily"
 	DummySearchEngine  = "dummy"
+	NoneSearchEngine   = ""
 )
 
 type SearchEngine struct {

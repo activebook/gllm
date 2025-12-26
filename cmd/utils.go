@@ -208,3 +208,64 @@ func convertUserInputToBool(input string) (bool, error) {
 // Define the hardcoded default system prompt
 const defaultSystemPromptContent = "You are a helpful assistant."
 const defaultTemplateContent = ""
+
+// GetAgentString retrieves a string value from the current agent configuration
+func GetAgentString(key string) string {
+	config := service.GetCurrentAgentConfig()
+	if v, ok := config[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+// GetAgentBool retrieves a boolean value from the current agent configuration
+func GetAgentBool(key string) bool {
+	config := service.GetCurrentAgentConfig()
+	if v, ok := config[key]; ok {
+		if b, ok := v.(bool); ok {
+			return b
+		}
+	}
+	return false
+}
+
+// GetAgentInt retrieves an integer value from the current agent configuration
+func GetAgentInt(key string) int {
+	config := service.GetCurrentAgentConfig()
+	if v, ok := config[key]; ok {
+		// Handle various number types that might be coming from Viper/JSON
+		switch val := v.(type) {
+		case int:
+			return val
+		case float64:
+			return int(val)
+		case int64:
+			return int(val)
+		}
+	}
+	return 0
+}
+
+// SetAgentValue updates a specific key in the current agent's configuration
+func SetAgentValue(key string, value interface{}) error {
+	name := service.GetCurrentAgentName()
+	if name == "unknown" {
+		return fmt.Errorf("no active agent found")
+	}
+
+	config, err := service.GetAgent(name)
+	if err != nil {
+		return fmt.Errorf("failed to get agent '%s': %w", name, err)
+	}
+
+	config[key] = value
+
+	// fmt.Printf("DEBUG: Setting agent value key=%s, value=%v\n", key, value)
+	if err := service.SetAgent(name, config); err != nil {
+		return fmt.Errorf("failed to save agent '%s': %w", name, err)
+	}
+
+	return nil
+}

@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/activebook/gllm/service"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -46,7 +47,12 @@ func SetEffectiveTemplate(tmpl string) error {
 
 // New helper function to get the effective template prompt based on config
 func GetEffectiveTemplate() string {
-	return plainTemplate
+	if plainTemplate != "" {
+		return plainTemplate
+	}
+	// Get from active agent and resolve reference
+	rawTmpl := GetAgentString("template")
+	return service.ResolveTemplateReference(rawTmpl)
 }
 
 // templateCmd represents the base command when called without any subcommands

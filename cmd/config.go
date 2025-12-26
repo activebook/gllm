@@ -377,19 +377,24 @@ If a value is provided, it sets the new maximum recursions value.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
 			// No argument provided - show current value
-			maxRecursions := viper.GetInt("agent.max_recursions")
+			maxRecursions := GetAgentInt("max_recursions")
 			if maxRecursions <= 0 {
 				maxRecursions = 5 // Default value
 			}
-			// Set the new value in viper
-			viper.Set("agent.max_recursions", maxRecursions)
+			// Update the active agent is complicated without a helper.
+			// Just display for now.
 
-			// Save the configuration to file
-			err := viper.WriteConfig()
-			if err != nil {
-				service.Errorf("Error saving config: %s\n", err)
-				return
-			}
+			/*
+				// Set the new value in viper (Legacy)
+				viper.Set("agent.max_recursions", maxRecursions)
+
+				// Save the configuration to file
+				err := viper.WriteConfig()
+				if err != nil {
+					service.Errorf("Error saving config: %s\n", err)
+					return
+				}
+			*/
 			fmt.Printf("Current maximum recursions: %d\n", maxRecursions)
 		} else {
 			// Argument provided - parse and set new value
@@ -406,12 +411,21 @@ If a value is provided, it sets the new maximum recursions value.`,
 				return
 			}
 
-			// Set the new value in viper
-			viper.Set("agent.max_recursions", maxRecursions)
+			// Update active agent
+			name := service.GetCurrentAgentName()
+			if name == "unknown" {
+				service.Errorf("No active agent to update.\n")
+				return
+			}
 
-			// Save the configuration to file
-			err = viper.WriteConfig()
+			config, err := service.GetAgent(name)
 			if err != nil {
+				service.Errorf("Error getting agent: %v\n", err)
+				return
+			}
+
+			config["max_recursions"] = maxRecursions
+			if err := service.SetAgent(name, config); err != nil {
 				service.Errorf("Error saving config: %s\n", err)
 				return
 			}
@@ -435,6 +449,18 @@ var configSetCmd = &cobra.Command{
 		key := args[0]
 		value := args[1]
 
+		name := service.GetCurrentAgentName()
+		if name == "unknown" {
+			service.Errorf("No active agent to update.\n")
+			return
+		}
+
+		config, err := service.GetAgent(name)
+		if err != nil {
+			service.Errorf("Error getting agent: %v\n", err)
+			return
+		}
+
 		switch key {
 		case "max_recursions":
 			// Parse the value as an integer
@@ -447,14 +473,15 @@ var configSetCmd = &cobra.Command{
 				service.Errorf("Invalid value for max_recursions: %d (must be positive)\n", num)
 				return
 			}
-			viper.Set("agent.max_recursions", num)
+			config["max_recursions"] = num
+			// viper.Set("agent.max_recursions", num)
 		default:
 			service.Errorf("Unknown configuration key: %s\n", key)
 			return
 		}
 
-		// Write the config file
-		if err := writeConfig(); err != nil {
+		// Update Agent
+		if err := service.SetAgent(name, config); err != nil {
 			service.Errorf("Error saving configuration: %s\n", err)
 			return
 		}
@@ -464,7 +491,7 @@ var configSetCmd = &cobra.Command{
 }
 
 func GetMaxRecursions() int {
-	maxRecursions := viper.GetInt("agent.max_recursions")
+	maxRecursions := GetAgentInt("max_recursions")
 	if maxRecursions <= 0 {
 		maxRecursions = 5 // Default value
 	}

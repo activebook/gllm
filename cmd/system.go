@@ -276,7 +276,9 @@ func GetEffectiveSystemPrompt() string {
 	if plainSystemPrompt != "" {
 		sysPrompt = plainSystemPrompt
 	} else {
-		sysPrompt = viper.GetString("agent.system_prompt")
+		// Get from active agent and resolve reference
+		rawSys := GetAgentString("system_prompt")
+		sysPrompt = service.ResolveSystemPromptReference(rawSys)
 	}
 
 	// Get memory content and append if not empty

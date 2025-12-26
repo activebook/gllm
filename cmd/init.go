@@ -31,6 +31,7 @@ func init() {
 // Exported so it can be called from root.go
 func RunInitWizard() error {
 	var (
+		agentName        string
 		provider         string
 		endpoint         string
 		apiKey           string
@@ -45,6 +46,18 @@ func RunInitWizard() error {
 			huh.NewNote().
 				Title("Welcome to gllm! Your agent for various LLMs.").
 				Description("Let's get you set up with your AI companion."),
+
+			huh.NewInput().
+				Title("Agent Name").
+				Description("From now on, you can have multiple agents. Give this one a name.").
+				Value(&agentName).
+				Placeholder("default").
+				Validate(func(s string) error {
+					if strings.TrimSpace(s) == "" {
+						return fmt.Errorf("agent name is required")
+					}
+					return nil
+				}),
 
 			huh.NewSelect[string]().
 				Title("Choose your AI Provider").
@@ -73,6 +86,10 @@ func RunInitWizard() error {
 
 	if err != nil {
 		return err
+	}
+
+	if strings.TrimSpace(agentName) == "" {
+		agentName = "default"
 	}
 
 	// Determine default model based on provider
@@ -232,21 +249,25 @@ func RunInitWizard() error {
 	modelsMap[encodedAlias] = newModel
 
 	viper.Set("models", modelsMap)
-	viper.Set("agent.model", encodedAlias)
 
-	// Save agent features
-	featureMap := map[string]bool{
-		"think":    false,
-		"tools":    false,
-		"usage":    false,
-		"markdown": false,
-	}
+	// Setup agent config
+	agentConfig := make(map[string]interface{})
+	agentConfig["model"] = encodedAlias
+
 	for _, f := range selectedFeatures {
-		featureMap[f] = true
+		agentConfig[f] = true
 	}
-	for k, v := range featureMap {
-		viper.Set("agent."+k, v)
+
+	// Add Agent
+	agentsMap := viper.GetStringMap("agents")
+	if agentsMap == nil {
+		agentsMap = make(map[string]interface{})
 	}
+	agentsMap[agentName] = agentConfig
+	viper.Set("agents", agentsMap)
+
+	// Set Active Agent
+	viper.Set("agent", agentName)
 
 	// Save
 	if err := writeConfig(); err != nil {
