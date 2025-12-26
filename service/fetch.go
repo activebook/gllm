@@ -353,8 +353,11 @@ func FetchProcess(urls []string) []string {
 		Text  string
 	}, len(urls))
 
+	Debugf("Fetching %d URLs...", len(urls))
+
 	for i, url := range urls {
 		wg.Add(1)
+		Debugf("Fetching URL [%s]...", url)
 		go func(idx int, u string) {
 			defer wg.Done()
 			text := fetchWorker(u)

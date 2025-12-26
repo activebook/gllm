@@ -449,9 +449,24 @@ func GetEffectiveSearchEngine() (name string, info map[string]any) {
 	enginesMap := viper.GetStringMap("search_engines")
 	if defaultName != "" && defaultName != service.NoneSearchEngine {
 		if engineConfig, ok := enginesMap[defaultName]; ok {
-			// Convert the map[string]interface{} to map[string]string
-			if configMap, ok := engineConfig.(map[string]interface{}); ok {
-				return defaultName, configMap
+			var configMap map[string]interface{}
+			if cm, ok := engineConfig.(map[string]interface{}); ok {
+				configMap = cm
+			} else if cm, ok := engineConfig.(map[interface{}]interface{}); ok {
+				configMap = make(map[string]interface{})
+				for k, v := range cm {
+					configMap[fmt.Sprint(k)] = v
+				}
+			}
+
+			if configMap != nil {
+				// Create a copy to avoid horizontal effects and add the name
+				resultMap := make(map[string]interface{})
+				for k, v := range configMap {
+					resultMap[k] = v
+				}
+				resultMap["name"] = defaultName
+				return defaultName, resultMap
 			}
 			service.Warnf("Warning: Default Search Engine '%s' has invalid configuration format", defaultName)
 		} else {
@@ -460,7 +475,6 @@ func GetEffectiveSearchEngine() (name string, info map[string]any) {
 	}
 
 	// 3. No search engine available
-	logger.Debugln("No search engine to use!")
 	return "", nil
 }
 

@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -63,23 +64,27 @@ func constructSearchEngine(searchEngine *map[string]any) *SearchEngine {
 	se.UseSearch = false
 	if searchEngine != nil {
 		se.UseSearch = true
-		if name, ok := (*searchEngine)["name"]; ok {
-			se.Name = name.(string)
-		} else {
+
+		// Helper to safely get string values
+		getString := func(m map[string]any, key string) string {
+			if val, ok := m[key]; ok {
+				return fmt.Sprint(val)
+			}
+			return ""
+		}
+
+		se.Name = getString(*searchEngine, "name")
+		if se.Name == "" {
 			se.UseSearch = false
-			se.Name = ""
 		}
-		if keyValue, ok := (*searchEngine)["key"]; ok {
-			se.ApiKey = keyValue.(string)
-		} else {
+
+		se.ApiKey = getString(*searchEngine, "key")
+		if se.ApiKey == "" && se.Name != "none" {
 			se.UseSearch = false
-			se.ApiKey = ""
 		}
-		if cxValue, ok := (*searchEngine)["cx"]; ok {
-			se.CxKey = cxValue.(string)
-		} else {
-			se.CxKey = ""
-		}
+
+		se.CxKey = getString(*searchEngine, "cx")
+
 		// Handle DeepDive (int)
 		if deepDive, ok := (*searchEngine)["deep_dive"]; ok {
 			switch v := deepDive.(type) {
@@ -89,6 +94,10 @@ func constructSearchEngine(searchEngine *map[string]any) *SearchEngine {
 				se.DeepDive = int(v)
 			case int64:
 				se.DeepDive = int(v)
+			case string:
+				if i, err := strconv.Atoi(v); err == nil {
+					se.DeepDive = i
+				}
 			}
 		} else {
 			se.DeepDive = 0 // Default
@@ -103,6 +112,10 @@ func constructSearchEngine(searchEngine *map[string]any) *SearchEngine {
 				se.MaxReferences = int(v)
 			case int64:
 				se.MaxReferences = int(v)
+			case string:
+				if i, err := strconv.Atoi(v); err == nil {
+					se.MaxReferences = i
+				}
 			}
 		} else {
 			se.MaxReferences = 10
@@ -236,6 +249,8 @@ func validateModelConfig(modelInfo *map[string]any) (apiKey, endpoint, modelName
 		// Seed is optional, leave as nil if not provided
 		seed = nil
 	}
+
+	Debugf("Model Config: API Key: %s, Endpoint: %s, Model Name: %s, Temperature: %f, Top P: %f, Seed: %v", apiKey, endpoint, modelName, temperature, topP, seed)
 
 	return apiKey, endpoint, modelName, temperature, topP, seed, nil
 }
