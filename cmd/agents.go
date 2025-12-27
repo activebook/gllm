@@ -905,8 +905,17 @@ func printAgentConfigDetails(agent map[string]interface{}, spaceholder string) {
 	if tools, exists := agent["tools"]; exists {
 		// tools is []interface{}, we need to convert it to []string
 		toolsSlice := ""
-		for _, tool := range tools.([]interface{}) {
-			toolsSlice += fmt.Sprintf("\n%s  - %s", spaceholder, tool.(string))
+		// check tools type whether is []string or []interface{}
+		if toolsSet, ok := tools.([]string); ok {
+			for _, tool := range toolsSet {
+				toolsSlice += fmt.Sprintf("\n%s  - %s", spaceholder, tool)
+			}
+		} else if toolsSet, ok := tools.([]interface{}); ok {
+			for _, tool := range toolsSet {
+				toolsSlice += fmt.Sprintf("\n%s  - %s", spaceholder, tool.(string))
+			}
+		} else {
+			toolsSlice = ""
 		}
 		fmt.Printf("%sTools:%s\n", spaceholder, toolsSlice)
 	} else {

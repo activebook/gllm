@@ -133,9 +133,8 @@ func ListEmbeddingTools() {
 	// Create a set of enabled tools for lookup
 	enabledSet := make(map[string]bool)
 	if enabledTools == nil {
-		// If nil, all tools are enabled by default
 		for _, t := range allTools {
-			enabledSet[t] = true
+			enabledSet[t] = false
 		}
 	} else {
 		for _, t := range enabledTools {
