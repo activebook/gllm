@@ -51,6 +51,16 @@ var toolsSwCmd = &cobra.Command{
 			}
 			options = append(options, opt)
 		}
+		// Sort: selected items first, then alphabetically within each group
+		// This fixes the huh MultiSelect UI issue where scroll starts at last selected item
+		sort.Slice(options, func(i, j int) bool {
+			iSelected := enabledSet[options[i].Value]
+			jSelected := enabledSet[options[j].Value]
+			if iSelected != jSelected {
+				return iSelected // selected items come first
+			}
+			return options[i].Key < options[j].Key
+		})
 
 		var selectedTools []string
 		err := huh.NewForm(

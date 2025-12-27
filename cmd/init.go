@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/activebook/gllm/service"
@@ -28,6 +29,20 @@ func init() {
 	rootCmd.AddCommand(initCmd)
 }
 
+// buildToolsOptions creates sorted huh.Option list for tools with all selected by default
+func buildToolsOptions() []huh.Option[string] {
+	toolsList := service.GetAllEmbeddingTools()
+	var options []huh.Option[string]
+	for _, tool := range toolsList {
+		// All tools selected by default for new agents
+		options = append(options, huh.NewOption(tool, tool).Selected(true))
+	}
+	sort.Slice(options, func(i, j int) bool {
+		return options[i].Key < options[j].Key
+	})
+	return options
+}
+
 // RunInitWizard runs the interactive setup
 // Exported so it can be called from root.go
 func RunInitWizard() error {
@@ -39,6 +54,7 @@ func RunInitWizard() error {
 		model            string
 		confirm          bool
 		selectedFeatures []string
+		selectedTools    []string
 	)
 
 	// Group 1: Provider selection
@@ -191,14 +207,21 @@ func RunInitWizard() error {
 					return nil
 				}),
 		),
-		// Group 3: Features
+		// Group 3: Tools Selection
+		huh.NewGroup(
+			huh.NewMultiSelect[string]().
+				Title("Tools").
+				Description("Select which tools to enable for this agent").
+				Options(buildToolsOptions()...).
+				Value(&selectedTools),
+		),
+		// Group 4: Capabilities
 		huh.NewGroup(
 			huh.NewMultiSelect[string]().
 				Title("Agent Capabilities").
-				Description("Select features to enable").
+				Description("Select additional features to enable").
 				Options(
 					huh.NewOption("Thinking Mode", "think").Selected(true),
-					huh.NewOption("Tools & Search", "tools").Selected(true),
 					huh.NewOption("Token Usage Stats", "usage").Selected(true),
 					huh.NewOption("Markdown Output", "markdown").Selected(true),
 				).
@@ -255,13 +278,12 @@ func RunInitWizard() error {
 	agentConfig := make(map[string]interface{})
 	agentConfig["model"] = encodedAlias
 
+	// Save selected tools as array
+	agentConfig["tools"] = selectedTools
+
+	// Save other capabilities as booleans
 	for _, f := range selectedFeatures {
-		if f == "tools" {
-			// Save tools as array of all embedding tools
-			agentConfig["tools"] = service.GetAllEmbeddingTools()
-		} else {
-			agentConfig[f] = true
-		}
+		agentConfig[f] = true
 	}
 
 	// Add Agent

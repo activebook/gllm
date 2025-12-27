@@ -499,7 +499,14 @@ var agentSetCmd = &cobra.Command{
 			}
 			toolsOptions = append(toolsOptions, opt)
 		}
+		// Sort: selected items first, then alphabetically within each group
+		// This fixes the huh MultiSelect UI issue where scroll starts at last selected item
 		sort.Slice(toolsOptions, func(i, j int) bool {
+			iSelected := toolsSet[toolsOptions[i].Value]
+			jSelected := toolsSet[toolsOptions[j].Value]
+			if iSelected != jSelected {
+				return iSelected // selected items come first
+			}
 			return toolsOptions[i].Key < toolsOptions[j].Key
 		})
 
@@ -592,16 +599,25 @@ var agentSetCmd = &cobra.Command{
 		for _, c := range capabilities {
 			capsSet[c] = true
 		}
+		capsOpts := []huh.Option[string]{
+			huh.NewOption("Enable MCP", "mcp").Selected(capsSet["mcp"]),
+			huh.NewOption("Show Usage", "usage").Selected(capsSet["usage"]),
+			huh.NewOption("Render Markdown", "markdown").Selected(capsSet["markdown"]),
+			huh.NewOption("Think Mode", "think").Selected(capsSet["think"]),
+		}
+		sort.Slice(capsOpts, func(i, j int) bool {
+			iSelected := capsSet[capsOpts[i].Value]
+			jSelected := capsSet[capsOpts[j].Value]
+			if iSelected != jSelected {
+				return iSelected // selected items come first
+			}
+			return capsOpts[i].Key < capsOpts[j].Key
+		})
 		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewMultiSelect[string]().
 					Title("Capabilities").
-					Options(
-						huh.NewOption("Enable MCP", "mcp").Selected(capsSet["mcp"]),
-						huh.NewOption("Show Usage", "usage").Selected(capsSet["usage"]),
-						huh.NewOption("Render Markdown", "markdown").Selected(capsSet["markdown"]),
-						huh.NewOption("Think Mode", "think").Selected(capsSet["think"]),
-					).
+					Options(capsOpts...).
 					Value(&capabilities),
 			),
 		).Run()
