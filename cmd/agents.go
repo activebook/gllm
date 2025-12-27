@@ -417,6 +417,14 @@ var agentSetCmd = &cobra.Command{
 		}
 		if v, ok := existingConfig["tools"].([]string); ok {
 			tools = v
+		} else if v, ok := existingConfig["tools"].([]interface{}); ok {
+			// Handle YAML deserialization which returns []interface{}
+			tools = make([]string, 0, len(v))
+			for _, item := range v {
+				if s, ok := item.(string); ok {
+					tools = append(tools, s)
+				}
+			}
 		}
 		if v, ok := existingConfig["template"].(string); ok {
 			template = v
@@ -477,11 +485,19 @@ var agentSetCmd = &cobra.Command{
 		}
 		sort.Slice(searchOptions, func(i, j int) bool { return searchOptions[i].Key < searchOptions[j].Key })
 
-		// Tools
+		// Tools - build options with pre-selected state
 		toolsList := service.GetAllEmbeddingTools()
+		toolsSet := make(map[string]bool)
+		for _, t := range tools {
+			toolsSet[t] = true
+		}
 		var toolsOptions []huh.Option[string]
 		for _, s := range toolsList {
-			toolsOptions = append(toolsOptions, huh.NewOption(s, s))
+			opt := huh.NewOption(s, s)
+			if toolsSet[s] {
+				opt = opt.Selected(true)
+			}
+			toolsOptions = append(toolsOptions, opt)
 		}
 		sort.Slice(toolsOptions, func(i, j int) bool {
 			return toolsOptions[i].Key < toolsOptions[j].Key
@@ -571,16 +587,20 @@ var agentSetCmd = &cobra.Command{
 			return
 		}
 
-		// Capabilities
+		// Capabilities - build options with pre-selected state
+		capsSet := make(map[string]bool)
+		for _, c := range capabilities {
+			capsSet[c] = true
+		}
 		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewMultiSelect[string]().
 					Title("Capabilities").
 					Options(
-						huh.NewOption("Enable MCP", "mcp"),
-						huh.NewOption("Show Usage", "usage"),
-						huh.NewOption("Render Markdown", "markdown"),
-						huh.NewOption("Think Mode", "think"),
+						huh.NewOption("Enable MCP", "mcp").Selected(capsSet["mcp"]),
+						huh.NewOption("Show Usage", "usage").Selected(capsSet["usage"]),
+						huh.NewOption("Render Markdown", "markdown").Selected(capsSet["markdown"]),
+						huh.NewOption("Think Mode", "think").Selected(capsSet["think"]),
 					).
 					Value(&capabilities),
 			),
@@ -603,18 +623,13 @@ var agentSetCmd = &cobra.Command{
 		fmt.Sscanf(maxRecursions, "%d", &val)
 		agentConfig["max_recursions"] = val
 
-		// Ensure other capability bools are set to false if not in capabilities
-		if _, found := agentConfig["mcp"]; !found {
-			agentConfig["mcp"] = false
-		}
-		if _, found := agentConfig["usage"]; !found {
-			agentConfig["usage"] = false
-		}
-		if _, found := agentConfig["markdown"]; !found {
-			agentConfig["markdown"] = false
-		}
-		if _, found := agentConfig["think"]; !found {
-			agentConfig["think"] = false
+		// Process capabilities from MultiSelect
+		agentConfig["mcp"] = false
+		agentConfig["usage"] = false
+		agentConfig["markdown"] = false
+		agentConfig["think"] = false
+		for _, cap := range capabilities {
+			agentConfig[cap] = true
 		}
 
 		// Keep other existing keys if any (though we reconstructed practically everything)
@@ -872,7 +887,12 @@ func printAgentConfigDetails(agent map[string]interface{}, spaceholder string) {
 	}
 
 	if tools, exists := agent["tools"]; exists {
-		fmt.Printf("%sTools: %v\n", spaceholder, tools)
+		// tools is []interface{}, we need to convert it to []string
+		toolsSlice := ""
+		for _, tool := range tools.([]interface{}) {
+			toolsSlice += fmt.Sprintf("\n%s  - %s", spaceholder, tool.(string))
+		}
+		fmt.Printf("%sTools:%s\n", spaceholder, toolsSlice)
 	} else {
 		fmt.Printf("%sTools: \n", spaceholder)
 	}

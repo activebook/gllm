@@ -5,19 +5,17 @@ import (
 )
 
 func TestGetOpenEmbeddingToolsFiltered(t *testing.T) {
-	allTools := GetAllEmbeddingTools()
-
-	t.Run("empty filter returns all tools", func(t *testing.T) {
+	t.Run("empty filter returns nil (no tools)", func(t *testing.T) {
 		result := GetOpenEmbeddingToolsFiltered(nil)
-		if len(result) != len(allTools) {
-			t.Errorf("Expected %d tools, got %d", len(allTools), len(result))
+		if result != nil {
+			t.Errorf("Expected nil for nil filter, got %d tools", len(result))
 		}
 	})
 
-	t.Run("empty slice returns all tools", func(t *testing.T) {
+	t.Run("empty slice returns nil (no tools)", func(t *testing.T) {
 		result := GetOpenEmbeddingToolsFiltered([]string{})
-		if len(result) != len(allTools) {
-			t.Errorf("Expected %d tools, got %d", len(allTools), len(result))
+		if result != nil {
+			t.Errorf("Expected nil for empty filter, got %d tools", len(result))
 		}
 	})
 
