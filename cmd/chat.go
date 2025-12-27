@@ -2,14 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"runtime"
 	"strings"
-	"sync"
 
 	"github.com/activebook/gllm/service"
-	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -21,29 +18,7 @@ var chatCmd = &cobra.Command{
 	Short: "Start an interactive chat session (REPL)",
 	Long: `Start an interactive chat session with the configured LLM.
 This provides a Read-Eval-Print-Loop (REPL) interface where you can
-have a continuous conversation with the model.
-
-Special commands:
-/exit, /quit - Exit the chat session
-/clear, /reset - Clear context
-/help, /? - Show available commands
-/info, /i - Show current settings
-/history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)
-/markdown, /m [on|off] - Switch whether to render markdown or not
-/system, /S <@name|prompt> - change system prompt
-/tools, /t [on|off|skip|confirm] - Switch whether to use embedding tools, skip tools confirmation
-/template, /p <@name|tmpl> - change template
-/think, /T [on|off] - Switch whether to use deep think mode
-/search, /s <search_engine> [on|off] - select a search engine to use, or switch on/off
-/mcp [on|off|list] - Switch whether to use MCP servers, list available servers
-/memory, /y [list|add|clear] - Manage long-term cross-session memory
-/reference, /r <num> - change link reference count
-/usage, /u [on|off] - Switch whether to show token usage information
-/editor, /e <editor>|list - Open external editor for multi-line input
-/attach, /a <filename> - Attach a file to the chat session
-/detach, /d <filename> - Detach a file to the chat session
-/output, /o <filename> [off] - Save to output file for model responses
-!<command> - Execute a shell command directly`,
+have a continuous conversation with the model.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Create an indeterminate progress bar
 		indicator := service.NewIndicator("Processing...")
@@ -156,8 +131,6 @@ func init() {
 	chatCmd.Flags().BoolVarP(&thinkFlag, "think", "T", false, "Enable or disable deep think mode for the chat session")
 	chatCmd.Flags().BoolVarP(&mcpFlag, "mcp", "", false, "Enable or disable MCP servers for the chat session")
 	chatCmd.Flags().Lookup("search").NoOptDefVal = service.GetDefaultSearchEngineName()
-	chatCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
-	chatCmd.Flags().BoolVar(&deepDiveFlag, "deep-dive", false, "Enable deep dive search to fetch all links from search results")
 	chatCmd.Flags().BoolVarP(&confirmToolsFlag, "confirm-tools", "", false, "Skip confirmation for tool operations")
 }
 
@@ -209,32 +182,50 @@ func buildChatInfo(files []*service.FileData) *ChatInfo {
 }
 
 func (ci *ChatInfo) printWelcome() {
-	fmt.Println("Welcome to GLLM Interactive Chat")
-	fmt.Println("Type '/exit' or '/quit' to end the session, or '/help' for commands")
-	fmt.Println("Use '/' for commands")
-	fmt.Println("Use '!' for exec local commands")
-	fmt.Println("Use Ctrl+C to exit")
-	// fmt.Println()
-	// ci.showHelp()
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("5")). // Purple
+		MarginTop(1).
+		MarginBottom(1).
+		Padding(0, 0)
+
+	contentStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("7")). // White/Light gray
+		Padding(0, 2)
+
+	hintStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("8")). // Dark gray
+		Italic(true)
+
+	borderStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("6")). // Cyan
+		Padding(1)
+
+	welcomeText := "Welcome to GLLM Interactive Chat"
+	instructions := []string{
+		"• Type '/exit' or '/quit' to end the session",
+		"• Type '/help' for a list of available commands",
+		"• Use '/' for commands and '!' for local shell commands",
+		"• Use Ctrl+C to exit at any time",
+	}
+
+	header := headerStyle.Render(welcomeText)
+	content := contentStyle.Render(strings.Join(instructions, "\n"))
+
+	banner := borderStyle.Render(lipgloss.JoinVertical(
+		lipgloss.Center,
+		header,
+		content,
+	))
+
+	fmt.Println(banner)
+	fmt.Println(hintStyle.Padding(0, 2).Render("Type your message below and press Enter to send."))
 	fmt.Println()
 }
 
 func (ci *ChatInfo) awaitChat() (string, error) {
 	var input string
-
-	// 1. Start with the default keymap
-	keyMap := huh.NewDefaultKeyMap()
-
-	// 2. Remap the Text field keys
-	// We swap 'enter' to be the submission key and 'alt+enter' for new lines
-	keyMap.Text.Submit = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "submit"))
-	// The Prev/Next keys are meant to navigate between multiple fields (like going from an Input field to a Text field to a Select field). Since there's only one field, pressing ctrl+[ or ctrl+] has nowhere to go!
-	// keyMap.Text.Prev = key.NewBinding(key.WithKeys("ctrl+["), key.WithHelp("ctrl+[", "prev"))
-	// keyMap.Text.Next = key.NewBinding(key.WithKeys("ctrl+]"), key.WithHelp("ctrl+]", "next"))
-	keyMap.Text.NewLine.SetHelp("ctrl+j", "new line")
-
-	// 3. Disable the Editor (Ctrl+E) keybinding
-	keyMap.Text.Editor = key.NewBinding(key.WithDisabled())
 
 	form := huh.NewForm(
 		huh.NewGroup(
@@ -243,7 +234,7 @@ func (ci *ChatInfo) awaitChat() (string, error) {
 				Value(&input).
 				Placeholder("Type your message..."),
 		),
-	).WithKeyMap(keyMap) // 4. CRITICAL: Apply the keymap to the FORM level
+	).WithKeyMap(GetHuhKeyMap()) // 4. CRITICAL: Apply the keymap to the FORM level
 
 	err := form.Run()
 	if err != nil {
@@ -327,139 +318,6 @@ func (ci *ChatInfo) startWithLocalCommand(line string) bool {
 	return strings.HasPrefix(line, "!")
 }
 
-func (ci *ChatInfo) addAttachFiles(input string) {
-	// Normalize input by replacing /attach with /a
-	input = strings.ReplaceAll(input, "/attach ", "/a ")
-
-	// Split input into tokens
-	tokens := strings.Fields(input)
-
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	for i := 0; i < len(tokens); i++ {
-		if tokens[i] == "/a" {
-			if i+1 < len(tokens) {
-				// Check if there's a file path after /a
-				filePath := tokens[i+1]
-				i++ // Skip the file path token
-
-				wg.Add(1)
-				go func(filePath string) {
-					defer wg.Done()
-
-					// Verify file exists and is not a directory
-					if !checkIsLink(filePath) {
-						fileInfo, err := os.Stat(filePath)
-						if err != nil {
-							if os.IsNotExist(err) {
-								service.Errorf("File not found: %s\n", filePath)
-							} else {
-								service.Errorf("Error accessing file %s: %v\n", filePath, err)
-							}
-							return
-						}
-						if fileInfo.IsDir() {
-							service.Errorf("Cannot attach directory: %s\n", filePath)
-							return
-						}
-					}
-					// Check if file is already attached
-					mu.Lock()
-					found := false
-					for _, file := range ci.Files {
-						if file.Path() == filePath {
-							found = true
-							break
-						}
-					}
-					mu.Unlock()
-					// If file is already attached, skip processing
-					if found {
-						service.Warnf("File already attached: %s", filePath)
-						return
-					}
-
-					// Process the attachment
-					file := processAttachment(filePath)
-					if file == nil {
-						service.Errorf("Error loading attachment: %s\n", filePath)
-						return
-					}
-
-					// Append the file to the list of attachments
-					mu.Lock()
-					ci.Files = append(ci.Files, file)
-					mu.Unlock()
-					fmt.Printf("Attachment loaded: %s\n", filePath)
-				}(filePath)
-			} else {
-				fmt.Println("Please specify a file path after /a")
-			}
-		}
-		// Ignore other tokens
-	}
-	wg.Wait()
-
-	if len(ci.Files) == 0 {
-		fmt.Println("No attachments were loaded")
-	}
-}
-
-func (ci *ChatInfo) detachFiles(input string) {
-	// Normalize input by replacing /detach with /d
-	input = strings.ReplaceAll(input, "/detach ", "/d ")
-
-	// Handle "all" case
-	if strings.Contains(input, "/d all") || strings.Contains(input, "/detach all") {
-		if len(ci.Files) == 0 {
-			fmt.Println("No attachments to detach")
-			return
-		}
-		ci.Files = []*service.FileData{}
-		fmt.Println("Detached all attachments")
-		return
-	}
-
-	// Split input into tokens
-	tokens := strings.Fields(input)
-
-	// Process detach commands
-	detachedAny := false
-	for i := 0; i < len(tokens); i++ {
-		if tokens[i] == "/d" {
-			// Check if there's a file path after /d
-			if i+1 >= len(tokens) {
-				fmt.Println("Please specify a file path after /d")
-				continue
-			}
-
-			// Get the file path (next token)
-			filePath := tokens[i+1]
-			i++ // Skip the file path token
-
-			// Find and detach the file
-			found := false
-			for j, file := range ci.Files {
-				if file.Path() == filePath {
-					ci.Files = append(ci.Files[:j], ci.Files[j+1:]...)
-					fmt.Printf("Detached: %s\n", filePath)
-					detachedAny = true
-					found = true
-					break
-				}
-			}
-
-			if !found {
-				fmt.Printf("Attachment not found: %s\n", filePath)
-			}
-		}
-	}
-
-	if !detachedAny {
-		fmt.Println("No valid detachment")
-	}
-}
-
 func (ci *ChatInfo) callAgent(input string) {
 	var sb strings.Builder
 	appendText(&sb, GetEffectiveTemplate())
@@ -480,16 +338,14 @@ func (ci *ChatInfo) callAgent(input string) {
 
 	// must recheck tools flag, because it can be set /tools
 	toolsFlag = AreToolsEnabled()
+	// regardless of toolsFlag, use the effective tools
+	tools := GetEnabledTools()
 	// If tools are enabled, we will use the search engine
 	searchFlag = IsSearchEnabled()
 	// If search flag is set, we will use the search engine, too
 	var searchEngine map[string]any
-	if searchFlag || toolsFlag {
+	if searchFlag {
 		_, searchEngine = GetEffectiveSearchEngine()
-		if searchEngine != nil {
-			searchEngine["deep_dive"] = deepDiveFlag   // Add deep dive flag to search engine settings
-			searchEngine["references"] = referenceFlag // Add references flag to search engine settings
-		}
 	}
 
 	// check if think flag is set
@@ -510,6 +366,7 @@ func (ci *ChatInfo) callAgent(input string) {
 		MaxRecursions:    ci.maxRecursions,
 		ThinkMode:        thinkFlag,
 		UseTools:         toolsFlag,
+		EnabledTools:     tools,
 		UseMCP:           mcpFlag,
 		SkipToolsConfirm: confirmToolsFlag,
 		AppendUsage:      includeUsage,

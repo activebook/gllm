@@ -26,6 +26,9 @@ func (ag *Agent) getGemini2FilePart(file *FileData) genai.Part {
 	case IsAudioMIMEType(mimeType):
 		// Handle audio files.
 		return genai.Part{InlineData: &genai.Blob{Data: data, MIMEType: mimeType}}
+	case IsVideoMIMEType(mimeType):
+		// Handle video files.
+		return genai.Part{InlineData: &genai.Blob{Data: data, MIMEType: mimeType}}
 	case IsTextMIMEType(mimeType):
 		// Handle plain text files.
 		return genai.Part{Text: string(data)}
@@ -132,7 +135,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	// - If UseCodeTool is true, enable code execution.
 	// - If UseTools is false but MCP client exists, enable MCP-only tools.
 	// Function tools and Google Search cannot be enabled simultaneously.
-	if ag.ToolsUse.Enable {
+	if len(ag.EnabledTools) > 0 {
 		// load embedding tools (include MCP if available)
 		includeMCP := ag.MCPClient != nil
 		config.Tools = append(config.Tools, ag.getGemini2EmbeddingTools(includeMCP))

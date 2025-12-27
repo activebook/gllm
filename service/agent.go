@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -44,6 +45,7 @@ type Agent struct {
 	ProceedChan     <-chan bool         // Sub Channel to receive proceed signal
 	SearchEngine    SearchEngine        // Search engine name
 	ToolsUse        ToolsUse            // Use tools
+	EnabledTools    []string            // List of enabled embedding tools
 	UseCodeTool     bool                // Use code tool
 	ThinkMode       bool                // Think mode
 	MCPClient       *MCPClient          // MCP client for MCP tools
@@ -63,32 +65,61 @@ func constructSearchEngine(searchEngine *map[string]any) *SearchEngine {
 	se.UseSearch = false
 	if searchEngine != nil {
 		se.UseSearch = true
-		if name, ok := (*searchEngine)["name"]; ok {
-			se.Name = name.(string)
-		} else {
+
+		// Helper to safely get string values
+		getString := func(m map[string]any, key string) string {
+			if val, ok := m[key]; ok {
+				return fmt.Sprint(val)
+			}
+			return ""
+		}
+
+		se.Name = getString(*searchEngine, "name")
+		if se.Name == "" {
 			se.UseSearch = false
-			se.Name = ""
 		}
-		if keyValue, ok := (*searchEngine)["key"]; ok {
-			se.ApiKey = keyValue.(string)
-		} else {
+
+		se.ApiKey = getString(*searchEngine, "key")
+		if se.ApiKey == "" && se.Name != "none" {
 			se.UseSearch = false
-			se.ApiKey = ""
 		}
-		if cxValue, ok := (*searchEngine)["cx"]; ok {
-			se.CxKey = cxValue.(string)
-		} else {
-			se.CxKey = ""
-		}
+
+		se.CxKey = getString(*searchEngine, "cx")
+
+		// Handle DeepDive (int)
 		if deepDive, ok := (*searchEngine)["deep_dive"]; ok {
-			se.DeepDive = deepDive.(bool)
+			switch v := deepDive.(type) {
+			case int:
+				se.DeepDive = v
+			case float64:
+				se.DeepDive = int(v)
+			case int64:
+				se.DeepDive = int(v)
+			case string:
+				if i, err := strconv.Atoi(v); err == nil {
+					se.DeepDive = i
+				}
+			}
 		} else {
-			se.DeepDive = false
+			se.DeepDive = 0 // Default
 		}
+
+		// Handle MaxReferences (int)
 		if references, ok := (*searchEngine)["references"]; ok {
-			se.MaxReferences = references.(int)
+			switch v := references.(type) {
+			case int:
+				se.MaxReferences = v
+			case float64:
+				se.MaxReferences = int(v)
+			case int64:
+				se.MaxReferences = int(v)
+			case string:
+				if i, err := strconv.Atoi(v); err == nil {
+					se.MaxReferences = i
+				}
+			}
 		} else {
-			se.MaxReferences = 5
+			se.MaxReferences = 10
 		}
 	}
 
@@ -140,6 +171,7 @@ type AgentOptions struct {
 	MaxRecursions    int
 	ThinkMode        bool
 	UseTools         bool
+	EnabledTools     []string // List of enabled embedding tools
 	UseMCP           bool
 	SkipToolsConfirm bool
 	AppendMarkdown   bool
@@ -220,6 +252,8 @@ func validateModelConfig(modelInfo *map[string]any) (apiKey, endpoint, modelName
 		seed = nil
 	}
 
+	Debugf("Model Config: API Key: %s, Endpoint: %s, Model Name: %s, Temperature: %f, Top P: %f, Seed: %v", apiKey, endpoint, modelName, temperature, topP, seed)
+
 	return apiKey, endpoint, modelName, temperature, topP, seed, nil
 }
 
@@ -232,7 +266,7 @@ func CallAgent(op *AgentOptions) error {
 
 	// Set up search engine settings
 	se := constructSearchEngine(op.SearchEngine)
-	toolsUse := ToolsUse{Enable: op.UseTools, AutoApprove: op.SkipToolsConfirm}
+	toolsUse := ToolsUse{AutoApprove: op.SkipToolsConfirm}
 
 	// Set up code tool settings
 	exeCode := IsCodeExecutionEnabled()
@@ -312,6 +346,7 @@ func CallAgent(op *AgentOptions) error {
 		ProceedChan:   proceedCh,
 		SearchEngine:  *se,
 		ToolsUse:      toolsUse,
+		EnabledTools:  op.EnabledTools,
 		UseCodeTool:   exeCode,
 		MCPClient:     mc,
 		ThinkMode:     op.ThinkMode,

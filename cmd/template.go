@@ -6,6 +6,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/activebook/gllm/service"
+	"github.com/charmbracelet/huh"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -46,7 +49,12 @@ func SetEffectiveTemplate(tmpl string) error {
 
 // New helper function to get the effective template prompt based on config
 func GetEffectiveTemplate() string {
-	return plainTemplate
+	if plainTemplate != "" {
+		return plainTemplate
+	}
+	// Get from active agent and resolve reference
+	rawTmpl := GetAgentString("template")
+	return service.ResolveTemplateReference(rawTmpl)
 }
 
 // templateCmd represents the base command when called without any subcommands
@@ -60,11 +68,7 @@ var templateCmd = &cobra.Command{
 	// },
 	// Suggest showing help if 'gllm config' is run without subcommand
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Manage template prompts here (e.g., add, list, remove)")
-		// Example: Access a viper setting for prompts (maybe a map or slice)
-		// prompts := viper.Get("prompts")
-		// fmt.Printf("Current prompts (from config): %v\n", prompts)
-		cmd.Help() // Show help for now
+		templateListCmd.Run(cmd, args)
 	},
 }
 
@@ -74,6 +78,8 @@ var templateListCmd = &cobra.Command{
 	Short:   "List all saved template prompt names",
 	Run: func(cmd *cobra.Command, args []string) {
 		templates := viper.GetStringMapString("templates")
+		activeTemplate := GetAgentString("template")
+		highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
 
 		if len(templates) == 0 {
 			fmt.Println("No template prompts defined yet. Use 'gllm template add'.")
@@ -82,28 +88,41 @@ var templateListCmd = &cobra.Command{
 
 		verbose, _ := cmd.Flags().GetBool("verbose")
 
+		// Sort keys for consistent output
+		names := make([]string, 0, len(templates))
+		for name := range templates {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+
 		if verbose {
-			// Print name and details
-			names := make([]string, 0, len(templates))
-			for name := range templates {
-				names = append(names, name)
-			}
-			sort.Strings(names)
 			fmt.Println("Available template prompts (with details):")
 			for _, name := range names {
-				fmt.Printf(" %s\n %s\n\n", name, templates[name])
+				prefix := "  "
+				pname := name
+				if name == activeTemplate {
+					prefix = highlightColor("* ")
+					pname = highlightColor(name)
+				}
+				fmt.Printf("%s%s\n %s\n\n", prefix, pname, templates[name])
 			}
 		} else {
 			fmt.Println("Available template prompts:")
-			// Sort keys for consistent output
-			names := make([]string, 0, len(templates))
-			for name := range templates {
-				names = append(names, name)
-			}
-			sort.Strings(names)
 			for _, name := range names {
-				fmt.Printf(" %s\n", name)
+				prefix := "  "
+				pname := name
+				if name == activeTemplate {
+					prefix = highlightColor("* ")
+					pname = highlightColor(name)
+				}
+				fmt.Printf("%s%s\n", prefix, pname)
 			}
+		}
+
+		if activeTemplate != "" {
+			fmt.Println("\n(*) Indicates the current template prompt.")
+		} else {
+			fmt.Println("\nNo template prompt selected. Use 'gllm template switch <name>' to select one.")
 		}
 	},
 }
@@ -118,6 +137,41 @@ Example:
 		name, _ := cmd.Flags().GetString("name")
 		content, _ := cmd.Flags().GetString("content")
 
+		// Interactive inputs
+		if name == "" || content == "" {
+			form := huh.NewForm(
+				huh.NewGroup(
+					huh.NewInput().
+						Title("Name").
+						Value(&name).
+						Validate(func(str string) error {
+							if str == "" {
+								return fmt.Errorf("name is required")
+							}
+							templates := viper.GetStringMapString("templates")
+							if _, exists := templates[str]; exists {
+								return fmt.Errorf("template '%s' already exists", str)
+							}
+							return nil
+						}),
+					huh.NewText().
+						Title("Content").
+						Value(&content).
+						Lines(10).
+						Validate(func(str string) error {
+							if str == "" {
+								return fmt.Errorf("content is required")
+							}
+							return nil
+						}),
+				),
+			).WithKeyMap(GetHuhKeyMap())
+			err := form.Run()
+			if err != nil {
+				return nil
+			}
+		}
+
 		templates := viper.GetStringMapString("templates")
 		// Initialize map if it doesn't exist
 		if templates == nil {
@@ -125,8 +179,10 @@ Example:
 		}
 
 		if _, exists := templates[name]; exists {
-			// Maybe add an --overwrite flag later? For now, error out.
-			return fmt.Errorf("template prompt named '%s' already exists. Use 'remove' first or choose a different name", name)
+			// Check if flag interaction
+			if cmd.Flags().Changed("name") {
+				return fmt.Errorf("template prompt named '%s' already exists", name)
+			}
 		}
 
 		templates[name] = content
@@ -143,29 +199,64 @@ Example:
 }
 
 var templateSetCmd = &cobra.Command{
-	Use:   "set",
+	Use:   "set [NAME]",
 	Short: "Set a named template prompt",
 	Long: `Sets a new template prompt with a specific name and content.
 Example:
-  gllm template set coder --content "You are an expert Go programmer"`,
-	Args: cobra.ExactArgs(1), // Requires exactly one argument (the name)
+  gllm template set coder --content "You are an expert Go programmer"
+  gllm template set (opens selection)`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		name := args[0]
-
+		var name string
 		templates := viper.GetStringMapString("templates")
-		// Initialize map if it doesn't exist
-		if templates == nil {
+		if len(templates) == 0 {
 			return fmt.Errorf("there is no template prompt yet, use 'add' first")
 		}
 
-		if _, exists := templates[name]; exists {
-			if content, err := cmd.Flags().GetString("content"); err == nil {
-				templates[name] = content
-			}
+		if len(args) > 0 {
+			name = args[0]
 		} else {
+			// Select prompt
+			var options []huh.Option[string]
+			var names []string
+			for n := range templates {
+				names = append(names, n)
+			}
+			sort.Strings(names)
+			for _, n := range names {
+				options = append(options, huh.NewOption(n, n))
+			}
+
+			err := huh.NewSelect[string]().
+				Title("Select Template to Edit").
+				Options(options...).
+				Value(&name).
+				Run()
+			if err != nil {
+				return nil
+			}
+		}
+
+		if _, exists := templates[name]; !exists {
 			return fmt.Errorf("template prompt named '%s' not found", name)
 		}
 
+		content, _ := cmd.Flags().GetString("content")
+		if !cmd.Flags().Changed("content") {
+			content = templates[name]
+			err := huh.NewForm(
+				huh.NewGroup(
+					huh.NewText().
+						Title("Content").
+						Value(&content).
+						Lines(10),
+				),
+			).WithKeyMap(GetHuhKeyMap()).Run()
+			if err != nil {
+				return nil
+			}
+		}
+
+		templates[name] = content
 		viper.Set("templates", templates)
 
 		// Write the config file
@@ -174,9 +265,6 @@ Example:
 		}
 
 		fmt.Printf("template prompt '%s' set successfully.\n", name)
-		fmt.Println("---")
-		fmt.Printf("content: %s\n", templates[name])
-		fmt.Println("---")
 		return nil
 	},
 }
@@ -201,13 +289,38 @@ var templateInfoCmd = &cobra.Command{
 }
 
 var templateRemoveCmd = &cobra.Command{
-	Use:     "remove NAME",
+	Use:     "remove [NAME]",
 	Aliases: []string{"rm"},
 	Short:   "Remove a named template prompt",
-	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		name := args[0]
 		templates := viper.GetStringMapString("templates")
+		if len(templates) == 0 {
+			fmt.Println("No templates to remove.")
+			return nil
+		}
+		var name string
+		if len(args) > 0 {
+			name = args[0]
+		} else {
+			var names []string
+			for n := range templates {
+				names = append(names, n)
+			}
+			sort.Strings(names)
+			var options []huh.Option[string]
+			for _, n := range names {
+				options = append(options, huh.NewOption(n, n))
+			}
+
+			err := huh.NewSelect[string]().
+				Title("Select Template to Remove").
+				Options(options...).
+				Value(&name).
+				Run()
+			if err != nil {
+				return nil
+			}
+		}
 
 		if _, exists := templates[name]; !exists {
 			cmd.SilenceUsage = true // Don't show usage for this error
@@ -216,6 +329,21 @@ var templateRemoveCmd = &cobra.Command{
 				return nil
 			}
 			return fmt.Errorf("template prompt named '%s' not found", name)
+		}
+
+		if !cmd.Flags().Changed("force") {
+			var confirm bool
+			err := huh.NewConfirm().
+				Title(fmt.Sprintf("Are you sure you want to remove '%s'?", name)).
+				Value(&confirm).
+				Run()
+			if err != nil {
+				return nil
+			}
+			if !confirm {
+				fmt.Println("Operation cancelled.")
+				return nil
+			}
 		}
 
 		// Delete the prompt
@@ -228,6 +356,67 @@ var templateRemoveCmd = &cobra.Command{
 		}
 
 		fmt.Printf("template prompt '%s' removed successfully.\n", name)
+		return nil
+	},
+}
+
+var templateSwitchCmd = &cobra.Command{
+	Use:     "switch [NAME]",
+	Aliases: []string{"sw", "select"},
+	Short:   "Switch to a different template",
+	Long:    `Switch the current agent's template to the specified one.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		var name string
+		if len(args) > 0 {
+			name = args[0]
+		} else {
+			templates := viper.GetStringMapString("templates")
+			if len(templates) == 0 {
+				fmt.Println("No templates found.")
+				return nil
+			}
+
+			currentName := GetAgentString("template")
+
+			var options []huh.Option[string]
+			var names []string
+			for n := range templates {
+				names = append(names, n)
+			}
+			sort.Strings(names)
+
+			options = append(options, huh.NewOption("None", ""))
+			highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
+
+			for _, n := range names {
+				label := n
+				if n == currentName {
+					label = highlightColor(n + " (active)")
+				}
+				options = append(options, huh.NewOption(label, n))
+			}
+
+			name = currentName
+
+			err := huh.NewSelect[string]().
+				Title("Select Template").
+				Options(options...).
+				Value(&name).
+				Run()
+			if err != nil {
+				return nil
+			}
+		}
+
+		if err := SetAgentValue("template", name); err != nil {
+			return fmt.Errorf("failed to switch template: %w", err)
+		}
+
+		if name == "" {
+			fmt.Println("Template disabled.")
+		} else {
+			fmt.Printf("Switched template to '%s'.\n", name)
+		}
 		return nil
 	},
 }
@@ -246,12 +435,17 @@ gllm template clear --force`,
 		force, _ := cmd.Flags().GetBool("force")
 
 		if !force {
-			fmt.Print("Are you sure you want to clear all template prompts? This cannot be undone. [y/N]: ")
-			var response string
-			fmt.Scanln(&response)
-
-			response = strings.ToLower(strings.TrimSpace(response))
-			if response != "y" && response != "yes" {
+			var confirm bool
+			err := huh.NewConfirm().
+				Title("Are you sure you want to clear ALL template prompts? This cannot be undone.").
+				Affirmative("Yes, delete all").
+				Negative("Cancel").
+				Value(&confirm).
+				Run()
+			if err != nil {
+				return nil
+			}
+			if !confirm {
 				fmt.Println("Operation cancelled.")
 				return nil
 			}
@@ -283,6 +477,7 @@ func init() {
 	templateCmd.AddCommand(templateListCmd)
 	templateCmd.AddCommand(templateAddCmd)
 	templateCmd.AddCommand(templateSetCmd)
+	templateCmd.AddCommand(templateSwitchCmd)
 	templateCmd.AddCommand(templateInfoCmd)
 	templateCmd.AddCommand(templateRemoveCmd)
 	templateCmd.AddCommand(templateClearCmd)
@@ -293,8 +488,8 @@ func init() {
 	templateAddCmd.Flags().StringP("name", "n", "", "Name for the new template prompt (required)")
 	templateAddCmd.Flags().StringP("content", "c", "", "Content/text of the new template prompt (required)")
 	// Mark flags as required - Cobra will handle error messages if they are missing
-	templateAddCmd.MarkFlagRequired("name")
-	templateAddCmd.MarkFlagRequired("content")
+	// templateAddCmd.MarkFlagRequired("name")
+	// templateAddCmd.MarkFlagRequired("content")
 	templateSetCmd.Flags().StringP("content", "c", defaultTemplateContent, "Content/text of the template prompt")
 
 	// Add flags for other prompt commands if needed in the future

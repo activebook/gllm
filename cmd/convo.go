@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/service"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
 
@@ -21,6 +22,10 @@ var convoCmd = &cobra.Command{
 	Use:   "convo",
 	Short: "Manage conversations",
 	Long:  `Commands to list, remove, and show details of conversations.`,
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return convoListCmd.RunE(cmd, args)
+	},
 }
 
 // convoListCmd represents the convo list command
@@ -75,11 +80,72 @@ gllm convo remove "chat_*" --force
 gllm convo remove 1 --force
 gllm convo remove 10-20 --force
 gllm convo remove "2 - 5" --force`,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		pattern := args[0]
 		convoDir := service.GetConvoDir()
 		var matches []string
+		var pattern string
+		if len(args) > 0 {
+			pattern = args[0]
+		} else {
+			// Select conversations to remove
+			convos, err := service.ListSortedConvos(convoDir)
+			if err != nil || len(convos) == 0 {
+				fmt.Println("No conversations found.")
+				return nil
+			}
+
+			var options []huh.Option[string]
+			for _, c := range convos {
+				label := c.Name
+				if c.Provider != "" {
+					label = fmt.Sprintf("%s [%s]", c.Name, c.Provider)
+				}
+				options = append(options, huh.NewOption(label, c.Name))
+			}
+
+			var selected []string
+			err = huh.NewMultiSelect[string]().
+				Title("Select Conversations to Remove").
+				Options(options...).
+				Value(&selected).
+				Run()
+			if err != nil {
+				return nil
+			}
+			if len(selected) == 0 {
+				return nil
+			}
+
+			// We treat selected names as specific matches
+			var matches []string
+			for _, s := range selected {
+				matches = append(matches, filepath.Join(convoDir, s+".json"))
+			}
+
+			// Confirm if not forced
+			force, _ := cmd.Flags().GetBool("force")
+			if !force {
+				var confirm bool
+				err = huh.NewConfirm().
+					Title(fmt.Sprintf("Are you sure you want to remove %d conversations?", len(matches))).
+					Value(&confirm).
+					Run()
+				if err != nil || !confirm {
+					fmt.Println("Operation cancelled.")
+					return nil
+				}
+			}
+
+			for _, match := range matches {
+				if err := os.Remove(match); err != nil {
+					fmt.Printf("Failed to remove '%s': %v\n", strings.TrimSuffix(filepath.Base(match), filepath.Ext(match)), err)
+				} else {
+					fmt.Printf("Conversation '%s' removed successfully.\n", strings.TrimSuffix(filepath.Base(match), filepath.Ext(match)))
+				}
+			}
+			return nil
+		}
 
 		// Check if pattern is a range
 		rangePattern := strings.ReplaceAll(pattern, " ", "")
@@ -134,12 +200,13 @@ gllm convo remove "2 - 5" --force`,
 			for _, match := range matches {
 				fmt.Printf("  - %s\n", strings.TrimSuffix(filepath.Base(match), filepath.Ext(match)))
 			}
-			fmt.Print("Are you sure? (y/N): ")
-			var response string
-			fmt.Scanln(&response)
 
-			response = strings.ToLower(strings.TrimSpace(response))
-			if response != "y" && response != "yes" {
+			var confirm bool
+			err := huh.NewConfirm().
+				Title("Are you sure you want to remove these conversations?").
+				Value(&confirm).
+				Run()
+			if err != nil || !confirm {
 				fmt.Println("Operation cancelled.")
 				return nil
 			}
@@ -212,12 +279,13 @@ gllm convo clear --force`,
 		force, _ := cmd.Flags().GetBool("force")
 
 		if !force {
-			fmt.Print("Are you sure you want to clear all saved conversations? This cannot be undone. [y/N]: ")
-			var response string
-			fmt.Scanln(&response)
-
-			response = strings.ToLower(strings.TrimSpace(response))
-			if response != "y" && response != "yes" {
+			var confirm bool
+			err := huh.NewConfirm().
+				Title("Are you sure you want to clear ALL saved conversations?").
+				Affirmative("Yes, delete all").
+				Value(&confirm).
+				Run()
+			if err != nil || !confirm {
 				fmt.Println("Operation cancelled.")
 				return nil
 			}
@@ -252,10 +320,38 @@ var convoInfoCmd = &cobra.Command{
 
 Using the --message-num (-n) flag, set the number of recent messages to display..
 Using the --message-chars (-c) flag, set the maximum length of each message's content.`,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		convoName := args[0]
 		convoDir := service.GetConvoDir()
+		var convoName string
+		if len(args) > 0 {
+			convoName = args[0]
+		} else {
+			// Select conversation
+			convos, err := service.ListSortedConvos(convoDir)
+			if err != nil || len(convos) == 0 {
+				fmt.Println("No conversations found.")
+				return nil
+			}
+
+			var options []huh.Option[string]
+			for _, c := range convos {
+				label := c.Name
+				if c.Provider != "" {
+					label = fmt.Sprintf("%s [%s]", c.Name, c.Provider)
+				}
+				options = append(options, huh.NewOption(label, c.Name))
+			}
+
+			err = huh.NewSelect[string]().
+				Title("Select Conversation").
+				Options(options...).
+				Value(&convoName).
+				Run()
+			if err != nil {
+				return nil
+			}
+		}
 
 		// If convoName is a number, treat it as an index
 		index, err := strconv.Atoi(convoName)
@@ -315,12 +411,60 @@ var convoRenameCmd = &cobra.Command{
 	Use:   "rename [oldname|index] [newname]",
 	Short: "Rename a conversation",
 	Long:  `Rename an existing conversation to a new name.`,
-	Args:  cobra.ExactArgs(2),
+	Args:  cobra.MaximumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		oldName := args[0]
-		newName := args[1]
-		newName = service.GetSanitizeTitle(newName)
 		convoDir := service.GetConvoDir()
+		var oldName, newName string
+
+		if len(args) >= 2 {
+			oldName = args[0]
+			newName = args[1]
+		} else {
+			// Select conversation to rename
+			convos, err := service.ListSortedConvos(convoDir)
+			if err != nil || len(convos) == 0 {
+				fmt.Println("No conversations found.")
+				return nil
+			}
+
+			if len(args) == 1 {
+				oldName = args[0]
+			} else {
+				var options []huh.Option[string]
+				for _, c := range convos {
+					label := c.Name
+					if c.Provider != "" {
+						label = fmt.Sprintf("%s [%s]", c.Name, c.Provider)
+					}
+					options = append(options, huh.NewOption(label, c.Name))
+				}
+
+				err = huh.NewSelect[string]().
+					Title("Select Conversation to Rename").
+					Options(options...).
+					Value(&oldName).
+					Run()
+				if err != nil {
+					return nil
+				}
+			}
+
+			// Get new name
+			err = huh.NewInput().
+				Title("New Name").
+				Value(&newName).
+				Validate(func(s string) error {
+					s = strings.TrimSpace(s)
+					if s == "" {
+						return fmt.Errorf("new name cannot be empty")
+					}
+					return nil
+				}).
+				Run()
+			if err != nil {
+				return nil
+			}
+		}
 
 		// If oldName is a number, treat it as an index
 		index, err := strconv.Atoi(oldName)
@@ -356,12 +500,12 @@ var convoRenameCmd = &cobra.Command{
 		// Ask for confirmation
 		force, _ := cmd.Flags().GetBool("force")
 		if !force {
-			fmt.Printf("Rename conversation '%s' to '%s'? (y/N): ", oldName, newName)
-			var response string
-			fmt.Scanln(&response)
-
-			response = strings.ToLower(strings.TrimSpace(response))
-			if response != "y" && response != "yes" {
+			var confirm bool
+			err := huh.NewConfirm().
+				Title(fmt.Sprintf("Rename conversation '%s' to '%s'?", oldName, newName)).
+				Value(&confirm).
+				Run()
+			if err != nil || !confirm {
 				fmt.Println("Operation cancelled.")
 				return nil
 			}

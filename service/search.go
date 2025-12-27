@@ -49,7 +49,7 @@ const (
 	GoogleSearchEngine = "google"
 	BingSearchEngine   = "bing"
 	TavilySearchEngine = "tavily"
-	DummySearchEngine  = "dummy"
+	NoneSearchEngine   = "none"
 )
 
 type SearchEngine struct {
@@ -59,21 +59,18 @@ type SearchEngine struct {
 	CxKey         string
 	MaxReferences int
 
-	// deepDive is a flag to indicate whether to perform a deep dive search
-	// If true, it will fetch all links from the search results
-	// If false, it will only fetch the first 3 links to keep it simple and token efficiency
-	// The top 3 results are ranked highly for a reason; they are generally the most authoritative and relevant pages for a given query.
-	// Whether to perform a deep dive search
-	DeepDive bool
+	// DeepDive indicates how many links to fetch content from
+	// If 0, it defaults to a small number (e.g. 3) for efficiency.
+	DeepDive int
 }
 
 func GetDefaultSearchEngineName() string {
 	return GoogleSearchEngine
 }
 
-func GetDummySearchEngineName() string {
+func GetNoneSearchEngineName() string {
 	// Using for placeholder
-	return DummySearchEngine
+	return NoneSearchEngine
 }
 
 func (s *SearchEngine) TavilySearch(query string) (map[string]any, error) {
@@ -153,19 +150,15 @@ func (s *SearchEngine) tavilyFormatResponse(tavilyResp *TavilyResponse) (map[str
 
 	// Collect all links
 	links := make([]string, 0, len(tavilyResp.Results))
-	if s.DeepDive {
-		// --deep-dive is true, use all links
-		for _, result := range tavilyResp.Results {
-			links = append(links, result.URL)
+	limit := s.DeepDive
+	if limit <= 0 {
+		limit = _maxLinks
+	}
+	for i, result := range tavilyResp.Results {
+		if i >= limit {
+			break
 		}
-	} else {
-		// Default behavior, take top 3
-		for i, result := range tavilyResp.Results {
-			if i >= _maxLinks {
-				break // Stop after the top 3
-			}
-			links = append(links, result.URL)
-		}
+		links = append(links, result.URL)
 	}
 
 	// Fetch contents for all links
@@ -219,19 +212,15 @@ func (s *SearchEngine) GoogleSearch(query string) (map[string]any, error) {
 
 	// Collect all links
 	links := make([]string, 0, len(resp.Items))
-	if s.DeepDive {
-		// --deep-dive is true, use all links
-		for _, result := range resp.Items {
-			links = append(links, result.Link)
+	limit := s.DeepDive
+	if limit <= 0 {
+		limit = _maxLinks
+	}
+	for i, result := range resp.Items {
+		if i >= limit {
+			break
 		}
-	} else {
-		// Default behavior, take top 3
-		for i, result := range resp.Items {
-			if i >= _maxLinks {
-				break // Stop after the top 3
-			}
-			links = append(links, result.Link)
-		}
+		links = append(links, result.Link)
 	}
 
 	// Fetch contents for all links
@@ -400,7 +389,7 @@ func (s *SearchEngine) RetrieveReferences(references []map[string]any) string {
 	}
 	if total > s.MaxReferences {
 		sb.WriteString("\n")
-		sb.WriteString(fmt.Sprintf("> **...and %d more references. Use the `-r` flag to view more.**\n", total-s.MaxReferences))
+		sb.WriteString(fmt.Sprintf("> **...and %d more references.**\n", total-s.MaxReferences))
 	}
 	return sb.String()
 }

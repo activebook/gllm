@@ -165,6 +165,8 @@ func GetMIMEType(filePath string) string {
 			return "text/rtf"
 		case ".mp3":
 			return "audio/mp3"
+		case ".m4a", ".mp4a":
+			return "audio/mp4"
 		case ".wav":
 			return "audio/wav"
 		case ".aiff":
@@ -175,6 +177,26 @@ func GetMIMEType(filePath string) string {
 			return "audio/ogg"
 		case ".flac":
 			return "audio/flac"
+		case ".mp4":
+			return "video/mp4"
+		case ".webm":
+			return "video/webm"
+		case ".mov":
+			return "video/quicktime"
+		case ".avi":
+			return "video/x-msvideo"
+		case ".wmv":
+			return "video/x-ms-wmv"
+		case ".mkv":
+			return "video/x-matroska"
+		case ".flv":
+			return "video/x-flv"
+		case ".m4v":
+			return "video/mp4"
+		case ".mpg":
+			return "video/mpg"
+		case ".mpeg":
+			return "video/mpeg"
 		default:
 			//return "text/plain" // Default txt
 
@@ -208,6 +230,12 @@ func IsExcelMIMEType(mimeType string) bool {
 func IsImageMIMEType(mimeType string) bool {
 	return mimeType == "image/jpeg" || mimeType == "image/png" || mimeType == "image/gif" ||
 		mimeType == "image/webp" || mimeType == "image/heic" || mimeType == "image/heif"
+}
+
+func IsVideoMIMEType(mimeType string) bool {
+	return mimeType == "video/mp4" || mimeType == "video/mpeg" || mimeType == "video/quicktime" ||
+		mimeType == "video/x-msvideo" || mimeType == "video/x-ms-wmv" || mimeType == "video/x-matroska" ||
+		mimeType == "video/webm"
 }
 
 func IsTextMIMEType(mimeType string) bool {

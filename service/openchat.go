@@ -33,6 +33,17 @@ func (ag *Agent) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessag
 				URL: imageURL,
 			},
 		}
+	} else if IsVideoMIMEType(format) {
+		// Create and append video part
+		base64Data := base64.StdEncoding.EncodeToString(file.Data())
+		Debugf("Processing video file: format=%s, data length=%d, base64 length=%d", format, len(file.Data()), len(base64Data))
+		part = &model.ChatCompletionMessageContentPart{
+			Type: model.ChatCompletionMessageContentPartTypeVideoURL,
+			VideoURL: &model.ChatMessageVideoURL{
+				URL: fmt.Sprintf("data:%s;base64,%s", format, base64Data),
+			},
+		}
+		Debugf("Created video part with type=%s, URL prefix=%s", part.Type, part.VideoURL.URL[:50])
 	} else if IsTextMIMEType(format) {
 		// Create and append text part
 		part = &model.ChatCompletionMessageContentPart{
@@ -146,7 +157,7 @@ func (ag *Agent) GenerateOpenChatStream() error {
 
 	// Create a tool with the function
 	tools := []*model.Tool{}
-	if ag.ToolsUse.Enable {
+	if len(ag.EnabledTools) > 0 {
 		// Add embedding operation tools, which includes the web_search tool
 		embeddingTools := ag.getOpenChatEmbeddingTools()
 		tools = append(tools, embeddingTools...)
@@ -226,11 +237,13 @@ func (c *OpenChat) process(ag *Agent) error {
 
 		// Set whether to use thinking mode
 		var thinking *model.Thinking
+		var reasoningEffort *model.ReasoningEffort
 		if thinkProperty {
 			if ag.ThinkMode {
 				thinking = &model.Thinking{
 					Type: model.ThinkingTypeEnabled,
 				}
+				reasoningEffort = Ptr(model.ReasoningEffortHigh)
 			} else {
 				// For some models, it must explicitly tell it not to use thinking mode
 				thinking = &model.Thinking{
@@ -254,12 +267,13 @@ func (c *OpenChat) process(ag *Agent) error {
 
 		// Create the request with thinking mode
 		req := model.CreateChatCompletionRequest{
-			Model:       ag.ModelName,
-			Temperature: &ag.Temperature,
-			TopP:        &ag.TopP,
-			Messages:    messages,
-			Tools:       c.tools,
-			Thinking:    thinking,
+			Model:           ag.ModelName,
+			Temperature:     &ag.Temperature,
+			TopP:            &ag.TopP,
+			Messages:        messages,
+			Tools:           c.tools,
+			Thinking:        thinking,
+			ReasoningEffort: reasoningEffort,
 		}
 
 		// Include token usage if tracking is enabled
@@ -579,8 +593,8 @@ func (ag *Agent) addUpOpenChatTokenUsage(resp *model.ChatCompletionStreamRespons
 func (ag *Agent) getOpenChatEmbeddingTools() []*model.Tool {
 	var tools []*model.Tool
 
-	// Get generic tools and convert them to OpenChat tools
-	genericTools := getOpenEmbeddingTools()
+	// Get filtered tools based on agent's enabled tools list
+	genericTools := GetOpenEmbeddingToolsFiltered(ag.EnabledTools)
 	for _, genericTool := range genericTools {
 		tools = append(tools, genericTool.ToOpenChatTool())
 	}

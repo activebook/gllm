@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/activebook/gllm/service"
+	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/huh"
 	"github.com/ergochat/readline"
 	"github.com/spf13/viper"
 )
@@ -208,3 +210,105 @@ func convertUserInputToBool(input string) (bool, error) {
 // Define the hardcoded default system prompt
 const defaultSystemPromptContent = "You are a helpful assistant."
 const defaultTemplateContent = ""
+
+// GetAgentString retrieves a string value from the current agent configuration
+func GetAgentString(key string) string {
+	config := service.GetCurrentAgentConfig()
+	if v, ok := config[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+// GetAgentBool retrieves a boolean value from the current agent configuration
+func GetAgentBool(key string) bool {
+	config := service.GetCurrentAgentConfig()
+	if v, ok := config[key]; ok {
+		if b, ok := v.(bool); ok {
+			return b
+		}
+	}
+	return false
+}
+
+// GetAgentInt retrieves an integer value from the current agent configuration
+func GetAgentInt(key string) int {
+	config := service.GetCurrentAgentConfig()
+	if v, ok := config[key]; ok {
+		// Handle various number types that might be coming from Viper/JSON
+		switch val := v.(type) {
+		case int:
+			return val
+		case float64:
+			return int(val)
+		case int64:
+			return int(val)
+		}
+	}
+	return 0
+}
+
+// GetAgentStringSlice retrieves a string slice value from the current agent configuration
+func GetAgentStringSlice(key string) []string {
+	config := service.GetCurrentAgentConfig()
+	if v, ok := config[key]; ok {
+		// Handle various slice types that might be coming from Viper/YAML
+		switch val := v.(type) {
+		case []string:
+			return val
+		case []interface{}:
+			result := make([]string, 0, len(val))
+			for _, item := range val {
+				if s, ok := item.(string); ok {
+					result = append(result, s)
+				}
+			}
+			return result
+		}
+	}
+	return nil
+}
+
+// SetAgentValue updates a specific key in the current agent's configuration
+func SetAgentValue(key string, value interface{}) error {
+	name := service.GetCurrentAgentName()
+	if name == "unknown" {
+		return fmt.Errorf("no active agent found")
+	}
+
+	config, err := service.GetAgent(name)
+	if err != nil {
+		return fmt.Errorf("failed to get agent '%s': %w", name, err)
+	}
+
+	config[key] = value
+
+	// fmt.Printf("DEBUG: Setting agent value key=%s, value=%v\n", key, value)
+	if err := service.SetAgent(name, config); err != nil {
+		return fmt.Errorf("failed to save agent '%s': %w", name, err)
+	}
+
+	return nil
+}
+
+// GetHuhKeyMap returns a custom keymap for huh forms
+// Specifically disables the Editor key binding for Text fields as it interferes with input
+func GetHuhKeyMap() *huh.KeyMap {
+	// 1. Start with the default keymap
+	keyMap := huh.NewDefaultKeyMap()
+
+	// 2. Remap the Text field keys
+	// We swap 'enter' to be the submission key and 'alt+enter' for new lines
+	keyMap.Text.Submit = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "submit"))
+	// The Prev/Next keys are meant to navigate between multiple fields (like going from an Input field to a Text field to a Select field). Since there's only one field, pressing ctrl+[ or ctrl+] has nowhere to go!
+	// keyMap.Text.Prev = key.NewBinding(key.WithKeys("ctrl+["), key.WithHelp("ctrl+[", "prev"))
+	// keyMap.Text.Next = key.NewBinding(key.WithKeys("ctrl+]"), key.WithHelp("ctrl+]", "next"))
+	keyMap.Text.NewLine.SetHelp("ctrl+j", "new line")
+
+	// 3. Disable the Editor (Ctrl+E) keybinding
+	keyMap.Text.Editor = key.NewBinding(key.WithDisabled())
+
+	return keyMap
+}

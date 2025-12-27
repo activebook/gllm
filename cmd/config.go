@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -214,138 +212,47 @@ var configPrintCmd = &cobra.Command{
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
 		sectionColor := color.New(color.FgCyan, color.Bold).SprintFunc()
-		headerColor := color.New(color.FgYellow, color.Bold).SprintFunc()
-		highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
-		keyColor := color.New(color.FgMagenta, color.Bold).SprintFunc()
 
 		printSection := func(title string) {
 			fmt.Println()
 			fullTitle := fmt.Sprintf("=== %s ===", strings.ToUpper(title))
-			lineWidth := 50
-			padding := (lineWidth - len(fullTitle)) / 2
-			if padding < 0 {
-				padding = 0
-			}
-			fmt.Printf("%s%s\n", strings.Repeat(" ", padding), sectionColor(fullTitle))
-			fmt.Println(color.New(color.FgCyan).Sprint(strings.Repeat("-", lineWidth)))
+			fmt.Printf("%s\n", sectionColor(fullTitle))
 		}
-
-		printSection("CONFIGURATION SUMMARY")
 
 		// Models section
 		printSection("Models")
-		models, err := GetAllModels()
-		if err != nil {
-			service.Errorf("Error retrieving models: %s\n", err)
-		} else {
-			fmt.Fprintln(w, headerColor(" MODEL ")+"\t"+headerColor(" SETTINGS "))
-			fmt.Fprintln(w, headerColor("-------")+"\t"+headerColor("----------"))
-			defaultName := GetEffectModelName()
-			for name, settings := range models {
-				if name == defaultName {
-					fmt.Fprintf(w, "%s\t%v\n", highlightColor("*"+name+"*"), settings)
-				} else {
-					fmt.Fprintf(w, "%s\t%v\n", keyColor(name), settings)
-				}
-			}
-			w.Flush()
-		}
+		modelListCmd.Run(modelListCmd, []string{})
+		w.Flush()
 
 		// System Prompts section
 		printSection("System Prompts")
-		sysPrompts := GetAllSystemPrompts()
-		fmt.Fprintln(w, headerColor(" NAME ")+"\t"+headerColor(" CONTENT "))
-		fmt.Fprintln(w, headerColor("------")+"\t"+headerColor("---------"))
-		fmt.Fprintf(w, "%v\n", sysPrompts)
+		systemListCmd.Run(systemListCmd, []string{})
 		w.Flush()
 
 		// Templates section
 		printSection("Templates")
-		templates := GetAllTemplates()
-		fmt.Fprintln(w, headerColor(" NAME ")+"\t"+headerColor(" CONTENT "))
-		fmt.Fprintln(w, headerColor("------")+"\t"+headerColor("---------"))
-		fmt.Fprintf(w, "%v\n", templates)
+		templateListCmd.Run(templateListCmd, []string{})
+		w.Flush()
+
+		// Memory section
+		printSection("Memory")
+		memoryListCmd.Run(memoryListCmd, []string{})
 		w.Flush()
 
 		// Search Engines section
 		printSection("Search Engines")
-		searchEngines := GetAllSearchEngines()
-		fmt.Fprintln(w, headerColor(" Search ")+"\t"+headerColor(" SETTINGS "))
-		fmt.Fprintln(w, headerColor("-------")+"\t"+headerColor("----------"))
-		defaultSearch := GetEffectSearchEngineName()
-		for name, settings := range searchEngines {
-			coloredName := name
-			if name == defaultSearch {
-				coloredName = highlightColor("*" + name + "*")
-			} else {
-				coloredName = keyColor(name)
-			}
-			fmt.Fprintf(w, "%s\t%s\n", coloredName, (fmt.Sprintf("%v", settings)))
-		}
+		searchListCmd.Run(searchListCmd, []string{})
 		w.Flush()
 
 		// Plugins section
 		printSection("Tools")
-		fmt.Fprintln(w, headerColor(" Tool ")+"\t"+headerColor(" Enabled "))
-		fmt.Fprintln(w, headerColor("------")+"\t"+headerColor("----------"))
-
-		toolsEnabled := AreToolsEnabled()
-		toolsStatus := highlightColor("Yes")
-		if !toolsEnabled {
-			toolsStatus = color.New(color.FgRed, color.Bold).Sprint("No")
-		}
-		for _, tool := range service.GetAllEmbeddingTools() {
-			fmt.Fprintf(w, "%s\t%s\n", keyColor(tool), toolsStatus)
-		}
-		toolsEnabled = IsSearchEnabled()
-		if !toolsEnabled {
-			toolsStatus = color.New(color.FgRed, color.Bold).Sprint("No")
-		}
-		for _, tool := range service.GetAllSearchTools() {
-			fmt.Fprintf(w, "%s\t%s\n", keyColor(tool), toolsStatus)
-		}
+		ListAllTools()
 		w.Flush()
 
-		// Default Configuration section
-		printSection("Default Configuration")
-
-		mark := IncludeMarkdown()
-		fmt.Printf("\n%s: %v\n", keyColor("Markdown Format"), mark)
-
-		// Display max recursions value
-		maxRecursions := viper.GetInt("agent.max_recursions")
-		if maxRecursions <= 0 {
-			maxRecursions = 5 // Default value
-		}
-		fmt.Printf("%s: %d\n", keyColor("Max Recursions"), maxRecursions)
-
-		modelName, modelInfo := GetEffectiveModel()
-		fmt.Printf("\n%s: %v\n", keyColor("Default Model"), highlightColor(modelName))
-		fmt.Fprintln(w, headerColor(" PROPERTY ")+"\t"+headerColor(" VALUE "))
-		fmt.Fprintln(w, headerColor("----------")+"\t"+headerColor("-------"))
-		for property, value := range modelInfo {
-			fmt.Fprintf(w, "%s\t%s\n", keyColor(property), (fmt.Sprintf("%v", value)))
-		}
+		// Current Agent section
+		printSection("Agents")
+		agentCmd.Run(agentCmd, []string{})
 		w.Flush()
-
-		searchName, searchEngine := GetEffectiveSearchEngine()
-		fmt.Printf("\n%s: %v\n", keyColor("Default Search Engine"), highlightColor(searchName))
-		fmt.Fprintln(w, headerColor(" PROPERTY ")+"\t"+headerColor(" VALUE "))
-		fmt.Fprintln(w, headerColor("----------")+"\t"+headerColor("-------"))
-		pairs := []struct{ k, v string }{}
-		for property, value := range searchEngine {
-			pairs = append(pairs, struct{ k, v string }{
-				keyColor(property),
-				(fmt.Sprintf("%v", value)),
-			})
-		}
-		sort.Slice(pairs, func(i, j int) bool { return pairs[i].k > pairs[j].k })
-		for _, pair := range pairs {
-			fmt.Fprintf(w, "%s\t%s\n", pair.k, pair.v)
-		}
-		w.Flush()
-
-		fmt.Println(color.New(color.FgCyan, color.Bold).Sprint(strings.Repeat("=", 50)))
 	},
 }
 
@@ -356,76 +263,19 @@ func init() {
 	// Add subcommands to configCmd
 	configCmd.AddCommand(configPathCmd)
 	configCmd.AddCommand(configPrintCmd)
-	configCmd.AddCommand(configSetCmd) // Register the config set command
-	configCmd.AddCommand(configMaxRecursionsCmd)
+	configCmd.AddCommand(configSetCmd)    // Register the config set command
 	configCmd.AddCommand(configExportCmd) // Register the config export command
 	configCmd.AddCommand(configImportCmd) // Register the config import command
 
 	// Add flags for other prompt commands if needed in the future
 }
 
-// configMaxRecursionsCmd represents the config max-recursions command
-var configMaxRecursionsCmd = &cobra.Command{
-	Use:     "max-recursions [value]",
-	Aliases: []string{"mr"},
-	Short:   "Get or set the maximum number of Model calling recursions allowed",
-	Long: `Get or set the maximum number of Model calling recursions allowed in the application.
-
-If no value is provided, the current setting is displayed.
-If a value is provided, it sets the new maximum recursions value.`,
-	Args: cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) == 0 {
-			// No argument provided - show current value
-			maxRecursions := viper.GetInt("agent.max_recursions")
-			if maxRecursions <= 0 {
-				maxRecursions = 5 // Default value
-			}
-			// Set the new value in viper
-			viper.Set("agent.max_recursions", maxRecursions)
-
-			// Save the configuration to file
-			err := viper.WriteConfig()
-			if err != nil {
-				service.Errorf("Error saving config: %s\n", err)
-				return
-			}
-			fmt.Printf("Current maximum recursions: %d\n", maxRecursions)
-		} else {
-			// Argument provided - parse and set new value
-			var err error
-			newValue := args[0]
-			maxRecursions, err := strconv.Atoi(newValue)
-			if err != nil {
-				service.Errorf("Invalid value: %s. Please provide a valid integer.\n", newValue)
-				return
-			}
-
-			if maxRecursions < 1 {
-				service.Errorf("Value must be a positive integer (at least 1).\n")
-				return
-			}
-
-			// Set the new value in viper
-			viper.Set("agent.max_recursions", maxRecursions)
-
-			// Save the configuration to file
-			err = viper.WriteConfig()
-			if err != nil {
-				service.Errorf("Error saving config: %s\n", err)
-				return
-			}
-
-			fmt.Printf("Maximum recursions set to: %d\n", maxRecursions)
-		}
-	},
-}
-
 // configSetCmd represents the command to set configuration values
 var configSetCmd = &cobra.Command{
-	Use:   "set",
-	Short: "Set a configuration value",
-	Long:  `Set a configuration value that will persist across sessions.`,
+	Use:    "set",
+	Short:  "Set a configuration value",
+	Long:   `Set a configuration value that will persist across sessions.`,
+	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) != 2 {
 			service.Errorf("Usage: gllm config set <key> <value>\n")
@@ -435,38 +285,26 @@ var configSetCmd = &cobra.Command{
 		key := args[0]
 		value := args[1]
 
-		switch key {
-		case "max_recursions":
-			// Parse the value as an integer
-			num, err := strconv.Atoi(value)
-			if err != nil {
-				service.Errorf("Invalid value for max_recursions: %s (must be an integer)\n", value)
-				return
-			}
-			if num <= 0 {
-				service.Errorf("Invalid value for max_recursions: %d (must be positive)\n", num)
-				return
-			}
-			viper.Set("agent.max_recursions", num)
-		default:
-			service.Errorf("Unknown configuration key: %s\n", key)
+		name := service.GetCurrentAgentName()
+		if name == "unknown" {
+			service.Errorf("No active agent to update.\n")
 			return
 		}
 
-		// Write the config file
-		if err := writeConfig(); err != nil {
+		config, err := service.GetAgent(name)
+		if err != nil {
+			service.Errorf("Error getting agent: %v\n", err)
+			return
+		}
+
+		config[key] = value
+
+		// Update Agent
+		if err := service.SetAgent(name, config); err != nil {
 			service.Errorf("Error saving configuration: %s\n", err)
 			return
 		}
 
 		fmt.Printf("Configuration '%s' set to '%s' successfully.\n", key, value)
 	},
-}
-
-func GetMaxRecursions() int {
-	maxRecursions := viper.GetInt("agent.max_recursions")
-	if maxRecursions <= 0 {
-		maxRecursions = 5 // Default value
-	}
-	return maxRecursions
 }

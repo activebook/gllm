@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
+	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -27,16 +29,32 @@ func init() {
 	rootCmd.AddCommand(initCmd)
 }
 
+// buildToolsOptions creates sorted huh.Option list for tools with all selected by default
+func buildToolsOptions() []huh.Option[string] {
+	toolsList := service.GetAllEmbeddingTools()
+	var options []huh.Option[string]
+	for _, tool := range toolsList {
+		// All tools selected by default for new agents
+		options = append(options, huh.NewOption(tool, tool).Selected(true))
+	}
+	sort.Slice(options, func(i, j int) bool {
+		return options[i].Key < options[j].Key
+	})
+	return options
+}
+
 // RunInitWizard runs the interactive setup
 // Exported so it can be called from root.go
 func RunInitWizard() error {
 	var (
+		agentName        string
 		provider         string
 		endpoint         string
 		apiKey           string
 		model            string
 		confirm          bool
 		selectedFeatures []string
+		selectedTools    []string
 	)
 
 	// Group 1: Provider selection
@@ -45,6 +63,18 @@ func RunInitWizard() error {
 			huh.NewNote().
 				Title("Welcome to gllm! Your agent for various LLMs.").
 				Description("Let's get you set up with your AI companion."),
+
+			huh.NewInput().
+				Title("Agent Name").
+				Description("From now on, you can have multiple agents. Give this one a name.").
+				Value(&agentName).
+				Placeholder("default").
+				Validate(func(s string) error {
+					if strings.TrimSpace(s) == "" {
+						return fmt.Errorf("agent name is required")
+					}
+					return nil
+				}),
 
 			huh.NewSelect[string]().
 				Title("Choose your AI Provider").
@@ -73,6 +103,10 @@ func RunInitWizard() error {
 
 	if err != nil {
 		return err
+	}
+
+	if strings.TrimSpace(agentName) == "" {
+		agentName = "default"
 	}
 
 	// Determine default model based on provider
@@ -173,14 +207,21 @@ func RunInitWizard() error {
 					return nil
 				}),
 		),
-		// Group 3: Features
+		// Group 3: Tools Selection
+		huh.NewGroup(
+			huh.NewMultiSelect[string]().
+				Title("Tools").
+				Description("Select which tools to enable for this agent").
+				Options(buildToolsOptions()...).
+				Value(&selectedTools),
+		),
+		// Group 4: Capabilities
 		huh.NewGroup(
 			huh.NewMultiSelect[string]().
 				Title("Agent Capabilities").
-				Description("Select features to enable").
+				Description("Select additional features to enable").
 				Options(
 					huh.NewOption("Thinking Mode", "think").Selected(true),
-					huh.NewOption("Tools & Search", "tools").Selected(true),
 					huh.NewOption("Token Usage Stats", "usage").Selected(true),
 					huh.NewOption("Markdown Output", "markdown").Selected(true),
 				).
@@ -232,21 +273,29 @@ func RunInitWizard() error {
 	modelsMap[encodedAlias] = newModel
 
 	viper.Set("models", modelsMap)
-	viper.Set("agent.model", encodedAlias)
 
-	// Save agent features
-	featureMap := map[string]bool{
-		"think":    false,
-		"tools":    false,
-		"usage":    false,
-		"markdown": false,
-	}
+	// Setup agent config
+	agentConfig := make(map[string]interface{})
+	agentConfig["model"] = encodedAlias
+
+	// Save selected tools as array
+	agentConfig["tools"] = selectedTools
+
+	// Save other capabilities as booleans
 	for _, f := range selectedFeatures {
-		featureMap[f] = true
+		agentConfig[f] = true
 	}
-	for k, v := range featureMap {
-		viper.Set("agent."+k, v)
+
+	// Add Agent
+	agentsMap := viper.GetStringMap("agents")
+	if agentsMap == nil {
+		agentsMap = make(map[string]interface{})
 	}
+	agentsMap[agentName] = agentConfig
+	viper.Set("agents", agentsMap)
+
+	// Set Active Agent
+	viper.Set("agent", agentName)
 
 	// Save
 	if err := writeConfig(); err != nil {

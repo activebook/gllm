@@ -65,6 +65,15 @@ func GetAllAgents() (map[string]AgentConfig, error) {
 	for name, config := range agentsMap {
 		if configMap, ok := config.(map[string]interface{}); ok {
 			agents[name] = configMap
+		} else if configMap, ok := config.(AgentConfig); ok {
+			agents[name] = configMap
+		} else if configMap, ok := config.(map[interface{}]interface{}); ok {
+			// Handle map[interface{}]interface{} if viper returns it
+			converted := make(map[string]interface{})
+			for k, v := range configMap {
+				converted[fmt.Sprint(k)] = v
+			}
+			agents[name] = converted
 		}
 	}
 	return agents, nil
@@ -81,7 +90,18 @@ func GetAgent(name string) (AgentConfig, error) {
 		if configMap, ok := config.(map[string]interface{}); ok {
 			return configMap, nil
 		}
-		return nil, fmt.Errorf("invalid agent configuration for '%s'", name)
+		if configMap, ok := config.(AgentConfig); ok {
+			return configMap, nil
+		}
+		if configMap, ok := config.(map[interface{}]interface{}); ok {
+			converted := make(map[string]interface{})
+			for k, v := range configMap {
+				converted[fmt.Sprint(k)] = v
+			}
+			return converted, nil
+		}
+
+		return nil, fmt.Errorf("invalid agent configuration for '%s' (type %T)", name, config)
 	}
 	return nil, fmt.Errorf("agent named '%s' not found", name)
 }
@@ -207,36 +227,16 @@ func RenameAgent(oldName, newName string) error {
 	return nil
 }
 
-// SwitchToAgent switches to the specified agent by copying its config to the main agent section
+// SwitchToAgent switches to the specified agent by setting it as the active agent
 func SwitchToAgent(name string) error {
-	// Get the agent configuration
-	agentConfig, err := GetAgent(name)
+	// Verify agent exists
+	_, err := GetAgent(name)
 	if err != nil {
 		return err
 	}
 
-	// Copy agent config to main agent section with lazy resolution
-	for key, value := range agentConfig {
-		if key == "template" {
-			if templateStr, ok := value.(string); ok {
-				// Resolve template reference lazily
-				resolvedTemplate := ResolveTemplateReference(templateStr)
-				viper.Set("agent."+key, resolvedTemplate)
-			} else {
-				viper.Set("agent."+key, value)
-			}
-		} else if key == "system_prompt" {
-			if sysPromptStr, ok := value.(string); ok {
-				// Resolve system prompt reference lazily
-				resolvedSysPrompt := ResolveSystemPromptReference(sysPromptStr)
-				viper.Set("agent."+key, resolvedSysPrompt)
-			} else {
-				viper.Set("agent."+key, value)
-			}
-		} else {
-			viper.Set("agent."+key, value)
-		}
-	}
+	// Set the active agent name
+	viper.Set("agent", name)
 
 	// Write the config file
 	if err := WriteConfig(); err != nil {
@@ -246,17 +246,58 @@ func SwitchToAgent(name string) error {
 	return nil
 }
 
-// getCurrentAgentConfig returns the current agent configuration from the agent section
+// getCurrentAgentConfig returns the current agent configuration
+// It resolves the configuration from the active agent name
 func getCurrentAgentConfig() AgentConfig {
-	config := make(AgentConfig)
+	// Check if "agent" is a string (new format)
+	agentVal := viper.Get("agent")
 
-	// Get all agent.* keys
-	agentSettings := viper.GetStringMap("agent")
-	for key, value := range agentSettings {
-		config[key] = value
+	if agentName, ok := agentVal.(string); ok && agentName != "" {
+		// New format: reference to an agent
+		if config, err := GetAgent(agentName); err == nil {
+			// Add the name to the config for display purposes
+			config["name"] = agentName
+			// Ensure we have resolved reference values locally for this session if needed
+			// But for a pure config object, we return as is. The consuming code might need resolution.
+			// We already resolve system_prompt and template in other places (GetEffectiveSystemPrompt and GetEffectiveTemplate)
+			// return resolveAgentConfig(config)
+			return AgentConfig(config)
+		}
+		// If agent not found, fall back to empty or default
+	} else if agentMap, ok := agentVal.(map[string]interface{}); ok {
+		// Legacy format: map in "agent"
+		// We should probably convert this to map[string]interface{} (AgentConfig)
+		return AgentConfig(agentMap)
 	}
 
-	return config
+	// If using viper.GetStringMap("agent") directly for legacy support
+	legacyMap := viper.GetStringMap("agent")
+	if len(legacyMap) > 0 {
+		return AgentConfig(legacyMap)
+	}
+
+	return make(AgentConfig)
+}
+
+// resolveAgentConfig resolves lazy references in the configuration
+// legacy
+func resolveAgentConfig(config AgentConfig) AgentConfig {
+	resolved := make(AgentConfig)
+	for k, v := range config {
+		resolved[k] = v
+	}
+
+	// Resolve template
+	if t, ok := resolved["template"].(string); ok {
+		resolved["template"] = ResolveTemplateReference(t)
+	}
+
+	// Resolve system prompt
+	if s, ok := resolved["system_prompt"].(string); ok {
+		resolved["system_prompt"] = ResolveSystemPromptReference(s)
+	}
+
+	return resolved
 }
 
 // MigrateCurrentConfigToDefaultAgent migrates the current agent config to a "default" agent
@@ -266,12 +307,23 @@ func MigrateCurrentConfigToDefaultAgent() error {
 		agentsMap = make(map[string]interface{})
 	}
 
+	// Check if "agent" is already a string (already migrated or new format)
+	if _, ok := viper.Get("agent").(string); ok {
+		return nil
+	}
+
 	// Check if default agent already exists
 	if _, exists := agentsMap["default"]; exists {
-		return nil // Already migrated
+		// If default exists, just switch to it if we are currently using legacy map
+		if _, ok := viper.Get("agent").(map[string]interface{}); ok {
+			viper.Set("agent", "default")
+			WriteConfig()
+		}
+		return nil
 	}
 
 	// Get current agent configuration
+	// Note: getCurrentAgentConfig handles legacy map reading
 	currentConfig := getCurrentAgentConfig()
 	if len(currentConfig) == 0 {
 		return nil // No config to migrate
@@ -280,6 +332,9 @@ func MigrateCurrentConfigToDefaultAgent() error {
 	// Add as default agent
 	agentsMap["default"] = currentConfig
 	viper.Set("agents", agentsMap)
+
+	// Set active agent to default
+	viper.Set("agent", "default")
 
 	// Write the config file
 	if err := WriteConfig(); err != nil {
@@ -306,23 +361,17 @@ func GetAgentNames() ([]string, error) {
 
 // GetCurrentAgentName returns the name of the currently active agent
 func GetCurrentAgentName() string {
-	// For now, we don't track the current agent name
-	// Users can determine this by comparing agent.* values with agents.* values
-	// This could be enhanced later if needed
+	agentVal := viper.Get("agent")
+	if name, ok := agentVal.(string); ok {
+		return name
+	}
 	return "unknown"
 }
 
-// GetCurrentAgentConfig returns the current agent configuration from the agent section
+// GetCurrentAgentConfig returns the current agent configuration
+// This is the public version that calls the internal one
 func GetCurrentAgentConfig() AgentConfig {
-	config := make(AgentConfig)
-
-	// Get all agent.* keys
-	agentSettings := viper.GetStringMap("agent")
-	for key, value := range agentSettings {
-		config[key] = value
-	}
-
-	return config
+	return getCurrentAgentConfig()
 }
 
 // ResolveTemplateReference resolves a template reference to actual content lazily

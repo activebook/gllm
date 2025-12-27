@@ -660,7 +660,7 @@ func webSearchToolCallImpl(argsMap *map[string]interface{}, queries *[]string, r
 	case TavilySearchEngine:
 		// Use Tavily Search Engine
 		data, err = search.TavilySearch(query)
-	case DummySearchEngine:
+	case NoneSearchEngine:
 		// Use None Search Engine
 		data, err = search.NoneSearch(query)
 	default:

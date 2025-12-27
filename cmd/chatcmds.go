@@ -7,13 +7,57 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-
+	"sync"
 	"text/tabwriter"
 
 	"github.com/activebook/gllm/service"
 	"github.com/fatih/color"
-	"github.com/spf13/viper"
+	"github.com/spf13/cobra"
 )
+
+// contains checks if a slice contains a string
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+// runCommand executes a command with arguments
+func runCommand(cmd *cobra.Command, args []string) {
+	if len(args) == 0 {
+		// No arguments, call the command directly
+		if cmd.RunE != nil {
+			if err := cmd.RunE(cmd, args); err != nil {
+				service.Errorf("%v\n", err)
+			}
+		} else if cmd.Run != nil {
+			cmd.Run(cmd, args)
+		}
+		return
+	}
+
+	// Find subcommand
+	subName := args[0]
+	for _, sub := range cmd.Commands() {
+		if sub.Name() == subName || (len(sub.Aliases) > 0 && contains(sub.Aliases, subName)) {
+			// Recurse with the subcommand and remaining args
+			runCommand(sub, args[1:])
+			return
+		}
+	}
+
+	// No subcommand found, call on current cmd with all args
+	if cmd.RunE != nil {
+		if err := cmd.RunE(cmd, args); err != nil {
+			service.Errorf("%v\n", err)
+		}
+	} else if cmd.Run != nil {
+		cmd.Run(cmd, args)
+	}
+}
 
 // handleCommand processes chat commands
 func (ci *ChatInfo) handleCommand(cmd string) {
@@ -40,7 +84,6 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	case "/history", "/h":
 		num := 20
 		chars := 200
-		// Parse arguments
 		if len(parts) > 1 {
 			if n, err := strconv.Atoi(parts[1]); err == nil && n > 0 {
 				num = n
@@ -53,92 +96,51 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		}
 		ci.showHistory(num, chars)
 
-	case "/markdown", "/m":
-		if len(parts) < 2 {
-			markdownCmd.Run(markdownCmd, []string{})
-			return
-		}
-		mark := strings.TrimSpace(parts[1])
-		SwitchMarkdown(mark)
-
 	case "/clear", "/reset":
 		ci.clearContext()
 
+	case "/model", "/m":
+		runCommand(modelCmd, parts[1:])
+
+	case "/agent", "/g":
+		runCommand(agentCmd, parts[1:])
+
 	case "/template", "/p":
-		if len(parts) < 2 {
-			templateListCmd.Run(templateListCmd, []string{})
-			return
-		}
-		// Join all remaining parts as they might contain spaces
-		tmpl := strings.Join(parts[1:], " ")
-		tmpl = strings.TrimSpace(tmpl)
-		ci.setTemplate(tmpl)
+		runCommand(templateCmd, parts[1:])
 
 	case "/system", "/S":
-		if len(parts) < 2 {
-			systemListCmd.Run(systemListCmd, []string{})
-			return
-		}
-		sysPrompt := strings.Join(parts[1:], " ")
-		sysPrompt = strings.TrimSpace(sysPrompt)
-		ci.setSystem(sysPrompt)
+		runCommand(systemCmd, parts[1:])
 
 	case "/search", "/s":
-		if len(parts) < 2 {
-			searchCmd.Run(searchCmd, []string{})
-			return
-		}
-		engine := strings.TrimSpace(parts[1])
-		ci.setSearchEngine(engine)
+		runCommand(searchCmd, parts[1:])
 
 	case "/tools", "/t":
-		if len(parts) < 2 {
-			toolsCmd.Run(toolsCmd, []string{})
-			return
-		}
-		tools := strings.TrimSpace(parts[1])
-		ci.setUseTools(tools)
+		runCommand(toolsCmd, parts[1:])
 
 	case "/mcp":
-		if len(parts) < 2 {
-			mcpCmd.Run(mcpCmd, []string{})
-			return
-		}
-		mcp := strings.TrimSpace(parts[1])
-		ci.setUseMCP(mcp)
+		runCommand(mcpCmd, parts[1:])
 
 	case "/memory", "/y":
-		if len(parts) < 2 {
-			memoryListCmd.Run(memoryListCmd, []string{})
-			return
-		}
-		args := parts[1:]
-		ci.handleMemory(args)
+		runCommand(memoryCmd, parts[1:])
+
+	case "/convo", "/c":
+		runCommand(convoCmd, parts[1:])
 
 	case "/think", "/T":
-		if len(parts) < 2 {
-			thinkCmd.Run(thinkCmd, []string{})
-			return
-		} else {
-			mode := strings.TrimSpace(parts[1])
-			SwitchThinkMode(mode)
-		}
-
-	case "/reference", "/r":
-		if len(parts) < 2 {
-			fmt.Println("Please specify a number")
-			return
-		}
-		count := strings.TrimSpace(parts[1])
-		ci.setReferences(count)
+		runCommand(thinkCmd, parts[1:])
 
 	case "/usage", "/u":
+		runCommand(usageCmd, parts[1:])
+
+	case "/markdown", "/k":
+		runCommand(markdownCmd, parts[1:])
+
+	case "/editor", "/e":
 		if len(parts) < 2 {
-			usageCmd.Run(usageCmd, []string{})
+			ci.handleEditor()
 			return
 		}
-		usage := strings.TrimSpace(parts[1])
-		SwitchUsageMetainfo(usage)
+		runCommand(editorCmd, parts[1:])
 
 	case "/attach", "/a":
 		if len(parts) < 2 {
@@ -154,31 +156,12 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		}
 		ci.detachFiles(cmd)
 
-	case "/editor", "/e":
-		if len(parts) < 2 {
-			ci.handleEditor()
-			return
-		}
-		arg := strings.TrimSpace(parts[1])
-		editorCmd.Run(editorCmd, []string{arg})
-
-	case "/output", "/o":
-		if len(parts) < 2 {
-			ci.setOutputFile("")
-		} else {
-			filename := strings.TrimSpace(parts[1])
-			ci.setOutputFile(filename)
-		}
-
 	case "/info", "/i":
-		// Show current model and conversation stats
 		ci.showInfo()
 
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 	}
-
-	// Continue the REPL
 }
 
 // showHelp displays available chat commands
@@ -188,22 +171,23 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /clear, /reset - Clear conversation history")
 	fmt.Println("  /help, /? - Show this help message")
 	fmt.Println("  /info, /i - Show current settings")
-	fmt.Println("  /history, /h [num] [chars] - Show recent conversation history (default: 20 messages, 200 chars)")
-	fmt.Println("  /markdown, /m [on|off] - Switch whether to render markdown or not")
-	fmt.Println("  /attach, /a <filename> - Attach a file to the conversation")
-	fmt.Println("  /detach, /d <filename|all> - Detach a file from the conversation")
-	fmt.Println("  /template, /p \"<tmpl|name>\" - Change the template")
-	fmt.Println("  /system /S \"<prompt|name>\" - Change the system prompt")
-	fmt.Println("  /think, /T \"[on|off]\" - Switch whether to use deep think mode")
-	fmt.Println("  /search, /s \"<engine>[on|off]\" - Change the search engine, or switch on/off")
-	fmt.Println("  /tools, /t \"[on|off|skip|confirm]\" - Switch whether to use embedding tools, skip tools confirmation")
-	fmt.Println("  /mcp \"[on|off|list]\" - Switch whether to use MCP servers, or list available servers")
-	fmt.Println("  /memory, /y \"[list|add|clear]\" - Manage long-term cross-session memory")
-	fmt.Println("  /reference, /r \"<num>\" - Change the search link reference count")
-	fmt.Println("  /usage, /u \"[on|off]\" - Switch whether to show token usage information")
-	fmt.Println("  /editor, /e <editor>|list - Open external editor for multi-line input")
-	fmt.Println("  /output, /o <filename> [off] - Save to output file for model responses")
-	fmt.Println("  !<command> - Execute a shell command directly (e.g. !ls -la)")
+	fmt.Println("  /history, /h [num] [chars] - Show recent conversation history")
+	fmt.Println("  /model, /m [subcmd] - Manage models (list, switch, add, etc.)")
+	fmt.Println("  /agent, /g [subcmd] - Manage agents (list, switch, add, etc.)")
+	fmt.Println("  /template, /p [subcmd] - Manage templates (list, switch, add, etc.)")
+	fmt.Println("  /system, /S [subcmd] - Manage system prompts (list, switch, add, etc.)")
+	fmt.Println("  /search, /s [subcmd] - Manage search engines (list, switch, etc.)")
+	fmt.Println("  /tools, /t [on|off|skip|confirm] - Manage embedding tools")
+	fmt.Println("  /mcp [subcmd] - Manage MCP servers (on, off, list, etc.)")
+	fmt.Println("  /memory, /y [subcmd] - Manage memory (list, add, clear)")
+	fmt.Println("  /convo, /c [subcmd] - Manage conversations (list, info, remove, etc.)")
+	fmt.Println("  /think, /T [on|off] - Switch deep think mode")
+	fmt.Println("  /usage, /u [on|off] - Switch token usage display")
+	fmt.Println("  /markdown, /k [on|off] - Switch markdown rendering")
+	fmt.Println("  /editor, /e [subcmd] - Manage editor or open for multi-line input")
+	fmt.Println("  /attach, /a <file> - Attach a file")
+	fmt.Println("  /detach, /d <file|all> - Detach a file")
+	fmt.Println("  !<command> - Execute a shell command")
 }
 
 // showInfo displays current chat settings and information
@@ -211,36 +195,15 @@ func (ci *ChatInfo) showInfo() {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
 	sectionColor := color.New(color.FgCyan, color.Bold).SprintFunc()
-	headerColor := color.New(color.FgYellow, color.Bold).SprintFunc()
-	highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
 	keyColor := color.New(color.FgMagenta, color.Bold).SprintFunc()
 
 	printSection := func(title string) {
 		fmt.Println()
 		fullTitle := fmt.Sprintf("=== %s ===", strings.ToUpper(title))
-		lineWidth := 50
-		padding := (lineWidth - len(fullTitle)) / 2
-		if padding < 0 {
-			padding = 0
-		}
-		fmt.Printf("%s%s\n", strings.Repeat(" ", padding), sectionColor(fullTitle))
-		fmt.Println(color.New(color.FgCyan).Sprint(strings.Repeat("-", lineWidth)))
+		fmt.Printf("%s\n", sectionColor(fullTitle))
 	}
 
 	printSection("CURRENT SETTINGS")
-
-	// Basic settings
-	fmt.Fprintln(w, headerColor(" SETTING ")+"\t"+headerColor(" VALUE "))
-	fmt.Fprintln(w, headerColor("---------")+"\t"+headerColor("-------"))
-	fmt.Fprintf(w, "%s\t%s\n", keyColor("Model"), highlightColor(ci.Model))
-	fmt.Fprintf(w, "%s\t%s\n", keyColor("Search Engine"), highlightColor(GetEffectSearchEngineName()))
-	fmt.Fprintf(w, "%s\t%t\n", keyColor("Deep Think"), IsThinkEnabled())
-	fmt.Fprintf(w, "%s\t%t\n", keyColor("Embedding Tools"), AreToolsEnabled())
-	fmt.Fprintf(w, "%s\t%t\n", keyColor("MCP Servers"), AreMCPServersEnabled())
-	fmt.Fprintf(w, "%s\t%t\n", keyColor("Markdown"), IncludeMarkdown())
-	fmt.Fprintf(w, "%s\t%t\n", keyColor("Usage Metainfo"), IncludeUsageMetainfo())
-	fmt.Fprintf(w, "%s\t%s\n", keyColor("Output File"), ci.outputFile)
-	w.Flush()
 
 	// System prompt
 	printSection("SYSTEM PROMPT")
@@ -249,6 +212,26 @@ func (ci *ChatInfo) showInfo() {
 	// Template
 	printSection("TEMPLATE")
 	fmt.Printf("%s\n", GetEffectiveTemplate())
+
+	// Memory section (included in system prompt)
+	// printSection("Memory")
+	// memoryListCmd.Run(memoryListCmd, []string{})
+	// w.Flush()
+
+	// Search Engines section
+	printSection("Search Engines")
+	searchListCmd.Run(searchListCmd, []string{})
+	w.Flush()
+
+	// Plugins section
+	printSection("Tools")
+	ListAllTools()
+	w.Flush()
+
+	// Current Agent section
+	printSection("Agents")
+	agentCmd.Run(agentCmd, []string{})
+	w.Flush()
 
 	// Attachments
 	printSection("ATTACHMENTS")
@@ -299,17 +282,8 @@ func (ci *ChatInfo) showHistory(num int, chars int) {
 
 // clearContext clears the conversation context
 func (ci *ChatInfo) clearContext() {
-	// Reset all settings
-	viper.Set("agent.system_prompt", "")
-	viper.Set("agent.template", "")
-	viper.Set("agent.search", "")
-	err := viper.WriteConfig()
-	if err != nil {
-		service.Errorf("Error clearing context: %v\n", err)
-		return
-	}
 	// Empty the conversation history
-	err = ci.Conversion.Clear()
+	err := ci.Conversion.Clear()
 	if err != nil {
 		service.Errorf("Error clearing context: %v\n", err)
 		return
@@ -317,138 +291,6 @@ func (ci *ChatInfo) clearContext() {
 	// Empty attachments
 	ci.Files = []*service.FileData{}
 	fmt.Printf("Context cleared.\n")
-}
-
-// setTemplate sets the conversation template
-func (ci *ChatInfo) setTemplate(template string) {
-	if err := SetEffectiveTemplate(template); err != nil {
-		service.Warnf("%v", err)
-		fmt.Println("Ignore template prompt")
-	} else {
-		fmt.Printf("Switched to template: %s\n", template)
-	}
-}
-
-// setSystem sets the system prompt
-func (ci *ChatInfo) setSystem(system string) {
-	if err := SetEffectiveSystemPrompt(system); err != nil {
-		service.Warnf("%v", err)
-		fmt.Println("Ignore system prompt")
-	} else {
-		fmt.Printf("Switched to system prompt: %s\n", system)
-	}
-}
-
-// setSearchEngine sets the search engine
-func (ci *ChatInfo) setSearchEngine(engine string) {
-	switch engine {
-	case "on":
-		searchOnCmd.Run(searchCmd, []string{})
-	case "off":
-		searchOffCmd.Run(searchCmd, []string{})
-	default:
-		succeed := SetEffectSearchEngineName(engine)
-		if succeed {
-			fmt.Printf("Switched to search engine: %s\n", GetEffectSearchEngineName())
-		}
-	}
-}
-
-// setReferences sets the reference count
-func (ci *ChatInfo) setReferences(count string) {
-	num, err := strconv.Atoi(count)
-	if err != nil {
-		fmt.Println("Invalid number")
-		return
-	}
-	referenceFlag = num
-	fmt.Printf("Reference count set to %d\n", num)
-}
-
-// setUseTools sets the tools usage mode
-func (ci *ChatInfo) setUseTools(useTools string) {
-	switch useTools {
-	// Set useTools on or off
-	case "on":
-		SwitchUseTools(useTools)
-	case "off":
-		SwitchUseTools(useTools)
-
-		// Set whether or not to skip tools confirmation
-	case "confirm":
-		confirmToolsFlag = false
-		fmt.Print("Tool operations would need confirmation\n")
-	case "skip":
-		confirmToolsFlag = true
-		fmt.Print("Tool confirmation would skip\n")
-
-	default:
-		toolsCmd.Run(toolsCmd, nil)
-	}
-}
-
-// setUseMCP sets the MCP usage mode
-func (ci *ChatInfo) setUseMCP(useMCP string) {
-	switch useMCP {
-	case "on":
-		SwitchMCP(useMCP)
-	case "off":
-		SwitchMCP(useMCP)
-	case "list":
-		mcpListCmd.Run(mcpListCmd, []string{})
-	default:
-		mcpCmd.Run(mcpCmd, []string{})
-	}
-}
-
-// handleMemory handles memory commands in the REPL
-func (ci *ChatInfo) handleMemory(args []string) {
-	// Simple argument parsing logic
-	// If it starts with "list", "clear", run those commands
-	// If it starts with "add", treat the rest as the memory content
-	subcmd := strings.TrimSpace(args[0])
-	switch subcmd {
-	case "list", "ls":
-		memoryListCmd.Run(memoryListCmd, []string{})
-	case "clear":
-		memoryClearCmd.Run(memoryClearCmd, []string{})
-	case "add":
-		if len(args) < 2 {
-			fmt.Println("Usage: memory add <content>")
-			return
-		}
-		content := strings.TrimSpace(strings.Join(args[1:], " "))
-		content = strings.Trim(content, "\"") // Remove surrounding quotes if present
-		memoryAddCmd.Run(memoryAddCmd, []string{content})
-	default:
-		// Default to base command which shows help/status
-		memoryListCmd.Run(memoryListCmd, []string{})
-	}
-}
-
-// setOutputFile sets the output file for responses
-func (ci *ChatInfo) setOutputFile(path string) {
-	switch path {
-	case "":
-		if ci.outputFile == "" {
-			fmt.Println("No output file is currently set")
-		} else {
-			fmt.Printf("Current output file: %s\n", ci.outputFile)
-		}
-	case "off":
-		ci.outputFile = ""
-		fmt.Println("No output file")
-	default:
-		filename := strings.TrimSpace(path)
-		err := validFilePath(filename, false)
-		if err != nil {
-			service.Warnf("%v", err)
-			return
-		}
-		// If we get here, the file can be created/overwritten
-		ci.outputFile = filename
-		fmt.Printf("Output file set to: %s\n", filename)
-	}
 }
 
 func (ci *ChatInfo) handleEditor() {
@@ -499,4 +341,137 @@ func (ci *ChatInfo) handleEditorCommand() {
 
 	// Set editor input
 	ci.EditorInput = content
+}
+
+func (ci *ChatInfo) addAttachFiles(input string) {
+	// Normalize input by replacing /attach with /a
+	input = strings.ReplaceAll(input, "/attach ", "/a ")
+
+	// Split input into tokens
+	tokens := strings.Fields(input)
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	for i := 0; i < len(tokens); i++ {
+		if tokens[i] == "/a" {
+			if i+1 < len(tokens) {
+				// Check if there's a file path after /a
+				filePath := tokens[i+1]
+				i++ // Skip the file path token
+
+				wg.Add(1)
+				go func(filePath string) {
+					defer wg.Done()
+
+					// Verify file exists and is not a directory
+					if !checkIsLink(filePath) {
+						fileInfo, err := os.Stat(filePath)
+						if err != nil {
+							if os.IsNotExist(err) {
+								service.Errorf("File not found: %s\n", filePath)
+							} else {
+								service.Errorf("Error accessing file %s: %v\n", filePath, err)
+							}
+							return
+						}
+						if fileInfo.IsDir() {
+							service.Errorf("Cannot attach directory: %s\n", filePath)
+							return
+						}
+					}
+					// Check if file is already attached
+					mu.Lock()
+					found := false
+					for _, file := range ci.Files {
+						if file.Path() == filePath {
+							found = true
+							break
+						}
+					}
+					mu.Unlock()
+					// If file is already attached, skip processing
+					if found {
+						service.Warnf("File already attached: %s", filePath)
+						return
+					}
+
+					// Process the attachment
+					file := processAttachment(filePath)
+					if file == nil {
+						service.Errorf("Error loading attachment: %s\n", filePath)
+						return
+					}
+
+					// Append the file to the list of attachments
+					mu.Lock()
+					ci.Files = append(ci.Files, file)
+					mu.Unlock()
+					fmt.Printf("Attachment loaded: %s\n", filePath)
+				}(filePath)
+			} else {
+				fmt.Println("Please specify a file path after /a")
+			}
+		}
+		// Ignore other tokens
+	}
+	wg.Wait()
+
+	if len(ci.Files) == 0 {
+		fmt.Println("No attachments were loaded")
+	}
+}
+
+func (ci *ChatInfo) detachFiles(input string) {
+	// Normalize input by replacing /detach with /d
+	input = strings.ReplaceAll(input, "/detach ", "/d ")
+
+	// Handle "all" case
+	if strings.Contains(input, "/d all") || strings.Contains(input, "/detach all") {
+		if len(ci.Files) == 0 {
+			fmt.Println("No attachments to detach")
+			return
+		}
+		ci.Files = []*service.FileData{}
+		fmt.Println("Detached all attachments")
+		return
+	}
+
+	// Split input into tokens
+	tokens := strings.Fields(input)
+
+	// Process detach commands
+	detachedAny := false
+	for i := 0; i < len(tokens); i++ {
+		if tokens[i] == "/d" {
+			// Check if there's a file path after /d
+			if i+1 >= len(tokens) {
+				fmt.Println("Please specify a file path after /d")
+				continue
+			}
+
+			// Get the file path (next token)
+			filePath := tokens[i+1]
+			i++ // Skip the file path token
+
+			// Find and detach the file
+			found := false
+			for j, file := range ci.Files {
+				if file.Path() == filePath {
+					ci.Files = append(ci.Files[:j], ci.Files[j+1:]...)
+					fmt.Printf("Detached: %s\n", filePath)
+					detachedAny = true
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				fmt.Printf("Attachment not found: %s\n", filePath)
+			}
+		}
+	}
+
+	if !detachedAny {
+		fmt.Println("No valid detachment")
+	}
 }

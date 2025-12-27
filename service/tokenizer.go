@@ -26,6 +26,19 @@ const (
 	CharsPerTokenDefault  = 4.0 // Default fallback
 	MessageOverheadTokens = 3   // Standard overhead per message (<|start|>role and <|end|>)
 	ToolCallOverhead      = 24  // Reduced from 100 to 24 (closer to reality for JSON overhead)
+
+	// Media Token Costs (Heuristics)
+	// 1MB = 1000 tokens
+	TokenCostImageDefault = 1000 // Safe upper bound average for high-res images (OpenAI high detail is ~1105, low is 85)
+	TokenCostImageGemini  = 1000 // Fixed cost for Gemini images <= 384px (often tiled, but 258 is the base unit)
+
+	// Video/Audio Heuristics (Tokens per MB - heavily estimated as we don't have duration)
+	// Assumptions:
+	// - Video: 2Mbps (.25MB/s). 1MB = 4s. Gemini Video: 263 tokens/s. 4s * 263 = 1052 tokens.
+	// - Audio: 128kbps (16KB/s). 1MB = 64s. Gemini Audio: 32 tokens/s. 64s * 32 = 2048 tokens.
+	TokenCostVideoPerMBGemini   = 1000
+	TokenCostVideoPerMBOpenChat = 10000 // For base64 encoded video
+	TokenCostAudioPerMBGemini   = 2000
 )
 
 // EstimateTokens provides fast character-based estimation for text.
@@ -54,6 +67,7 @@ func detectCharsPerToken(text string) float64 {
 	var hiragana int      // Japanese hiragana
 	var katakana int      // Japanese katakana
 	var hangul int        // Korean hangul
+	var ascii int
 
 	for _, r := range runes {
 		switch {
@@ -78,6 +92,8 @@ func detectCharsPerToken(text string) float64 {
 		// Hangul Compatibility Jamo
 		case r >= '\u3130' && r <= '\u318f':
 			hangul++
+		case r < 128:
+			ascii++
 		}
 	}
 
@@ -132,6 +148,11 @@ func contains(s, substr string) bool {
 	return false
 }
 
+// isDataURL checks if a string starts with "data:"
+func isDataURL(s string) bool {
+	return len(s) > 5 && s[:5] == "data:"
+}
+
 // EstimateOpenAIMessageTokens estimates tokens for an OpenAI chat message.
 // This accounts for role tokens, content, and tool calls.
 func EstimateOpenAIMessageTokens(msg openai.ChatCompletionMessage) int {
@@ -152,10 +173,16 @@ func EstimateOpenAIMessageTokens(msg openai.ChatCompletionMessage) int {
 			case openai.ChatMessagePartTypeText:
 				tokens += EstimateTokens(part.Text)
 			case openai.ChatMessagePartTypeImageURL:
-				// Images typically cost 765-1105 tokens depending on size
-				// Use a conservative estimate
-				tokens += EstimateTokens(part.ImageURL.URL)
-				tokens += EstimateTokens(string(part.ImageURL.Detail))
+				// If it's a data URL, usage fixed cost
+				if part.ImageURL != nil {
+					if isDataURL(part.ImageURL.URL) {
+						tokens += TokenCostImageDefault
+					} else {
+						tokens += EstimateTokens(part.ImageURL.URL)
+					}
+					// Check detail if available, but for now we rely on the heuristic
+					// tokens += EstimateTokens(string(part.ImageURL.Detail))
+				}
 			}
 		}
 	}
@@ -196,11 +223,25 @@ func EstimateOpenChatMessageTokens(msg *openchat.ChatCompletionMessage) int {
 					tokens += EstimateTokens(part.Text)
 				}
 				if part.ImageURL != nil {
-					tokens += EstimateTokens(part.ImageURL.URL)
-					tokens += EstimateTokens(string(part.ImageURL.Detail))
+					if isDataURL(part.ImageURL.URL) {
+						tokens += TokenCostImageDefault
+					} else {
+						tokens += EstimateTokens(part.ImageURL.URL)
+					}
 				}
 				if part.VideoURL != nil {
-					tokens += EstimateTokens(part.VideoURL.URL)
+					if isDataURL(part.VideoURL.URL) {
+						// Video cost heuristic (1MB ~ 10k tokens)
+						// Since we can't easily get size from base64 string without decoding or overhead math
+						// base64 length = 4/3 * original size.
+						// So len(base64) / 1.33 = size in bytes.
+						// tokens = (len / 1.33 / 1024 / 1024) * TokenCostVideoPerMB
+						// simplified: len / 1400  (approx)
+						sizeInMB := (float64(len(part.VideoURL.URL)) / 1.33) / 1024 / 1024
+						tokens += int(sizeInMB * TokenCostVideoPerMBOpenChat)
+					} else {
+						tokens += EstimateTokens(part.VideoURL.URL)
+					}
 				}
 			}
 		}
@@ -261,12 +302,41 @@ func EstimateGeminiMessageTokens(msg *genai.Content) int {
 
 		// Inline data (images/files)
 		if part.InlineData != nil {
-			tokens += int(float64(len(part.InlineData.Data)) / 3.5)
+			// tokens += int(float64(len(part.InlineData.Data)) / 3.5) // OLD INCORRECT LOGIC
+			sizeInMB := float64(len(part.InlineData.Data)) / 1024 / 1024
+			if IsImageMIMEType(part.InlineData.MIMEType) {
+				tokens += TokenCostImageGemini
+			} else if IsVideoMIMEType(part.InlineData.MIMEType) {
+				tokens += int(sizeInMB * TokenCostVideoPerMBGemini)
+			} else if IsAudioMIMEType(part.InlineData.MIMEType) {
+				tokens += int(sizeInMB * TokenCostAudioPerMBGemini)
+			} else {
+				// Fallback for other files (PDFs etc) - treat as dense text?
+				// PDFs are often text, so size based might be okay, or extracting text would be better.
+				// For now, let's assume safe text estimate: 1 char = 1 byte = 0.25 tokens?
+				// Actually text is usually compressed.
+				// Let's stick with the text heuristic for unknown types if it's text-based,
+				// but PDF is binary.
+				// Gemini PDF tokenization is based on extracted text.
+				// Heuristic: 1MB PDF ~= 10k tokens?
+				tokens += int(sizeInMB * 10000)
+			}
 			tokens += EstimateTokens(part.InlineData.MIMEType)
 		}
 
 		// File data (images/files via URI)
 		if part.FileData != nil {
+			// We can't know the size of remote user files easily here without fetching.
+			// But usually fileUri means it's already uploaded.
+			// The API response will have the usage.
+			// For estimation, we might have to just guess or ignore.
+			// Let's guess based on typical file?
+			if IsImageMIMEType(part.FileData.MIMEType) {
+				tokens += TokenCostImageGemini
+			} else {
+				// Can't estimate well.
+				tokens += 100 // placeholder
+			}
 			tokens += EstimateTokens(part.FileData.FileURI)
 			tokens += EstimateTokens(part.FileData.MIMEType)
 		}

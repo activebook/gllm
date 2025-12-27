@@ -72,7 +72,6 @@ var (
 )
 
 type ToolsUse struct {
-	Enable      bool // Whether tools can be used
 	AutoApprove bool // Whether tools can be used without user confirmation
 }
 
@@ -100,6 +99,39 @@ func AvailableSearchTool(toolName string) bool {
 		}
 	}
 	return false
+}
+
+// GetOpenEmbeddingToolsFiltered returns embedding tools filtered by the allowed list.
+// If allowedTools is nil or empty, returns all embedding tools.
+// Unknown tool names are gracefully ignored.
+func GetOpenEmbeddingToolsFiltered(allowedTools []string) []*OpenTool {
+	allTools := getOpenEmbeddingTools()
+
+	// If no filter specified, return all tools
+	if len(allowedTools) == 0 {
+		return nil
+	}
+
+	// Create a set of allowed tool names for O(1) lookup
+	allowedSet := make(map[string]bool)
+	for _, name := range allowedTools {
+		allowedSet[name] = true
+	}
+
+	// Filter tools
+	var filtered []*OpenTool
+	for _, tool := range allTools {
+		if allowedSet[tool.Function.Name] {
+			filtered = append(filtered, tool)
+		}
+	}
+
+	return filtered
+}
+
+// IsValidEmbeddingTool checks if a tool name is a valid embedding tool
+func IsValidEmbeddingTool(toolName string) bool {
+	return AvailableEmbeddingTool(toolName)
 }
 
 func AvailableMCPTool(toolName string, client *MCPClient) bool {

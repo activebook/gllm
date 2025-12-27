@@ -23,7 +23,8 @@ This means that you can't use a built-in tool and function calling at the same t
 
 // Tool definitions for Gemini 2
 func (ag *Agent) getGemini2EmbeddingTools(includeMCP bool) *genai.Tool {
-	openTools := getOpenEmbeddingTools()
+	// Get filtered tools based on agent's enabled tools list
+	openTools := GetOpenEmbeddingToolsFiltered(ag.EnabledTools)
 	var funcs []*genai.FunctionDeclaration
 
 	// Track registered tool names to prevent duplicates

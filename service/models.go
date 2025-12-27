@@ -30,6 +30,7 @@ var DefaultModelLimits = map[string]ModelLimits{
 	"qwen3-next-80b-a3b-thinking":    {ContextWindow: 131072, MaxOutputTokens: 8192},
 	"qwen3-vl-plus":                  {ContextWindow: 256000, MaxOutputTokens: 32768},
 	"qwen3-vl-flash":                 {ContextWindow: 256000, MaxOutputTokens: 32768},
+	"qwen3-omni-flash":               {ContextWindow: 64000, MaxOutputTokens: 16384},
 	"qwen-max-2025-01-25":            {ContextWindow: 128000, MaxOutputTokens: 8192},
 	"qwen-turbo":                     {ContextWindow: 1000000, MaxOutputTokens: 8192},
 	"qwen-vl-max-2025-01-25":         {ContextWindow: 128000, MaxOutputTokens: 8192},
@@ -37,8 +38,8 @@ var DefaultModelLimits = map[string]ModelLimits{
 	/*
 	 * ByteDance Models
 	 */
-	"doubao-seed‑1-8":          {ContextWindow: 256000, MaxOutputTokens: 65536},
-	"doubao‑seed-1-6":          {ContextWindow: 256000, MaxOutputTokens: 32768},
+	"doubao-seed-1-8":          {ContextWindow: 256000, MaxOutputTokens: 65536},
+	"doubao-seed-1-6":          {ContextWindow: 256000, MaxOutputTokens: 32768},
 	"doubao-seed-1.6":          {ContextWindow: 256000, MaxOutputTokens: 32768},
 	"doubao-seed-1.6-flash":    {ContextWindow: 256000, MaxOutputTokens: 32768},
 	"doubao-seed-1.6-thinking": {ContextWindow: 256000, MaxOutputTokens: 32768},

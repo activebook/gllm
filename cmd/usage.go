@@ -5,7 +5,6 @@ import (
 
 	"github.com/activebook/gllm/service"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {
@@ -15,15 +14,16 @@ func init() {
 }
 
 var usageCmd = &cobra.Command{
-	Use:   "usage",
-	Short: "Whether to include token usage metainfo in the output",
+	Use:     "usage",
+	Aliases: []string{"ua"}, // Optional alias
+	Short:   "Whether to include token usage metainfo in the output",
 	Long: `When Usage is switched on, the output will include token usage metainfo.
 When Usage is switched off, the output will not include any token usage metainfo.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
-		fmt.Println("-------------------------------------------")
+		fmt.Println()
 		fmt.Print("Usage output is currently switched: ")
-		usage := viper.GetBool("agent.usage")
+		usage := GetAgentBool("usage")
 		if usage {
 			fmt.Println(switchOnColor + "on" + resetColor)
 		} else {
@@ -36,10 +36,7 @@ var usageOnCmd = &cobra.Command{
 	Use:   "on",
 	Short: "Switch usage output on",
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("agent.usage", true)
-
-		// Write the config file
-		if err := writeConfig(); err != nil {
+		if err := SetAgentValue("usage", true); err != nil {
 			service.Errorf("failed to save usage format output: %w", err)
 			return
 		}
@@ -52,10 +49,7 @@ var usageOffCmd = &cobra.Command{
 	Use:   "off",
 	Short: "Switch usage output off",
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("agent.usage", false)
-
-		// Write the config file
-		if err := writeConfig(); err != nil {
+		if err := SetAgentValue("usage", false); err != nil {
 			service.Errorf("failed to save usage format output: %w", err)
 			return
 		}
@@ -76,6 +70,6 @@ func SwitchUsageMetainfo(s string) {
 }
 
 func IncludeUsageMetainfo() bool {
-	usage := viper.GetBool("agent.usage")
+	usage := GetAgentBool("usage")
 	return usage
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/charmbracelet/huh"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -12,35 +13,76 @@ import (
 
 // editorCmd represents the editor command
 var editorCmd = &cobra.Command{
-	Use:   "editor [editor_name]",
+	Use:   "editor [NAME]",
 	Short: "Manage preferred text editor for multi-line input",
 	Long: `Manage the preferred text editor used for multi-line input editing.
 This allows you to set, check, and list available text editors for use
-with the /editor command in chat sessions.
-
-Examples:
-  gllm editor           # Show current editor
-  gllm editor vim       # Set vim as preferred editor
-  gllm editor list      # List all available editors`,
+with the /editor command in chat sessions.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
-			// Show current editor
-			current := viper.GetString("chat.editor")
-			if current != "" {
-				fmt.Printf("Current preferred editor: %s\n", current)
-			} else {
-				fmt.Println("No preferred editor set.")
-				fmt.Println("Use 'gllm editor list' to see available editors.")
-			}
+			editorListCmd.Run(cmd, args)
 			return
 		}
 
-		if args[0] == "list" || args[0] == "pr" {
-			listAvailableEditors()
-		} else {
-			// Set editor
-			setPreferredEditor(args[0])
+		// Fallback for script compatibility
+		arg := args[0]
+		switch arg {
+		case "list", "ls", "pr":
+			editorListCmd.Run(cmd, args)
+		case "switch", "sw", "select":
+			editorSwitchCmd.RunE(cmd, args[1:])
+		default:
+			setPreferredEditor(arg)
 		}
+	},
+}
+
+// editorSwitchCmd represents the editor switch command
+var editorSwitchCmd = &cobra.Command{
+	Use:     "switch [NAME]",
+	Aliases: []string{"sw", "select"},
+	Short:   "Switch to a different text editor",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		var name string
+		if len(args) > 0 {
+			name = args[0]
+		} else {
+			commonEditors := []string{"vim", "vi", "nvim", "neovim", "nano", "pico", "emacs", "emacsclient", "code", "code-insiders", "subl", "sublime_text", "atom", "gedit", "pluma", "kate", "kwrite", "notepad.exe", "notepad++", "textedit"}
+
+			var installed []string
+			for _, ed := range commonEditors {
+				if _, err := exec.LookPath(ed); err == nil {
+					installed = append(installed, ed)
+				}
+			}
+
+			if len(installed) == 0 {
+				return fmt.Errorf("no supported text editors found in PATH")
+			}
+
+			name = viper.GetString("chat.editor")
+			highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
+
+			var options []huh.Option[string]
+			for _, ed := range installed {
+				label := ed
+				if ed == name {
+					label = highlightColor(ed + " (active)")
+				}
+				options = append(options, huh.NewOption(label, ed))
+			}
+
+			err := huh.NewSelect[string]().
+				Title("Select Preferred Editor").
+				Options(options...).
+				Value(&name).
+				Run()
+			if err != nil {
+				return nil
+			}
+		}
+
+		return setPreferredEditor(name)
 	},
 }
 
@@ -58,6 +100,7 @@ var editorListCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(editorCmd)
 	editorCmd.AddCommand(editorListCmd)
+	editorCmd.AddCommand(editorSwitchCmd)
 }
 
 // getPreferredEditor gets the user's preferred editor from config or detects it
@@ -136,30 +179,32 @@ func setPreferredEditor(editor string) error {
 // listAvailableEditors shows all available editors
 func listAvailableEditors() {
 	fmt.Println("Available editors:")
-	fmt.Println("==================")
 
 	commonEditors := []string{"vim", "vi", "nvim", "neovim", "nano", "pico", "emacs", "emacsclient", "code", "code-insiders", "subl", "sublime_text", "atom", "gedit", "pluma", "kate", "kwrite", "notepad.exe", "notepad++", "textedit"}
 
 	green := color.New(color.FgGreen).SprintFunc()
 	gray := color.New(color.FgHiBlack).SprintFunc()
+	highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
+
+	current := viper.GetString("chat.editor")
 
 	for _, editor := range commonEditors {
 		if _, err := exec.LookPath(editor); err == nil {
-			fmt.Printf("[%s] %s (installed)\n", green("✔"), editor)
+			indicator := "  "
+			pname := fmt.Sprintf("%-14s", editor)
+			if editor == current {
+				indicator = highlightColor("* ")
+				pname = highlightColor(pname)
+			}
+			fmt.Printf("%s%s %s\n", indicator, pname, green("(installed)"))
 		} else {
-			fmt.Printf("[%s] %s (not found)\n", gray("x"), editor)
+			fmt.Printf("  %-14s %s\n", editor, gray("(not found)"))
 		}
 	}
 
-	current := viper.GetString("chat.editor")
 	if current != "" {
-		fmt.Printf("\nCurrent preferred: %s\n", current)
+		fmt.Printf("\n(*) Indicates the current preferred editor.\n")
 	} else {
-		fmt.Println("\nNo preferred editor set.")
+		fmt.Println("\nNo preferred editor set. Use 'gllm editor switch' to select one.")
 	}
-
-	fmt.Println("\nUsage:")
-	fmt.Println("  gllm editor <name>      - Set preferred editor")
-	fmt.Println("  gllm editor list        - Show this list")
-	fmt.Println("  gllm editor             - Show current editor")
 }

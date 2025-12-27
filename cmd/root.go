@@ -33,8 +33,6 @@ var (
 	searchFlag       bool     // gllm --search(-s) "What is the stock price of Tesla right now?"
 	toolsFlag        bool     // gllm --tools(-t) "Move a.txt to folder b"
 	codeFlag         bool     // gllm --code(-C) "print('Hello, World!')"
-	deepDiveFlag     bool     // gllm --deep-dive "Tell me current tariff war results"
-	referenceFlag    int      // gllm --reference(-r) 3 "What is the stock price of Tesla right now?"
 	convoName        string   // gllm --conversation(-c) "My Conversation" "What is the stock price of Tesla right now?"
 	confirmToolsFlag bool     // gllm --confirm-tools "Allow skipping confirmation for tool operations"
 	thinkFlag        bool     // gllm --think(-T) "Enable deep think mode"
@@ -102,7 +100,6 @@ Configure your API keys and preferred models, then start chatting or executing c
 				!cmd.Flags().Changed("attachment") &&
 				!cmd.Flags().Changed("version") &&
 				!cmd.Flags().Changed("conversation") &&
-				!cmd.Flags().Changed("reference") &&
 				!cmd.Flags().Changed("mcp") &&
 				!hasStdinData() {
 				cmd.Help()
@@ -307,14 +304,13 @@ func processQuery(prompt string, files []*service.FileData) {
 	// or if tools are enabled (useTools is true).
 	var searchEngine map[string]any
 	// If search flag is set, use the effective search engine
-	// If toolsFlag is set, we also need to use the search engine
-	if searchFlag || toolsFlag {
+	if searchFlag {
 		_, searchEngine = GetEffectiveSearchEngine()
-		// if global search engine isn't set, and searchFlag is false, then no search engine is available
-		if searchEngine != nil {
-			searchEngine["deep_dive"] = deepDiveFlag   // Add deep dive flag to search engine settings
-			searchEngine["references"] = referenceFlag // Add references flag to search engine settings
-		}
+	}
+	// Regardless of toolsFlag, use the effective tools
+	tools := GetEnabledTools()
+	if tools == nil {
+		tools = []string{}
 	}
 
 	// Include usage metainfo
@@ -331,6 +327,7 @@ func processQuery(prompt string, files []*service.FileData) {
 		MaxRecursions:    maxRecursions,
 		ThinkMode:        thinkFlag,
 		UseTools:         toolsFlag,
+		EnabledTools:     tools,
 		UseMCP:           mcpFlag,
 		SkipToolsConfirm: confirmToolsFlag,
 		AppendUsage:      includeUsage,
@@ -397,18 +394,13 @@ func init() {
 	rootCmd.Flags().StringSliceVarP(&attachments, "attachment", "a", []string{}, "Specify file(s), image(s), url(s) to append to the prompt")
 	rootCmd.Flags().StringVarP(&sysPromptFlag, "system", "S", "", "Specify a system prompt")
 	rootCmd.Flags().StringVarP(&templateFlag, "template", "p", "", "Specify a template to use")
-	rootCmd.Flags().IntVarP(&referenceFlag, "reference", "r", 5, "Specify the number of reference links to show")
-
-	// The key fix is using NoOptDefVal property which specifically handles the case when a flag is provided without a value.
 	rootCmd.Flags().StringVarP(&convoName, "conversation", "c", "", "Specify a conversation name to track chat session")
-	rootCmd.Flags().Int("max-recursions", 5, "Maximum number of Model calling recursions")
 
 	// Flags for enabling/disabling features
 	// These flags are not persistent, so they only apply to this command
 	rootCmd.Flags().BoolVarP(&searchFlag, "search", "s", false, "To query with a search tool")
 	rootCmd.Flags().BoolVarP(&toolsFlag, "tools", "t", false, "Enable model to use embedding tools")
 	rootCmd.Flags().BoolVarP(&codeFlag, "code", "C", false, "Enable model to generate and run Python code (only for gemini)")
-	rootCmd.Flags().BoolVarP(&deepDiveFlag, "deep-dive", "", false, "Fetch more details from the search (default: off)")
 	rootCmd.Flags().BoolVarP(&confirmToolsFlag, "confirm-tools", "", false, "Skip confirmation for tool operations (default: no)")
 	rootCmd.Flags().BoolVarP(&thinkFlag, "think", "T", false, "Enable deep think mode")
 	rootCmd.Flags().BoolVarP(&mcpFlag, "mcp", "", false, "Enable model to use MCP servers")

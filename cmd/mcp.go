@@ -7,7 +7,6 @@ import (
 
 	"github.com/activebook/gllm/service"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var mcpCmd = &cobra.Command{
@@ -17,9 +16,9 @@ var mcpCmd = &cobra.Command{
 Switch on/off to enable/disable all mcp servers`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
-		fmt.Println("-------------------------------------------")
+		fmt.Println()
 		fmt.Print("MCP is currently: ")
-		enabled := viper.GetBool("agent.mcp")
+		enabled := GetAgentBool("mcp")
 		if enabled {
 			fmt.Println(switchOnColor + "enabled" + resetColor)
 		} else {
@@ -69,7 +68,7 @@ var mcpListCmd = &cobra.Command{
 		}
 
 		fmt.Println("Available MCP Servers:")
-		fmt.Println("====================")
+		fmt.Println()
 
 		for _, server := range servers {
 			status := switchOffColor + "Blocked" + resetColor
@@ -132,9 +131,7 @@ var mcpOnCmd = &cobra.Command{
 	Use:   "on",
 	Short: "Enable MCP Servers",
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("agent.mcp", true)
-		err := viper.WriteConfig()
-		if err != nil {
+		if err := SetAgentValue("mcp", true); err != nil {
 			fmt.Printf("Error writing config: %v\n", err)
 			return
 		}
@@ -146,9 +143,7 @@ var mcpOffCmd = &cobra.Command{
 	Use:   "off",
 	Short: "Disable MCP Servers",
 	Run: func(cmd *cobra.Command, args []string) {
-		viper.Set("agent.mcp", false)
-		err := viper.WriteConfig()
-		if err != nil {
+		if err := SetAgentValue("mcp", false); err != nil {
 			fmt.Printf("Error writing config: %v\n", err)
 			return
 		}
@@ -660,7 +655,7 @@ func init() {
 }
 
 func AreMCPServersEnabled() bool {
-	enabled := viper.GetBool("agent.mcp")
+	enabled := GetAgentBool("mcp")
 	return enabled
 }
 

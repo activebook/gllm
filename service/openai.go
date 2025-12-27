@@ -135,7 +135,7 @@ func (ag *Agent) GenerateOpenAIStream() error {
 
 	// Create tools
 	tools := []openai.Tool{}
-	if ag.ToolsUse.Enable {
+	if len(ag.EnabledTools) > 0 {
 		// Add embedding operation tools, which includes the web_search tool
 		embeddingTools := ag.getOpenAIEmbeddingTools()
 		tools = append(tools, embeddingTools...)
@@ -545,8 +545,8 @@ func addUpOpenAITokenUsage(ag *Agent, resp *openai.ChatCompletionStreamResponse)
 func (ag *Agent) getOpenAIEmbeddingTools() []openai.Tool {
 	var tools []openai.Tool
 
-	// Get generic tools and convert them to OpenAI tools
-	genericTools := getOpenEmbeddingTools()
+	// Get filtered tools based on agent's enabled tools list
+	genericTools := GetOpenEmbeddingToolsFiltered(ag.EnabledTools)
 	for _, genericTool := range genericTools {
 		tools = append(tools, genericTool.ToOpenAITool())
 	}
