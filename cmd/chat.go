@@ -338,11 +338,13 @@ func (ci *ChatInfo) callAgent(input string) {
 
 	// must recheck tools flag, because it can be set /tools
 	toolsFlag = AreToolsEnabled()
+	// regardless of toolsFlag, use the effective tools
+	tools := GetEnabledTools()
 	// If tools are enabled, we will use the search engine
 	searchFlag = IsSearchEnabled()
 	// If search flag is set, we will use the search engine, too
 	var searchEngine map[string]any
-	if searchFlag || toolsFlag {
+	if searchFlag {
 		_, searchEngine = GetEffectiveSearchEngine()
 	}
 
@@ -364,6 +366,7 @@ func (ci *ChatInfo) callAgent(input string) {
 		MaxRecursions:    ci.maxRecursions,
 		ThinkMode:        thinkFlag,
 		UseTools:         toolsFlag,
+		EnabledTools:     tools,
 		UseMCP:           mcpFlag,
 		SkipToolsConfirm: confirmToolsFlag,
 		AppendUsage:      includeUsage,

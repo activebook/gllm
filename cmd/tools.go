@@ -2,16 +2,18 @@ package cmd
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/activebook/gllm/service"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
 
 var toolsCmd = &cobra.Command{
 	Use:   "tools",
-	Short: "Enable/Disable embedding tools globally",
+	Short: "Configure embedding tools for current agent",
 	Long: `Tools give gllm the ability to interact with the file system, execute commands, and perform other operations.
-Switch on/off to enable/disable all embedding tools`,
+Use 'gllm tools sw' to select which tools to enable for the current agent.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
 		fmt.Println()
@@ -19,61 +21,126 @@ Switch on/off to enable/disable all embedding tools`,
 	},
 }
 
-var toolsOnCmd = &cobra.Command{
-	Use:   "on",
-	Short: "Enable all embedding tools",
+var toolsSwCmd = &cobra.Command{
+	Use:   "sw",
+	Short: "Switch tools on/off",
+	Long:  "Choose which embedding tools to enable for the current agent.",
 	Run: func(cmd *cobra.Command, args []string) {
-		err := SetAgentValue("tools", true)
-		if err != nil {
-			fmt.Printf("Error writing config: %v\n", err)
-			return
-		}
-		fmt.Printf("All embedding tools %s\n\n", switchOnColor+"enabled"+resetColor)
-		ListAllTools()
-	},
-}
+		// Get all available tools
+		allTools := service.GetAllEmbeddingTools()
 
-var toolsOffCmd = &cobra.Command{
-	Use:   "off",
-	Short: "Disable all embedding tools",
-	Run: func(cmd *cobra.Command, args []string) {
-		err := SetAgentValue("tools", false)
+		// Get currently enabled tools
+		enabledTools := GetAgentStringSlice("tools")
+		if enabledTools == nil {
+			// If no tools configured, default to all tools
+			enabledTools = nil
+		}
+
+		// Create a set for quick lookup
+		enabledSet := make(map[string]bool)
+		for _, t := range enabledTools {
+			enabledSet[t] = true
+		}
+
+		// Build options with current state
+		var options []huh.Option[string]
+		for _, tool := range allTools {
+			opt := huh.NewOption(tool, tool)
+			if enabledSet[tool] {
+				opt = opt.Selected(true)
+			}
+			options = append(options, opt)
+		}
+
+		var selectedTools []string
+		err := huh.NewForm(
+			huh.NewGroup(
+				huh.NewMultiSelect[string]().
+					Title("Select Embedding Tools").
+					Description("Choose which tools to enable for this agent. Press space to toggle, enter to confirm.").
+					Options(options...).
+					Value(&selectedTools),
+			),
+		).Run()
+
 		if err != nil {
-			fmt.Printf("Error writing config: %v\n", err)
+			fmt.Printf("Error: %v\n", err)
 			return
 		}
-		fmt.Printf("All embedding tools %s\n\n", switchOffColor+"disabled"+resetColor)
+
+		// Save selected tools
+		err = SetAgentValue("tools", selectedTools)
+		if err != nil {
+			fmt.Printf("Error saving tools config: %v\n", err)
+			return
+		}
+
+		fmt.Printf("\n%d tool(s) enabled for current agent.\n\n", len(selectedTools))
 		ListAllTools()
 	},
 }
 
 func init() {
-	toolsCmd.AddCommand(toolsOnCmd)
-	toolsCmd.AddCommand(toolsOffCmd)
+	toolsCmd.AddCommand(toolsSwCmd)
 	rootCmd.AddCommand(toolsCmd)
 }
 
+// GetEnabledTools returns the list of enabled tools for the current agent
+// If nil/empty, returns all tools (default behavior)
+func GetEnabledTools() []string {
+	enabledTools := GetAgentStringSlice("tools")
+	if enabledTools == nil {
+		return nil
+	}
+	return enabledTools
+}
+
+// AreToolsEnabled returns true if tools are enabled (at least one tool is configured)
 func AreToolsEnabled() bool {
-	enabled := GetAgentBool("tools")
-	return enabled
+	enabledTools := GetAgentStringSlice("tools")
+	// Consider tools enabled if the slice exists and is not empty
+	return len(enabledTools) > 0
 }
 
 func SwitchUseTools(s string) {
 	switch s {
-	case "on":
-		toolsOnCmd.Run(toolsOnCmd, nil)
-	case "off":
-		toolsOffCmd.Run(toolsOffCmd, nil)
+	case "sw":
+		toolsSwCmd.Run(toolsSwCmd, nil)
 	default:
 		toolsCmd.Run(toolsCmd, nil)
 	}
 }
 
 func ListEmbeddingTools() {
-	enabled := AreToolsEnabled()
-	fmt.Println("Available[✔] embedding tools:")
-	for _, tool := range service.GetAllEmbeddingTools() {
-		if enabled {
+	enabledTools := GetAgentStringSlice("tools")
+	allTools := service.GetAllEmbeddingTools()
+
+	// Sort for consistent display
+	sortedTools := make([]string, len(allTools))
+	copy(sortedTools, allTools)
+	sort.Strings(sortedTools)
+
+	// Create a set of enabled tools for lookup
+	enabledSet := make(map[string]bool)
+	if enabledTools == nil {
+		// If nil, all tools are enabled by default
+		for _, t := range allTools {
+			enabledSet[t] = true
+		}
+	} else {
+		for _, t := range enabledTools {
+			enabledSet[t] = true
+		}
+	}
+
+	enabledCount := 0
+	for range enabledSet {
+		enabledCount++
+	}
+
+	fmt.Println("Embedding tools:")
+	for _, tool := range sortedTools {
+		if enabledSet[tool] {
 			fmt.Printf("[✔] %s\n", tool)
 		} else {
 			fmt.Printf("[ ] %s\n", tool)

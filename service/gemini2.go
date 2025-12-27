@@ -135,7 +135,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	// - If UseCodeTool is true, enable code execution.
 	// - If UseTools is false but MCP client exists, enable MCP-only tools.
 	// Function tools and Google Search cannot be enabled simultaneously.
-	if ag.ToolsUse.Enable {
+	if len(ag.EnabledTools) > 0 {
 		// load embedding tools (include MCP if available)
 		includeMCP := ag.MCPClient != nil
 		config.Tools = append(config.Tools, ag.getGemini2EmbeddingTools(includeMCP))

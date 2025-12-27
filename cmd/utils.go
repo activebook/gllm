@@ -250,6 +250,27 @@ func GetAgentInt(key string) int {
 	return 0
 }
 
+// GetAgentStringSlice retrieves a string slice value from the current agent configuration
+func GetAgentStringSlice(key string) []string {
+	config := service.GetCurrentAgentConfig()
+	if v, ok := config[key]; ok {
+		// Handle various slice types that might be coming from Viper/YAML
+		switch val := v.(type) {
+		case []string:
+			return val
+		case []interface{}:
+			result := make([]string, 0, len(val))
+			for _, item := range val {
+				if s, ok := item.(string); ok {
+					result = append(result, s)
+				}
+			}
+			return result
+		}
+	}
+	return nil
+}
+
 // SetAgentValue updates a specific key in the current agent's configuration
 func SetAgentValue(key string, value interface{}) error {
 	name := service.GetCurrentAgentName()

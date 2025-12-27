@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -255,7 +256,12 @@ func RunInitWizard() error {
 	agentConfig["model"] = encodedAlias
 
 	for _, f := range selectedFeatures {
-		agentConfig[f] = true
+		if f == "tools" {
+			// Save tools as array of all embedding tools
+			agentConfig["tools"] = service.GetAllEmbeddingTools()
+		} else {
+			agentConfig[f] = true
+		}
 	}
 
 	// Add Agent

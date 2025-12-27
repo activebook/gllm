@@ -45,6 +45,7 @@ type Agent struct {
 	ProceedChan     <-chan bool         // Sub Channel to receive proceed signal
 	SearchEngine    SearchEngine        // Search engine name
 	ToolsUse        ToolsUse            // Use tools
+	EnabledTools    []string            // List of enabled embedding tools
 	UseCodeTool     bool                // Use code tool
 	ThinkMode       bool                // Think mode
 	MCPClient       *MCPClient          // MCP client for MCP tools
@@ -170,6 +171,7 @@ type AgentOptions struct {
 	MaxRecursions    int
 	ThinkMode        bool
 	UseTools         bool
+	EnabledTools     []string // List of enabled embedding tools
 	UseMCP           bool
 	SkipToolsConfirm bool
 	AppendMarkdown   bool
@@ -264,7 +266,7 @@ func CallAgent(op *AgentOptions) error {
 
 	// Set up search engine settings
 	se := constructSearchEngine(op.SearchEngine)
-	toolsUse := ToolsUse{Enable: op.UseTools, AutoApprove: op.SkipToolsConfirm}
+	toolsUse := ToolsUse{AutoApprove: op.SkipToolsConfirm}
 
 	// Set up code tool settings
 	exeCode := IsCodeExecutionEnabled()
@@ -344,6 +346,7 @@ func CallAgent(op *AgentOptions) error {
 		ProceedChan:   proceedCh,
 		SearchEngine:  *se,
 		ToolsUse:      toolsUse,
+		EnabledTools:  op.EnabledTools,
 		UseCodeTool:   exeCode,
 		MCPClient:     mc,
 		ThinkMode:     op.ThinkMode,

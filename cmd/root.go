@@ -304,9 +304,13 @@ func processQuery(prompt string, files []*service.FileData) {
 	// or if tools are enabled (useTools is true).
 	var searchEngine map[string]any
 	// If search flag is set, use the effective search engine
-	// If toolsFlag is set, we also need to use the search engine
-	if searchFlag || toolsFlag {
+	if searchFlag {
 		_, searchEngine = GetEffectiveSearchEngine()
+	}
+	// Regardless of toolsFlag, use the effective tools
+	tools := GetEnabledTools()
+	if tools == nil {
+		tools = []string{}
 	}
 
 	// Include usage metainfo
@@ -323,6 +327,7 @@ func processQuery(prompt string, files []*service.FileData) {
 		MaxRecursions:    maxRecursions,
 		ThinkMode:        thinkFlag,
 		UseTools:         toolsFlag,
+		EnabledTools:     tools,
 		UseMCP:           mcpFlag,
 		SkipToolsConfirm: confirmToolsFlag,
 		AppendUsage:      includeUsage,

@@ -100,7 +100,7 @@ var agentAddCmd = &cobra.Command{
 		// Form variables
 		var (
 			model         string
-			tools         bool
+			tools         []string
 			mcp           bool
 			search        string
 			template      string
@@ -158,6 +158,16 @@ var agentAddCmd = &cobra.Command{
 		}
 		sort.Slice(searchOptions, func(i, j int) bool {
 			return searchOptions[i].Key < searchOptions[j].Key
+		})
+
+		// Tools
+		toolsList := service.GetAllEmbeddingTools()
+		var toolsOptions []huh.Option[string]
+		for _, s := range toolsList {
+			toolsOptions = append(toolsOptions, huh.NewOption(s, s))
+		}
+		sort.Slice(toolsOptions, func(i, j int) bool {
+			return toolsOptions[i].Key < toolsOptions[j].Key
 		})
 
 		// Build form
@@ -244,10 +254,21 @@ var agentAddCmd = &cobra.Command{
 			return
 		}
 
-		// 6. Max Recursions & 7. Capabilities
-		// We can group these or keep them separate? Input is small. MultiSelect is potentially large-ish.
-		// Let's keep them somewhat together or just split to be safe?
-		// Split is safer.
+		// 6. Tools
+		err = huh.NewForm(
+			huh.NewGroup(
+				huh.NewMultiSelect[string]().
+					Title("Tools").
+					Description("The tools to use for agent responses").
+					Options(toolsOptions...).
+					Value(&tools),
+			),
+		).Run()
+		if err != nil {
+			return
+		}
+
+		// 7. Max Recursions
 		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewInput().
@@ -260,12 +281,15 @@ var agentAddCmd = &cobra.Command{
 			return
 		}
 
+		// 8. Capabilities
+		// We can group these or keep them separate? Input is small. MultiSelect is potentially large-ish.
+		// Let's keep them somewhat together or just split to be safe?
+		// Split is safer.
 		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewMultiSelect[string]().
 					Title("Capabilities").
 					Options(
-						huh.NewOption("Enable Tools", "tools"),
 						huh.NewOption("Enable MCP", "mcp"),
 						huh.NewOption("Show Usage", "usage"),
 						huh.NewOption("Render Markdown", "markdown"),
@@ -282,8 +306,6 @@ var agentAddCmd = &cobra.Command{
 		// Process capabilities
 		for _, cap := range capabilities {
 			switch cap {
-			case "tools":
-				tools = true
 			case "mcp":
 				mcp = true
 			case "usage":
@@ -306,8 +328,6 @@ var agentAddCmd = &cobra.Command{
 		agentConfig["search"] = search
 		agentConfig["template"] = template
 		agentConfig["system_prompt"] = sysPrompt
-
-		// Parse maxRecursions
 
 		// Parse maxRecursions
 		var val int
@@ -382,6 +402,7 @@ var agentSetCmd = &cobra.Command{
 		var (
 			model         string
 			search        string
+			tools         []string
 			template      string
 			sysPrompt     string
 			maxRecursions string
@@ -393,6 +414,9 @@ var agentSetCmd = &cobra.Command{
 		}
 		if v, ok := existingConfig["search"].(string); ok {
 			search = v
+		}
+		if v, ok := existingConfig["tools"].([]string); ok {
+			tools = v
 		}
 		if v, ok := existingConfig["template"].(string); ok {
 			template = v
@@ -407,9 +431,7 @@ var agentSetCmd = &cobra.Command{
 		}
 
 		// Populate capabilities
-		if v, ok := existingConfig["tools"].(bool); ok && v {
-			capabilities = append(capabilities, "tools")
-		}
+		// Check for tools - can be bool or []string/[]interface{}
 		if v, ok := existingConfig["mcp"].(bool); ok && v {
 			capabilities = append(capabilities, "mcp")
 		}
@@ -454,6 +476,16 @@ var agentSetCmd = &cobra.Command{
 			searchOptions = append(searchOptions, huh.NewOption(s, s))
 		}
 		sort.Slice(searchOptions, func(i, j int) bool { return searchOptions[i].Key < searchOptions[j].Key })
+
+		// Tools
+		toolsList := service.GetAllEmbeddingTools()
+		var toolsOptions []huh.Option[string]
+		for _, s := range toolsList {
+			toolsOptions = append(toolsOptions, huh.NewOption(s, s))
+		}
+		sort.Slice(toolsOptions, func(i, j int) bool {
+			return toolsOptions[i].Key < toolsOptions[j].Key
+		})
 
 		// Build form
 		// Model
@@ -512,6 +544,20 @@ var agentSetCmd = &cobra.Command{
 			return
 		}
 
+		// Tools
+		err = huh.NewForm(
+			huh.NewGroup(
+				huh.NewMultiSelect[string]().
+					Title("Tools").
+					Description("The tools to use for agent responses").
+					Options(toolsOptions...).
+					Value(&tools),
+			),
+		).Run()
+		if err != nil {
+			return
+		}
+
 		// Max Recursions
 		err = huh.NewForm(
 			huh.NewGroup(
@@ -531,7 +577,6 @@ var agentSetCmd = &cobra.Command{
 				huh.NewMultiSelect[string]().
 					Title("Capabilities").
 					Options(
-						huh.NewOption("Enable Tools", "tools"),
 						huh.NewOption("Enable MCP", "mcp"),
 						huh.NewOption("Show Usage", "usage"),
 						huh.NewOption("Render Markdown", "markdown"),
@@ -550,6 +595,7 @@ var agentSetCmd = &cobra.Command{
 		agentConfig := make(service.AgentConfig)
 		agentConfig["model"] = encodeModelName(model)
 		agentConfig["search"] = search
+		agentConfig["tools"] = tools
 		agentConfig["template"] = template
 		agentConfig["system_prompt"] = sysPrompt
 
@@ -557,15 +603,18 @@ var agentSetCmd = &cobra.Command{
 		fmt.Sscanf(maxRecursions, "%d", &val)
 		agentConfig["max_recursions"] = val
 
-		// Reset bools
-		agentConfig["tools"] = false
-		agentConfig["mcp"] = false
-		agentConfig["usage"] = false
-		agentConfig["markdown"] = false
-		agentConfig["think"] = false
-
-		for _, cap := range capabilities {
-			agentConfig[cap] = true
+		// Ensure other capability bools are set to false if not in capabilities
+		if _, found := agentConfig["mcp"]; !found {
+			agentConfig["mcp"] = false
+		}
+		if _, found := agentConfig["usage"]; !found {
+			agentConfig["usage"] = false
+		}
+		if _, found := agentConfig["markdown"]; !found {
+			agentConfig["markdown"] = false
+		}
+		if _, found := agentConfig["think"]; !found {
+			agentConfig["think"] = false
 		}
 
 		// Keep other existing keys if any (though we reconstructed practically everything)
@@ -749,6 +798,30 @@ func init() {
 	// For now, I'm focusing on the interactive requirement as primary.
 }
 
+// getToolsFromConfig extracts tools list from agent config, handling both bool and []string/[]interface{} types
+func getToolsFromConfig(config map[string]interface{}) []string {
+	if v, ok := config["tools"]; ok {
+		switch val := v.(type) {
+		case []string:
+			return val
+		case []interface{}:
+			result := make([]string, 0, len(val))
+			for _, item := range val {
+				if s, ok := item.(string); ok {
+					result = append(result, s)
+				}
+			}
+			return result
+		case bool:
+			if val {
+				// Legacy: if tools is true, return all tools
+				return service.GetAllEmbeddingTools()
+			}
+		}
+	}
+	return nil
+}
+
 // printAgentConfigDetails prints the agent details in a formatted way
 func printAgentConfigDetails(agent map[string]interface{}, spaceholder string) {
 	if name, exists := agent["name"]; exists {
@@ -796,6 +869,12 @@ func printAgentConfigDetails(agent map[string]interface{}, spaceholder string) {
 		fmt.Printf("%sSearch: %s\n", spaceholder, search)
 	} else {
 		fmt.Printf("%sSearch: \n", spaceholder)
+	}
+
+	if tools, exists := agent["tools"]; exists {
+		fmt.Printf("%sTools: %v\n", spaceholder, tools)
+	} else {
+		fmt.Printf("%sTools: \n", spaceholder)
 	}
 
 	if mcp, exists := agent["mcp"]; exists {

@@ -157,7 +157,7 @@ func (ag *Agent) GenerateOpenChatStream() error {
 
 	// Create a tool with the function
 	tools := []*model.Tool{}
-	if ag.ToolsUse.Enable {
+	if len(ag.EnabledTools) > 0 {
 		// Add embedding operation tools, which includes the web_search tool
 		embeddingTools := ag.getOpenChatEmbeddingTools()
 		tools = append(tools, embeddingTools...)
@@ -593,8 +593,8 @@ func (ag *Agent) addUpOpenChatTokenUsage(resp *model.ChatCompletionStreamRespons
 func (ag *Agent) getOpenChatEmbeddingTools() []*model.Tool {
 	var tools []*model.Tool
 
-	// Get generic tools and convert them to OpenChat tools
-	genericTools := getOpenEmbeddingTools()
+	// Get filtered tools based on agent's enabled tools list
+	genericTools := GetOpenEmbeddingToolsFiltered(ag.EnabledTools)
 	for _, genericTool := range genericTools {
 		tools = append(tools, genericTool.ToOpenChatTool())
 	}
