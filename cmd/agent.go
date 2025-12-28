@@ -367,10 +367,6 @@ var agentSetCmd = &cobra.Command{
 		} else {
 			// Default to current agent
 			name = store.GetActiveAgentName()
-			if name == "" {
-				fmt.Println("No active agent.")
-				return
-			}
 
 			// Select agent
 			agents := store.GetAllAgents()
@@ -681,6 +677,8 @@ var agentRemoveCmd = &cobra.Command{
 		if len(args) > 0 {
 			name = args[0]
 		} else {
+			name = store.GetActiveAgentName()
+
 			// Select agent to remove
 			agents := store.GetAllAgents()
 			if len(agents) == 0 {
@@ -748,10 +746,7 @@ tools, search settings, and other preferences to match the selected agent.`,
 			name = args[0]
 		} else {
 			name = store.GetActiveAgentName()
-			if name == "" {
-				fmt.Println("No active agent.")
-				return
-			}
+
 			// Interactive select
 			agents := store.GetAllAgents()
 			if len(agents) == 0 {
@@ -838,9 +833,10 @@ func init() {
 	agentCmd.AddCommand(agentInfoCmd)
 
 	// Note: We removed flags for interactive commands, but we could keep them for scripting if needed.
-	// However, the requirement emphasizes interactivity.
-	// If the user wants to use scripting, they might need to use `gllm config` or we'd need to add flags back and check if they are set.
-	// For now, I'm focusing on the interactive requirement as primary.
+	// agentAddCmd flags
+
+	// agentSetCmd flags
+
 }
 
 // NOTE: getToolsFromConfig is no longer needed - data.AgentConfig.Tools is already []string

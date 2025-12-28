@@ -171,6 +171,10 @@ Example:
 		if len(args) > 0 {
 			name = args[0]
 		} else {
+			activeAgent := store.GetActiveAgent()
+			if activeAgent != nil {
+				name = activeAgent.Template
+			}
 			// Select prompt
 			var options []huh.Option[string]
 			var names []string
@@ -256,6 +260,10 @@ var templateRemoveCmd = &cobra.Command{
 		if len(args) > 0 {
 			name = args[0]
 		} else {
+			activeAgent := store.GetActiveAgent()
+			if activeAgent != nil {
+				name = activeAgent.Template
+			}
 			var names []string
 			for n := range templates {
 				names = append(names, n)

@@ -175,6 +175,10 @@ Example:
 		if len(args) > 0 {
 			name = args[0]
 		} else {
+			activeAgent := store.GetActiveAgent()
+			if activeAgent != nil {
+				name = activeAgent.SystemPrompt
+			}
 			// Select prompt
 			var names []string
 			for n := range sysPrompts {
@@ -262,6 +266,10 @@ var systemRemoveCmd = &cobra.Command{
 		if len(args) > 0 {
 			name = args[0]
 		} else {
+			activeAgent := store.GetActiveAgent()
+			if activeAgent != nil {
+				name = activeAgent.SystemPrompt
+			}
 			// Select prompt to remove
 			var names []string
 			for n := range sysPrompts {
