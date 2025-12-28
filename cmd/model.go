@@ -27,6 +27,7 @@ func init() {
 	modelListCmd.Flags().BoolP("verbose", "v", false, "Show model names and their content")
 
 	// Add required flags to the add command
+	// e.g. ./gllm model add --name minimax2 --provider openai --endpoint "https://api.openai.com/v1" --key "bbcc" --model gpt-4o --temp 0.5 --top_p 0.8 --seed 0
 	modelAddCmd.Flags().StringP("name", "n", "", "Model name (required)")
 	modelAddCmd.Flags().StringP("provider", "p", "", "Model provider (required)")
 	modelAddCmd.Flags().StringP("endpoint", "e", "", "API endpoint URL (required)")
@@ -37,6 +38,7 @@ func init() {
 	modelAddCmd.Flags().IntP("seed", "s", 0, "Seed for deterministic generation (default 0, use 0 for random)")
 
 	// Add optional flags to the set command
+	// e.g. ./gllm model set minimax2 --provider openai --endpoint "https://api.openai.com/v1" --key "bbcc" --model gpt-5 --temp 0.75 --top_p 0.9 --seed 1010
 	modelSetCmd.Flags().StringP("provider", "p", "", "Model provider (required)")
 	modelSetCmd.Flags().StringP("endpoint", "e", "", "API endpoint URL")
 	modelSetCmd.Flags().StringP("key", "k", "", "API key")
@@ -514,27 +516,45 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 			}
 		} else {
 			// Update from flags
-			if provider, err := cmd.Flags().GetString("provider"); err == nil && provider != "" {
-				modelConfig.Provider = provider
+			if cmd.Flags().Changed("provider") {
+				if v, err := cmd.Flags().GetString("provider"); err == nil {
+					modelConfig.Provider = v
+				}
 			}
-			if endpoint, err := cmd.Flags().GetString("endpoint"); err == nil && endpoint != "" {
-				modelConfig.Endpoint = endpoint
+			if cmd.Flags().Changed("endpoint") {
+				if v, err := cmd.Flags().GetString("endpoint"); err == nil {
+					modelConfig.Endpoint = v
+				}
 			}
-			if key, err := cmd.Flags().GetString("key"); err == nil && key != "" {
-				modelConfig.Key = key
+			if cmd.Flags().Changed("key") {
+				if v, err := cmd.Flags().GetString("key"); err == nil {
+					modelConfig.Key = v
+				}
 			}
-			if model, err := cmd.Flags().GetString("model"); err == nil && model != "" {
-				modelConfig.Model = model
+			if cmd.Flags().Changed("model") {
+				if v, err := cmd.Flags().GetString("model"); err == nil {
+					modelConfig.Model = v
+				}
 			}
-			if temp, err := cmd.Flags().GetFloat32("temp"); err == nil && temp != 0 {
-				modelConfig.Temp = temp
+			if cmd.Flags().Changed("temp") {
+				if v, err := cmd.Flags().GetFloat32("temp"); err == nil {
+					modelConfig.Temp = v
+				}
 			}
-			if topP, err := cmd.Flags().GetFloat32("top_p"); err == nil && topP != 0 {
-				modelConfig.TopP = topP
+			if cmd.Flags().Changed("top_p") {
+				if v, err := cmd.Flags().GetFloat32("top_p"); err == nil {
+					modelConfig.TopP = v
+				}
 			}
-			if seed, err := cmd.Flags().GetInt("seed"); err == nil && seed != 0 {
-				i32 := int32(seed)
-				modelConfig.Seed = &i32
+			if cmd.Flags().Changed("seed") {
+				if v, err := cmd.Flags().GetInt("seed"); err == nil {
+					if v == 0 {
+						modelConfig.Seed = nil
+					} else {
+						i32 := int32(v)
+						modelConfig.Seed = &i32
+					}
+				}
 			}
 		}
 
