@@ -277,9 +277,9 @@ func (c *ConfigStore) GetModel(name string) *Model {
 	return nil
 }
 
-// getModelFromMap returns a single model's config.
+// getModelFromAgentMap returns a single model's config.
 // for private use only
-func (c *ConfigStore) getModelFromMap(m map[string]interface{}, key string) Model {
+func (c *ConfigStore) getModelFromAgentMap(m map[string]interface{}, key string) Model {
 	val, exists := m[key]
 	if !exists {
 		return Model{}
@@ -325,9 +325,9 @@ func (c *ConfigStore) GetSearchEngines() map[string]*SearchEngine {
 	return result
 }
 
-// getSearchEngineFromMap returns a specific search engine by name.
+// getSearchEngineFromAgentMap returns a specific search engine by name.
 // for private use only
-func (c *ConfigStore) getSearchEngineFromMap(m map[string]interface{}, name string) SearchEngine {
+func (c *ConfigStore) getSearchEngineFromAgentMap(m map[string]interface{}, name string) SearchEngine {
 	val, exists := m[name]
 	if !exists {
 		return SearchEngine{}
@@ -490,12 +490,12 @@ func (c *ConfigStore) parseAgentConfig(name string, config interface{}) *AgentCo
 
 	agent := &AgentConfig{
 		Name:          name,
-		Model:         c.getModelFromMap(configMap, "model"),
+		Model:         c.getModelFromAgentMap(configMap, "model"),
 		MCP:           getBool(configMap, "mcp"),
 		Usage:         getBool(configMap, "usage"),
 		Markdown:      getBool(configMap, "markdown"),
 		Think:         getBool(configMap, "think"),
-		Search:        c.getSearchEngineFromMap(configMap, "search"),
+		Search:        c.getSearchEngineFromAgentMap(configMap, "search"),
 		Template:      getString(configMap, "template"),
 		SystemPrompt:  getString(configMap, "system_prompt"),
 		MaxRecursions: getInt(configMap, "max_recursions", 10),
