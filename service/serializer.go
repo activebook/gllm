@@ -10,28 +10,22 @@ import (
 var (
 	// RoleColors for message roles
 	RoleColors = map[string]string{
-		"message":   "\033[93m", // Bright Yellow
-		"system":    "\033[33m", // Yellow
-		"user":      "\033[32m", // Green
-		"assistant": "\033[34m", // Blue
-		"model":     "\033[34m", // Blue (Gemini equivalent to assistant)
-		"function":  "\033[36m", // Cyan
-		"tool":      "\033[36m", // Cyan (OpenAI tool responses)
+		"message":   messageColor,
+		"system":    systemColor,
+		"user":      userColor,
+		"assistant": assistantColor,
+		"model":     modelColorSer,
+		"function":  functionColor,
+		"tool":      toolColor,
 	}
 
 	// ContentTypeColors for special content
 	ContentTypeColors = map[string]string{
-		"function_call":     "\033[35m", // Magenta
-		"function_response": "\033[35m", // Magenta
-		"image":             "\033[31m", // Red
-		"file_data":         "\033[31m", // Red
+		"function_call":     functionCallColor,
+		"function_response": functionRespColor,
+		"image":             imageColor,
+		"file_data":         fileDataColor,
 	}
-
-	// Reset code to end coloring
-	ResetColor = "\033[0m"
-
-	// Gray for additional info like "... and X more messages"
-	GrayColor = "\033[90m"
 )
 
 // Gemini message format

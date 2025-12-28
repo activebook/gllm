@@ -98,16 +98,6 @@ func buildAgentPrompt(agent *WorkflowAgent, prompt string) string {
 }
 
 // Terminal colors for workflow confirmation
-const (
-	agentNameColor     = "\033[95m" // Bright Magenta
-	agentRoleColor     = "\033[36m" // Cyan
-	modelColor         = "\033[92m" // Bright Green
-	directoryColor     = "\033[93m" // Yellow
-	promptColor        = "\033[96m" // Cyan
-	booleanTrueColor   = "\033[92m" // Bright Green
-	booleanFalseColor  = "\033[90m" // Bright Black
-	workflowResetColor = "\033[0m"  // Reset
-)
 
 // promptUserForConfirmation asks the user to confirm before proceeding with an agent
 func promptUserForConfirmation(agent *WorkflowAgent) bool {

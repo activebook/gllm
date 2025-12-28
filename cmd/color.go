@@ -245,6 +245,30 @@ var colorCmd = &cobra.Command{
 				color.RGB(r, g, b).Print("█")
 			}
 			fmt.Println()
+
+			// Test termenv sequences from service/color.go
+			fmt.Println("Termenv TrueColor Sequences Test:")
+			testColors := []struct {
+				name string
+				seq  string
+			}{
+				{"Orangered", "\033[38;2;255;69;0m"},
+				{"Limegreen", "\033[38;2;50;205;50m"},
+				{"DarkOrange", "\033[38;2;255;140;0m"},
+				{"DarkCyan", "\033[38;2;0;206;209m"},
+				{"DodgerBlue", "\033[38;2;30;144;255m"},
+				{"Cyan", "\033[38;2;0;255;255m"},
+				{"DimGray", "\033[38;2;105;105;105m"},
+				{"DeepSkyBlue", "\033[38;2;0;191;255m"},
+				{"Gray", "\033[38;2;128;128;128m"},
+				{"MediumPurple", "\033[38;2;147;112;219m"},
+				{"Gold", "\033[38;2;255;215;0m"},
+			}
+			for _, tc := range testColors {
+				fmt.Printf("%s%s%s ", tc.seq, tc.name, "\033[0m")
+			}
+			fmt.Println()
+			fmt.Println()
 		} else {
 			fmt.Println("=== Limited Color Support ===")
 			fmt.Println("Your terminal doesn't support true color (24-bit).")

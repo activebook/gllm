@@ -9,13 +9,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const (
-	// Terminal colors
-	inReasoningColor = "\033[90m" // Bright Black
-	inCallingColor   = "\033[36m" // Cyan
-	completeColor    = "\033[32m" // Green
-)
-
 type StreamDataType int
 
 const (

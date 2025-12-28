@@ -27,6 +27,36 @@ var (
 
 	// Reset
 	resetColor string
+
+	// Agent-specific colors
+	inReasoningColor string
+	inCallingColor   string
+	completeColor    string
+
+	// Workflow colors
+	agentNameColor     string
+	agentRoleColor     string
+	modelColor         string
+	directoryColor     string
+	promptColor        string
+	booleanTrueColor   string
+	booleanFalseColor  string
+	workflowResetColor string
+
+	// Serializer colors
+	messageColor      string
+	systemColor       string
+	userColor         string
+	assistantColor    string
+	modelColorSer     string // Rename to avoid conflict with workflow modelColor
+	functionColor     string
+	toolColor         string
+	functionCallColor string
+	functionRespColor string
+	imageColor        string
+	fileDataColor     string
+	ResetColor        string
+	GrayColor         string
 )
 
 func init() {
@@ -83,4 +113,34 @@ func setupColors() {
 
 	boldColor = "\033[1m"
 	underlineColor = "\033[4m"
+
+	// Agent-specific colors (fixed ANSI)
+	inReasoningColor = "\033[90m" // Bright Black
+	inCallingColor = "\033[36m"   // Cyan
+	completeColor = "\033[32m"    // Green
+
+	// Workflow colors (fixed ANSI)
+	agentNameColor = "\033[95m"    // Bright Magenta
+	agentRoleColor = "\033[36m"    // Cyan
+	modelColor = "\033[92m"        // Bright Green
+	directoryColor = "\033[93m"    // Yellow
+	promptColor = "\033[96m"       // Cyan
+	booleanTrueColor = "\033[92m"  // Bright Green
+	booleanFalseColor = "\033[90m" // Bright Black
+	workflowResetColor = "\033[0m" // Reset
+
+	// Serializer colors (TrueColor)
+	messageColor = "\033[38;2;255;255;0m"      // Bright Yellow
+	systemColor = "\033[38;2;255;215;0m"       // Gold
+	userColor = "\033[38;2;0;255;0m"           // Lime
+	assistantColor = "\033[38;2;0;0;255m"      // Blue
+	modelColorSer = "\033[38;2;0;0;255m"       // Blue
+	functionColor = "\033[38;2;0;255;255m"     // Cyan
+	toolColor = "\033[38;2;0;255;255m"         // Cyan
+	functionCallColor = "\033[38;2;255;0;255m" // Magenta
+	functionRespColor = "\033[38;2;255;0;255m" // Magenta
+	imageColor = "\033[38;2;255;0;0m"          // Red
+	fileDataColor = "\033[38;2;255;0;0m"       // Red
+	ResetColor = "\033[0m"                     // Reset
+	GrayColor = "\033[38;2;128;128;128m"       // Gray
 }
