@@ -188,7 +188,7 @@ func (m *MCPStore) Export(path string) error {
 	if err != nil {
 		return err
 	}
-	return m.Save(servers, allowed)
+	return m.SaveToPath(servers, allowed, path)
 }
 
 // Import imports MCP server configurations from a JSON file.
