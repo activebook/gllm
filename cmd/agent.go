@@ -879,7 +879,7 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 		fmt.Printf("%sTemplate: \n", spaceholder)
 	}
 
-	fmt.Printf("%sSearch: %s\n", spaceholder, agent.Search)
+	fmt.Printf("%sSearch: %s\n", spaceholder, agent.Search.Name)
 
 	toolsSlice := ""
 	for _, tool := range agent.Tools {
