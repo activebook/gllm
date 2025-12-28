@@ -4,6 +4,7 @@ package cmd
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/activebook/gllm/data"
@@ -280,7 +281,8 @@ var agentAddCmd = &cobra.Command{
 				huh.NewInput().
 					Title("Max Recursions").
 					Description("The maximum number of Model calling recursions allowed").
-					Value(&maxRecursions),
+					Value(&maxRecursions).
+					Validate(ValidateMaxRecursions),
 			),
 		).Run()
 		if err != nil {
@@ -578,7 +580,8 @@ var agentSetCmd = &cobra.Command{
 				huh.NewInput().
 					Title("Max Recursions").
 					Description("The maximum number of Model calling recursions allowed").
-					Value(&maxRecursions),
+					Value(&maxRecursions).
+					Validate(ValidateMaxRecursions),
 			),
 		).Run()
 		if err != nil {
@@ -894,6 +897,20 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 func CheckAgentName(name string) error {
 	if strings.Contains(name, ".") {
 		return fmt.Errorf("agent name '%s' contains a dot, which is not allowed", name)
+	}
+	return nil
+}
+
+func ValidateMaxRecursions(s string) error {
+	if s == "" {
+		return nil
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil {
+		return err
+	}
+	if v <= 0 {
+		return fmt.Errorf("max recursions must be greater than 0")
 	}
 	return nil
 }

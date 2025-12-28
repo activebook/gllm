@@ -263,6 +263,18 @@ func processQuery(prompt string, files []*service.FileData) {
 	mcpStore := data.NewMCPStore()
 	mcpConfig, _, _ := mcpStore.Load()
 
+	// Check whether model is valid
+	if activeAgent.Model.Name == "" {
+		service.Errorf("No model specified")
+		return
+	} else {
+		model := store.GetModel(activeAgent.Model.Name)
+		if model == nil {
+			service.Errorf("Model %s not found", activeAgent.Model.Name)
+			return
+		}
+	}
+
 	// Call your LLM service here
 	op := service.AgentOptions{
 		Prompt:         prompt,

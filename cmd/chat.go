@@ -320,6 +320,18 @@ func (ci *ChatInfo) callAgent(input string) {
 	mcpStore := data.NewMCPStore()
 	mcpConfig, _, _ := mcpStore.Load()
 
+	// Check whether model is valid
+	if agent.Model.Name == "" {
+		service.Errorf("No model specified")
+		return
+	} else {
+		model := store.GetModel(agent.Model.Name)
+		if model == nil {
+			service.Errorf("Model %s not found", agent.Model.Name)
+			return
+		}
+	}
+
 	// Call agent
 	op := service.AgentOptions{
 		Prompt:         processedPrompt,

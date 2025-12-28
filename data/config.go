@@ -227,16 +227,7 @@ func (c *ConfigStore) SetActiveAgent(name string) error {
 func (c *ConfigStore) GetActiveAgent() *AgentConfig {
 	name := c.GetActiveAgentName()
 	if name == "" {
-		// Try to get from legacy format or return first available
-		agents := c.GetAllAgents()
-		if len(agents) == 0 {
-			return nil
-		}
-		// Return first agent (sorted alphabetically)
-		names := c.GetAgentNames()
-		if len(names) > 0 {
-			return agents[names[0]]
-		}
+		// Don't use default first one, would cause user confuse
 		return nil
 	}
 	return c.GetAgent(name)
