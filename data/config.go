@@ -113,16 +113,18 @@ func (c *ConfigStore) SetEditor(editor string) error {
 
 // SetConfigFile sets the configuration file path.
 func (c *ConfigStore) SetConfigFile(path string) error {
-	c.v.SetConfigFile(path)   // Set the config file path
-	c.v.SetConfigName("gllm") // Name of config file (without ext)
-	c.v.SetConfigType("yaml") // REQUIRED if the config file does not have the extension in the name
-	c.v.AutomaticEnv()        // Read in environment variables that match
+	c.v.SetConfigFile(path) // Set the config file path
+	c.v.AutomaticEnv()      // Read in environment variables that match
 
 	// Set default log settings in Viper *before* reading the config
 	// This ensures these keys exist even if not in the file
 	c.v.SetDefault("log.level", "info")
 
 	// If a config file is found, read it in.
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil
+	}
+
 	if err := c.v.ReadInConfig(); err != nil {
 		return err
 	}
@@ -161,7 +163,7 @@ func (c *ConfigStore) GetAllAgents() map[string]*AgentConfig {
 	result := make(map[string]*AgentConfig)
 	for name, config := range agentsMap {
 		agent := c.parseAgentConfig(name, config)
-		if agent != nil {
+		if agent == nil {
 			continue // Skip invalid agents
 		}
 		result[name] = agent
