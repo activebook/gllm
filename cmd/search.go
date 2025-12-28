@@ -298,30 +298,6 @@ var searchSetCmd = &cobra.Command{
 	},
 }
 
-// Helper functions for map access (duplicated from data/config.go logic but useful locally for map[string]interface{})
-func getString(m map[string]interface{}, key string) string {
-	if v, ok := m[key]; ok {
-		if s, ok := v.(string); ok {
-			return s
-		}
-	}
-	return ""
-}
-
-func getInt(m map[string]interface{}, key string) int {
-	if v, ok := m[key]; ok {
-		switch i := v.(type) {
-		case int:
-			return i
-		case float64:
-			return int(i)
-		case int64:
-			return int(i)
-		}
-	}
-	return 0
-}
-
 // listCmd represents the command to list all search engines
 var searchListCmd = &cobra.Command{
 	Use:     "list",

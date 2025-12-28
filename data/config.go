@@ -578,18 +578,21 @@ func (c *ConfigStore) mapToModel(name string, m map[string]interface{}) Model {
 }
 
 func (c *ConfigStore) searchEngineToMap(se *SearchEngine) map[string]interface{} {
-	return map[string]interface{}{
-		"deep_dive": se.DeepDive,
-		"reference": se.Reference,
-		"config":    se.Config,
+	m := map[string]interface{}{
+		"deep_dive":  se.DeepDive,
+		"references": se.Reference,
 	}
+	for k, v := range se.Config {
+		m[k] = v
+	}
+	return m
 }
 
 func (c *ConfigStore) mapToSearchEngine(name string, m map[string]interface{}) SearchEngine {
 	se := SearchEngine{
 		Name:      name,
 		DeepDive:  getInt(m, "deep_dive", 3),
-		Reference: getInt(m, "reference", 5),
+		Reference: getInt(m, "references", 5),
 		Config:    make(map[string]string),
 	}
 	// Copy all string values to Config
