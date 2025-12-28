@@ -95,7 +95,7 @@ func init() {
 	// In each chat session, it shouldn't change model, because the chat history would be invalid.
 	// Attach should be used inside chat session
 	// Imagine like using web llm ui, you can attach file to the chat session and turn search on and off
-	chatCmd.Flags().StringVarP(&agentName, "agent", "A", "", "Agent to use for the chat session")
+	chatCmd.Flags().StringVarP(&agentName, "agent", "g", "", "Agent to use for the chat session")
 	chatCmd.Flags().StringVarP(&convoName, "conversation", "c", GenerateChatFileName(), "Name for this chat session")
 	chatCmd.Flags().BoolVarP(&yoloFlag, "yolo", "y", false, "Enable yolo mode (non-interactive)")
 }
