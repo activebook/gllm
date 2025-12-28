@@ -8,6 +8,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
 
@@ -585,6 +586,74 @@ var mcpPathCmd = &cobra.Command{
 	},
 }
 
+var mcpSwitchCmd = &cobra.Command{
+	Use:     "switch",
+	Aliases: []string{"sw"},
+	Short:   "Toggle which MCP servers are allowed",
+	Long:    `Interactively select which MCP servers should be allowed. Use space to toggle, enter to confirm.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		store := data.NewMCPStore()
+		servers, _, err := store.Load()
+		if err != nil {
+			fmt.Printf("Error loading MCP config: %v\n", err)
+			return
+		}
+
+		if len(servers) == 0 {
+			fmt.Println("No MCP servers defined.")
+			return
+		}
+
+		// Sort keys for consistent output
+		names := make([]string, 0, len(servers))
+		for name := range servers {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+
+		// Build options and pre-select allowed ones
+		var options []huh.Option[string]
+		var selected []string
+		for _, name := range names {
+			server := servers[name]
+			label := fmt.Sprintf("%-18s [%s]", name, server.Type)
+			options = append(options, huh.NewOption(label, name))
+			if server.Allowed {
+				selected = append(selected, name)
+			}
+		}
+
+		err = huh.NewMultiSelect[string]().
+			Title("Select MCP servers to allow").
+			Description("Use space to toggle, enter to confirm.").
+			Options(options...).
+			Value(&selected).
+			Run()
+		if err != nil {
+			return // User cancelled
+		}
+
+		// Create a set for fast lookup
+		allowedSet := make(map[string]bool)
+		for _, s := range selected {
+			allowedSet[s] = true
+		}
+
+		// Update allowed state for each server
+		for name, server := range servers {
+			server.Allowed = allowedSet[name]
+		}
+
+		// Save updated config
+		if err := store.Save(servers, selected); err != nil {
+			fmt.Printf("Error saving MCP config: %v\n", err)
+			return
+		}
+
+		fmt.Printf("Updated allowed MCP servers: %v\n", selected)
+	},
+}
+
 // center centers a string within a given width by adding spaces
 func center(s string, width int) string {
 	if len(s) > width {
@@ -618,6 +687,7 @@ func init() {
 	mcpCmd.AddCommand(mcpOnCmd)
 	mcpCmd.AddCommand(mcpOffCmd)
 	mcpCmd.AddCommand(mcpAddCmd)
+	mcpCmd.AddCommand(mcpSwitchCmd)
 	mcpCmd.AddCommand(mcpSetCmd)
 	mcpCmd.AddCommand(mcpRemoveCmd)
 	mcpCmd.AddCommand(mcpExportCmd)
