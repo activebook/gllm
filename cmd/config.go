@@ -55,123 +55,66 @@ var configPathCmd = &cobra.Command{
 
 // configExportCmd represents the config export command
 var configExportCmd = &cobra.Command{
-	Use:   "export [directory]",
-	Short: "Export configuration to a directory",
-	Long: `Export current configuration to a directory.
+	Use: "export [file]",
+	Long: `Export current configuration to a file or directory.
 
-If no directory is specified, the configuration will be exported to the current directory.
-Files will be saved as 'gllm.yaml' and 'mcp.json' (if MCP config exists).`,
+If a directory is specified, the configuration will be exported as 'gllm.yaml' 
+to that directory. If a file path is specified, it will be exported directly 
+to that file. If no target is specified, it defaults to 'gllm.yaml' 
+in the current directory.`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		var exportDir string
+		var exportPath string
 
 		if len(args) == 0 {
-			exportDir = "."
+			exportPath = "gllm.yaml"
 		} else {
-			exportDir = args[0]
+			exportPath = args[0]
 		}
 
-		// Ensure the export directory exists
-		if err := os.MkdirAll(exportDir, 0755); err != nil {
-			service.Errorf("Error creating export directory: %s\n", err)
-			return
+		// Check if it's a directory
+		if info, err := os.Stat(exportPath); err == nil && info.IsDir() {
+			exportPath = filepath.Join(exportPath, "gllm.yaml")
 		}
-
-		// Set export file paths
-		configExportFile := filepath.Join(exportDir, "gllm.yaml")
-		mcpExportFile := filepath.Join(exportDir, "mcp.json")
 
 		configStore := data.NewConfigStore()
 
 		// Write the configuration to the file using ConfigStore
-		if err := configStore.Export(configExportFile); err != nil {
+		if err := configStore.Export(exportPath); err != nil {
 			service.Errorf("Error exporting configuration: %s\n", err)
 			return
 		}
 
-		fmt.Printf("Configuration exported successfully to: %s\n", configExportFile)
-
-		mcpStore := data.NewMCPStore()
-
-		// Check if MCP config exists and export it
-		servers, allowed, err := mcpStore.Load()
-		if err != nil {
-			service.Errorf("Error loading MCP configuration: %s\n", err)
-			return
-		}
-
-		if servers != nil {
-			// MCP config exists, save it to export location
-			if err := mcpStore.SaveToPath(servers, allowed, mcpExportFile); err != nil {
-				service.Errorf("Error exporting MCP configuration: %s\n", err)
-				return
-			}
-			fmt.Printf("MCP configuration exported successfully to: %s\n", mcpExportFile)
-		} else {
-			fmt.Printf("No MCP configuration found to export\n")
-		}
+		fmt.Printf("Configuration exported successfully to: %s\n", exportPath)
 	},
 }
 
 // configImportCmd represents the config import command
 var configImportCmd = &cobra.Command{
-	Use:   "import [directory]",
-	Short: "Import configuration from a directory",
-	Long: `Import configuration from a directory.
+	Use:   "import [file]",
+	Short: "Import configuration from a file",
+	Long: `Import configuration from a file.
 
-This will look for 'gllm.yaml' and 'mcp.json' files in the specified directory
-and merge them with the current configuration. If no directory is specified,
-it will look in the current directory.`,
-	Args: cobra.MaximumNArgs(1),
+This will replace the current configuration with the settings from the specified file.`,
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		var importDir string
-
-		if len(args) == 0 {
-			importDir = "."
-		} else {
-			importDir = args[0]
-		}
-
-		// Set import file paths
-		configImportFile := filepath.Join(importDir, "gllm.yaml")
-		mcpImportFile := filepath.Join(importDir, "mcp.json")
+		importFile := args[0]
 
 		// Check if main config file exists
-		if _, err := os.Stat(configImportFile); os.IsNotExist(err) {
-			service.Errorf("Configuration file does not exist: %s\n", configImportFile)
+		if _, err := os.Stat(importFile); os.IsNotExist(err) {
+			service.Errorf("Configuration file does not exist: %s\n", importFile)
 			return
 		}
 
 		storeConfig := data.NewConfigStore()
 
 		// Import the configuration using ConfigStore
-		if err := storeConfig.Import(configImportFile); err != nil {
+		if err := storeConfig.Import(importFile); err != nil {
 			service.Errorf("Error importing configuration: %s\n", err)
 			return
 		}
 
-		fmt.Printf("Configuration imported successfully from: %s\n", configImportFile)
-
-		// Check if MCP config exists and import it
-		if _, err := os.Stat(mcpImportFile); os.IsNotExist(err) {
-			fmt.Printf("No MCP configuration file found to import\n")
-		}
-
-		// MCP config exists, load and save it
-		mcpStore := data.NewMCPStore()
-		mcpConfig, allowed, err := mcpStore.LoadFromPath(mcpImportFile)
-		if err != nil {
-			service.Errorf("Error loading MCP configuration: %s\n", err)
-			return
-		}
-		if mcpConfig != nil {
-			// Save the MCP config to the default location
-			if err := mcpStore.Save(mcpConfig, allowed); err != nil {
-				service.Errorf("Error saving MCP configuration: %s\n", err)
-				return
-			}
-			fmt.Printf("MCP configuration imported successfully from: %s\n", mcpImportFile)
-		}
+		fmt.Printf("Configuration imported successfully from: %s\n", importFile)
 	},
 }
 

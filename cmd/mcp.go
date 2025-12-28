@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -516,28 +517,35 @@ var mcpListCmd = &cobra.Command{
 var mcpExportCmd = &cobra.Command{
 	Use:   "export [file]",
 	Short: "Export MCP configuration to a file",
-	Long: `Export MCP configuration to a file.
+	Long: `Export MCP configuration to a file or directory.
 
-If no file is specified, the configuration will be exported to 'mcp.json' 
+If a directory is specified, the configuration will be exported as 'mcp.json' 
+to that directory. If a file path is specified, it will be exported directly 
+to that file. If no target is specified, it defaults to 'mcp.json' 
 in the current directory.`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		var exportFile string
+		var exportPath string
 
 		if len(args) == 0 {
-			exportFile = "mcp.json"
+			exportPath = "mcp.json"
 		} else {
-			exportFile = args[0]
+			exportPath = args[0]
+		}
+
+		// Check if it's a directory
+		if info, err := os.Stat(exportPath); err == nil && info.IsDir() {
+			exportPath = filepath.Join(exportPath, "mcp.json")
 		}
 
 		store := data.NewMCPStore()
-		err := store.Export(exportFile)
+		err := store.Export(exportPath)
 		if err != nil {
 			fmt.Printf("Error exporting MCP configuration: %v\n", err)
 			return
 		}
 
-		fmt.Printf("MCP configuration exported successfully to: %s\n", exportFile)
+		fmt.Printf("MCP configuration exported successfully to: %s\n", exportPath)
 	},
 }
 
