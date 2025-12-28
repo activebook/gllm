@@ -268,6 +268,8 @@ func RunInitWizard() error {
 		Endpoint: endpoint,
 		Key:      apiKey,
 		Model:    model,
+		Temp:     1.0,
+		TopP:     1.0,
 	}
 
 	// Save Model via data layer

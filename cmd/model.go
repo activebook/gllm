@@ -277,35 +277,17 @@ Example:
 						Title("Temperature").
 						Description("Controls randomness (0.0 - 2.0). Lower is more deterministic.").
 						Value(&tempStr).
-						Validate(func(s string) error {
-							if s == "" {
-								return nil
-							}
-							_, err := strconv.ParseFloat(s, 32)
-							return err
-						}),
+						Validate(ValidateTemperature),
 					huh.NewInput().
 						Title("Top P").
 						Description("Nucleus sampling (0.0 - 1.0). Limits token choices to top probability mass.").
 						Value(&topPStr).
-						Validate(func(s string) error {
-							if s == "" {
-								return nil
-							}
-							_, err := strconv.ParseFloat(s, 32)
-							return err
-						}),
+						Validate(ValidateTopP),
 					huh.NewInput().
 						Title("Seed").
 						Description("Integer for deterministic generation. Leave empty for random.").
 						Value(&seedStr).
-						Validate(func(s string) error {
-							if s == "" {
-								return nil
-							}
-							_, err := strconv.Atoi(s)
-							return err
-						}),
+						Validate(ValidateSeed),
 				).Title("Advanced Settings"),
 			).Run()
 			if err != nil {
@@ -462,35 +444,17 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 						Title("Temperature").
 						Description("Controls randomness (0.0 - 2.0).").
 						Value(&tempStr).
-						Validate(func(s string) error {
-							if s == "" {
-								return nil
-							}
-							_, err := strconv.ParseFloat(s, 32)
-							return err
-						}),
+						Validate(ValidateTemperature),
 					huh.NewInput().
 						Title("Top P").
 						Description("Nucleus sampling (0.0 - 1.0).").
 						Value(&topPStr).
-						Validate(func(s string) error {
-							if s == "" {
-								return nil
-							}
-							_, err := strconv.ParseFloat(s, 32)
-							return err
-						}),
+						Validate(ValidateTopP),
 					huh.NewInput().
 						Title("Seed").
 						Description("Deterministic generation (Integer).").
 						Value(&seedStr).
-						Validate(func(s string) error {
-							if s == "" {
-								return nil
-							}
-							_, err := strconv.Atoi(s)
-							return err
-						}),
+						Validate(ValidateSeed),
 				).Title("Advanced Settings"),
 			).Run()
 			if err != nil {
@@ -799,4 +763,40 @@ func CheckModelName(name string) error {
 		return fmt.Errorf("model name '%s' contains a dot, which is not allowed", name)
 	}
 	return nil
+}
+
+func ValidateTemperature(s string) error {
+	if s == "" {
+		return nil
+	}
+	v, err := strconv.ParseFloat(s, 32)
+	if err != nil {
+		return err
+	}
+	if v < 0 || v > 2.0 {
+		return fmt.Errorf("temperature must be between 0.0 and 2.0")
+	}
+	return nil
+}
+
+func ValidateTopP(s string) error {
+	if s == "" {
+		return nil
+	}
+	v, err := strconv.ParseFloat(s, 32)
+	if err != nil {
+		return err
+	}
+	if v <= 0 || v > 1.0 {
+		return fmt.Errorf("top_p must be greater than 0.0 and less than or equal to 1.0")
+	}
+	return nil
+}
+
+func ValidateSeed(s string) error {
+	if s == "" {
+		return nil
+	}
+	_, err := strconv.Atoi(s)
+	return err
 }
