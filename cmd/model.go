@@ -1,4 +1,4 @@
-// File: cmd/version.go
+// File: cmd/model.go
 package cmd
 
 import (
@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {
@@ -29,6 +29,7 @@ func init() {
 
 	// Add required flags to the add command
 	modelAddCmd.Flags().StringP("name", "n", "", "Model name (required)")
+	modelAddCmd.Flags().StringP("provider", "p", "", "Model provider (required)")
 	modelAddCmd.Flags().StringP("endpoint", "e", "", "API endpoint URL (required)")
 	modelAddCmd.Flags().StringP("key", "k", "", "API key (required)")
 	modelAddCmd.Flags().StringP("model", "m", "", "Model ID (required)")
@@ -36,12 +37,8 @@ func init() {
 	modelAddCmd.Flags().Float32P("top_p", "p", 1.0, "Top-p sampling parameter")
 	modelAddCmd.Flags().IntP("seed", "s", 0, "Seed for deterministic generation (default 0, use 0 for random)")
 
-	// modelAddCmd.MarkFlagRequired("name")
-	// modelAddCmd.MarkFlagRequired("endpoint")
-	// modelAddCmd.MarkFlagRequired("key")
-	// modelAddCmd.MarkFlagRequired("model")
-
 	// Add optional flags to the set command
+	modelSetCmd.Flags().StringP("provider", "p", "", "Model provider (required)")
 	modelSetCmd.Flags().StringP("endpoint", "e", "", "API endpoint URL")
 	modelSetCmd.Flags().StringP("key", "k", "", "API key")
 	modelSetCmd.Flags().StringP("model", "m", "", "Model ID")
@@ -52,16 +49,6 @@ func init() {
 	// Add the force flag to the remove command
 	modelRemoveCmd.Flags().BoolP("force", "f", false, "Skip error when model doesn't exist")
 	modelClearCmd.Flags().BoolP("force", "f", false, "Clear all models without confirmation prompt")
-}
-
-// encodeModelName encodes model names that contain dots to avoid Viper path interpretation issues
-func encodeModelName(name string) string {
-	return strings.ReplaceAll(name, ".", "#dot#")
-}
-
-// decodeModelName decodes model names that were encoded to avoid Viper path interpretation issues
-func decodeModelName(name string) string {
-	return strings.ReplaceAll(name, "#dot#", ".")
 }
 
 // modelCmd represents the base command when called without any subcommands
@@ -82,8 +69,15 @@ var modelListCmd = &cobra.Command{
 	Short:   "List all set models",
 	Run: func(cmd *cobra.Command, args []string) {
 		highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
-		modelsMap := viper.GetStringMap("models")
-		defaultModel := GetAgentString("model")
+		store := data.NewConfigStore()
+		modelsMap := store.GetModels()
+
+		// Get default model name from active agent
+		defaultModelName := ""
+		activeAgent := store.GetActiveAgent()
+		if activeAgent != nil {
+			defaultModelName = activeAgent.Model.Name
+		}
 
 		if len(modelsMap) == 0 {
 			fmt.Println("No model defined yet. Use 'gllm model add'.")
@@ -96,15 +90,27 @@ var modelListCmd = &cobra.Command{
 		// Sort keys for consistent output
 		names := make([]string, 0, len(modelsMap))
 		for name := range modelsMap {
-			names = append(names, decodeModelName(name))
+			// In data layer, keys might be encoded or raw. Display decoded.
+			// Ideally we don't need encoding anymore if not using viper dot notation,
+			// but for safety with existing config files:
+			names = append(names, name)
 		}
 		sort.Strings(names)
+
+		// Map from display name to actual key
+		displayToKey := make(map[string]string)
+		for k := range modelsMap {
+			displayToKey[k] = k
+		}
 
 		for _, name := range names {
 			indicator := " "
 			pname := ""
-			encodedName := encodeModelName(name)
-			if encodedName == defaultModel {
+
+			modelName := displayToKey[name]
+
+			// Check if this model is default (compare to defaultModel string)
+			if modelName == defaultModelName {
 				indicator = highlightColor("*") // Mark the default model
 				pname = highlightColor(name)
 			} else {
@@ -113,14 +119,19 @@ var modelListCmd = &cobra.Command{
 			}
 			fmt.Printf(" %s %s\n", indicator, pname)
 			if verbose {
-				if configMap, ok := modelsMap[encodedName].(map[string]interface{}); ok {
-					for key, value := range configMap {
-						fmt.Printf("\t%s: %v\n", key, value)
+				if modelConfig := modelsMap[modelName]; modelConfig != nil {
+					fmt.Printf("\tProvider: %s\n", modelConfig.Provider)
+					fmt.Printf("\tEndpoint: %s\n", modelConfig.Endpoint)
+					fmt.Printf("\tModel: %s\n", modelConfig.Model)
+					fmt.Printf("\tTemp: %v\n", modelConfig.Temp)
+					fmt.Printf("\tTopP: %v\n", modelConfig.TopP)
+					if modelConfig.Seed != nil {
+						fmt.Printf("\tSeed: %d\n", *modelConfig.Seed)
 					}
 				}
 			}
 		}
-		if defaultModel != "" {
+		if defaultModelName != "" {
 			fmt.Println("\n(*) Indicates the current model.")
 		} else {
 			fmt.Println("\nNo model selected. Use 'gllm model switch <name>' to select one.")
@@ -137,12 +148,15 @@ Example:
   gllm model add --name gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name, _ := cmd.Flags().GetString("name")
+		modelProvider, _ := cmd.Flags().GetString("provider")
 		endpoint, _ := cmd.Flags().GetString("endpoint")
 		key, _ := cmd.Flags().GetString("key")
 		model, _ := cmd.Flags().GetString("model")
 		temp, _ := cmd.Flags().GetFloat32("temp")
 		topP, _ := cmd.Flags().GetFloat32("top_p")
 		seed, _ := cmd.Flags().GetInt("seed")
+
+		store := data.NewConfigStore()
 
 		// Interactive mode if critical flags are missing
 		if name == "" || endpoint == "" || key == "" || model == "" {
@@ -160,8 +174,11 @@ Example:
 								if s == "" {
 									return fmt.Errorf("name is required")
 								}
+								if err := CheckModelName(s); err != nil {
+									return err
+								}
 								// Check existence
-								if _, exists := viper.GetStringMap("models")[encodeModelName(s)]; exists {
+								if _, exists := store.GetModels()[s]; exists {
 									return fmt.Errorf("model '%s' already exists", s)
 								}
 								return nil
@@ -179,10 +196,10 @@ Example:
 					huh.NewSelect[string]().
 						Title("Provider").
 						Options(
-							huh.NewOption("OpenAI", "openai"),
-							huh.NewOption("Anthropic", "anthropic"),
-							huh.NewOption("Google Gemini", "gemini"),
-							huh.NewOption("Other (OpenAI Compatible)", "other"),
+							huh.NewOption("OpenAI", service.ModelProviderOpenAI),
+							huh.NewOption("Anthropic", service.ModelProviderAnthropic),
+							huh.NewOption("Google Gemini", service.ModelProviderGemini),
+							huh.NewOption("Other (OpenAI Compatible)", service.ModelProviderOpenAICompatible),
 						).
 						Value(&provider),
 				),
@@ -194,16 +211,21 @@ Example:
 			defaultEndpoint := ""
 			defaultModel := ""
 			switch provider {
-			case "openai":
+			case service.ModelProviderOpenAI:
 				defaultEndpoint = "https://api.openai.com/v1"
 				defaultModel = "gpt-5.2"
-			case "anthropic":
+			case service.ModelProviderAnthropic:
 				defaultEndpoint = "https://api.anthropic.com/v1"
 				defaultModel = "claude-4-5-sonnet"
-			case "gemini":
+			case service.ModelProviderGemini:
 				defaultEndpoint = "https://generativelanguage.googleapis.com"
 				defaultModel = "gemini-flash-latest"
+			case service.ModelProviderOpenAICompatible:
+				defaultEndpoint = "https://openrouter.ai/api/v1"
+				defaultModel = "deepseek-r1"
 			}
+			// Update provider
+			modelProvider = provider
 
 			// 3. Endpoint, Key, Model ID
 			err = huh.NewForm(
@@ -304,26 +326,21 @@ Example:
 			}
 		}
 
-		// Get existing models map
-		modelsMap := viper.GetStringMap("models")
-		if modelsMap == nil {
-			modelsMap = make(map[string]interface{})
-		}
+		modelsMap := store.GetModels()
 
-		encodedName := encodeModelName(name)
-
-		// Check if model already exists
-		if _, exists := modelsMap[encodedName]; exists {
+		// Check existence again (redundant with form validation but safe for flags)
+		if _, exists := modelsMap[name]; exists {
 			return fmt.Errorf("model named '%s' already exists. Use 'remove' first or use 'set' to change its config or choose a different name", name)
 		}
 
 		// Create new model config
-		newModel := map[string]any{
-			"endpoint":    endpoint,
-			"key":         key,
-			"model":       model,
-			"temperature": temp,
-			"top_p":       topP,
+		newModel := data.Model{
+			Provider: modelProvider,
+			Endpoint: endpoint,
+			Key:      key,
+			Model:    model,
+			Temp:     temp,
+			TopP:     topP,
 		}
 
 		// Validate temperature value (should be between 0 and 2.0)
@@ -338,22 +355,12 @@ Example:
 
 		// Only add seed if it's not 0 (0 means random)
 		if seed != 0 {
-			newModel["seed"] = seed
+			s := int32(seed)
+			newModel.Seed = &s
 		}
 
-		// Add the new model
-		modelsMap[encodedName] = newModel
-		viper.Set("models", modelsMap)
-
-		// Set default model if none exists
-		if GetAgentString("model") == "" {
-			if err := SetAgentValue("model", encodedName); err != nil {
-				return fmt.Errorf("failed to save model setting: %w", err)
-			}
-		}
-
-		// Write the config file
-		if err := writeConfig(); err != nil {
+		// Add the new model via data layer
+		if err := store.SetModel(name, &newModel); err != nil {
 			return fmt.Errorf("failed to save model: %w", err)
 		}
 
@@ -370,23 +377,25 @@ Example:
 gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name string
+		store := data.NewConfigStore()
+
 		if len(args) > 0 {
 			name = args[0]
 		} else {
 			// Default to current model
-			current := GetEffectModelName()
-			if current != "" {
-				name = current
+			model := GetEffectModel()
+			if model != nil {
+				name = model.Name
 			}
 
 			// Interactive select
-			modelsMap := viper.GetStringMap("models")
+			modelsMap := store.GetModels()
 			if len(modelsMap) == 0 {
 				return fmt.Errorf("no models found")
 			}
 			var options []huh.Option[string]
 			for m := range modelsMap {
-				options = append(options, huh.NewOption(decodeModelName(m), decodeModelName(m)))
+				options = append(options, huh.NewOption(m, m))
 			}
 			sort.Slice(options, func(i, j int) bool { return options[i].Key < options[j].Key })
 
@@ -400,54 +409,43 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 			}
 		}
 
-		encodedName := encodeModelName(name)
-
-		// Get or create model configuration
-		modelsMap := viper.GetStringMap("models")
-		if modelsMap == nil {
-			return fmt.Errorf("there is no model yet, use 'add' first")
-		}
-
-		// Get existing model entry
-		var modelConfig map[string]interface{}
-		if existingConfig, exists := modelsMap[encodedName]; exists {
-			var ok bool
-			if modelConfig, ok = existingConfig.(map[string]interface{}); !ok {
-				modelConfig = make(map[string]interface{})
-			}
-		} else {
+		// Find model
+		modelConfig := store.GetModel(name)
+		if modelConfig == nil {
 			return fmt.Errorf("model named '%s' not found", name)
 		}
 
 		// Update fields if flags are provided, OR if interactive
 		// If NO flags provided, run interactive edit
 		if cmd.Flags().NFlag() == 0 {
-			var endpoint, key, model string
+			var provider, endpoint, key, model string
 			var tempStr = "1.0"
 			var topPStr = "1.0"
 			var seedStr = ""
 
 			// Populate from existing
-			if v, ok := modelConfig["endpoint"].(string); ok {
-				endpoint = v
-			}
-			if v, ok := modelConfig["key"].(string); ok {
-				key = v
-			}
-			if v, ok := modelConfig["model"].(string); ok {
-				model = v
-			}
-			if v, ok := modelConfig["temperature"]; ok {
-				tempStr = fmt.Sprintf("%v", v)
-			}
-			if v, ok := modelConfig["top_p"]; ok {
-				topPStr = fmt.Sprintf("%v", v)
-			}
-			if v, ok := modelConfig["seed"]; ok {
-				seedStr = fmt.Sprintf("%v", v)
+			provider = modelConfig.Provider
+			endpoint = modelConfig.Endpoint
+			key = modelConfig.Key
+			model = modelConfig.Model
+			tempStr = fmt.Sprintf("%v", modelConfig.Temp)
+			topPStr = fmt.Sprintf("%v", modelConfig.TopP)
+			if modelConfig.Seed != nil {
+				seedStr = fmt.Sprintf("%v", *modelConfig.Seed)
 			}
 
 			err := huh.NewForm(
+				huh.NewGroup(
+					huh.NewSelect[string]().
+						Title("Provider").
+						Options(
+							huh.NewOption("OpenAI", service.ModelProviderOpenAI),
+							huh.NewOption("Anthropic", service.ModelProviderAnthropic),
+							huh.NewOption("Google Gemini", service.ModelProviderGemini),
+							huh.NewOption("Other (OpenAI Compatible)", service.ModelProviderOpenAICompatible),
+						).
+						Value(&provider),
+				),
 				huh.NewGroup(
 					huh.NewInput().
 						Title("Endpoint").
@@ -501,43 +499,40 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 				return nil
 			}
 
-			modelConfig["endpoint"] = endpoint
-			modelConfig["key"] = key
-			modelConfig["model"] = model
+			modelConfig.Endpoint = endpoint
+			modelConfig.Key = key
+			modelConfig.Model = model
 
 			if t, err := strconv.ParseFloat(tempStr, 32); err == nil {
-				modelConfig["temperature"] = float32(t)
+				modelConfig.Temp = float32(t)
 			}
 			if p, err := strconv.ParseFloat(topPStr, 32); err == nil {
-				modelConfig["top_p"] = float32(p)
+				modelConfig.TopP = float32(p)
 			}
 			if s, err := strconv.Atoi(seedStr); err == nil {
-				modelConfig["seed"] = s
+				i32 := int32(s)
+				modelConfig.Seed = &i32
 			} else {
-				delete(modelConfig, "seed")
+				modelConfig.Seed = nil
 			}
 		} else {
 			// Update from flags
+			if provider, err := cmd.Flags().GetString("provider"); err == nil && provider != "" {
+				modelConfig.Provider = provider
+			}
 			if endpoint, err := cmd.Flags().GetString("endpoint"); err == nil && endpoint != "" {
-				modelConfig["endpoint"] = endpoint
+				modelConfig.Endpoint = endpoint
 			}
 			if key, err := cmd.Flags().GetString("key"); err == nil && key != "" {
-				modelConfig["key"] = key
+				modelConfig.Key = key
 			}
 			if model, err := cmd.Flags().GetString("model"); err == nil && model != "" {
-				modelConfig["model"] = model
+				modelConfig.Model = model
 			}
-			// ... (keep temp/top_p logic from original if desired, or simplified)
-			// For brevity, I'm focusing on the main 3 fields in interactive.
 		}
 
-		// ... (Same save logic)
-		// Update the entry
-		modelsMap[encodedName] = modelConfig
-		viper.Set("models", modelsMap)
-
-		// Write the config file
-		if err := writeConfig(); err != nil {
+		// Update the entry via data layer
+		if err := store.SetModel(name, modelConfig); err != nil {
 			return fmt.Errorf("failed to save model: %w", err)
 		}
 
@@ -553,21 +548,28 @@ var modelInfoCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
-		encodedName := encodeModelName(name)
+		store := data.NewConfigStore()
+		modelsMap := store.GetModels()
 
-		// Get the models map with nested structure
-		modelsMap := viper.GetStringMap("models")
-
-		modelConfig, exists := modelsMap[encodedName]
-		if !exists {
+		// Try finding key
+		var modelName string
+		if _, exists := modelsMap[name]; exists {
+			modelName = name
+		} else {
 			return fmt.Errorf("model named '%s' not found", name)
 		}
 
-		// Type assert to get the nested map
-		if configMap, ok := modelConfig.(map[string]interface{}); ok {
+		modelConfig := modelsMap[modelName]
+
+		if modelConfig != nil {
 			fmt.Printf("Model '%s':\n---\n", name)
-			for key, value := range configMap {
-				fmt.Printf("%s: %v\n", key, value)
+			fmt.Printf("Provider: %s\n", modelConfig.Provider)
+			fmt.Printf("Endpoint: %s\n", modelConfig.Endpoint)
+			fmt.Printf("Model ID: %s\n", modelConfig.Model)
+			fmt.Printf("Temp: %v\n", modelConfig.Temp)
+			fmt.Printf("TopP: %v\n", modelConfig.TopP)
+			if modelConfig.Seed != nil {
+				fmt.Printf("Seed: %d\n", *modelConfig.Seed)
 			}
 			fmt.Println("---")
 			return nil
@@ -588,18 +590,20 @@ gllm model remove gpt4
 gllm model remove gpt4 --force`,
 	// Args: cobra.ExactArgs(1), // Removed for interactive mode
 	RunE: func(cmd *cobra.Command, args []string) error {
+		store := data.NewConfigStore()
+		modelsMap := store.GetModels()
+
 		var name string
 		if len(args) > 0 {
 			name = args[0]
 		} else {
-			modelsMap := viper.GetStringMap("models")
 			if len(modelsMap) == 0 {
 				fmt.Println("No models to remove.")
 				return nil
 			}
 			var options []huh.Option[string]
 			for m := range modelsMap {
-				options = append(options, huh.NewOption(decodeModelName(m), decodeModelName(m)))
+				options = append(options, huh.NewOption(m, m))
 			}
 			sort.Slice(options, func(i, j int) bool { return options[i].Key < options[j].Key })
 
@@ -613,10 +617,11 @@ gllm model remove gpt4 --force`,
 			}
 		}
 
-		encodedName := encodeModelName(name)
-		modelsMap := viper.GetStringMap("models")
-
-		if _, exists := modelsMap[encodedName]; !exists {
+		// Find key
+		var modelName string
+		if _, exists := modelsMap[name]; exists {
+			modelName = name
+		} else {
 			cmd.SilenceUsage = true // Don't show usage for this error
 			if force, _ := cmd.Flags().GetBool("force"); force {
 				fmt.Printf("Model '%s' does not exist, nothing to remove.\n", name)
@@ -638,23 +643,9 @@ gllm model remove gpt4 --force`,
 			}
 		}
 
-		// Delete the prompt
-		delete(modelsMap, encodedName)
-		viper.Set("models", modelsMap)
-
-		// Check if the removed model was the default
-		defaultPrompt := GetAgentString("model")
-		if encodedName == defaultPrompt {
-			// Clear the default
-			if err := SetAgentValue("model", ""); err != nil {
-				return fmt.Errorf("failed to update agent config: %w", err)
-			}
-			fmt.Printf("Note: Removed model '%s' was the agent. Default model cleared.\n", name)
-		}
-
-		// Write the config file
-		if err := writeConfig(); err != nil {
-			return fmt.Errorf("failed to save configuration after removing model: %w", err)
+		// Delete the model
+		if err := store.DeleteModel(modelName); err != nil {
+			return fmt.Errorf("failed to remove model: %w", err)
 		}
 
 		fmt.Printf("Model '%s' removed successfully.\n", name)
@@ -690,20 +681,12 @@ gllm model clear --force`,
 		}
 
 		// Clear all models
-		modelsMap := viper.GetStringMap("models")
-		for modelConfig := range modelsMap {
-			delete(modelsMap, modelConfig)
-		}
-		viper.Set("models", modelsMap)
-
-		// Clear default model if set
-		if GetAgentString("model") != "" {
-			SetAgentValue("model", "")
-		}
-
-		// Write config file
-		if err := writeConfig(); err != nil {
-			return fmt.Errorf("failed to update configuration: %w", err)
+		store := data.NewConfigStore()
+		modelsMap := store.GetModels()
+		for modelName := range modelsMap {
+			if err := store.DeleteModel(modelName); err != nil {
+				return fmt.Errorf("failed to delete model %s: %w", modelName, err)
+			}
 		}
 
 		fmt.Println("All models have been cleared.")
@@ -720,23 +703,25 @@ to the specified one for all subsequent operations.`,
 	// Args: cobra.ExactArgs(1), // Removed to allow interactive mode
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name string
+		store := data.NewConfigStore()
+		modelsMap := store.GetModels()
+
 		if len(args) > 0 {
 			name = args[0]
 		} else {
-			modelsMap := viper.GetStringMap("models")
 			if len(modelsMap) == 0 {
 				return fmt.Errorf("no models found")
 			}
 			var options []huh.Option[string]
 			for m := range modelsMap {
-				options = append(options, huh.NewOption(decodeModelName(m), decodeModelName(m)))
+				options = append(options, huh.NewOption(m, m))
 			}
 			sort.Slice(options, func(i, j int) bool { return options[i].Key < options[j].Key })
 
 			// Default to current model
-			current := GetEffectModelName()
-			if current != "" {
-				name = current
+			model := GetEffectModel()
+			if model != nil {
+				name = model.Name
 			}
 
 			err := huh.NewSelect[string]().
@@ -749,16 +734,21 @@ to the specified one for all subsequent operations.`,
 			}
 		}
 
-		encodedName := encodeModelName(name)
-		models := viper.GetStringMap("models")
-
-		// Check if the model exists before switching to it
-		if _, exists := models[encodedName]; !exists {
+		// Find key
+		var model *data.Model
+		if m, exists := modelsMap[name]; exists {
+			model = m
+		} else {
 			return fmt.Errorf("model named '%s' not found. Use 'gllm model list' to see available models", name)
 		}
 
-		if err := SetAgentValue("model", encodedName); err != nil {
-			return fmt.Errorf("failed to save model setting: %w", err)
+		agent := store.GetActiveAgent()
+		if agent == nil {
+			return fmt.Errorf("failed to get active agent")
+		}
+		agent.Model = *model
+		if err := store.SetAgent(agent.Name, agent); err != nil {
+			return fmt.Errorf("failed to set active agent: %w", err)
 		}
 
 		fmt.Printf("Switched to model '%s' successfully.\n", name)
@@ -767,125 +757,19 @@ to the specified one for all subsequent operations.`,
 	},
 }
 
-func GetAllModels() (map[string]string, error) {
-	modelsMap := viper.GetStringMap("models")
-	if modelsMap == nil {
-		return nil, fmt.Errorf("no models found")
-	}
-
-	// Get keys and sort them
-	keys := make([]string, 0, len(modelsMap))
-	for k := range modelsMap {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	models := make(map[string]string)
-	for _, k := range keys {
-		decodedName := decodeModelName(k)
-		v := modelsMap[k]
-		var configMap map[string]interface{}
-
-		if cm, ok := v.(map[string]interface{}); ok {
-			configMap = cm
-		} else if cm, ok := v.(map[interface{}]interface{}); ok {
-			configMap = make(map[string]interface{})
-			for k, v := range cm {
-				configMap[fmt.Sprint(k)] = v
-			}
-		}
-
-		if configMap != nil {
-			// Convert the inner map to a string representation
-			var pairs []string
-			for k, v := range configMap {
-				pairs = append(pairs, fmt.Sprintf("\t%s: %v", k, v))
-			}
-			sort.Strings(pairs)
-			models[decodedName] = strings.Join(pairs, "\n")
-		} else {
-			return nil, fmt.Errorf("invalid model configuration for '%s' (type %T)", decodedName, v)
-		}
-	}
-	return models, nil
-}
-
-func SetEffectiveModel(name string) error {
-	encodedName := encodeModelName(name)
-	modelsMap := viper.GetStringMap("models")
-	if _, ok := modelsMap[encodedName]; !ok {
-		return fmt.Errorf("model named '%s' not found", name)
-	}
-
-	if err := SetAgentValue("model", encodedName); err != nil {
-		return fmt.Errorf("failed to update configuration: %w", err)
-	}
-	return nil
-}
-
-func GetEffectModelName() string {
-	defaultName := GetAgentString("model")
-	return decodeModelName(defaultName)
-}
-
-func GetModelInfo(name string) (details map[string]any) {
-	encodedName := encodeModelName(name)
-	modelsMap := viper.GetStringMap("models")
-
-	if modelsMap == nil {
+func GetEffectModel() (model *data.Model) {
+	// Get from active agent
+	store := data.NewConfigStore()
+	agent := store.GetActiveAgent()
+	if agent == nil {
 		return nil
 	}
-
-	modelConfig, exists := modelsMap[encodedName]
-	if !exists {
-		return nil
-	}
-
-	// Type assert to get the nested map
-	if configMap, ok := modelConfig.(map[string]interface{}); ok {
-		return configMap
-	}
-
-	return nil
+	return &agent.Model
 }
 
-// GetEffectiveModel returns the configuration for the model to use
-func GetEffectiveModel() (name string, details map[string]any) {
-	defaultName := GetAgentString("model")
-	modelsMap := viper.GetStringMap("models")
-
-	// 1. Try to use default model
-	if defaultName != "" {
-		if modelConfig, ok := modelsMap[defaultName]; ok {
-			// Convert the map[string]interface{} to map[string]string
-			if configMap, ok := modelConfig.(map[string]interface{}); ok {
-				return decodeModelName(defaultName), configMap
-			}
-			service.Warnf("Warning: Default model '%s' has invalid configuration format", defaultName)
-		} else {
-			service.Warnf("Warning: Default model '%s' not found in configuration. Falling back...", defaultName)
-		}
+func CheckModelName(name string) error {
+	if strings.Contains(name, ".") {
+		return fmt.Errorf("model name '%s' contains a dot, which is not allowed", name)
 	}
-
-	// 2. Fall back to the first model alphabetically
-	if len(modelsMap) > 0 {
-		names := make([]string, 0, len(modelsMap))
-		for name := range modelsMap {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-
-		firstModelName := names[0]
-		logger.Debugf("Using first available model '%s' as fallback", firstModelName)
-
-		if modelConfig, ok := modelsMap[firstModelName]; ok {
-			if configMap, ok := modelConfig.(map[string]interface{}); ok {
-				return decodeModelName(firstModelName), configMap
-			}
-		}
-	}
-
-	// 3. No models available
-	logger.Debugln("No model to use!")
-	return "", nil
+	return nil
 }

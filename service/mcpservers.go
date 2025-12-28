@@ -1,172 +1,140 @@
 package service
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
-
-	"github.com/mitchellh/go-homedir"
+	"github.com/activebook/gllm/data"
 )
 
-// MCPServerConfig represents the configuration for an MCP server
+// MCPServerConfig uses data.MCPServer for configuration.
+// Note: The runtime MCPServer struct is defined in service/mcp.go and is different.
+
+// MCPServerConfig is DEPRECATED. Use MCPServer instead.
+// Kept for backward compatibility.
 type MCPServerConfig struct {
-	Command     string            `json:"command,omitempty"` // Command to execute
-	Args        []string          `json:"args,omitempty"`    // Arguments to pass to the command
-	Type        string            `json:"type,omitempty"`    // sse or http
-	Url         string            `json:"url,omitempty"`     // URL for SSE
-	HttpUrl     string            `json:"httpUrl,omitempty"` // URL for HTTP(Streamable)
-	BaseUrl     string            `json:"baseUrl,omitempty"` // URL for SSE
-	Headers     map[string]string `json:"headers,omitempty"` // Headers for SSE/HTTP
-	Env         map[string]string `json:"env,omitempty"`     // Environment variables for the command
+	Command     string            `json:"command,omitempty"`
+	Args        []string          `json:"args,omitempty"`
+	Type        string            `json:"type,omitempty"`
+	Url         string            `json:"url,omitempty"`
+	HttpUrl     string            `json:"httpUrl,omitempty"`
+	BaseUrl     string            `json:"baseUrl,omitempty"`
+	Headers     map[string]string `json:"headers,omitempty"`
+	Env         map[string]string `json:"env,omitempty"`
 	WorkDir     string            `json:"working_directory,omitempty"`
 	Cwd         string            `json:"cwd,omitempty"`
 	Name        string            `json:"name,omitempty"`
 	Description string            `json:"description,omitempty"`
-	Allowed     bool              // whether to allow MCP servers
+	Allowed     bool
 }
 
-// MCPConfig represents the overall MCP configuration
+// MCPConfig represents the overall MCP configuration.
+// DEPRECATED: Use data.MCPStore methods directly.
 type MCPConfig struct {
-	MCPServers      map[string]MCPServerConfig `json:"mcpServers"`      // name:server
-	AllowMCPServers []string                   `json:"allowMCPServers"` // whether to allow MCP servers
+	MCPServers      map[string]MCPServerConfig `json:"mcpServers"`
+	AllowMCPServers []string                   `json:"allowMCPServers"`
 }
 
-// LoadMCPServers reads the MCP configuration from the specified JSON file
-// and initializes the MCP client with the configured servers
-func LoadMCPServers() (*MCPConfig, error) {
-	// Get the path to the MCP servers configuration file
-	configPath := GetMCPServersPath()
-
-	// Check if the configuration file exists
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return nil, nil
-	}
-
-	// Read the configuration file
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, err
-	}
-
-	// Unmarshal the JSON data into the MCPConfig struct
-	var config MCPConfig
-	err = json.Unmarshal(data, &config)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create a set of allowed servers for quick lookup
-	for _, s := range config.AllowMCPServers {
-		if s != "" {
-			if server, exists := config.MCPServers[s]; exists {
-				// If the server exists in the AllowMCPServers list,
-				// Mark the server as allowed
-				server.Allowed = true
-				config.MCPServers[s] = server
-			} else if server.Allowed {
-				// If the server does not exist in the AllowMCPServers list,
-				// Mark the server as not allowed
-				server.Allowed = false
-				config.MCPServers[s] = server
-			}
-		}
-	}
-
-	return &config, nil
-}
-
-// SaveMCPServers writes the MCP configuration to the specified JSON file
-func SaveMCPServers(config *MCPConfig) error {
-	// Get the path to the MCP servers configuration file
-	configPath := GetMCPServersPath()
-
-	// Ensure the directory exists
-	dir := filepath.Dir(configPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-
-	// Marshal the config to JSON
-	data, err := json.MarshalIndent(config, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	// Write to file
-	return os.WriteFile(configPath, data, 0644)
-}
-
-// SaveMCPServersToPath writes the MCP configuration to a specific path
-func SaveMCPServersToPath(config *MCPConfig, path string) error {
-	// Ensure the directory exists
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-
-	// Marshal the config to JSON
-	data, err := json.MarshalIndent(config, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	// Write to file
-	return os.WriteFile(path, data, 0644)
-}
-
-// LoadMCPServersFromPath reads the MCP configuration from a specific path
-func LoadMCPServersFromPath(path string) (*MCPConfig, error) {
-	// Check if the configuration file exists
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, nil
-	}
-
-	// Read the configuration file
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	// Unmarshal the JSON data into the MCPConfig struct
-	var config MCPConfig
-	err = json.Unmarshal(data, &config)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create a set of allowed servers for quick lookup
-	for _, s := range config.AllowMCPServers {
-		if s != "" {
-			if server, exists := config.MCPServers[s]; exists {
-				// If the server exists in the AllowMCPServers list,
-				// Mark the server as allowed
-				server.Allowed = true
-				config.MCPServers[s] = server
-			} else if server.Allowed {
-				// If the server does not exist in the AllowMCPServers list,
-				// Mark the server as not allowed
-				server.Allowed = false
-				config.MCPServers[s] = server
-			}
-		}
-	}
-
-	return &config, nil
-}
-
-// GetMCPServersPath returns the path to the MCP servers configuration file
+// GetMCPServersPath returns the path to the MCP servers configuration file.
 func GetMCPServersPath() string {
-	var err error
-	// Prefer os.UserConfigDir()
-	userConfigDir, err := os.UserConfigDir()
+	store := data.NewMCPStore()
+	return store.GetPath()
+}
+
+// LoadMCPServers reads the MCP configuration.
+// Returns legacy MCPConfig for backward compatibility.
+func LoadMCPServers() (*MCPConfig, error) {
+	store := data.NewMCPStore()
+	servers, allowed, err := store.Load()
 	if err != nil {
-		// Fallback to home directory if UserConfigDir fails
-		userConfigDir, _ = homedir.Dir()
+		return nil, err
 	}
 
-	// App specific directory: e.g., ~/.config/gllm or ~/Library/Application Support/gllm
-	appConfigDir := filepath.Join(userConfigDir, "gllm")
+	if len(servers) == 0 {
+		return nil, nil
+	}
 
-	// Default config file path: e.g., ~/.config/gllm/.mcp.json
-	return filepath.Join(appConfigDir, "mcp.json")
+	return toMCPConfig(servers, allowed), nil
+}
+
+// SaveMCPServers writes the MCP configuration.
+func SaveMCPServers(config *MCPConfig) error {
+	store := data.NewMCPStore()
+	servers, allowed := fromMCPConfig(config)
+	return store.Save(servers, allowed)
+}
+
+// SaveMCPServersToPath writes the MCP configuration to a specific path.
+func SaveMCPServersToPath(config *MCPConfig, path string) error {
+	store := data.NewMCPStore()
+	servers, allowed := fromMCPConfig(config)
+	return store.SaveToPath(servers, allowed, path)
+}
+
+// LoadMCPServersFromPath reads the MCP configuration from a specific path.
+func LoadMCPServersFromPath(path string) (*MCPConfig, error) {
+	store := data.NewMCPStore()
+	servers, allowed, err := store.LoadFromPath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(servers) == 0 {
+		return nil, nil
+	}
+
+	return toMCPConfig(servers, allowed), nil
+}
+
+// toMCPConfig converts data.MCPServer map to legacy MCPConfig.
+func toMCPConfig(servers map[string]*data.MCPServer, allowed []string) *MCPConfig {
+	config := &MCPConfig{
+		MCPServers:      make(map[string]MCPServerConfig),
+		AllowMCPServers: allowed,
+	}
+
+	for name, server := range servers {
+		config.MCPServers[name] = MCPServerConfig{
+			Command:     server.Command,
+			Args:        server.Args,
+			Type:        server.Type,
+			Url:         server.URL,
+			HttpUrl:     server.HTTPUrl,
+			BaseUrl:     server.BaseURL,
+			Headers:     server.Headers,
+			Env:         server.Env,
+			WorkDir:     server.WorkDir,
+			Cwd:         server.Cwd,
+			Name:        server.Name,
+			Description: server.Description,
+			Allowed:     server.Allowed,
+		}
+	}
+
+	return config
+}
+
+// fromMCPConfig converts legacy MCPConfig to data.MCPServer map.
+func fromMCPConfig(config *MCPConfig) (map[string]*data.MCPServer, []string) {
+	if config == nil {
+		return nil, nil
+	}
+
+	servers := make(map[string]*data.MCPServer)
+	for name, sc := range config.MCPServers {
+		servers[name] = &data.MCPServer{
+			Name:        name,
+			Command:     sc.Command,
+			Args:        sc.Args,
+			Type:        sc.Type,
+			URL:         sc.Url,
+			HTTPUrl:     sc.HttpUrl,
+			BaseURL:     sc.BaseUrl,
+			Headers:     sc.Headers,
+			Env:         sc.Env,
+			WorkDir:     sc.WorkDir,
+			Cwd:         sc.Cwd,
+			Description: sc.Description,
+			Allowed:     sc.Allowed,
+		}
+	}
+
+	return servers, config.AllowMCPServers
 }

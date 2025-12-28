@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -23,57 +24,33 @@ have a continuous conversation with the model.`,
 		// Create an indeterminate progress bar
 		indicator := service.NewIndicator("Processing...")
 
+		var chatInfo *ChatInfo
 		files := []*service.FileData{}
 		// Start a goroutine for your actual LLM work
 		done := make(chan bool)
 		go func() {
 
-			// If model flag is provided, update the default model
-			if cmd.Flags().Changed("model") {
-				if err := SetEffectiveModel(modelFlag); err != nil {
-					service.Warnf("%v", err)
-					fmt.Println("Using default model instead")
+			store := data.NewConfigStore()
+
+			// If agent flag is provided, update the default agent
+			if cmd.Flags().Changed("agent") {
+				if store.GetAgent(agentName) == nil {
+					service.Warnf("Agent %s does not exist", agentName)
+					return
 				}
+				store.SetActiveAgent(agentName)
 			}
 
-			// If system prompt is provided, update the default system prompt
-			if sysPromptFlag != "" {
-				if err := SetEffectiveSystemPrompt(sysPromptFlag); err != nil {
-					service.Warnf("%v", err)
-					fmt.Println("Using default system prompt instead")
-				}
+			// Get active agent
+			activeAgent := store.GetActiveAgent()
+			if activeAgent == nil {
+				service.Warnf("No active agent found")
+				return
 			}
-
-			// If template is provided, update the default template
-			if templateFlag != "" {
-				if err := SetEffectiveTemplate(templateFlag); err != nil {
-					service.Warnf("%v", err)
-					fmt.Println("Using default template instead")
-				}
-			}
-
-			// Search
-			if !searchFlag {
-				// if search flag are not set, check if they are enabled globally
-				searchFlag = IsSearchEnabled()
-			}
-
-			// Tools
-			if !toolsFlag {
-				// if tools flag are not set, check if they are enabled globally
-				toolsFlag = AreToolsEnabled()
-			}
-
-			// Check if think mode is enabled
-			if !thinkFlag {
-				// if think flag is not set, check if it's enabled globally
-				thinkFlag = IsThinkEnabled()
-			}
-
-			// MCP
-			if !mcpFlag {
-				// if mcp flag is not set, check if it's enabled globally
-				mcpFlag = AreMCPServersEnabled()
+			// Build the ChatInfo object
+			chatInfo = buildChatInfo(activeAgent, files)
+			if chatInfo == nil {
+				return
 			}
 
 			// Always save a conversation file regardless of the flag
@@ -97,12 +74,6 @@ have a continuous conversation with the model.`,
 		<-done
 		indicator.Stop()
 
-		// Build the ChatInfo object
-		chatInfo := buildChatInfo(files)
-		if chatInfo == nil {
-			return
-		}
-
 		// Start the REPL
 		chatInfo.startREPL()
 	},
@@ -114,6 +85,7 @@ const (
 	_gllmTempFile = ".gllm-edit-*.tmp"
 )
 
+// Load when package is initialized
 func init() {
 	rootCmd.AddCommand(chatCmd)
 
@@ -121,31 +93,21 @@ func init() {
 	// In each chat session, it shouldn't change model, because the chat history would be invalid.
 	// Attach should be used inside chat session
 	// Imagine like using web llm ui, you can attach file to the chat session and turn search on and off
-	chatCmd.Flags().StringVarP(&modelFlag, "model", "m", "", "Model to use for the chat session")
-	chatCmd.Flags().StringVarP(&sysPromptFlag, "system", "S", "", "System prompt to use for the chat session")
-	chatCmd.Flags().StringVarP(&templateFlag, "template", "p", "", "Template to use for the chat session")
-	chatCmd.Flags().StringSliceVarP(&attachments, "attachment", "a", []string{}, "Specify file(s) or image(s) to append to the chat sessioin")
+	chatCmd.Flags().StringVarP(&agentName, "agent", "A", "", "Agent to use for the chat session")
 	chatCmd.Flags().StringVarP(&convoName, "conversation", "c", GenerateChatFileName(), "Name for this chat session")
-	chatCmd.Flags().BoolVarP(&searchFlag, "search", "s", false, "Search engine for the chat session")
-	chatCmd.Flags().BoolVarP(&toolsFlag, "tools", "t", true, "Enable or disable tools for the chat session")
-	chatCmd.Flags().BoolVarP(&thinkFlag, "think", "T", false, "Enable or disable deep think mode for the chat session")
-	chatCmd.Flags().BoolVarP(&mcpFlag, "mcp", "", false, "Enable or disable MCP servers for the chat session")
-	chatCmd.Flags().Lookup("search").NoOptDefVal = service.GetDefaultSearchEngineName()
-	chatCmd.Flags().BoolVarP(&confirmToolsFlag, "confirm-tools", "", false, "Skip confirmation for tool operations")
+	chatCmd.Flags().BoolVarP(&yoloFlag, "yolo", "y", false, "Enable yolo mode (non-interactive)")
 }
 
 type ChatInfo struct {
-	Model         string
-	Provider      service.ModelProvider
+	ModelProvider string
 	Files         []*service.FileData
 	Conversion    service.ConversationManager
 	QuitFlag      bool   // for cmd /quit or /exit
 	EditorInput   string // for /e editor edit
-	maxRecursions int
 	outputFile    string
 }
 
-func buildChatInfo(files []*service.FileData) *ChatInfo {
+func buildChatInfo(agent *data.AgentConfig, files []*service.FileData) *ChatInfo {
 
 	// Bugfix:
 	// When convoName is an index number, and use it to find convo file
@@ -161,22 +123,17 @@ func buildChatInfo(files []*service.FileData) *ChatInfo {
 	}
 
 	// Construct conversation manager
-	// Use dual detection: endpoint first, then model name patterns
-	_, modelInfo := GetEffectiveModel()
-	provider := service.DetectModelProvider(modelInfo["endpoint"].(string), modelInfo["model"].(string))
-	cm, err := service.ConstructConversationManager(convoName, provider)
+	cm, err := service.ConstructConversationManager(convoName, agent.Model.Provider)
 	if err != nil {
 		service.Errorf("Error constructing conversation manager: %v\n", err)
 		return nil
 	}
-	mr := GetMaxRecursions()
+
 	ci := ChatInfo{
-		Model:         modelInfo["model"].(string),
-		Provider:      provider,
+		ModelProvider: agent.Model.Provider,
 		Files:         files,
 		Conversion:    cm,
 		QuitFlag:      false,
-		maxRecursions: mr,
 	}
 	return &ci
 }
@@ -320,10 +277,25 @@ func (ci *ChatInfo) startWithLocalCommand(line string) bool {
 
 func (ci *ChatInfo) callAgent(input string) {
 	var sb strings.Builder
-	appendText(&sb, GetEffectiveTemplate())
+
+	yolo := false
+	if yoloFlag {
+		yolo = true
+	}
+
+	// Get ActiveAgent
+	store := data.NewConfigStore()
+	agent := store.GetActiveAgent()
+	if agent == nil {
+		service.Warnf("No active agent found")
+		return
+	}
+
+	templateContent := store.GetTemplate(agent.Template)
+	appendText(&sb, templateContent)
 	appendText(&sb, input)
 
-	// Process @ references in prompt
+	//Process @ references in prompt
 	prompt := sb.String()
 	atRefProcessor := service.NewAtRefProcessor()
 	processedPrompt, err := atRefProcessor.ProcessText(prompt)
@@ -333,47 +305,24 @@ func (ci *ChatInfo) callAgent(input string) {
 		processedPrompt = prompt
 	}
 
-	_, modelInfo := GetEffectiveModel()
-	sys_prompt := GetEffectiveSystemPrompt()
-
-	// must recheck tools flag, because it can be set /tools
-	toolsFlag = AreToolsEnabled()
-	// regardless of toolsFlag, use the effective tools
-	tools := GetEnabledTools()
-	// If tools are enabled, we will use the search engine
-	searchFlag = IsSearchEnabled()
-	// If search flag is set, we will use the search engine, too
-	var searchEngine map[string]any
-	if searchFlag {
-		_, searchEngine = GetEffectiveSearchEngine()
-	}
-
-	// check if think flag is set
-	thinkFlag = IsThinkEnabled()
-	// check if mcp flag is set
-	mcpFlag = AreMCPServersEnabled()
-	// Include usage metainfo
-	includeUsage := IncludeUsageMetainfo()
-	// Include markdown
-	includeMarkdown := IncludeMarkdown()
+	sys_prompt := store.GetSystemPrompt(agent.SystemPrompt)
 
 	op := service.AgentOptions{
-		Prompt:           processedPrompt,
-		SysPrompt:        sys_prompt,
-		Files:            ci.Files,
-		ModelInfo:        &modelInfo,
-		SearchEngine:     &searchEngine,
-		MaxRecursions:    ci.maxRecursions,
-		ThinkMode:        thinkFlag,
-		UseTools:         toolsFlag,
-		EnabledTools:     tools,
-		UseMCP:           mcpFlag,
-		SkipToolsConfirm: confirmToolsFlag,
-		AppendUsage:      includeUsage,
-		AppendMarkdown:   includeMarkdown,
-		OutputFile:       ci.outputFile,
-		QuietMode:        false,
-		ConvoName:        convoName,
+		Prompt:         processedPrompt,
+		SysPrompt:      sys_prompt,
+		Files:          ci.Files,
+		ModelInfo:      &agent.Model,
+		SearchEngine:   &agent.Search,
+		MaxRecursions:  agent.MaxRecursions,
+		ThinkMode:      agent.Think,
+		EnabledTools:   agent.Tools,
+		UseMCP:         agent.MCP,
+		YoloMode:       yolo,
+		AppendUsage:    agent.Usage,
+		AppendMarkdown: agent.Markdown,
+		OutputFile:     ci.outputFile,
+		QuietMode:      false,
+		ConvoName:      convoName,
 	}
 
 	err = service.CallAgent(&op)
@@ -390,11 +339,6 @@ func (ci *ChatInfo) callAgent(input string) {
 
 	// Reset the files after processing
 	ci.Files = []*service.FileData{}
-	// Reset the system prompt
-	SetEffectiveSystemPrompt("")
-	// Reset the template
-	SetEffectiveTemplate("")
-	// Reset the input lines
 }
 
 func (ci *ChatInfo) executeShellCommand(command string) {

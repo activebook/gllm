@@ -1,16 +1,14 @@
+// File: cmd/search.go
 package cmd
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
-	"strconv"
-
+	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // searchCmd represents the search command
@@ -21,7 +19,13 @@ var searchCmd = &cobra.Command{
 You can switch to use which search engine.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
-		defaultEngine := GetAgentString("search")
+		store := data.NewConfigStore()
+		agent := store.GetActiveAgent()
+		if agent == nil {
+			fmt.Println("No active agent found")
+			return
+		}
+		defaultEngine := agent.Search.Name
 		fmt.Println()
 		if defaultEngine != "" {
 			fmt.Printf("Current search engine set to %s\n", switchOnColor+defaultEngine+resetColor)
@@ -40,6 +44,7 @@ var searchSwitchCmd = &cobra.Command{
 	Short:   "Switch the active search engine",
 	Long:    `Switch the search engine used by the current agent. Options: google, bing, tavily, none.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		store := data.NewConfigStore()
 		var engine string
 
 		// Check if engine name provided as argument
@@ -63,7 +68,12 @@ var searchSwitchCmd = &cobra.Command{
 			}
 
 			// Default to current
-			current := GetAgentString("search")
+			activeAgent := store.GetActiveAgent()
+			if activeAgent == nil {
+				fmt.Println("No active agent found")
+				return nil
+			}
+			current := activeAgent.Search.Name
 			if current == "" {
 				engine = service.NoneSearchEngine
 			} else {
@@ -82,7 +92,13 @@ var searchSwitchCmd = &cobra.Command{
 			}
 		}
 
-		if err := SetAgentValue("search", engine); err != nil {
+		activeAgent := store.GetActiveAgent()
+		if activeAgent == nil {
+			fmt.Println("No active agent found")
+			return nil
+		}
+		activeAgent.Search.Name = engine
+		if err := store.SetAgent(activeAgent.Name, activeAgent); err != nil {
 			return fmt.Errorf("failed to saving configuration: %w", err)
 		}
 
@@ -120,13 +136,22 @@ var searchSetCmd = &cobra.Command{
 			}
 		}
 
+		// Get all search engines
+		store := data.NewConfigStore()
+		engines := store.GetSearchEngines()
+		engineConfig := engines[engine]
+		if engineConfig == nil {
+			engineConfig = &data.SearchEngine{}
+		}
+
 		// Configure based on engine
 		switch engine {
 		case service.GoogleSearchEngine:
-			key := viper.GetString("search_engines.google.key")
-			cx := viper.GetString("search_engines.google.cx")
-			dd := viper.GetInt("search_engines.google.deep_dive")
-			mr := viper.GetInt("search_engines.google.references")
+			key := engineConfig.Config["key"]
+			cx := engineConfig.Config["cx"]
+			dd := engineConfig.DeepDive
+			mr := engineConfig.Reference
+
 			if dd == 0 {
 				dd = 3 // default
 			}
@@ -166,15 +191,16 @@ var searchSetCmd = &cobra.Command{
 				return nil
 			}
 
-			viper.Set("search_engines.google.key", key)
-			viper.Set("search_engines.google.cx", cx)
-			viper.Set("search_engines.google.deep_dive", toInt(ddStr))
-			viper.Set("search_engines.google.references", toInt(mrStr))
+			engineConfig.Config["key"] = key
+			engineConfig.Config["cx"] = cx
+			engineConfig.DeepDive = toInt(ddStr)
+			engineConfig.Reference = toInt(mrStr)
 
 		case service.BingSearchEngine:
-			key := viper.GetString("search_engines.bing.key")
-			dd := viper.GetInt("search_engines.bing.deep_dive")
-			mr := viper.GetInt("search_engines.bing.references")
+			key := engineConfig.Config["key"]
+			dd := engineConfig.DeepDive
+			mr := engineConfig.Reference
+
 			if dd == 0 {
 				dd = 3
 			}
@@ -210,14 +236,15 @@ var searchSetCmd = &cobra.Command{
 				return nil
 			}
 
-			viper.Set("search_engines.bing.key", key)
-			viper.Set("search_engines.bing.deep_dive", toInt(ddStr))
-			viper.Set("search_engines.bing.references", toInt(mrStr))
+			engineConfig.Config["key"] = key
+			engineConfig.DeepDive = toInt(ddStr)
+			engineConfig.Reference = toInt(mrStr)
 
 		case service.TavilySearchEngine:
-			key := viper.GetString("search_engines.tavily.key")
-			dd := viper.GetInt("search_engines.tavily.deep_dive")
-			mr := viper.GetInt("search_engines.tavily.references")
+			key := engineConfig.Config["key"]
+			dd := engineConfig.DeepDive
+			mr := engineConfig.Reference
+
 			if dd == 0 {
 				dd = 3
 			}
@@ -253,21 +280,46 @@ var searchSetCmd = &cobra.Command{
 				return nil
 			}
 
-			viper.Set("search_engines.tavily.key", key)
-			viper.Set("search_engines.tavily.deep_dive", toInt(ddStr))
-			viper.Set("search_engines.tavily.references", toInt(mrStr))
+			engineConfig.Config["key"] = key
+			engineConfig.DeepDive = toInt(ddStr)
+			engineConfig.Reference = toInt(mrStr)
 
 		default:
 			return fmt.Errorf("unknown search engine: %s", engine)
 		}
 
-		if err := viper.WriteConfig(); err != nil {
-			return fmt.Errorf("failed to save configuration: %w", err)
+		engines[engine] = engineConfig
+		if err := store.SetSearchEngine(engine, engineConfig); err != nil {
+			return fmt.Errorf("failed to save %s config: %w", engine, err)
 		}
 
 		fmt.Printf("Configuration for '%s' saved successfully.\n", engine)
 		return nil
 	},
+}
+
+// Helper functions for map access (duplicated from data/config.go logic but useful locally for map[string]interface{})
+func getString(m map[string]interface{}, key string) string {
+	if v, ok := m[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+func getInt(m map[string]interface{}, key string) int {
+	if v, ok := m[key]; ok {
+		switch i := v.(type) {
+		case int:
+			return i
+		case float64:
+			return int(i)
+		case int64:
+			return int(i)
+		}
+	}
+	return 0
 }
 
 // listCmd represents the command to list all search engines
@@ -280,39 +332,43 @@ var searchListCmd = &cobra.Command{
 		fmt.Println("Configured Search Engines:")
 		fmt.Println()
 
+		store := data.NewConfigStore()
+		engines := store.GetSearchEngines()
+
 		// Google
-		googleKey := viper.GetString("search_engines.google.key")
-		googleCx := viper.GetString("search_engines.google.cx")
-		if googleKey != "" {
+		googleConfig := engines[service.GoogleSearchEngine]
+		if googleConfig != nil {
 			fmt.Println("Google Search:")
-			fmt.Printf("  API Key: %s\n", maskAPIKey(googleKey))
-			fmt.Printf("  CX: %s\n", maskAPIKey(googleCx))
-			fmt.Println("  DeepDive limit: ", viper.GetInt("search_engines.google.deep_dive"))
-			fmt.Println("  Max References: ", viper.GetInt("search_engines.google.references"))
+			fmt.Printf("  API Key: %s\n", maskAPIKey(googleConfig.Config["key"]))
+			fmt.Printf("  CX: %s\n", maskAPIKey(googleConfig.Config["cx"]))
+			fmt.Println("  DeepDive limit: ", googleConfig.DeepDive)
+			fmt.Println("  Max References: ", googleConfig.Reference)
 			fmt.Println("  Quota: 100 searches per day (free tier)")
 		}
 
 		// Tavily
-		tavilyKey := viper.GetString("search_engines.tavily.key")
-		if tavilyKey != "" {
+		tavilyConfig := engines[service.TavilySearchEngine]
+		if tavilyConfig != nil {
 			fmt.Println("Tavily Search:")
-			fmt.Printf("  API Key: %s\n", maskAPIKey(tavilyKey))
-			fmt.Println("  DeepDive limit: ", viper.GetInt("search_engines.tavily.deep_dive"))
-			fmt.Println("  Max References: ", viper.GetInt("search_engines.tavily.references"))
+			fmt.Printf("  API Key: %s\n", maskAPIKey(tavilyConfig.Config["key"]))
+			fmt.Println("  DeepDive limit: ", tavilyConfig.DeepDive)
+			fmt.Println("  Max References: ", tavilyConfig.Reference)
 			fmt.Println("  Quota: 1000 searches per month (free tier)")
 		}
 
 		// Bing
-		bingKey := viper.GetString("search_engines.bing.key")
-		if bingKey != "" {
+		bingConfig := engines[service.BingSearchEngine]
+		if bingConfig != nil {
 			fmt.Println("Bing Search:")
-			fmt.Printf("  API Key: %s\n", maskAPIKey(bingKey))
-			fmt.Println("  DeepDive limit: ", viper.GetInt("search_engines.bing.deep_dive"))
-			fmt.Println("  Max References: ", viper.GetInt("search_engines.bing.references"))
+			fmt.Printf("  API Key: %s\n", maskAPIKey(bingConfig.Config["key"]))
+			fmt.Println("  DeepDive limit: ", bingConfig.DeepDive)
+			fmt.Println("  Max References: ", bingConfig.Reference)
 			fmt.Println("  Quota: 100 searches per month (free tier) - SerpAPI")
 		}
 
-		if googleKey == "" && tavilyKey == "" && bingKey == "" {
+		if (googleConfig == nil || googleConfig.Config["key"] == "") &&
+			(tavilyConfig == nil || tavilyConfig.Config["key"] == "") &&
+			(bingConfig == nil || bingConfig.Config["key"] == "") {
 			fmt.Println("No search engines are currently configured.")
 			fmt.Println("Use 'gllm search [engine] --key YOUR_KEY' to configure.")
 		}
@@ -320,8 +376,7 @@ var searchListCmd = &cobra.Command{
 		fmt.Println()
 
 		// Update the list command to show default status
-		// In the listCmd.Run function, add:
-		defaultEngine := GetAgentString("search")
+		defaultEngine := GetEffectSearchEngineName()
 		if defaultEngine != "" {
 			fmt.Printf("Current search engine set to %s\n", switchOnColor+defaultEngine+resetColor)
 		} else {
@@ -355,127 +410,13 @@ func IsSearchEnabled() bool {
 }
 
 func GetEffectSearchEngineName() string {
-	defaultName := GetAgentString("search")
+	store := data.NewConfigStore()
+	activeAgent := store.GetActiveAgent()
+	if activeAgent == nil {
+		return ""
+	}
+	defaultName := activeAgent.Search.Name
 	return defaultName
-}
-
-func SetEffectSearchEngineName(name string) bool {
-	var err error
-	switch name {
-	case service.GoogleSearchEngine:
-		err = SetAgentValue("search", service.GoogleSearchEngine)
-	case service.TavilySearchEngine:
-		err = SetAgentValue("search", service.TavilySearchEngine)
-	case service.BingSearchEngine:
-		err = SetAgentValue("search", service.BingSearchEngine)
-	case service.NoneSearchEngine:
-		err = SetAgentValue("search", service.NoneSearchEngine)
-	default:
-		service.Warnf("Error: '%s' is not a valid search engine. Options: google, tavily, bing, none", name)
-		return false
-	}
-	if err != nil {
-		service.Errorf("Error saving configuration: %s\n", err)
-		return false
-	}
-	return true
-}
-
-func GetAllSearchEngines() map[string]string {
-	searchEngines := viper.GetStringMap("search_engines")
-
-	keys := make([]string, 0, len(searchEngines))
-	for k := range searchEngines {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	engines := make(map[string]string)
-	for _, k := range keys {
-		v := searchEngines[k]
-		if configMap, ok := v.(map[string]interface{}); ok {
-			// Convert the inner map to a string representation
-			var pairs []string
-			for k, v := range configMap {
-				pairs = append(pairs, fmt.Sprintf("\t%s: %v", k, v))
-			}
-			engines[k] = strings.Join(pairs, "\n")
-		}
-	}
-
-	return engines
-}
-
-func GetSearchEngineInfo(name string) map[string]any {
-	enginesMap := viper.GetStringMap("search_engines")
-
-	if enginesMap == nil {
-		return nil
-	}
-
-	engineConfig, exists := enginesMap[name]
-	if !exists {
-		return nil
-	}
-
-	// Convert the map[string]interface{} to map[string]any
-	if configMap, ok := engineConfig.(map[string]interface{}); ok {
-		// Create a new map with string keys and any values
-		resultMap := make(map[string]any)
-		for k, v := range configMap {
-			resultMap[k] = v
-		}
-		resultMap["name"] = name
-		return resultMap
-	}
-	return nil
-}
-
-func validateInt(s string) error {
-	_, err := strconv.Atoi(s)
-	if err != nil {
-		return fmt.Errorf("must be a valid number")
-	}
-	return nil
-}
-
-func toInt(s string) int {
-	v, _ := strconv.Atoi(s)
-	return v
-}
-
-func GetEffectiveSearchEngine() (name string, info map[string]any) {
-	defaultName := GetAgentString("search")
-	enginesMap := viper.GetStringMap("search_engines")
-	if defaultName != "" && defaultName != service.NoneSearchEngine {
-		if engineConfig, ok := enginesMap[defaultName]; ok {
-			var configMap map[string]interface{}
-			if cm, ok := engineConfig.(map[string]interface{}); ok {
-				configMap = cm
-			} else if cm, ok := engineConfig.(map[interface{}]interface{}); ok {
-				configMap = make(map[string]interface{})
-				for k, v := range cm {
-					configMap[fmt.Sprint(k)] = v
-				}
-			}
-
-			if configMap != nil {
-				// Create a copy to avoid horizontal effects and add the name
-				resultMap := make(map[string]interface{})
-				for k, v := range configMap {
-					resultMap[k] = v
-				}
-				resultMap["name"] = defaultName
-				return defaultName, resultMap
-			}
-			service.Warnf("Warning: Default Search Engine '%s' has invalid configuration format", defaultName)
-		} else {
-			service.Warnf("Warning: Default Search Engine '%s' not found in configuration. Falling back...", defaultName)
-		}
-	}
-
-	// 3. No search engine available
-	return "", nil
 }
 
 func init() {

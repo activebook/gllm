@@ -14,7 +14,7 @@ func init() {
 
 var colorCmd = &cobra.Command{
 	Use:   "color",
-	Short: "Show some different colors of gllm output",
+	Short: "Test different colors of gllm output",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("Terminal Color Support: ")
 		if supportsTrueColor() {

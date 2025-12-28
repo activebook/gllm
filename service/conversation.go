@@ -355,7 +355,7 @@ func (c *OpenAIConversation) Clear() error {
 
 type ConvoMeta struct {
 	Name     string
-	Provider ModelProvider
+	Provider string
 	ModTime  int64
 }
 
@@ -400,7 +400,7 @@ func ListSortedConvos(convoDir string) ([]ConvoMeta, error) {
 		if !file.IsDir() && strings.HasSuffix(file.Name(), ".json") {
 			title := strings.TrimSuffix(file.Name(), ".json")
 			fullPath := GetFilePath(convoDir, file.Name())
-			var provider ModelProvider
+			var provider string
 			data, err := os.ReadFile(fullPath)
 			if err == nil {
 				provider = DetectMessageProvider(data)

@@ -3,13 +3,12 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"path/filepath" // Import filepath
+	"os" // Import filepath
 	"strings"
 	"sync"
 
+	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
-	homedir "github.com/mitchellh/go-homedir"
 	log "github.com/sirupsen/logrus" // Import logrus
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -26,17 +25,10 @@ var (
 	// Global logger instance, configured by setupLogging
 	logger = service.GetLogger()
 
-	modelFlag        string   // gllm "What is Go?" -model(-m) gpt4o
-	attachments      []string // gllm "Summarize this" --attachment(-a) report.txt
-	sysPromptFlag    string   // gllm "Act as shell" --system(-S) shell-assistant
-	templateFlag     string   // gllm --template(-t) coder
-	searchFlag       bool     // gllm --search(-s) "What is the stock price of Tesla right now?"
-	toolsFlag        bool     // gllm --tools(-t) "Move a.txt to folder b"
-	codeFlag         bool     // gllm --code(-C) "print('Hello, World!')"
-	convoName        string   // gllm --conversation(-c) "My Conversation" "What is the stock price of Tesla right now?"
-	confirmToolsFlag bool     // gllm --confirm-tools "Allow skipping confirmation for tool operations"
-	thinkFlag        bool     // gllm --think(-T) "Enable deep think mode"
-	mcpFlag          bool     // gllm --mcp "Enable model to use MCP servers"
+	agentName   string   // gllm "What is Go?" -agent(-g) plan
+	attachments []string // gllm "Summarize this" --attachment(-a) report.txt
+	convoName   string   // gllm --conversation(-c) "My Conversation" "What is the stock price of Tesla right now?"
+	yoloFlag    bool     // gllm -y, --yolo enable yolo mode (non-interactive)
 
 	// Global cmd instance, to be used by subcommands
 	rootCmd = &cobra.Command{
@@ -60,7 +52,8 @@ Configure your API keys and preferred models, then start chatting or executing c
 			}
 
 			// Check if config file is loaded
-			if viper.ConfigFileUsed() == "" {
+			store := data.NewConfigStore()
+			if store.ConfigFileUsed() == "" {
 				// Config missing!
 				// Ask user if they want to setup
 				fmt.Println("Configuration file not found.")
@@ -94,13 +87,10 @@ Configure your API keys and preferred models, then start chatting or executing c
 			// Args: cobra.ArbitraryArgs: This tells Cobra that receiving any number of positional arguments (including zero arguments) is perfectly valid.
 			// It won't trigger an error or the help message based on the argument count alone.
 			if len(args) == 0 &&
-				!cmd.Flags().Changed("model") &&
-				!cmd.Flags().Changed("system") &&
-				!cmd.Flags().Changed("template") &&
+				!cmd.Flags().Changed("agent") &&
 				!cmd.Flags().Changed("attachment") &&
 				!cmd.Flags().Changed("version") &&
 				!cmd.Flags().Changed("conversation") &&
-				!cmd.Flags().Changed("mcp") &&
 				!hasStdinData() {
 				cmd.Help()
 				return
@@ -128,65 +118,26 @@ Configure your API keys and preferred models, then start chatting or executing c
 			// Start a goroutine for your actual LLM work
 			done := make(chan bool)
 			go func() {
-
-				// If model flag is provided, update the default model
-				if cmd.Flags().Changed("model") {
-					if err := SetEffectiveModel(modelFlag); err != nil {
-						service.Warnf("%v", err)
-						fmt.Println("Using default model instead")
+				store := data.NewConfigStore()
+				// If agent flag is provided, update the default agent
+				if cmd.Flags().Changed("agent") {
+					// Check if agent exists
+					if store.GetAgent(agentName) == nil {
+						service.Warnf("Agent %s does not exist", agentName)
+						return
 					}
+					store.SetActiveAgent(agentName)
 				}
-
-				// If system prompt is provided, update the default system prompt
-				if sysPromptFlag != "" {
-					if err := SetEffectiveSystemPrompt(sysPromptFlag); err != nil {
-						service.Warnf("%v", err)
-						fmt.Println("Ignore system prompt")
-					}
-				}
-
-				// If template is provided, update the default template
-				if templateFlag != "" {
-					if err := SetEffectiveTemplate(templateFlag); err != nil {
-						service.Warnf("%v", err)
-						fmt.Println("Ignore template prompt")
-					}
-				}
-
-				// Search
-				if !searchFlag {
-					// if search flag are not set, check if they are enabled globally
-					searchFlag = IsSearchEnabled()
-				}
-
-				// Tools
-				if !toolsFlag {
-					// if tools flag are not set, check if they are enabled globally
-					toolsFlag = AreToolsEnabled()
-				}
-
-				// Code execution
-				if codeFlag {
-					service.EnableCodeExecution()
-				} else {
-					service.DisableCodeExecution()
-				}
-
-				// Check if think mode is enabled
-				if !thinkFlag {
-					// if think flag is not set, check if it's enabled globally
-					thinkFlag = IsThinkEnabled()
-				}
-
-				// MCP
-				if !mcpFlag {
-					// if mcp flag is not set, check if it's enabled globally
-					mcpFlag = AreMCPServersEnabled()
+				// Get active agent
+				activeAgent := store.GetActiveAgent()
+				if activeAgent == nil {
+					service.Warnf("No active agent found")
+					return
 				}
 
 				// Process all prompt building
 				isThereAttachment := cmd.Flags().Changed("attachment")
-				prompt, files = buildPrompt(prompt, isThereAttachment)
+				prompt, files = buildPrompt(activeAgent, prompt, isThereAttachment)
 				done <- true
 			}()
 			// Update the spinner until work is done
@@ -198,17 +149,6 @@ Configure your API keys and preferred models, then start chatting or executing c
 		},
 	}
 )
-
-// Appends text to builder with proper newline handling
-func appendText(builder *strings.Builder, text string) {
-	if text == "" {
-		return
-	}
-	builder.WriteString(text)
-	if !strings.HasSuffix(text, "\n") {
-		builder.WriteString("\n\n")
-	}
-}
 
 // Processes a single attachment (file or stdin marker)
 func processAttachment(path string) *service.FileData {
@@ -260,12 +200,13 @@ func batchAttachments(files *[]*service.FileData) {
 	}
 }
 
-func buildPrompt(prompt string, isThereAttachment bool) (string, []*service.FileData) {
+func buildPrompt(agent *data.AgentConfig, prompt string, isThereAttachment bool) (string, []*service.FileData) {
 	var sb strings.Builder
 	files := []*service.FileData{}
 
 	// Get template content
-	templateContent := GetEffectiveTemplate()
+	store := data.NewConfigStore()
+	templateContent := store.GetTemplate(agent.Template)
 	appendText(&sb, templateContent)
 	appendText(&sb, prompt)
 
@@ -294,47 +235,38 @@ func buildPrompt(prompt string, isThereAttachment bool) (string, []*service.File
 }
 
 func processQuery(prompt string, files []*service.FileData) {
+	// Get Active Agent
+	store := data.NewConfigStore()
+	activeAgent := store.GetActiveAgent()
+	if activeAgent == nil {
+		service.Errorf("No active agent found")
+		return
+	}
+
+	// Yolo mode(non-interactive mode)
+	yolo := false
+	if yoloFlag {
+		yolo = true
+	}
+
 	// Call your LLM service here
-	_, modelInfo := GetEffectiveModel()
-	sys_prompt := GetEffectiveSystemPrompt()
-	maxRecursions := GetMaxRecursions()
-
-	// search engine will be loaded and made available if
-	// either the -s flag is used (searchFlag is true)
-	// or if tools are enabled (useTools is true).
-	var searchEngine map[string]any
-	// If search flag is set, use the effective search engine
-	if searchFlag {
-		_, searchEngine = GetEffectiveSearchEngine()
-	}
-	// Regardless of toolsFlag, use the effective tools
-	tools := GetEnabledTools()
-	if tools == nil {
-		tools = []string{}
-	}
-
-	// Include usage metainfo
-	includeUsage := IncludeUsageMetainfo()
-	// Include markdown
-	includeMarkdown := IncludeMarkdown()
-
+	sys_prompt := store.GetSystemPrompt(activeAgent.SystemPrompt)
 	op := service.AgentOptions{
-		Prompt:           prompt,
-		SysPrompt:        sys_prompt,
-		Files:            files,
-		ModelInfo:        &modelInfo,
-		SearchEngine:     &searchEngine,
-		MaxRecursions:    maxRecursions,
-		ThinkMode:        thinkFlag,
-		UseTools:         toolsFlag,
-		EnabledTools:     tools,
-		UseMCP:           mcpFlag,
-		SkipToolsConfirm: confirmToolsFlag,
-		AppendUsage:      includeUsage,
-		AppendMarkdown:   includeMarkdown,
-		OutputFile:       "",
-		QuietMode:        false,
-		ConvoName:        convoName,
+		Prompt:         prompt,
+		SysPrompt:      sys_prompt,
+		Files:          files,
+		ModelInfo:      &activeAgent.Model,
+		SearchEngine:   &activeAgent.Search,
+		MaxRecursions:  activeAgent.MaxRecursions,
+		ThinkMode:      activeAgent.Think,
+		EnabledTools:   activeAgent.Tools,
+		UseMCP:         activeAgent.MCP,
+		YoloMode:       yolo,
+		AppendUsage:    activeAgent.Usage,
+		AppendMarkdown: activeAgent.Markdown,
+		OutputFile:     "",
+		QuietMode:      false,
+		ConvoName:      convoName,
 	}
 	err := service.CallAgent(&op)
 	if err != nil {
@@ -346,18 +278,6 @@ func processQuery(prompt string, files []*service.FileData) {
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	// Ensure the config directory exists before Cobra/Viper try to read from it
-	// We do it here because initConfig might run *after* some Cobra initialization
-	// that could potentially depend on the directory existing (though unlikely here).
-	// It's generally safer to ensure prerequisites early.
-	// Alternatively, put this inside initConfig before viper.ReadInConfig().
-	if appConfigDir != "" { // Make sure appConfigDir has been calculated by init()
-		if err := os.MkdirAll(appConfigDir, 0750); err != nil { // 0750 permissions: user rwx, group rx, others none
-			service.Errorf("Error creating config directory '%s': %v\n", appConfigDir, err)
-			// Decide if this is a fatal error. Maybe just warn? For now, let's warn.
-		}
-	}
-
 	// Ensure MCPClient resources are cleaned up on exit
 	// This is a safeguard; the shared instance should ideally be closed only once
 	// when the application is truly exiting, not after every command execution.
@@ -372,12 +292,8 @@ func Execute() {
 	}
 }
 
+// This function runs when the package is initialized.
 func init() {
-	// This function runs when the package is initialized.
-
-	// Calculate config paths early
-	initConfigPaths() // New function to calculate paths
-
 	// Initialize Viper configuration
 	cobra.OnInitialize(initConfig)
 
@@ -390,78 +306,32 @@ func init() {
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 
 	// Define the flags
-	rootCmd.Flags().StringVarP(&modelFlag, "model", "m", "", "Specify the language model to use")
+	rootCmd.Flags().StringVarP(&agentName, "agent", "g", "", "Switch to the agent to use")
 	rootCmd.Flags().StringSliceVarP(&attachments, "attachment", "a", []string{}, "Specify file(s), image(s), url(s) to append to the prompt")
-	rootCmd.Flags().StringVarP(&sysPromptFlag, "system", "S", "", "Specify a system prompt")
-	rootCmd.Flags().StringVarP(&templateFlag, "template", "p", "", "Specify a template to use")
 	rootCmd.Flags().StringVarP(&convoName, "conversation", "c", "", "Specify a conversation name to track chat session")
-
-	// Flags for enabling/disabling features
-	// These flags are not persistent, so they only apply to this command
-	rootCmd.Flags().BoolVarP(&searchFlag, "search", "s", false, "To query with a search tool")
-	rootCmd.Flags().BoolVarP(&toolsFlag, "tools", "t", false, "Enable model to use embedding tools")
-	rootCmd.Flags().BoolVarP(&codeFlag, "code", "C", false, "Enable model to generate and run Python code (only for gemini)")
-	rootCmd.Flags().BoolVarP(&confirmToolsFlag, "confirm-tools", "", false, "Skip confirmation for tool operations (default: no)")
-	rootCmd.Flags().BoolVarP(&thinkFlag, "think", "T", false, "Enable deep think mode")
-	rootCmd.Flags().BoolVarP(&mcpFlag, "mcp", "", false, "Enable model to use MCP servers")
+	rootCmd.Flags().BoolVarP(&yoloFlag, "yolo", "y", false, "Enable yolo mode (non-interactive)")
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
 
-	// Add more persistent flags here if needed (e.g., --verbose, --log-file)
 	// Set logrus defaults before configuration is loaded
 	// This ensures basic logging works even if config fails
 	service.InitLogger()
 }
 
-// initConfigPaths calculates the application's configuration directory and file path.
-func initConfigPaths() {
-	var err error
-	// Prefer os.UserConfigDir()
-	userConfigDir, err := os.UserConfigDir()
-	if err != nil {
-		// Fallback to home directory if UserConfigDir fails
-		service.Warnf("Warning: Could not find user config dir, falling back to home directory.%v", err)
-		userConfigDir, err = homedir.Dir()
-		cobra.CheckErr(err) // If home dir also fails, panic
-	}
-
-	// App specific directory: e.g., ~/.config/gllm or ~/Library/Application Support/gllm
-	appConfigDir = filepath.Join(userConfigDir, "gllm")
-
-	// Default config file path: e.g., ~/.config/gllm/.gllm.yaml
-	appConfigFilePath = filepath.Join(appConfigDir, "gllm.yaml")
-}
-
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Search config in home directory with name ".gllm" (without extension).
-		viper.AddConfigPath(appConfigDir) // Add home directory to search path
-		viper.SetConfigName("gllm")       // Name of config file (without ext)
-		viper.SetConfigType("yaml")       // REQUIRED if the config file does not have the extension in the name
+	// Ensure the config directory exists before Cobra/Viper try to read from it
+	if err := data.EnsureConfigDir(); err != nil {
+		cobra.CheckErr(err)
+		return
 	}
 
-	viper.AutomaticEnv() // Read in environment variables that match
-
-	// Set default log settings in Viper *before* reading the config
-	// This ensures these keys exist even if not in the file
-	viper.SetDefault("log.level", "info")
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		//service.Debugf("Using config file:", viper.ConfigFileUsed())
-	} else {
-		// Handle errors using the logger
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			service.Debugf("Config file not found in %s or via --config flag. Using defaults/env vars.", appConfigDir)
-		} else if os.IsNotExist(err) {
-			service.Debugf("Config file path %s does not exist. Using defaults/env vars.", viper.ConfigFileUsed())
-		} else {
-			// Use Warn or Error level for actual reading errors
-			service.Errorf("Error reading config file (%s): %v", viper.ConfigFileUsed(), err)
-		}
+	// Initialize the config store, and read the config file
+	// It only needs to be done once, and viper will handle the rest
+	store := data.NewConfigStore()
+	err := store.SetConfigFile(data.GetConfigFilePath())
+	if err != nil {
+		cobra.CheckErr(err)
+		return
 	}
 
 	// *** Placeholder for Log Configuration ***
@@ -494,15 +364,4 @@ func setupLogging() {
 
 	// Log the final configuration being used (at Debug level)
 	service.Debugf("Logger initialized: level=%s ", logLevelStr)
-}
-
-// Helper function to get the calculated default config file path
-// Useful for the 'config path' command.
-func getDefaultConfigFilePath() string {
-	// Ensure paths are calculated if they haven't been for some reason
-	// (though 'init' should have handled this)
-	if appConfigFilePath == "" {
-		initConfigPaths()
-	}
-	return appConfigFilePath
 }

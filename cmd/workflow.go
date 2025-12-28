@@ -1,3 +1,4 @@
+// File: cmd/workflow.go
 package cmd
 
 import (
@@ -5,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {
@@ -59,7 +60,7 @@ func init() {
 	workflowStartCmd.Flags().BoolP("interactive", "i", false, "Enable interactive mode for workflow execution")
 }
 
-// configCmd represents the base command when called without any subcommands
+// workflowCmd represents the base command when called without any subcommands
 var workflowCmd = &cobra.Command{
 	Use:     "workflow",
 	Aliases: []string{"wf"}, // Optional alias
@@ -80,14 +81,10 @@ var workflowListCmd = &cobra.Command{
 	Aliases: []string{"ls", "pr"},
 	Long:    `List all agents in the current workflow configuration with their properties.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		agents := viper.Get("workflow.agents")
-		if agents == nil {
-			fmt.Println("No agents defined in workflow.")
-			return nil
-		}
+		store := data.NewConfigStore()
+		agentsSlice := store.GetWorkflowAgentsRaw()
 
-		agentsSlice, ok := agents.([]interface{})
-		if !ok || len(agentsSlice) == 0 {
+		if len(agentsSlice) == 0 {
 			fmt.Println("No agents defined in workflow.")
 			return nil
 		}
@@ -149,6 +146,9 @@ func validateWorkflow(agentsSlice []interface{}) error {
 		return fmt.Errorf("the first agent (%s) must have output directory", service.WorkflowAgentTypeMaster)
 	}
 
+	store := data.NewConfigStore()
+	modelsMap := store.GetModels()
+
 	// Validate all agents
 	for i, agentItem := range agentsSlice {
 		agent, ok := agentItem.(map[string]interface{})
@@ -174,9 +174,8 @@ func validateWorkflow(agentsSlice []interface{}) error {
 		} else {
 			// Validate model exists in configuration
 			modelName := model.(string)
-			encodedModelName := encodeModelName(modelName)
-			modelsMap := viper.GetStringMap("models")
-			if _, exists := modelsMap[encodedModelName]; !exists {
+
+			if _, exists := modelsMap[modelName]; !exists {
 				return fmt.Errorf("agent '%s' references model '%s' which is not configured. Please add the model first using 'gllm model add'", agent["name"], modelName)
 			}
 		}
@@ -190,7 +189,12 @@ func validateWorkflow(agentsSlice []interface{}) error {
 				}
 
 				// Validate search engine is configured
-				key := viper.GetString(fmt.Sprintf("search_engines.%s.key", searchStr))
+				engineConfig := store.GetSearchEngine(searchStr)
+				key := ""
+				if engineConfig != nil {
+					key = engineConfig.Config["key"]
+				}
+
 				if key == "" {
 					return fmt.Errorf("agent '%s' references search engine '%s' which is not configured. Please configure it first using 'gllm search %s --key YOUR_KEY'", agent["name"], searchStr, searchStr)
 				}
@@ -243,14 +247,10 @@ gllm workflow add --name planner --model groq-oss --tools enabled --template pla
 			return fmt.Errorf("output directory cannot be empty")
 		}
 
-		// Get existing agents slice
-		agents := viper.Get("workflow.agents")
-		var agentsSlice []interface{}
-
-		if agents != nil {
-			if existingSlice, ok := agents.([]interface{}); ok {
-				agentsSlice = existingSlice
-			}
+		store := data.NewConfigStore()
+		agentsSlice := store.GetWorkflowAgentsRaw()
+		if agentsSlice == nil {
+			agentsSlice = make([]interface{}, 0)
 		}
 
 		// Check if agent with same name already exists
@@ -298,7 +298,7 @@ gllm workflow add --name planner --model groq-oss --tools enabled --template pla
 				newAgent["template"] = template
 			} else {
 				// Reference to a named template
-				templates := viper.GetStringMapString("templates")
+				templates := store.GetTemplates()
 				if templateContent, exists := templates[template]; exists {
 					// Valid template reference - store the actual content
 					newAgent["template"] = templateContent
@@ -319,7 +319,7 @@ gllm workflow add --name planner --model groq-oss --tools enabled --template pla
 				newAgent["system"] = sysPrompt
 			} else {
 				// Reference to a named system prompt
-				sysPrompts := viper.GetStringMapString("system_prompts")
+				sysPrompts := store.GetSystemPrompts()
 				if sysPromptContent, exists := sysPrompts[sysPrompt]; exists {
 					// Valid system prompt reference - store the actual content
 					newAgent["system"] = sysPromptContent
@@ -388,10 +388,8 @@ gllm workflow add --name planner --model groq-oss --tools enabled --template pla
 			return fmt.Errorf("invalid workflow configuration: %w", err)
 		}
 
-		viper.Set("workflow.agents", agentsSlice)
-
-		// Write the config file
-		if err := writeConfig(); err != nil {
+		// Save via data layer
+		if err := store.SetWorkflowAgents(agentsSlice); err != nil {
 			return fmt.Errorf("failed to save workflow agent: %w", err)
 		}
 
@@ -416,15 +414,10 @@ gllm workflow remove planner`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		identifier := args[0]
+		store := data.NewConfigStore()
+		agentsSlice := store.GetWorkflowAgentsRaw()
 
-		// Get existing agents
-		agents := viper.Get("workflow.agents")
-		if agents == nil {
-			return fmt.Errorf("no workflow agents defined")
-		}
-
-		agentsSlice, ok := agents.([]interface{})
-		if !ok || len(agentsSlice) == 0 {
+		if len(agentsSlice) == 0 {
 			return fmt.Errorf("no workflow agents defined")
 		}
 
@@ -470,10 +463,8 @@ gllm workflow remove planner`,
 
 		// Remove the agent
 		agentsSlice = append(agentsSlice[:agentIndex], agentsSlice[agentIndex+1:]...)
-		viper.Set("workflow.agents", agentsSlice)
 
-		// Write the config file
-		if err := writeConfig(); err != nil {
+		if err := store.SetWorkflowAgents(agentsSlice); err != nil {
 			return fmt.Errorf("failed to save workflow configuration: %w", err)
 		}
 
@@ -492,15 +483,10 @@ gllm workflow set planner --model groq-oss --role master`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		identifier := args[0]
+		store := data.NewConfigStore()
+		agentsSlice := store.GetWorkflowAgentsRaw()
 
-		// Get existing agents
-		agents := viper.Get("workflow.agents")
-		if agents == nil {
-			return fmt.Errorf("no workflow agents defined")
-		}
-
-		agentsSlice, ok := agents.([]interface{})
-		if !ok || len(agentsSlice) == 0 {
+		if len(agentsSlice) == 0 {
 			return fmt.Errorf("no workflow agents defined")
 		}
 
@@ -605,7 +591,7 @@ gllm workflow set planner --model groq-oss --role master`,
 				agentMap["template"] = template
 			} else {
 				// Reference to a named template
-				templates := viper.GetStringMapString("templates")
+				templates := store.GetTemplates()
 				if templateContent, exists := templates[template]; exists {
 					// Valid template reference - store the actual content
 					agentMap["template"] = templateContent
@@ -627,7 +613,7 @@ gllm workflow set planner --model groq-oss --role master`,
 				agentMap["system"] = sysPrompt
 			} else {
 				// Reference to a named system prompt
-				sysPrompts := viper.GetStringMapString("system_prompts")
+				sysPrompts := store.GetSystemPrompts()
 				if sysPromptContent, exists := sysPrompts[sysPrompt]; exists {
 					// Valid system prompt reference - store the actual content
 					agentMap["system"] = sysPromptContent
@@ -721,10 +707,7 @@ gllm workflow set planner --model groq-oss --role master`,
 			return fmt.Errorf("invalid workflow configuration: %w", err)
 		}
 
-		viper.Set("workflow.agents", agentsSlice)
-
-		// Write the config file
-		if err := writeConfig(); err != nil {
+		if err := store.SetWorkflowAgents(agentsSlice); err != nil {
 			return fmt.Errorf("failed to save agent: %w", err)
 		}
 
@@ -761,14 +744,10 @@ gllm workflow move 1 3`,
 			return fmt.Errorf("invalid to index '%s': %w", toStr, err)
 		}
 
-		// Get existing agents
-		agents := viper.Get("workflow.agents")
-		if agents == nil {
-			return fmt.Errorf("no workflow agents defined")
-		}
+		store := data.NewConfigStore()
+		agentsSlice := store.GetWorkflowAgentsRaw()
 
-		agentsSlice, ok := agents.([]interface{})
-		if !ok || len(agentsSlice) == 0 {
+		if len(agentsSlice) == 0 {
 			return fmt.Errorf("no workflow agents defined")
 		}
 
@@ -807,10 +786,7 @@ gllm workflow move 1 3`,
 			return fmt.Errorf("invalid workflow configuration after move: %w", err)
 		}
 
-		viper.Set("workflow.agents", agentsSlice)
-
-		// Write the config file
-		if err := writeConfig(); err != nil {
+		if err := store.SetWorkflowAgents(agentsSlice); err != nil {
 			return fmt.Errorf("failed to save workflow configuration: %w", err)
 		}
 
@@ -827,15 +803,10 @@ var workflowInfoCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		agentName := args[0]
+		store := data.NewConfigStore()
+		agentsSlice := store.GetWorkflowAgentsRaw()
 
-		// Get existing agents
-		agents := viper.Get("workflow.agents")
-		if agents == nil {
-			return fmt.Errorf("no workflow agents defined")
-		}
-
-		agentsSlice, ok := agents.([]interface{})
-		if !ok || len(agentsSlice) == 0 {
+		if len(agentsSlice) == 0 {
 			return fmt.Errorf("no workflow agents defined")
 		}
 
@@ -876,14 +847,9 @@ gllm workflow start "What are the latest advancements in AI?"
 gllm workflow start -i  # Run in interactive mode`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Get existing agents
-		agents := viper.Get("workflow.agents")
-		if agents == nil {
-			return fmt.Errorf("no workflow agents defined")
-		}
-
-		agentsSlice, ok := agents.([]interface{})
-		if !ok || len(agentsSlice) == 0 {
+		store := data.NewConfigStore()
+		agentsSlice := store.GetWorkflowAgentsRaw()
+		if len(agentsSlice) == 0 {
 			return fmt.Errorf("no workflow agents defined")
 		}
 
@@ -900,53 +866,54 @@ gllm workflow start -i  # Run in interactive mode`,
 			InterActiveMode: interactive, // Set the interactive mode flag
 		}
 
-		for _, agentItem := range agentsSlice {
-			agent, ok := agentItem.(map[string]interface{})
-			if !ok {
-				return fmt.Errorf("agent has invalid format")
-			}
+		// TODO: implement this
+		// for _, agentItem := range agentsSlice {
+		// agent, ok := agentItem.(map[string]interface{})
+		// if !ok {
+		// 	return fmt.Errorf("agent has invalid format")
+		// }
 
-			workflowAgent := service.WorkflowAgent{
-				Name:          getStringValue(agent, "name"),
-				Role:          service.WorkflowAgentType(getStringValue(agent, "role")),
-				Template:      getStringValue(agent, "template"),
-				SystemPrompt:  getStringValue(agent, "system"),
-				Tools:         getBoolValue(agent, "tools"),
-				MCP:           getBoolValue(agent, "mcp"),
-				Think:         getBoolValue(agent, "think"),
-				Usage:         getBoolValue(agent, "usage"),
-				Markdown:      getBoolValue(agent, "markdown"),
-				InputDir:      getStringValue(agent, "input"),
-				OutputDir:     getStringValue(agent, "output"),
-				MaxRecursions: GetMaxRecursions(), // default max recursions
-				PassThrough:   getBoolValue(agent, "pass"),
-			}
+		// workflowAgent := service.WorkflowAgent{
+		// 	Name:          getStringValue(agent, "name"),
+		// 	Role:          service.WorkflowAgentType(getStringValue(agent, "role")),
+		// 	Template:      getStringValue(agent, "template"),
+		// 	SystemPrompt:  getStringValue(agent, "system"),
+		// 	EnabledTools:  []string{},
+		// 	MCP:           getBoolValue(agent, "mcp"),
+		// 	Think:         getBoolValue(agent, "think"),
+		// 	Usage:         getBoolValue(agent, "usage"),
+		// 	Markdown:      getBoolValue(agent, "markdown"),
+		// 	InputDir:      getStringValue(agent, "input"),
+		// 	OutputDir:     getStringValue(agent, "output"),
+		// 	MaxRecursions: 10, // default max recursions
+		// 	PassThrough:   getBoolValue(agent, "pass"),
+		// }
 
-			// Handle model configuration
-			modelName := getStringValue(agent, "model")
-			if modelName != "" {
-				encodedModelName := encodeModelName(modelName)
-				modelConfig := GetModelInfo(encodedModelName)
-				if len(modelConfig) > 0 {
-					workflowAgent.Model = &modelConfig
-				} else {
-					return fmt.Errorf("model '%s' referenced by agent '%s' is not configured", modelName, workflowAgent.Name)
-				}
-			}
+		// // Handle model configuration
+		// modelName := getStringValue(agent, "model")
+		// if modelName != "" {
+		// 	encodedModelName := encodeModelName(modelName)
+		// 	modelConfig, err := GetModelInfo(encodedModelName)
+		// 	if err == nil && len(modelConfig) > 0 {
+		// 		workflowAgent.Model = &modelConfig
+		// 	} else {
+		// 		return fmt.Errorf("model '%s' referenced by agent '%s' is not configured", modelName, workflowAgent.Name)
+		// 	}
+		// }
 
-			// Handle search configuration
-			searchEngine := getStringValue(agent, "search")
-			if searchEngine != "" {
-				searchConfig := GetSearchEngineInfo(searchEngine)
-				if len(searchConfig) > 0 {
-					workflowAgent.Search = &searchConfig
-				} else {
-					return fmt.Errorf("error getting search engine info for '%s'", searchEngine)
-				}
-			}
+		// // Handle search configuration
+		// searchEngine := getStringValue(agent, "search")
+		// if searchEngine != "" {
+		// 	searchConfig := GetSearchEngine(searchEngine)
+		// 	if len(searchConfig) > 0 {
+		// 		workflowAgent.Search = &searchConfig
+		// 	} else {
+		// 		return fmt.Errorf("error getting search engine info for '%s'", searchEngine)
+		// 	}
+		// }
 
-			workflowConfig.Agents = append(workflowConfig.Agents, workflowAgent)
-		}
+		// workflowConfig.Agents = append(workflowConfig.Agents, workflowAgent)
+		// }
 
 		// Get prompt if provided
 		prompt := ""

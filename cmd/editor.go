@@ -1,3 +1,4 @@
+// File: cmd/editor.go
 package cmd
 
 import (
@@ -5,10 +6,10 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/activebook/gllm/data"
 	"github.com/charmbracelet/huh"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // editorCmd represents the editor command
@@ -30,9 +31,14 @@ with the /editor command in chat sessions.`,
 		case "list", "ls", "pr":
 			editorListCmd.Run(cmd, args)
 		case "switch", "sw", "select":
-			editorSwitchCmd.RunE(cmd, args[1:])
+			// Handle error if switch fails
+			if err := editorSwitchCmd.RunE(cmd, args[1:]); err != nil {
+				fmt.Printf("Error switching editor: %v\n", err)
+			}
 		default:
-			setPreferredEditor(arg)
+			if err := setPreferredEditor(arg); err != nil {
+				fmt.Printf("Error setting preferred editor: %v\n", err)
+			}
 		}
 	},
 }
@@ -44,6 +50,8 @@ var editorSwitchCmd = &cobra.Command{
 	Short:   "Switch to a different text editor",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name string
+		store := data.NewConfigStore()
+
 		if len(args) > 0 {
 			name = args[0]
 		} else {
@@ -60,7 +68,7 @@ var editorSwitchCmd = &cobra.Command{
 				return fmt.Errorf("no supported text editors found in PATH")
 			}
 
-			name = viper.GetString("chat.editor")
+			name = store.GetEditor()
 			highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
 
 			var options []huh.Option[string]
@@ -105,8 +113,10 @@ func init() {
 
 // getPreferredEditor gets the user's preferred editor from config or detects it
 func getPreferredEditor() string {
+	store := data.NewConfigStore()
+
 	// Check config first
-	editor := viper.GetString("chat.editor")
+	editor := store.GetEditor()
 	if editor != "" {
 		return editor
 	}
@@ -130,6 +140,8 @@ func getPreferredEditor() string {
 
 // setPreferredEditor sets the user's preferred editor in config
 func setPreferredEditor(editor string) error {
+	store := data.NewConfigStore()
+
 	// Check if editor exists
 	if _, err := exec.LookPath(editor); err != nil {
 		fmt.Printf("Editor '%s' is not found in PATH.\n", editor)
@@ -162,15 +174,15 @@ func setPreferredEditor(editor string) error {
 		}
 
 		fmt.Printf("Using '%s' instead.\n", bestEditor)
-		viper.Set("chat.editor", bestEditor)
+		if err := store.SetEditor(bestEditor); err != nil {
+			return fmt.Errorf("failed to save preferred editor: %w", err)
+		}
 	} else {
 		// Editor exists, set it
-		viper.Set("chat.editor", editor)
+		if err := store.SetEditor(editor); err != nil {
+			return fmt.Errorf("failed to save preferred editor: %w", err)
+		}
 		fmt.Printf("Preferred editor set to: %s\n", editor)
-	}
-
-	if err := writeConfig(); err != nil {
-		return fmt.Errorf("failed to save preferred editor: %w", err)
 	}
 
 	return nil
@@ -186,7 +198,8 @@ func listAvailableEditors() {
 	gray := color.New(color.FgHiBlack).SprintFunc()
 	highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
 
-	current := viper.GetString("chat.editor")
+	store := data.NewConfigStore()
+	current := store.GetEditor()
 
 	for _, editor := range commonEditors {
 		if _, err := exec.LookPath(editor); err == nil {

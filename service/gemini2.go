@@ -55,7 +55,7 @@ func (ag *Agent) initGemini2Agent() (*Gemini2Agent, error) {
 	// so it's a server side job
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:  ag.ApiKey,
+		APIKey:  ag.Model.ApiKey,
 		Backend: genai.BackendGeminiAPI,
 	})
 	if err != nil {
@@ -106,8 +106,8 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	}
 	// Create the model and generate content
 	config := genai.GenerateContentConfig{
-		Temperature: &ag.Temperature,
-		TopP:        &ag.TopP,
+		Temperature: &ag.Model.Temperature,
+		TopP:        &ag.Model.TopP,
 		ThinkingConfig: &genai.ThinkingConfig{
 			// Let model decide how to allocate tokens
 			ThinkingBudget:  &thinkingBudgetVal,
@@ -121,9 +121,8 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	}
 
 	// Add seed if provided
-	if ag.Seed != nil {
-		seedInt32 := int32(*ag.Seed)
-		config.Seed = &seedInt32
+	if ag.Model.Seed != nil {
+		config.Seed = ag.Model.Seed
 	}
 	// System Instruction (System Prompt)
 	if ag.SystemPrompt != "" {
@@ -168,7 +167,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 
 	// Context Management
 	truncated := false
-	cm := NewContextManagerForModel(ag.ModelName, StrategyTruncateOldest)
+	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
 
 	// Signal that streaming has started
 	// Wait for the main goroutine to tell sub-goroutine to proceed
@@ -305,7 +304,7 @@ func (ag *Agent) processGemini2Stream(ctx context.Context,
 
 	// Stream the response
 	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusProcessing}, ag.ProceedChan)
-	iter := client.Models.GenerateContentStream(ctx, ag.ModelName, messages, config)
+	iter := client.Models.GenerateContentStream(ctx, ag.Model.ModelName, messages, config)
 	// Wait for the main goroutine to tell sub-goroutine to proceed
 	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
 

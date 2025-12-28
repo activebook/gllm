@@ -3,9 +3,9 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 
+	"github.com/activebook/gllm/data"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -30,20 +30,25 @@ type StreamData struct {
 	Type StreamDataType
 }
 
+type ModelInfo struct {
+	ApiKey      string
+	EndPoint    string
+	ModelName   string
+	Provider    string
+	Temperature float32
+	TopP        float32 // Top-p sampling parameter
+	Seed        *int32  // Seed for deterministic generation
+}
+
 type Agent struct {
-	ApiKey          string
-	EndPoint        string
-	ModelName       string
+	Model           *ModelInfo
 	SystemPrompt    string
 	UserPrompt      string
-	Temperature     float32
-	TopP            float32             // Top-p sampling parameter
-	Seed            *int                // Seed for deterministic generation
 	Files           []*FileData         // Attachment files
 	NotifyChan      chan<- StreamNotify // Sub Channel to send notifications
 	DataChan        chan<- StreamData   // Sub Channel to receive streamed text data
 	ProceedChan     <-chan bool         // Sub Channel to receive proceed signal
-	SearchEngine    SearchEngine        // Search engine name
+	SearchEngine    *SearchEngine       // Search engine name
 	ToolsUse        ToolsUse            // Use tools
 	EnabledTools    []string            // List of enabled embedding tools
 	UseCodeTool     bool                // Use code tool
@@ -60,76 +65,42 @@ type Agent struct {
 	LastWrittenData string              // Last written data
 }
 
-func constructSearchEngine(searchEngine *map[string]any) *SearchEngine {
+func constructModelInfo(model *data.Model) *ModelInfo {
+	mi := ModelInfo{}
+	mi.ModelName = model.Name
+	mi.Provider = model.Provider
+	mi.EndPoint = model.Endpoint
+	mi.ApiKey = model.Key
+	mi.Temperature = model.Temp
+	mi.TopP = model.TopP
+	mi.Seed = model.Seed
+	return &mi
+}
+
+func constructSearchEngine(searchEngine *data.SearchEngine) *SearchEngine {
 	se := SearchEngine{}
 	se.UseSearch = false
 	if searchEngine != nil {
 		se.UseSearch = true
-
-		// Helper to safely get string values
-		getString := func(m map[string]any, key string) string {
-			if val, ok := m[key]; ok {
-				return fmt.Sprint(val)
-			}
-			return ""
-		}
-
-		se.Name = getString(*searchEngine, "name")
+		se.Name = searchEngine.Name
 		if se.Name == "" {
 			se.UseSearch = false
 		}
-
-		se.ApiKey = getString(*searchEngine, "key")
+		se.ApiKey = searchEngine.Config["key"]
 		if se.ApiKey == "" && se.Name != "none" {
 			se.UseSearch = false
 		}
-
-		se.CxKey = getString(*searchEngine, "cx")
-
-		// Handle DeepDive (int)
-		if deepDive, ok := (*searchEngine)["deep_dive"]; ok {
-			switch v := deepDive.(type) {
-			case int:
-				se.DeepDive = v
-			case float64:
-				se.DeepDive = int(v)
-			case int64:
-				se.DeepDive = int(v)
-			case string:
-				if i, err := strconv.Atoi(v); err == nil {
-					se.DeepDive = i
-				}
-			}
-		} else {
-			se.DeepDive = 0 // Default
-		}
-
-		// Handle MaxReferences (int)
-		if references, ok := (*searchEngine)["references"]; ok {
-			switch v := references.(type) {
-			case int:
-				se.MaxReferences = v
-			case float64:
-				se.MaxReferences = int(v)
-			case int64:
-				se.MaxReferences = int(v)
-			case string:
-				if i, err := strconv.Atoi(v); err == nil {
-					se.MaxReferences = i
-				}
-			}
-		} else {
-			se.MaxReferences = 10
-		}
+		se.CxKey = searchEngine.Config["cx"]
+		se.DeepDive = searchEngine.DeepDive
+		se.MaxReferences = searchEngine.Reference
 	}
-
 	return &se
 }
 
-func ConstructConversationManager(convoName string, provider ModelProvider) (ConversationManager, error) {
+func ConstructConversationManager(convoName string, provider string) (ConversationManager, error) {
 	//var convo ConversationManager
 	switch provider {
-	case ModelOpenChat:
+	case ModelProviderOpenAICompatible:
 		// Used for Chinese Models
 		convo := OpenChatConversation{}
 		err := convo.Open(convoName)
@@ -138,7 +109,7 @@ func ConstructConversationManager(convoName string, provider ModelProvider) (Con
 		}
 		return &convo, nil
 
-	case ModelOpenAI, ModelMistral, ModelOpenAICompatible:
+	case ModelProviderOpenAI, ModelProviderMistral:
 		// Used for OpenAI compatible models
 		convo := OpenAIConversation{}
 		err := convo.Open(convoName)
@@ -147,7 +118,7 @@ func ConstructConversationManager(convoName string, provider ModelProvider) (Con
 		}
 		return &convo, nil
 
-	case ModelGemini:
+	case ModelProviderGemini:
 		// Used for Gemini
 		convo := Gemini2Conversation{}
 		err := convo.Open(convoName)
@@ -163,110 +134,31 @@ func ConstructConversationManager(convoName string, provider ModelProvider) (Con
 }
 
 type AgentOptions struct {
-	Prompt           string
-	SysPrompt        string
-	Files            []*FileData
-	ModelInfo        *map[string]any
-	SearchEngine     *map[string]any
-	MaxRecursions    int
-	ThinkMode        bool
-	UseTools         bool
-	EnabledTools     []string // List of enabled embedding tools
-	UseMCP           bool
-	SkipToolsConfirm bool
-	AppendMarkdown   bool
-	AppendUsage      bool
-	OutputFile       string
-	QuietMode        bool
-	ConvoName        string
-}
-
-// validateModelConfig validates the model configuration and extracts required fields
-func validateModelConfig(modelInfo *map[string]any) (apiKey, endpoint, modelName string, temperature float32, topP float32, seed *int, err error) {
-	// Check if ModelInfo is nil (happens when no config file exists)
-	if modelInfo == nil {
-		return "", "", "", 0, 0, nil, fmt.Errorf("no model configuration found. Please run 'gllm model add' to configure a model first, or use 'gllm model list' to see existing models")
-	}
-
-	// Safely extract model configuration with type assertions
-	apiKey, ok := (*modelInfo)["key"].(string)
-	if !ok {
-		return "", "", "", 0, 0, nil, fmt.Errorf("invalid or missing API key in model configuration")
-	}
-
-	endpoint, ok = (*modelInfo)["endpoint"].(string)
-	if !ok {
-		return "", "", "", 0, 0, nil, fmt.Errorf("invalid or missing endpoint in model configuration")
-	}
-
-	modelName, ok = (*modelInfo)["model"].(string)
-	if !ok {
-		return "", "", "", 0, 0, nil, fmt.Errorf("invalid or missing model name in model configuration")
-	}
-
-	// Extract temperature with safe type conversion
-	switch temp := (*modelInfo)["temperature"].(type) {
-	case float64:
-		temperature = float32(temp)
-	case int:
-		temperature = float32(temp)
-	case int64:
-		temperature = float32(temp)
-	case float32:
-		temperature = temp
-	default:
-		// Set a default value if type is unexpected
-		temperature = 1.0
-	}
-
-	// Extract top_p with safe type conversion
-	switch tp := (*modelInfo)["top_p"].(type) {
-	case float64:
-		topP = float32(tp)
-	case int:
-		topP = float32(tp)
-	case int64:
-		topP = float32(tp)
-	case float32:
-		topP = tp
-	default:
-		// Set a default value if type is unexpected or not provided
-		topP = 1.0
-	}
-
-	// Extract seed with safe type conversion
-	switch s := (*modelInfo)["seed"].(type) {
-	case int:
-		seed = &s
-	case int64:
-		seedInt := int(s)
-		seed = &seedInt
-	case float64:
-		seedInt := int(s)
-		seed = &seedInt
-	case float32:
-		seedInt := int(s)
-		seed = &seedInt
-	default:
-		// Seed is optional, leave as nil if not provided
-		seed = nil
-	}
-
-	Debugf("Model Config: API Key: %s, Endpoint: %s, Model Name: %s, Temperature: %f, Top P: %f, Seed: %v", apiKey, endpoint, modelName, temperature, topP, seed)
-
-	return apiKey, endpoint, modelName, temperature, topP, seed, nil
+	Prompt         string
+	SysPrompt      string
+	Files          []*FileData
+	ModelInfo      *data.Model
+	SearchEngine   *data.SearchEngine
+	MaxRecursions  int
+	ThinkMode      bool
+	EnabledTools   []string // List of enabled embedding tools
+	UseMCP         bool
+	YoloMode       bool // Whether to automatically approve tools
+	AppendMarkdown bool
+	AppendUsage    bool
+	OutputFile     string
+	QuietMode      bool
+	ConvoName      string
 }
 
 func CallAgent(op *AgentOptions) error {
-	// Validate model configuration
-	apiKey, endpoint, modelName, temperature, topP, seed, err := validateModelConfig(op.ModelInfo)
-	if err != nil {
-		return err
-	}
+
+	// Set up model settings
+	mi := constructModelInfo(op.ModelInfo)
 
 	// Set up search engine settings
 	se := constructSearchEngine(op.SearchEngine)
-	toolsUse := ToolsUse{AutoApprove: op.SkipToolsConfirm}
+	toolsUse := ToolsUse{AutoApprove: op.YoloMode}
 
 	// Set up code tool settings
 	exeCode := IsCodeExecutionEnabled()
@@ -332,19 +224,14 @@ func CallAgent(op *AgentOptions) error {
 	}
 
 	ag := Agent{
-		ApiKey:        apiKey,
-		EndPoint:      endpoint,
-		ModelName:     modelName,
+		Model:         mi,
 		SystemPrompt:  op.SysPrompt,
 		UserPrompt:    op.Prompt,
-		Temperature:   temperature,
-		TopP:          topP,
-		Seed:          seed,
 		Files:         op.Files,
 		NotifyChan:    notifyCh,
 		DataChan:      dataCh,
 		ProceedChan:   proceedCh,
-		SearchEngine:  *se,
+		SearchEngine:  se,
 		ToolsUse:      toolsUse,
 		EnabledTools:  op.EnabledTools,
 		UseCodeTool:   exeCode,
@@ -359,12 +246,8 @@ func CallAgent(op *AgentOptions) error {
 		Indicator:     indicator,
 	}
 
-	// Check if the endpoint is compatible with OpenAI
-	// Use dual detection: endpoint first, then model name patterns
-	provider := DetectModelProvider(ag.EndPoint, ag.ModelName)
-
 	// Construct conversation manager
-	cm, err := ConstructConversationManager(op.ConvoName, provider)
+	cm, err := ConstructConversationManager(op.ConvoName, ag.Model.Provider)
 	if err != nil {
 		return err
 	}
@@ -380,26 +263,26 @@ func CallAgent(op *AgentOptions) error {
 			}
 		}()
 
-		switch provider {
-		case ModelOpenChat:
+		switch ag.Model.Provider {
+		case ModelProviderOpenAICompatible:
 			// Used for Chinese Models, they use "thinking[enable/disable]" as extra_body
 			if err := ag.GenerateOpenChatStream(); err != nil {
 				// Send error through channel instead of returning
 				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 			}
-		case ModelOpenAI, ModelMistral, ModelOpenAICompatible:
+		case ModelProviderOpenAI, ModelProviderMistral:
 			// Used for OpenAI compatible models
 			if err := ag.GenerateOpenAIStream(); err != nil {
 				// Send error through channel instead of returning
 				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 			}
-		case ModelGemini:
+		case ModelProviderGemini:
 			if err := ag.GenerateGemini2Stream(); err != nil {
 				// Send error through channel instead of returning
 				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 			}
 		default:
-			notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Unsupported model provider: %s", provider)}
+			notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Unsupported model provider: %s", ag.Model.Provider)}
 		}
 	}()
 

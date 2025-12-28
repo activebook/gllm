@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
 	"github.com/spf13/cobra"
 )
@@ -18,7 +19,13 @@ Switch on/off to enable/disable all mcp servers`,
 		fmt.Println(cmd.Long)
 		fmt.Println()
 		fmt.Print("MCP is currently: ")
-		enabled := GetAgentBool("mcp")
+		store := data.NewConfigStore()
+		agent := store.GetActiveAgent()
+		if agent == nil {
+			fmt.Println(switchOffColor + "disabled" + resetColor)
+			return
+		}
+		enabled := agent.MCP
 		if enabled {
 			fmt.Println(switchOnColor + "enabled" + resetColor)
 		} else {
@@ -27,8 +34,8 @@ Switch on/off to enable/disable all mcp servers`,
 	},
 }
 
-var mcpListCmd = &cobra.Command{
-	Use:     "list",
+var mcpLoadCmd = &cobra.Command{
+	Use:     "load",
 	Aliases: []string{"ls", "show", "pr"},
 	Short:   "List all available MCP tools",
 	Long:    `Lists all tools available from configured MCP servers.`,
@@ -131,7 +138,14 @@ var mcpOnCmd = &cobra.Command{
 	Use:   "on",
 	Short: "Enable MCP Servers",
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := SetAgentValue("mcp", true); err != nil {
+		store := data.NewConfigStore()
+		agent := store.GetActiveAgent()
+		if agent == nil {
+			fmt.Printf("Error: No active agent found\n")
+			return
+		}
+		agent.MCP = true
+		if err := store.SetAgent(agent.Name, agent); err != nil {
 			fmt.Printf("Error writing config: %v\n", err)
 			return
 		}
@@ -143,7 +157,14 @@ var mcpOffCmd = &cobra.Command{
 	Use:   "off",
 	Short: "Disable MCP Servers",
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := SetAgentValue("mcp", false); err != nil {
+		store := data.NewConfigStore()
+		agent := store.GetActiveAgent()
+		if agent == nil {
+			fmt.Printf("Error: No active agent found\n")
+			return
+		}
+		agent.MCP = false
+		if err := store.SetAgent(agent.Name, agent); err != nil {
 			fmt.Printf("Error writing config: %v\n", err)
 			return
 		}
@@ -484,38 +505,33 @@ var mcpRemoveCmd = &cobra.Command{
 			return
 		}
 
-		// Load existing config
-		config, err := service.LoadMCPServers()
+		store := data.NewMCPStore()
+		err := store.RemoveServer(name)
+		if err != nil {
+			fmt.Printf("Error removing MCP server '%s': %v\n", name, err)
+			return
+		}
+
+		fmt.Printf("Successfully removed MCP server '%s'\n", name)
+	},
+}
+
+var mcpListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List MCP servers",
+	Long:  `List all MCP servers in the configuration.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		store := data.NewMCPStore()
+		servers, _, err := store.Load()
 		if err != nil {
 			fmt.Printf("Error loading MCP config: %v\n", err)
 			return
 		}
 
-		// Check if server exists
-		if _, exists := config.MCPServers[name]; !exists {
-			fmt.Printf("Error: MCP server '%s' does not exist\n", name)
-			return
+		fmt.Println("MCP servers:")
+		for name, server := range servers {
+			fmt.Printf("  %s: %s %t\n", name, server.Type, server.Allowed)
 		}
-
-		// Remove the server from config
-		delete(config.MCPServers, name)
-
-		// Also remove from AllowMCPServers if present
-		for i, allowed := range config.AllowMCPServers {
-			if allowed == name {
-				config.AllowMCPServers = append(config.AllowMCPServers[:i], config.AllowMCPServers[i+1:]...)
-				break
-			}
-		}
-
-		// Save config
-		err = service.SaveMCPServers(config)
-		if err != nil {
-			fmt.Printf("Error saving MCP config: %v\n", err)
-			return
-		}
-
-		fmt.Printf("Successfully removed MCP server '%s'\n", name)
 	},
 }
 
@@ -536,20 +552,8 @@ in the current directory.`,
 			exportFile = args[0]
 		}
 
-		// Load MCP config
-		config, err := service.LoadMCPServers()
-		if err != nil {
-			fmt.Printf("Error loading MCP configuration: %v\n", err)
-			return
-		}
-
-		if config == nil {
-			fmt.Println("No MCP configuration found to export")
-			return
-		}
-
-		// Export MCP config
-		err = service.SaveMCPServersToPath(config, exportFile)
+		store := data.NewMCPStore()
+		err := store.Export(exportFile)
 		if err != nil {
 			fmt.Printf("Error exporting MCP configuration: %v\n", err)
 			return
@@ -569,28 +573,10 @@ This will replace the current MCP configuration with the imported one.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		importFile := args[0]
 
-		// Check if file exists
-		if _, err := os.Stat(importFile); os.IsNotExist(err) {
-			fmt.Printf("MCP configuration file does not exist: %s\n", importFile)
-			return
-		}
-
-		// Load MCP config from file
-		config, err := service.LoadMCPServersFromPath(importFile)
+		store := data.NewMCPStore()
+		err := store.Import(importFile)
 		if err != nil {
-			fmt.Printf("Error loading MCP configuration: %v\n", err)
-			return
-		}
-
-		if config == nil {
-			fmt.Println("No MCP configuration found in file")
-			return
-		}
-
-		// Save the imported config
-		err = service.SaveMCPServers(config)
-		if err != nil {
-			fmt.Printf("Error saving MCP configuration: %v\n", err)
+			fmt.Printf("Error importing MCP configuration: %v\n", err)
 			return
 		}
 
@@ -604,16 +590,13 @@ var mcpPathCmd = &cobra.Command{
 	Long:  `Displays the full path to the MCP configuration file. You can manually edit it and reload the available MCPs.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Get the MCP config path
-		configPath := service.GetMCPServersPath()
+		store := data.NewMCPStore()
+		configPath := store.GetPath()
 
 		// Check if the file exists
 		if _, err := os.Stat(configPath); os.IsNotExist(err) {
 			// File doesn't exist, initialize with template
-			templateConfig := &service.MCPConfig{
-				MCPServers:      make(map[string]service.MCPServerConfig),
-				AllowMCPServers: []string{},
-			}
-			err := service.SaveMCPServers(templateConfig)
+			err := store.CreateTemplate()
 			if err != nil {
 				fmt.Printf("Error initializing MCP configuration file: %v\n", err)
 				return
@@ -626,9 +609,9 @@ var mcpPathCmd = &cobra.Command{
 }
 
 func init() {
-	mcpListCmd.Flags().BoolP("all", "a", false, "List all mcp servers, including blocked ones")
-	mcpListCmd.Flags().BoolP("prompts", "p", false, "Include MCP prompts, if available")
-	mcpListCmd.Flags().BoolP("resources", "r", false, "Include MCP resources, if available")
+	mcpLoadCmd.Flags().BoolP("all", "a", false, "List all mcp servers, including blocked ones")
+	mcpLoadCmd.Flags().BoolP("prompts", "p", false, "Include MCP prompts, if available")
+	mcpLoadCmd.Flags().BoolP("resources", "r", false, "Include MCP resources, if available")
 	mcpAddCmd.Flags().StringP("name", "n", "", "Name of the MCP server (required)")
 	mcpAddCmd.Flags().StringP("type", "t", "", "Type of the MCP server: std, local, sse, http (required)")
 	mcpAddCmd.Flags().StringP("url", "u", "", "URL for sse/http type servers")
@@ -642,6 +625,7 @@ func init() {
 	mcpSetCmd.Flags().StringSliceP("env", "e", []string{}, "Environment variables in key=value format (can be used multiple times)")
 	mcpSetCmd.Flags().BoolP("allow", "a", false, "Allow this MCP server to be used")
 	mcpRemoveCmd.Flags().StringP("name", "n", "", "Name of the MCP server to remove (required)")
+	mcpCmd.AddCommand(mcpLoadCmd)
 	mcpCmd.AddCommand(mcpListCmd)
 	mcpCmd.AddCommand(mcpOnCmd)
 	mcpCmd.AddCommand(mcpOffCmd)
@@ -652,20 +636,4 @@ func init() {
 	mcpCmd.AddCommand(mcpImportCmd)
 	mcpCmd.AddCommand(mcpPathCmd)
 	rootCmd.AddCommand(mcpCmd)
-}
-
-func AreMCPServersEnabled() bool {
-	enabled := GetAgentBool("mcp")
-	return enabled
-}
-
-func SwitchMCP(s string) {
-	switch s {
-	case "on":
-		mcpOnCmd.Run(mcpOnCmd, nil)
-	case "off":
-		mcpOffCmd.Run(mcpOffCmd, nil)
-	default:
-		mcpCmd.Run(mcpCmd, nil)
-	}
 }

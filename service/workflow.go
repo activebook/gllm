@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/activebook/gllm/data"
 	"github.com/ergochat/readline"
 )
 
@@ -30,11 +31,11 @@ const (
 type WorkflowAgent struct {
 	Name          string
 	Role          WorkflowAgentType
-	Model         *map[string]any
-	Search        *map[string]any
+	Model         *data.Model
+	Search        *data.SearchEngine
 	Template      string
 	SystemPrompt  string
-	Tools         bool
+	EnabledTools  []string
 	Think         bool
 	MCP           bool
 	Usage         bool
@@ -111,7 +112,7 @@ const (
 // promptUserForConfirmation asks the user to confirm before proceeding with an agent
 func promptUserForConfirmation(agent *WorkflowAgent) bool {
 	fmt.Printf("\n %sAgent:%s %s%s (%s%s%s)\n", agentNameColor, workflowResetColor, agentNameColor, agent.Name, agentRoleColor, agent.Role, workflowResetColor)
-	fmt.Printf("   %sModel:%s %s%v%s\n", modelColor, workflowResetColor, modelColor, (*agent.Model)["model"], workflowResetColor)
+	fmt.Printf("   %sModel:%s %s%s%s\n", modelColor, workflowResetColor, modelColor, agent.Model.Name, workflowResetColor)
 	fmt.Printf("   %sInput directory:%s %s%s%s\n", directoryColor, workflowResetColor, directoryColor, agent.InputDir, workflowResetColor)
 	fmt.Printf("   %sOutput directory:%s %s%s%s\n", directoryColor, workflowResetColor, directoryColor, agent.OutputDir, workflowResetColor)
 	fmt.Printf("   %sSystem prompt:%s %s%s\n", promptColor, workflowResetColor, agent.SystemPrompt, workflowResetColor)
@@ -129,7 +130,7 @@ func promptUserForConfirmation(agent *WorkflowAgent) bool {
 	// Format tools status
 	toolsStatus := "false"
 	toolsColor := booleanFalseColor
-	if agent.Tools {
+	if len(agent.EnabledTools) > 0 {
 		toolsStatus = "true"
 		toolsColor = booleanTrueColor
 	}
@@ -514,20 +515,21 @@ func executeAgent(agent *WorkflowAgent, prompt string) error {
 	quiet := (agent.Role == WorkflowAgentTypeWorker)
 
 	agentOptions := AgentOptions{
-		Prompt:           prompt,
-		SysPrompt:        agent.SystemPrompt,
-		ModelInfo:        agent.Model,
-		SearchEngine:     agent.Search,
-		MaxRecursions:    agent.MaxRecursions,
-		ThinkMode:        agent.Think,
-		UseTools:         agent.Tools,
-		UseMCP:           agent.MCP,
-		SkipToolsConfirm: true, // Always skip tools confirmation
-		AppendMarkdown:   agent.Markdown,
-		AppendUsage:      agent.Usage,
-		OutputFile:       agent.OutputFile, // Write to file
-		QuietMode:        quiet,            // Worker in quiet mode
-		ConvoName:        agent.ConvoName,  // conversation name, for iterate prompt
+		Prompt:         prompt,
+		SysPrompt:      agent.SystemPrompt,
+		Files:          nil,
+		ModelInfo:      agent.Model,
+		SearchEngine:   agent.Search,
+		MaxRecursions:  agent.MaxRecursions,
+		ThinkMode:      agent.Think,
+		EnabledTools:   agent.EnabledTools,
+		UseMCP:         agent.MCP,
+		YoloMode:       true, // Always skip tools confirmation
+		AppendMarkdown: agent.Markdown,
+		AppendUsage:    agent.Usage,
+		OutputFile:     agent.OutputFile, // Write to file
+		QuietMode:      quiet,            // Worker in quiet mode
+		ConvoName:      agent.ConvoName,  // conversation name, for iterate prompt
 	}
 
 	err := CallAgent(&agentOptions)

@@ -4,10 +4,16 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
+
+func init() {
+	toolsCmd.AddCommand(toolsSwCmd)
+	rootCmd.AddCommand(toolsCmd)
+}
 
 var toolsCmd = &cobra.Command{
 	Use:   "tools",
@@ -26,15 +32,18 @@ var toolsSwCmd = &cobra.Command{
 	Short: "Switch tools on/off",
 	Long:  "Choose which embedding tools to enable for the current agent.",
 	Run: func(cmd *cobra.Command, args []string) {
+		store := data.NewConfigStore()
+		agent := store.GetActiveAgent()
+		if agent == nil {
+			fmt.Println("No active agent found")
+			return
+		}
+
 		// Get all available tools
 		allTools := service.GetAllEmbeddingTools()
 
 		// Get currently enabled tools
-		enabledTools := GetAgentStringSlice("tools")
-		if enabledTools == nil {
-			// If no tools configured, default to all tools
-			enabledTools = nil
-		}
+		enabledTools := agent.Tools
 
 		// Create a set for quick lookup
 		enabledSet := make(map[string]bool)
@@ -79,7 +88,8 @@ var toolsSwCmd = &cobra.Command{
 		}
 
 		// Save selected tools
-		err = SetAgentValue("tools", selectedTools)
+		agent.Tools = selectedTools
+		err = store.SetAgent(agent.Name, agent)
 		if err != nil {
 			fmt.Printf("Error saving tools config: %v\n", err)
 			return
@@ -90,39 +100,14 @@ var toolsSwCmd = &cobra.Command{
 	},
 }
 
-func init() {
-	toolsCmd.AddCommand(toolsSwCmd)
-	rootCmd.AddCommand(toolsCmd)
-}
-
-// GetEnabledTools returns the list of enabled tools for the current agent
-// If nil/empty, returns all tools (default behavior)
-func GetEnabledTools() []string {
-	enabledTools := GetAgentStringSlice("tools")
-	if enabledTools == nil {
-		return nil
-	}
-	return enabledTools
-}
-
-// AreToolsEnabled returns true if tools are enabled (at least one tool is configured)
-func AreToolsEnabled() bool {
-	enabledTools := GetAgentStringSlice("tools")
-	// Consider tools enabled if the slice exists and is not empty
-	return len(enabledTools) > 0
-}
-
-func SwitchUseTools(s string) {
-	switch s {
-	case "sw":
-		toolsSwCmd.Run(toolsSwCmd, nil)
-	default:
-		toolsCmd.Run(toolsCmd, nil)
-	}
-}
-
 func ListEmbeddingTools() {
-	enabledTools := GetAgentStringSlice("tools")
+	store := data.NewConfigStore()
+	agent := store.GetActiveAgent()
+	if agent == nil {
+		fmt.Println("No active agent found")
+		return
+	}
+
 	allTools := service.GetAllEmbeddingTools()
 
 	// Sort for consistent display
@@ -132,12 +117,12 @@ func ListEmbeddingTools() {
 
 	// Create a set of enabled tools for lookup
 	enabledSet := make(map[string]bool)
-	if enabledTools == nil {
+	if agent.Tools == nil {
 		for _, t := range allTools {
 			enabledSet[t] = false
 		}
 	} else {
-		for _, t := range enabledTools {
+		for _, t := range agent.Tools {
 			enabledSet[t] = true
 		}
 	}

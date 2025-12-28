@@ -3,6 +3,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/service"
 	"github.com/spf13/cobra"
 )
 
@@ -14,9 +16,13 @@ var thinkCmd = &cobra.Command{
 		fmt.Println(cmd.Long)
 		fmt.Println()
 
-		// Show current status
-		enabled := IsThinkEnabled()
-		if enabled {
+		store := data.NewConfigStore()
+		agent := store.GetActiveAgent()
+		if agent == nil {
+			fmt.Println(switchOffColor + "off" + resetColor)
+			return
+		}
+		if agent.Think {
 			fmt.Printf("Deep think mode: %s\n", switchOnColor+"on"+resetColor)
 		} else {
 			fmt.Printf("Deep think mode: %s\n", switchOffColor+"off"+resetColor)
@@ -30,8 +36,15 @@ var thinkOnCmd = &cobra.Command{
 	Long:  `Enable deep think mode which enhances the model's reasoning capabilities.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Set the agent.think flag to true in the configuration
-		if err := SetAgentValue("think", true); err != nil {
-			fmt.Printf("Error saving config: %v\n", err)
+		store := data.NewConfigStore()
+		agent := store.GetActiveAgent()
+		if agent == nil {
+			fmt.Println(switchOffColor + "off" + resetColor)
+			return
+		}
+		agent.Think = true
+		if err := store.SetAgent(agent.Name, agent); err != nil {
+			service.Errorf("failed to save think mode: %w", err)
 			return
 		}
 
@@ -45,8 +58,15 @@ var thinkOffCmd = &cobra.Command{
 	Long:  `Disable deep think mode to return to normal operation.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Set the agent.think flag to false in the configuration
-		if err := SetAgentValue("think", false); err != nil {
-			fmt.Printf("Error saving config: %v\n", err)
+		store := data.NewConfigStore()
+		agent := store.GetActiveAgent()
+		if agent == nil {
+			fmt.Println(switchOffColor + "off" + resetColor)
+			return
+		}
+		agent.Think = false
+		if err := store.SetAgent(agent.Name, agent); err != nil {
+			service.Errorf("failed to save think mode: %w", err)
 			return
 		}
 
@@ -61,22 +81,4 @@ func init() {
 
 	// Add the main think command to the root command
 	rootCmd.AddCommand(thinkCmd)
-}
-
-func SwitchThinkMode(mode string) {
-	switch mode {
-	case "on":
-		thinkOnCmd.Run(thinkCmd, []string{})
-	case "off":
-		thinkOffCmd.Run(thinkCmd, []string{})
-	default:
-		fmt.Printf("invalid think mode: %s", mode)
-	}
-}
-
-// IsThinkEnabled returns whether deep think mode is enabled
-func IsThinkEnabled() bool {
-	// By default, deep think mode is disabled
-	enabled := GetAgentBool("think")
-	return enabled
 }

@@ -207,11 +207,13 @@ func (ci *ChatInfo) showInfo() {
 
 	// System prompt
 	printSection("SYSTEM PROMPT")
-	fmt.Printf("%s\n", GetEffectiveSystemPrompt())
+	systemCmd.Run(systemCmd, []string{})
+	w.Flush()
 
 	// Template
 	printSection("TEMPLATE")
-	fmt.Printf("%s\n", GetEffectiveTemplate())
+	templateCmd.Run(templateCmd, []string{})
+	w.Flush()
 
 	// Memory section (included in system prompt)
 	// printSection("Memory")
@@ -268,12 +270,10 @@ func (ci *ChatInfo) showHistory(num int, chars int) {
 	// Display conversation details
 	fmt.Printf("Name: %s\n", convoName)
 
-	switch ci.Provider {
-	case service.ModelGemini:
+	switch ci.ModelProvider {
+	case service.ModelProviderGemini:
 		service.DisplayGeminiConversationLog(data, num, chars)
-	case service.ModelOpenChat:
-		service.DisplayOpenAIConversationLog(data, num, chars)
-	case service.ModelOpenAI, service.ModelMistral, service.ModelOpenAICompatible:
+	case service.ModelProviderOpenAI, service.ModelProviderMistral, service.ModelProviderOpenAICompatible:
 		service.DisplayOpenAIConversationLog(data, num, chars)
 	default:
 		fmt.Println("Unknown provider")

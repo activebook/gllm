@@ -99,22 +99,22 @@ type OpenAIImageURL struct {
 }
 
 // Detects the conversation provider based on message format
-func DetectMessageProvider(data []byte) ModelProvider {
+func DetectMessageProvider(data []byte) string {
 	// Try to unmarshal as array of messages
 	var messages []json.RawMessage
 	if err := json.Unmarshal(data, &messages); err != nil {
-		return ModelUnknown
+		return ModelProviderUnknown
 	}
 
 	if len(messages) == 0 {
-		return ModelUnknown
+		return ModelProviderUnknown
 	}
 
 	// Try to detect Gemini format
 	var geminiMsg GeminiMessage
 	if err := json.Unmarshal(messages[0], &geminiMsg); err == nil {
 		if geminiMsg.Role != "" && len(geminiMsg.Parts) > 0 {
-			return ModelGemini
+			return ModelProviderGemini
 		}
 	}
 
@@ -122,11 +122,11 @@ func DetectMessageProvider(data []byte) ModelProvider {
 	var openaiMsg OpenAIMessage
 	if err := json.Unmarshal(messages[0], &openaiMsg); err == nil {
 		if openaiMsg.Role != "" {
-			return ModelOpenAI
+			return ModelProviderOpenAI
 		}
 	}
 
-	return ModelUnknown
+	return ModelProviderUnknown
 }
 
 // Display summary of Gemini conversation

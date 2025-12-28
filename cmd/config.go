@@ -8,10 +8,10 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // configCmd represents the base command when called without any subcommands
@@ -42,18 +42,14 @@ var configPathCmd = &cobra.Command{
 	Short: "Show the location of the configuration file",
 	Long:  `Displays the full path to the configuration file gllm attempts to load.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		store := data.NewConfigStore()
+
 		// Check if a config file was explicitly loaded by Viper
-		usedCfgFile := viper.ConfigFileUsed()
+		usedCfgFile := store.ConfigFileUsed()
 		if usedCfgFile != "" {
 			fmt.Printf("Configuration file in use: %s\n", usedCfgFile)
-			// You could add a check here to see if it differs from the default path
-			defaultPath := getDefaultConfigFilePath()
-			if usedCfgFile != defaultPath {
-				fmt.Printf("Note: This differs from the default path: %s\n", defaultPath)
-			}
 		} else {
-			// If no config file was loaded, show the default path where gllm looks
-			fmt.Printf("No configuration file loaded.\nDefault location is: %s\n", getDefaultConfigFilePath())
+			fmt.Printf("No configuration file loaded.\nDefault location is: %s\n", data.GetConfigFilePath())
 		}
 	},
 }
@@ -83,38 +79,31 @@ Files will be saved as 'gllm.yaml' and 'mcp.json' (if MCP config exists).`,
 		}
 
 		// Set export file paths
-		exportFile := filepath.Join(exportDir, "gllm.yaml")
+		configExportFile := filepath.Join(exportDir, "gllm.yaml")
 		mcpExportFile := filepath.Join(exportDir, "mcp.json")
 
-		// Get all configuration settings
-		configMap := viper.AllSettings()
+		configStore := data.NewConfigStore()
 
-		// Create a new viper instance for export
-		exportViper := viper.New()
-		for key, value := range configMap {
-			exportViper.Set(key, value)
-		}
-
-		// Set the export file
-		exportViper.SetConfigFile(exportFile)
-
-		// Write the configuration to the file
-		if err := exportViper.WriteConfigAs(exportFile); err != nil {
+		// Write the configuration to the file using ConfigStore
+		if err := configStore.Export(configExportFile); err != nil {
 			service.Errorf("Error exporting configuration: %s\n", err)
 			return
 		}
 
-		fmt.Printf("Configuration exported successfully to: %s\n", exportFile)
+		fmt.Printf("Configuration exported successfully to: %s\n", configExportFile)
+
+		mcpStore := data.NewMCPStore()
 
 		// Check if MCP config exists and export it
-		mcpConfig, err := service.LoadMCPServers()
+		servers, allowed, err := mcpStore.Load()
 		if err != nil {
 			service.Errorf("Error loading MCP configuration: %s\n", err)
 			return
 		}
-		if mcpConfig != nil {
+
+		if servers != nil {
 			// MCP config exists, save it to export location
-			if err := service.SaveMCPServersToPath(mcpConfig, mcpExportFile); err != nil {
+			if err := mcpStore.SaveToPath(servers, allowed, mcpExportFile); err != nil {
 				service.Errorf("Error exporting MCP configuration: %s\n", err)
 				return
 			}
@@ -145,59 +134,44 @@ it will look in the current directory.`,
 		}
 
 		// Set import file paths
-		importFile := filepath.Join(importDir, "gllm.yaml")
+		configImportFile := filepath.Join(importDir, "gllm.yaml")
 		mcpImportFile := filepath.Join(importDir, "mcp.json")
 
 		// Check if main config file exists
-		if _, err := os.Stat(importFile); os.IsNotExist(err) {
-			service.Errorf("Configuration file does not exist: %s\n", importFile)
+		if _, err := os.Stat(configImportFile); os.IsNotExist(err) {
+			service.Errorf("Configuration file does not exist: %s\n", configImportFile)
 			return
 		}
 
-		// Create a new viper instance for import
-		importViper := viper.New()
-		importViper.SetConfigFile(importFile)
+		storeConfig := data.NewConfigStore()
 
-		// Read the configuration file
-		if err := importViper.ReadInConfig(); err != nil {
-			service.Errorf("Error reading configuration file: %s\n", err)
+		// Import the configuration using ConfigStore
+		if err := storeConfig.Import(configImportFile); err != nil {
+			service.Errorf("Error importing configuration: %s\n", err)
 			return
 		}
 
-		// Get all settings from the import file
-		importedSettings := importViper.AllSettings()
-
-		// Merge imported settings with current configuration
-		for key, value := range importedSettings {
-			viper.Set(key, value)
-		}
-
-		// Save the merged configuration
-		if err := writeConfig(); err != nil {
-			service.Errorf("Error saving configuration: %s\n", err)
-			return
-		}
-
-		fmt.Printf("Configuration imported successfully from: %s\n", importFile)
+		fmt.Printf("Configuration imported successfully from: %s\n", configImportFile)
 
 		// Check if MCP config exists and import it
-		if _, err := os.Stat(mcpImportFile); err == nil {
-			// MCP config exists, load and save it
-			mcpConfig, err := service.LoadMCPServersFromPath(mcpImportFile)
-			if err != nil {
-				service.Errorf("Error loading MCP configuration: %s\n", err)
+		if _, err := os.Stat(mcpImportFile); os.IsNotExist(err) {
+			fmt.Printf("No MCP configuration file found to import\n")
+		}
+
+		// MCP config exists, load and save it
+		mcpStore := data.NewMCPStore()
+		mcpConfig, allowed, err := mcpStore.LoadFromPath(mcpImportFile)
+		if err != nil {
+			service.Errorf("Error loading MCP configuration: %s\n", err)
+			return
+		}
+		if mcpConfig != nil {
+			// Save the MCP config to the default location
+			if err := mcpStore.Save(mcpConfig, allowed); err != nil {
+				service.Errorf("Error saving MCP configuration: %s\n", err)
 				return
 			}
-			if mcpConfig != nil {
-				// Save the MCP config to the default location
-				if err := service.SaveMCPServers(mcpConfig); err != nil {
-					service.Errorf("Error saving MCP configuration: %s\n", err)
-					return
-				}
-				fmt.Printf("MCP configuration imported successfully from: %s\n", mcpImportFile)
-			}
-		} else {
-			fmt.Printf("No MCP configuration file found to import\n")
+			fmt.Printf("MCP configuration imported successfully from: %s\n", mcpImportFile)
 		}
 	},
 }
@@ -263,48 +237,8 @@ func init() {
 	// Add subcommands to configCmd
 	configCmd.AddCommand(configPathCmd)
 	configCmd.AddCommand(configPrintCmd)
-	configCmd.AddCommand(configSetCmd)    // Register the config set command
-	configCmd.AddCommand(configExportCmd) // Register the config export command
+	configCmd.AddCommand(configExportCmd) // Register theconfig export command
 	configCmd.AddCommand(configImportCmd) // Register the config import command
 
 	// Add flags for other prompt commands if needed in the future
-}
-
-// configSetCmd represents the command to set configuration values
-var configSetCmd = &cobra.Command{
-	Use:    "set",
-	Short:  "Set a configuration value",
-	Long:   `Set a configuration value that will persist across sessions.`,
-	Hidden: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) != 2 {
-			service.Errorf("Usage: gllm config set <key> <value>\n")
-			return
-		}
-
-		key := args[0]
-		value := args[1]
-
-		name := service.GetCurrentAgentName()
-		if name == "unknown" {
-			service.Errorf("No active agent to update.\n")
-			return
-		}
-
-		config, err := service.GetAgent(name)
-		if err != nil {
-			service.Errorf("Error getting agent: %v\n", err)
-			return
-		}
-
-		config[key] = value
-
-		// Update Agent
-		if err := service.SetAgent(name, config); err != nil {
-			service.Errorf("Error saving configuration: %s\n", err)
-			return
-		}
-
-		fmt.Printf("Configuration '%s' set to '%s' successfully.\n", key, value)
-	},
 }

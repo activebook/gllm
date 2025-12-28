@@ -6,12 +6,37 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
+
+// agentCmd represents the agent subcommand for agents
+var agentCmd = &cobra.Command{
+	Use:     "agent",
+	Aliases: []string{"ag"}, // Optional alias
+	Short:   "Manage agent configurations",
+	Long: `Manage agent configurations that allow you to quickly switch between
+different AI assistant setups with different models, tools, and settings.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		// Show current agent configuration first
+		store := data.NewConfigStore()
+		activeAgent := store.GetActiveAgent()
+		if activeAgent == nil {
+			fmt.Println("No current agent configuration found.")
+			fmt.Println()
+			return
+		}
+		fmt.Println("Current agent configuration:")
+		printAgentConfigDetails(activeAgent, "  ")
+		fmt.Println()
+
+		// Then show the list of available agents
+		agentListCmd.Run(agentListCmd, args)
+	},
+}
 
 // agentListCmd represents the list subcommand for agents
 var agentListCmd = &cobra.Command{
@@ -21,8 +46,9 @@ var agentListCmd = &cobra.Command{
 	Long:    `List all configured agent profiles with their names and basic information.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// List all agents
-		agents, err := service.GetAllAgents()
-		if err != nil {
+		store := data.NewConfigStore()
+		agents := store.GetAllAgents()
+		if agents == nil {
 			fmt.Printf("No agents configured yet. Use 'gllm agent add' to create one.\n")
 			return
 		}
@@ -41,49 +67,26 @@ var agentListCmd = &cobra.Command{
 		}
 		sort.Strings(names)
 
-		activeAgent := service.GetCurrentAgentName()
+		activeAgentName := store.GetActiveAgentName()
 
 		highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
 		// Display agents in a clean, simple list
 		for _, name := range names {
 			// change color for selected agent
 			prefix := "  "
-			if name == activeAgent {
+			if name == activeAgentName {
 				prefix = highlightColor("* ")
 				name = highlightColor(name)
 			}
 			fmt.Printf("%s%s\n", prefix, name)
 		}
 
-		if activeAgent != "" {
+		if activeAgentName != "" {
 			fmt.Println("\n(*) Indicates the current agent.")
 		} else {
 			fmt.Println("\nNo agent selected. Use 'gllm agent switch <name>' to select one.")
 			fmt.Println("The first available agent will be used if needed.")
 		}
-	},
-}
-
-var agentCmd = &cobra.Command{
-	Use:     "agent",
-	Aliases: []string{"ag"}, // Optional alias
-	Short:   "Manage agent configurations",
-	Long: `Manage agent configurations that allow you to quickly switch between
-different AI assistant setups with different models, tools, and settings.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		// Show current agent configuration first
-		currentConfig := service.GetCurrentAgentConfig()
-		if len(currentConfig) > 0 {
-			fmt.Println("Current agent configuration:")
-			printAgentConfigDetails(currentConfig, "  ")
-			fmt.Println()
-		} else {
-			fmt.Println("No current agent configuration found.")
-			fmt.Println()
-		}
-
-		// Then show the list of available agents
-		agentListCmd.Run(agentListCmd, args)
 	},
 }
 
@@ -115,12 +118,14 @@ var agentAddCmd = &cobra.Command{
 		markdown = true // Default to true typically
 		maxRecursions = "10"
 
-		// Get available options
+		// Get available options from data layer
+		store := data.NewConfigStore()
+
 		// Models
-		modelsMap := viper.GetStringMap("models")
+		modelsMap := store.GetModels()
 		var modelOptions []huh.Option[string]
 		for m := range modelsMap {
-			modelOptions = append(modelOptions, huh.NewOption(decodeModelName(m), decodeModelName(m)))
+			modelOptions = append(modelOptions, huh.NewOption(m, m))
 		}
 		// Sort models
 		sort.Slice(modelOptions, func(i, j int) bool {
@@ -128,7 +133,7 @@ var agentAddCmd = &cobra.Command{
 		})
 
 		// Templates
-		templatesMap := viper.GetStringMapString("templates")
+		templatesMap := store.GetTemplates()
 		var templateOptions []huh.Option[string]
 		templateOptions = append(templateOptions, huh.NewOption("None", ""))
 		for t := range templatesMap {
@@ -139,7 +144,7 @@ var agentAddCmd = &cobra.Command{
 		})
 
 		// System Prompts
-		sysPromptsMap := viper.GetStringMapString("system_prompts")
+		sysPromptsMap := store.GetSystemPrompts()
 		var sysPromptOptions []huh.Option[string]
 		sysPromptOptions = append(sysPromptOptions, huh.NewOption("None", ""))
 		for s := range sysPromptsMap {
@@ -150,10 +155,10 @@ var agentAddCmd = &cobra.Command{
 		})
 
 		// Search Engines
-		searchMap := viper.GetStringMap("search_engines")
+		engines := store.GetSearchEngines()
 		var searchOptions []huh.Option[string]
 		searchOptions = append(searchOptions, huh.NewOption("None", ""))
-		for s := range searchMap {
+		for s := range engines {
 			searchOptions = append(searchOptions, huh.NewOption(s, s))
 		}
 		sort.Slice(searchOptions, func(i, j int) bool {
@@ -186,8 +191,12 @@ var agentAddCmd = &cobra.Command{
 						if strings.TrimSpace(s) == "" {
 							return fmt.Errorf("name is required")
 						}
+						if err := CheckAgentName(s); err != nil {
+							return err
+						}
 						// Check if exists
-						if _, err := service.GetAgent(s); err == nil {
+						agent := store.GetAgent(s)
+						if agent != nil {
 							return fmt.Errorf("agent '%s' already exists", s)
 						}
 						return nil
@@ -317,27 +326,27 @@ var agentAddCmd = &cobra.Command{
 			}
 		}
 
-		// Construct config
-		agentConfig := make(service.AgentConfig)
-		agentConfig["model"] = encodeModelName(model)
-		agentConfig["tools"] = tools
-		agentConfig["mcp"] = mcp
-		agentConfig["usage"] = usage
-		agentConfig["markdown"] = markdown
-		agentConfig["think"] = think
-		agentConfig["search"] = search
-		agentConfig["template"] = template
-		agentConfig["system_prompt"] = sysPrompt
-
-		// Parse maxRecursions
-		var val int
-		if _, err := fmt.Sscanf(maxRecursions, "%d", &val); err != nil || val <= 0 {
-			agentConfig["max_recursions"] = 10
-		} else {
-			agentConfig["max_recursions"] = val
+		// Construct typed config
+		var recursionVal int
+		if _, err := fmt.Sscanf(maxRecursions, "%d", &recursionVal); err != nil || recursionVal <= 0 {
+			recursionVal = 10
 		}
 
-		err = service.AddAgentWithConfig(name, agentConfig)
+		agentConfig := &data.AgentConfig{
+			Name:          name,
+			Model:         data.Model{Name: model},
+			Tools:         tools,
+			MCP:           mcp,
+			Usage:         usage,
+			Markdown:      markdown,
+			Think:         think,
+			Search:        data.SearchEngine{Name: search},
+			Template:      template,
+			SystemPrompt:  sysPrompt,
+			MaxRecursions: recursionVal,
+		}
+
+		store.SetAgent(name, agentConfig)
 		if err != nil {
 			fmt.Printf("Error adding agent: %v\n", err)
 			return
@@ -352,18 +361,21 @@ var agentSetCmd = &cobra.Command{
 	Short: "Update an existing agent configuration",
 	Long:  `Update an existing agent with detailed configuration settings using an interactive form.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		store := data.NewConfigStore()
 		var name string
 		if len(args) > 0 {
 			name = args[0]
 		} else {
 			// Default to current agent
-			current := service.GetCurrentAgentName()
-			if current != "" {
-				name = current
+			name = store.GetActiveAgentName()
+			if name == "" {
+				fmt.Println("No active agent.")
+				return
 			}
+
 			// Select agent
-			agents, err := service.GetAllAgents()
-			if err != nil || len(agents) == 0 {
+			agents := store.GetAllAgents()
+			if len(agents) == 0 {
 				fmt.Println("No agents found.")
 				return
 			}
@@ -380,7 +392,7 @@ var agentSetCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 
-			err = huh.NewSelect[string]().
+			err := huh.NewSelect[string]().
 				Title("Select Agent to Edit").
 				Options(options...).
 				Value(&name).
@@ -392,9 +404,9 @@ var agentSetCmd = &cobra.Command{
 		}
 
 		// Get existing agent configuration
-		existingConfig, err := service.GetAgent(name)
-		if err != nil {
-			fmt.Printf("Error getting agent: %v\n", err)
+		agent := store.GetAgent(name)
+		if agent == nil {
+			fmt.Printf("Agent '%s' not found.\n", name)
 			return
 		}
 
@@ -409,59 +421,41 @@ var agentSetCmd = &cobra.Command{
 			capabilities  []string
 		)
 
-		if v, ok := existingConfig["model"].(string); ok {
-			model = decodeModelName(v)
-		}
-		if v, ok := existingConfig["search"].(string); ok {
-			search = v
-		}
-		if v, ok := existingConfig["tools"].([]string); ok {
-			tools = v
-		} else if v, ok := existingConfig["tools"].([]interface{}); ok {
-			// Handle YAML deserialization which returns []interface{}
-			tools = make([]string, 0, len(v))
-			for _, item := range v {
-				if s, ok := item.(string); ok {
-					tools = append(tools, s)
-				}
-			}
-		}
-		if v, ok := existingConfig["template"].(string); ok {
-			template = v
-		}
-		if v, ok := existingConfig["system_prompt"].(string); ok {
-			sysPrompt = v
-		}
-		if v, ok := existingConfig["max_recursions"]; ok {
-			maxRecursions = fmt.Sprintf("%v", v)
+		// Access typed struct fields directly - no type assertions needed!
+		model = agent.Model.Name
+		search = agent.Search.Name
+		tools = agent.Tools
+		template = agent.Template
+		sysPrompt = agent.SystemPrompt
+		if agent.MaxRecursions > 0 {
+			maxRecursions = fmt.Sprintf("%d", agent.MaxRecursions)
 		} else {
 			maxRecursions = "10"
 		}
 
-		// Populate capabilities
-		// Check for tools - can be bool or []string/[]interface{}
-		if v, ok := existingConfig["mcp"].(bool); ok && v {
+		// Populate capabilities from struct fields
+		if agent.MCP {
 			capabilities = append(capabilities, "mcp")
 		}
-		if v, ok := existingConfig["usage"].(bool); ok && v {
+		if agent.Usage {
 			capabilities = append(capabilities, "usage")
 		}
-		if v, ok := existingConfig["markdown"].(bool); ok && v {
+		if agent.Markdown {
 			capabilities = append(capabilities, "markdown")
 		}
-		if v, ok := existingConfig["think"].(bool); ok && v {
+		if agent.Think {
 			capabilities = append(capabilities, "think")
 		}
 
-		// Reuse options logic (simplified copy-paste for safety)
-		modelsMap := viper.GetStringMap("models")
+		// Reuse options logic - access data layer directly
+		modelsMap := store.GetModels()
 		var modelOptions []huh.Option[string]
-		for m := range modelsMap {
-			modelOptions = append(modelOptions, huh.NewOption(decodeModelName(m), decodeModelName(m)))
+		for name := range modelsMap {
+			modelOptions = append(modelOptions, huh.NewOption(name, name))
 		}
 		sort.Slice(modelOptions, func(i, j int) bool { return modelOptions[i].Key < modelOptions[j].Key })
 
-		templatesMap := viper.GetStringMapString("templates")
+		templatesMap := store.GetTemplates()
 		var templateOptions []huh.Option[string]
 		templateOptions = append(templateOptions, huh.NewOption("None", ""))
 		for t := range templatesMap {
@@ -469,7 +463,7 @@ var agentSetCmd = &cobra.Command{
 		}
 		sort.Slice(templateOptions, func(i, j int) bool { return templateOptions[i].Key < templateOptions[j].Key })
 
-		sysPromptsMap := viper.GetStringMapString("system_prompts")
+		sysPromptsMap := store.GetSystemPrompts()
 		var sysPromptOptions []huh.Option[string]
 		sysPromptOptions = append(sysPromptOptions, huh.NewOption("None", ""))
 		for s := range sysPromptsMap {
@@ -477,10 +471,10 @@ var agentSetCmd = &cobra.Command{
 		}
 		sort.Slice(sysPromptOptions, func(i, j int) bool { return sysPromptOptions[i].Key < sysPromptOptions[j].Key })
 
-		searchMap := viper.GetStringMap("search_engines")
+		engines := store.GetSearchEngines()
 		var searchOptions []huh.Option[string]
 		searchOptions = append(searchOptions, huh.NewOption("None", ""))
-		for s := range searchMap {
+		for s := range engines {
 			searchOptions = append(searchOptions, huh.NewOption(s, s))
 		}
 		sort.Slice(searchOptions, func(i, j int) bool { return searchOptions[i].Key < searchOptions[j].Key })
@@ -512,7 +506,7 @@ var agentSetCmd = &cobra.Command{
 
 		// Build form
 		// Model
-		err = huh.NewForm(
+		err := huh.NewForm(
 			huh.NewGroup(
 				huh.NewSelect[string]().
 					Title("Model").
@@ -627,30 +621,46 @@ var agentSetCmd = &cobra.Command{
 			return
 		}
 
-		// Reconstruct config
-		agentConfig := make(service.AgentConfig)
-		agentConfig["model"] = encodeModelName(model)
-		agentConfig["search"] = search
-		agentConfig["tools"] = tools
-		agentConfig["template"] = template
-		agentConfig["system_prompt"] = sysPrompt
-
-		var val int
-		fmt.Sscanf(maxRecursions, "%d", &val)
-		agentConfig["max_recursions"] = val
-
-		// Process capabilities from MultiSelect
-		agentConfig["mcp"] = false
-		agentConfig["usage"] = false
-		agentConfig["markdown"] = false
-		agentConfig["think"] = false
-		for _, cap := range capabilities {
-			agentConfig[cap] = true
+		// Reconstruct typed config
+		var recursionVal int
+		fmt.Sscanf(maxRecursions, "%d", &recursionVal)
+		if recursionVal <= 0 {
+			recursionVal = 10
 		}
 
-		// Keep other existing keys if any (though we reconstructed practically everything)
+		// Process capabilities to booleans
+		mcpEnabled := false
+		usageEnabled := false
+		markdownEnabled := false
+		thinkEnabled := false
+		for _, cap := range capabilities {
+			switch cap {
+			case "mcp":
+				mcpEnabled = true
+			case "usage":
+				usageEnabled = true
+			case "markdown":
+				markdownEnabled = true
+			case "think":
+				thinkEnabled = true
+			}
+		}
 
-		err = service.SetAgent(name, agentConfig)
+		agentConfig := &data.AgentConfig{
+			Name:          name,
+			Model:         data.Model{Name: model},
+			Tools:         tools,
+			MCP:           mcpEnabled,
+			Usage:         usageEnabled,
+			Markdown:      markdownEnabled,
+			Think:         thinkEnabled,
+			Search:        data.SearchEngine{Name: search},
+			Template:      template,
+			SystemPrompt:  sysPrompt,
+			MaxRecursions: recursionVal,
+		}
+
+		err = store.SetAgent(name, agentConfig)
 		if err != nil {
 			fmt.Printf("Error updating agent: %v\n", err)
 			return
@@ -666,13 +676,14 @@ var agentRemoveCmd = &cobra.Command{
 	Short:   "Remove an agent",
 	Long:    `Remove an agent configuration. This action cannot be undone.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		store := data.NewConfigStore()
 		var name string
 		if len(args) > 0 {
 			name = args[0]
 		} else {
 			// Select agent to remove
-			agents, err := service.GetAllAgents()
-			if err != nil || len(agents) == 0 {
+			agents := store.GetAllAgents()
+			if len(agents) == 0 {
 				fmt.Println("No agents found.")
 				return
 			}
@@ -683,7 +694,7 @@ var agentRemoveCmd = &cobra.Command{
 			}
 			sort.Slice(options, func(i, j int) bool { return options[i].Key < options[j].Key })
 
-			err = huh.NewSelect[string]().
+			err := huh.NewSelect[string]().
 				Title("Select Agent to Remove").
 				Options(options...).
 				Value(&name).
@@ -713,7 +724,7 @@ var agentRemoveCmd = &cobra.Command{
 			return
 		}
 
-		err = service.RemoveAgent(name)
+		err = store.DeleteAgent(name)
 		if err != nil {
 			fmt.Printf("Error removing agent: %v\n", err)
 			return
@@ -730,18 +741,20 @@ var agentSwitchCmd = &cobra.Command{
 	Long: `Switch to a different agent configuration. This will change your current AI model,
 tools, search settings, and other preferences to match the selected agent.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		store := data.NewConfigStore()
+
 		var name string
 		if len(args) > 0 {
 			name = args[0]
 		} else {
-			// Default to current agent
-			current := service.GetCurrentAgentName()
-			if current != "" {
-				name = current
+			name = store.GetActiveAgentName()
+			if name == "" {
+				fmt.Println("No active agent.")
+				return
 			}
 			// Interactive select
-			agents, err := service.GetAllAgents()
-			if err != nil || len(agents) == 0 {
+			agents := store.GetAllAgents()
+			if len(agents) == 0 {
 				fmt.Println("No agents found.")
 				return
 			}
@@ -758,7 +771,7 @@ tools, search settings, and other preferences to match the selected agent.`,
 				options = append(options, huh.NewOption(n, n))
 			}
 
-			err = huh.NewSelect[string]().
+			err := huh.NewSelect[string]().
 				Title("Select Agent").
 				Options(options...).
 				Value(&name).
@@ -770,7 +783,7 @@ tools, search settings, and other preferences to match the selected agent.`,
 			}
 		}
 
-		err := service.SwitchToAgent(name)
+		err := store.SetActiveAgent(name)
 		if err != nil {
 			fmt.Printf("Error switching to agent: %v\n", err)
 			return
@@ -786,26 +799,27 @@ var agentInfoCmd = &cobra.Command{
 	Short:   "Show detailed information about an agent",
 	Long:    `Display detailed configuration information for a specific agent.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		store := data.NewConfigStore()
 		var name string
 		if len(args) > 0 {
 			name = args[0]
 		} else {
 			// Default to active agent
-			name = service.GetCurrentAgentName()
-			if name == "unknown" {
+			name = store.GetActiveAgentName()
+			if name == "" {
 				fmt.Println("No active agent.")
 				return
 			}
 		}
 
-		agentConfig, err := service.GetAgent(name)
-		if err != nil {
-			fmt.Printf("Error getting agent info: %v\n", err)
+		agentConfig := store.GetAgent(name)
+		if agentConfig == nil {
+			fmt.Printf("Agent '%s' not found.\n", name)
 			return
 		}
 
 		fmt.Printf("Agent '%s' configuration:\n", name)
-		fmt.Println("==========================")
+		fmt.Println()
 
 		// Display configuration using the same formatting as add/set commands
 		printAgentConfigDetails(agentConfig, "  ")
@@ -829,134 +843,60 @@ func init() {
 	// For now, I'm focusing on the interactive requirement as primary.
 }
 
-// getToolsFromConfig extracts tools list from agent config, handling both bool and []string/[]interface{} types
-func getToolsFromConfig(config map[string]interface{}) []string {
-	if v, ok := config["tools"]; ok {
-		switch val := v.(type) {
-		case []string:
-			return val
-		case []interface{}:
-			result := make([]string, 0, len(val))
-			for _, item := range val {
-				if s, ok := item.(string); ok {
-					result = append(result, s)
-				}
-			}
-			return result
-		case bool:
-			if val {
-				// Legacy: if tools is true, return all tools
-				return service.GetAllEmbeddingTools()
-			}
-		}
-	}
-	return nil
-}
+// NOTE: getToolsFromConfig is no longer needed - data.AgentConfig.Tools is already []string
+// Legacy function removed in data layer refactoring
 
 // printAgentConfigDetails prints the agent details in a formatted way
-func printAgentConfigDetails(agent map[string]interface{}, spaceholder string) {
-	if name, exists := agent["name"]; exists {
-		fmt.Printf("%sName: %s\n", spaceholder, name)
+func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
+	if agent.Name != "" {
+		fmt.Printf("%sName: %s\n", spaceholder, agent.Name)
 	}
 
-	if model, exists := agent["model"]; exists {
-		fmt.Printf("%sModel: %s\n", spaceholder, decodeModelName(model.(string)))
+	if agent.Model.Name != "" {
+		fmt.Printf("%sModel: %s\n", spaceholder, agent.Model.Name)
 	}
 
-	if system, exists := agent["system_prompt"]; exists {
-		if sysPromptStr, ok := system.(string); ok && sysPromptStr != "" {
-			// Resolve system prompt reference for display (don't modify stored config)
-			resolvedSysPrompt := service.ResolveSystemPromptReference(sysPromptStr)
-			// Truncate if too long?
-			if len(resolvedSysPrompt) > 50 {
-				fmt.Printf("%sSystem Prompt: %s...\n", spaceholder, resolvedSysPrompt[:47])
-			} else {
-				fmt.Printf("%sSystem Prompt: %s\n", spaceholder, resolvedSysPrompt)
-			}
+	store := data.NewConfigStore()
+	if agent.SystemPrompt != "" {
+		resolvedSysPrompt := store.GetSystemPrompt(agent.SystemPrompt)
+		if len(resolvedSysPrompt) > 50 {
+			fmt.Printf("%sSystem Prompt: %s...\n", spaceholder, resolvedSysPrompt[:47])
 		} else {
-			fmt.Printf("%sSystem Prompt: \n", spaceholder)
+			fmt.Printf("%sSystem Prompt: %s\n", spaceholder, resolvedSysPrompt)
 		}
 	} else {
 		fmt.Printf("%sSystem Prompt: \n", spaceholder)
 	}
 
-	if template, exists := agent["template"]; exists {
-		if templateStr, ok := template.(string); ok && templateStr != "" {
-			// Resolve template reference for display (don't modify stored config)
-			resolvedTemplate := service.ResolveTemplateReference(templateStr)
-			if len(resolvedTemplate) > 50 {
-				fmt.Printf("%sTemplate: %s...\n", spaceholder, resolvedTemplate[:47])
-			} else {
-				fmt.Printf("%sTemplate: %s\n", spaceholder, resolvedTemplate)
-			}
+	if agent.Template != "" {
+		resolvedTemplate := store.GetTemplate(agent.Template)
+		if len(resolvedTemplate) > 50 {
+			fmt.Printf("%sTemplate: %s...\n", spaceholder, resolvedTemplate[:47])
 		} else {
-			fmt.Printf("%sTemplate: \n", spaceholder)
+			fmt.Printf("%sTemplate: %s\n", spaceholder, resolvedTemplate)
 		}
 	} else {
 		fmt.Printf("%sTemplate: \n", spaceholder)
 	}
 
-	if search, exists := agent["search"]; exists {
-		fmt.Printf("%sSearch: %s\n", spaceholder, search)
-	} else {
-		fmt.Printf("%sSearch: \n", spaceholder)
-	}
+	fmt.Printf("%sSearch: %s\n", spaceholder, agent.Search)
 
-	if tools, exists := agent["tools"]; exists {
-		// tools is []interface{}, we need to convert it to []string
-		toolsSlice := ""
-		// check tools type whether is []string or []interface{}
-		if toolsSet, ok := tools.([]string); ok {
-			for _, tool := range toolsSet {
-				toolsSlice += fmt.Sprintf("\n%s  - %s", spaceholder, tool)
-			}
-		} else if toolsSet, ok := tools.([]interface{}); ok {
-			for _, tool := range toolsSet {
-				toolsSlice += fmt.Sprintf("\n%s  - %s", spaceholder, tool.(string))
-			}
-		} else {
-			toolsSlice = ""
-		}
-		fmt.Printf("%sTools:%s\n", spaceholder, toolsSlice)
-	} else {
-		fmt.Printf("%sTools: \n", spaceholder)
+	toolsSlice := ""
+	for _, tool := range agent.Tools {
+		toolsSlice += fmt.Sprintf("\n%s  - %s", spaceholder, tool)
 	}
+	fmt.Printf("%sTools:%s\n", spaceholder, toolsSlice)
 
-	if mcp, exists := agent["mcp"]; exists {
-		fmt.Printf("%sMCP: %v\n", spaceholder, mcp)
-	} else {
-		fmt.Printf("%sMCP: false\n", spaceholder)
-	}
-
-	if usage, exists := agent["usage"]; exists {
-		fmt.Printf("%sUsage: %v\n", spaceholder, usage)
-	} else {
-		fmt.Printf("%sUsage: false\n", spaceholder)
-	}
-
-	if markdown, exists := agent["markdown"]; exists {
-		fmt.Printf("%sMarkdown: %v\n", spaceholder, markdown)
-	} else {
-		fmt.Printf("%sMarkdown: false\n", spaceholder)
-	}
-
-	if think, exists := agent["think"]; exists {
-		fmt.Printf("%sThink: %v\n", spaceholder, think)
-	} else {
-		fmt.Printf("%sThink: false\n", spaceholder)
-	}
-
-	if maxRecursions, exists := agent["max_recursions"]; exists {
-		fmt.Printf("%sMax Recursions: %v\n", spaceholder, maxRecursions)
-	} else {
-		fmt.Printf("%sMax Recursions: 0\n", spaceholder)
-	}
+	fmt.Printf("%sMCP: %v\n", spaceholder, agent.MCP)
+	fmt.Printf("%sUsage: %v\n", spaceholder, agent.Usage)
+	fmt.Printf("%sMarkdown: %v\n", spaceholder, agent.Markdown)
+	fmt.Printf("%sThink: %v\n", spaceholder, agent.Think)
+	fmt.Printf("%sMax Recursions: %d\n", spaceholder, agent.MaxRecursions)
 }
 
-func GetMaxRecursions() int {
-	maxRecursions := GetAgentInt("max_recursions")
-	if maxRecursions <= 0 {
-		maxRecursions = 10 // Default value
+func CheckAgentName(name string) error {
+	if strings.Contains(name, ".") {
+		return fmt.Errorf("agent name '%s' contains a dot, which is not allowed", name)
 	}
-	return maxRecursions
+	return nil
 }
