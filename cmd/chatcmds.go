@@ -194,9 +194,6 @@ func (ci *ChatInfo) showHelp() {
 func (ci *ChatInfo) showInfo() {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
-	sectionColor := color.New(color.FgCyan, color.Bold).SprintFunc()
-	keyColor := color.New(color.FgMagenta, color.Bold).SprintFunc()
-
 	printSection := func(title string) {
 		fmt.Println()
 		fullTitle := fmt.Sprintf("=== %s ===", strings.ToUpper(title))

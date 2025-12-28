@@ -8,7 +8,6 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/charmbracelet/huh"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -69,7 +68,6 @@ var editorSwitchCmd = &cobra.Command{
 			}
 
 			name = store.GetEditor()
-			highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
 
 			var options []huh.Option[string]
 			for _, ed := range installed {
@@ -194,10 +192,6 @@ func listAvailableEditors() {
 
 	commonEditors := []string{"vim", "vi", "nvim", "neovim", "nano", "pico", "emacs", "emacsclient", "code", "code-insiders", "subl", "sublime_text", "atom", "gedit", "pluma", "kate", "kwrite", "notepad.exe", "notepad++", "textedit"}
 
-	green := color.New(color.FgGreen).SprintFunc()
-	gray := color.New(color.FgHiBlack).SprintFunc()
-	highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
-
 	store := data.NewConfigStore()
 	current := store.GetEditor()
 
@@ -209,9 +203,9 @@ func listAvailableEditors() {
 				indicator = highlightColor("* ")
 				pname = highlightColor(pname)
 			}
-			fmt.Printf("%s%s %s\n", indicator, pname, green("(installed)"))
+			fmt.Printf("%s%s %s\n", indicator, pname, greenColor("(installed)"))
 		} else {
-			fmt.Printf("  %-14s %s\n", editor, gray("(not found)"))
+			fmt.Printf("  %-14s %s\n", editor, grayColor("(not found)"))
 		}
 	}
 

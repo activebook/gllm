@@ -7,7 +7,6 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/charmbracelet/huh"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -49,7 +48,6 @@ var systemListCmd = &cobra.Command{
 		}
 		sysPrompts := store.GetSystemPrompts()
 		activeSystem := activeAgent.SystemPrompt
-		highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
 
 		if len(sysPrompts) == 0 {
 			fmt.Println("No system prompts defined yet. Use 'gllm system add'.")
@@ -357,8 +355,6 @@ var systemSwitchCmd = &cobra.Command{
 
 			// Add "None" option
 			options = append(options, huh.NewOption("None", ""))
-
-			highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
 
 			for _, n := range names {
 				label := n

@@ -7,7 +7,6 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/charmbracelet/huh"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -44,7 +43,6 @@ var templateListCmd = &cobra.Command{
 		}
 		templates := store.GetTemplates()
 		activeTemplate := activeAgent.Template
-		highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
 
 		if len(templates) == 0 {
 			fmt.Println("No template prompts defined yet. Use 'gllm template add'.")
@@ -346,7 +344,6 @@ var templateSwitchCmd = &cobra.Command{
 			sort.Strings(names)
 
 			options = append(options, huh.NewOption("None", ""))
-			highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
 
 			for _, n := range names {
 				label := n

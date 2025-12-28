@@ -9,7 +9,6 @@ import (
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -68,8 +67,6 @@ var agentListCmd = &cobra.Command{
 		sort.Strings(names)
 
 		activeAgentName := store.GetActiveAgentName()
-
-		highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
 		// Display agents in a clean, simple list
 		for _, name := range names {
 			// change color for selected agent

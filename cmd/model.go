@@ -10,7 +10,6 @@ import (
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -68,7 +67,6 @@ var modelListCmd = &cobra.Command{
 	Aliases: []string{"ls"},
 	Short:   "List all set models",
 	Run: func(cmd *cobra.Command, args []string) {
-		highlightColor := color.New(color.FgGreen, color.Bold).SprintFunc()
 		store := data.NewConfigStore()
 		modelsMap := store.GetModels()
 

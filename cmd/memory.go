@@ -9,14 +9,7 @@ import (
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-)
-
-// Color definitions for memory command output
-var (
-	memoryHeaderColor = color.New(color.FgCyan, color.Bold).SprintFunc()
-	memoryItemColor   = color.New(color.FgGreen).SprintFunc()
 )
 
 var memoryCmd = &cobra.Command{

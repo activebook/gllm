@@ -2,19 +2,107 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/fatih/color"
+	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
+)
+
+var (
+	// Terminal ANSI colors (raw strings for direct concatenation)
+	switchOffColor string
+	switchOnColor  string
+	resetColor     string
+
+	cmdOutputColor string
+	cmdErrorColor  string
+
+	// Functional colors using SprintFunc
+	highlightColor func(a ...interface{}) string
+	sectionColor   func(a ...interface{}) string
+	keyColor       func(a ...interface{}) string
+
+	// Specialized UI colors
+	memoryHeaderColor func(a ...interface{}) string
+	memoryItemColor   func(a ...interface{}) string
+
+	// Helper colors
+	greenColor func(a ...interface{}) string
+	grayColor  func(a ...interface{}) string
 )
 
 func init() {
 	rootCmd.AddCommand(colorCmd)
+	setupColors()
+}
+
+func setupColors() {
+	p := termenv.ColorProfile()
+
+	// 1. Raw ANSI strings for concatenation
+	resetColor = "\033[0m"
+
+	if p == termenv.TrueColor {
+		// Vibrant TrueColor (24-bit)
+		switchOffColor = p.Color("#808080").Sequence(false) // Grey
+		switchOnColor = p.Color("#00FF7F").Sequence(false)  // Spring Green
+		cmdOutputColor = p.Color("#FFFFE0").Sequence(false) // Light Yellow
+		cmdErrorColor = p.Color("#FF69B4").Sequence(false)  // Hot Pink
+	} else if p >= termenv.ANSI256 {
+		// ANSI 256 Color (8-bit)
+		switchOffColor = "\033[38;5;244m"
+		switchOnColor = "\033[38;5;82m"
+		cmdOutputColor = "\033[38;5;187m"
+		cmdErrorColor = "\033[38;5;175m"
+	} else {
+		// Basic ANSI (4-bit)
+		switchOffColor = "\033[90m"
+		switchOnColor = "\033[92m"
+		cmdOutputColor = "\033[33m"
+		cmdErrorColor = "\033[35m"
+	}
+
+	// 2. Functional colors (SprintFunc style)
+	style := func(color string, bold bool) func(a ...interface{}) string {
+		return func(a ...interface{}) string {
+			s := termenv.String(fmt.Sprint(a...)).Foreground(p.Color(color))
+			if bold {
+				s = s.Bold()
+			}
+			return s.String()
+		}
+	}
+
+	if p == termenv.TrueColor {
+		highlightColor = style("#00FF7F", true)
+		sectionColor = style("#00CED1", true)
+		keyColor = style("#FF69B4", true)
+		memoryHeaderColor = style("#00BFFF", true)
+		memoryItemColor = style("#ADFF2F", false)
+		greenColor = style("#00FF00", false)
+		grayColor = style("#808080", false)
+	} else {
+		// Fallback to fatih/color for consistent basic/256 output
+		if p >= termenv.ANSI256 {
+			highlightColor = color.New(color.FgHiGreen, color.Bold).SprintFunc()
+			sectionColor = color.New(color.FgHiCyan, color.Bold).SprintFunc()
+			keyColor = color.New(color.FgHiMagenta, color.Bold).SprintFunc()
+		} else {
+			highlightColor = color.New(color.FgGreen, color.Bold).SprintFunc()
+			sectionColor = color.New(color.FgCyan, color.Bold).SprintFunc()
+			keyColor = color.New(color.FgMagenta, color.Bold).SprintFunc()
+		}
+		memoryHeaderColor = color.New(color.FgCyan, color.Bold).SprintFunc()
+		memoryItemColor = color.New(color.FgGreen).SprintFunc()
+		greenColor = color.New(color.FgGreen).SprintFunc()
+		grayColor = color.New(color.FgHiBlack).SprintFunc()
+	}
 }
 
 var colorCmd = &cobra.Command{
-	Use:   "color",
-	Short: "Test different colors of gllm output",
+	Use:    "color",
+	Hidden: true, // hidden from help
+	Short:  "Test different colors of gllm output",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("Terminal Color Support: ")
 		if supportsTrueColor() {
@@ -174,6 +262,5 @@ var colorCmd = &cobra.Command{
 }
 
 func supportsTrueColor() bool {
-	colorTerm := os.Getenv("COLORTERM")
-	return colorTerm == "truecolor" || colorTerm == "24bit"
+	return termenv.ColorProfile() == termenv.TrueColor
 }

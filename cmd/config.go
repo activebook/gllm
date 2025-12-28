@@ -10,7 +10,6 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -184,8 +183,6 @@ var configPrintCmd = &cobra.Command{
 	Long:    `Print all configuration including all LLM models, system prompts, and templates. and all default settings (e.g., default model, default system prompt, default template).`,
 	Run: func(cmd *cobra.Command, args []string) {
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-
-		sectionColor := color.New(color.FgCyan, color.Bold).SprintFunc()
 
 		printSection := func(title string) {
 			fmt.Println()
