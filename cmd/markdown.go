@@ -51,7 +51,7 @@ var markdownOnCmd = &cobra.Command{
 		}
 		agent.Markdown = true
 		if err := store.SetAgent(agent.Name, agent); err != nil {
-			service.Errorf("failed to save markdown format output: %w", err)
+			service.Errorf("failed to save markdown format output: %v", err)
 			return
 		}
 
@@ -71,7 +71,7 @@ var markdownOffCmd = &cobra.Command{
 		}
 		agent.Markdown = false
 		if err := store.SetAgent(agent.Name, agent); err != nil {
-			service.Errorf("failed to save markdown format output: %w", err)
+			service.Errorf("failed to save markdown format output: %v", err)
 			return
 		}
 

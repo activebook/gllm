@@ -51,7 +51,7 @@ var usageOnCmd = &cobra.Command{
 		}
 		agent.Usage = true
 		if err := store.SetAgent(agent.Name, agent); err != nil {
-			service.Errorf("failed to save usage format output: %w", err)
+			service.Errorf("failed to save usage format output: %v", err)
 			return
 		}
 
@@ -71,7 +71,7 @@ var usageOffCmd = &cobra.Command{
 		}
 		agent.Usage = false
 		if err := store.SetAgent(agent.Name, agent); err != nil {
-			service.Errorf("failed to save usage format output: %w", err)
+			service.Errorf("failed to save usage format output: %v", err)
 			return
 		}
 

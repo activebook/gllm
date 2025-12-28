@@ -292,7 +292,8 @@ func (c *ConfigStore) getModelFromAgentMap(m map[string]interface{}, key string)
 		modelsMap := c.v.GetStringMap("models")
 		if modelConfig, ok := modelsMap[name]; ok {
 			if configMap := toStringMap(modelConfig); configMap != nil {
-				return c.mapToModel(name, configMap)
+				model := c.mapToModel(name, configMap)
+				return model
 			}
 		}
 		// Return partial model if not found found (or just name)

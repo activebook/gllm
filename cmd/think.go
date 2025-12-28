@@ -44,7 +44,7 @@ var thinkOnCmd = &cobra.Command{
 		}
 		agent.Think = true
 		if err := store.SetAgent(agent.Name, agent); err != nil {
-			service.Errorf("failed to save think mode: %w", err)
+			service.Errorf("failed to save think mode: %v", err)
 			return
 		}
 
@@ -66,7 +66,7 @@ var thinkOffCmd = &cobra.Command{
 		}
 		agent.Think = false
 		if err := store.SetAgent(agent.Name, agent); err != nil {
-			service.Errorf("failed to save think mode: %w", err)
+			service.Errorf("failed to save think mode: %v", err)
 			return
 		}
 

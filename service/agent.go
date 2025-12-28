@@ -67,8 +67,13 @@ type Agent struct {
 
 func constructModelInfo(model *data.Model) *ModelInfo {
 	mi := ModelInfo{}
-	mi.ModelName = model.Name
-	mi.Provider = model.Provider
+	provider := model.Provider
+	if provider == "" {
+		// Auto-detect provider if not set
+		provider = DetectModelProvider(model.Endpoint, model.Model)
+	}
+	mi.ModelName = model.Model
+	mi.Provider = provider
 	mi.EndPoint = model.Endpoint
 	mi.ApiKey = model.Key
 	mi.Temperature = model.Temp

@@ -33,19 +33,19 @@ func InitLogger() {
 
 func Infof(format string, args ...interface{}) {
 	if logger != nil {
-		logger.Infof(cyanColor+format+resetColor, args...)
+		logger.Infof(format, args...)
 	}
 }
 
 func Successf(format string, args ...interface{}) {
 	if logger != nil {
-		logger.Infof(completeColor+format+resetColor, args...)
+		logger.Infof(format, args...)
 	}
 }
 
 func Debugf(format string, args ...interface{}) {
 	if logger != nil {
-		logger.Debugf(debugColor+format+resetColor, args...)
+		logger.Debugf(format, args...)
 	}
 }
 
@@ -57,7 +57,7 @@ func Debugln(args ...interface{}) {
 
 func Warnf(format string, args ...interface{}) {
 	if logger != nil {
-		logger.Warnf(warnColor+format+resetColor, args...)
+		logger.Warnf(format, args...)
 	}
 }
 
@@ -69,7 +69,7 @@ func Warnln(args ...interface{}) {
 
 func Errorf(format string, args ...interface{}) {
 	if logger != nil {
-		logger.Errorf(errorColor+format+resetColor, args...)
+		logger.Errorf(format, args...)
 	}
 }
 
