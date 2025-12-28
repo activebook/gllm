@@ -43,20 +43,23 @@ var (
 	booleanFalseColor  string
 	workflowResetColor string
 
-	// Serializer colors
-	messageColor      string
-	systemColor       string
-	userColor         string
-	assistantColor    string
-	modelColorSer     string // Rename to avoid conflict with workflow modelColor
-	functionColor     string
-	toolColor         string
-	functionCallColor string
-	functionRespColor string
-	imageColor        string
-	fileDataColor     string
-	ResetColor        string
-	GrayColor         string
+	// Role colors for logs/serialization (semantic naming)
+	roleSystemColor    string
+	roleUserColor      string
+	roleAssistantColor string
+	toolCallColor      string
+	toolResponseColor  string
+	mediaColor         string
+)
+
+const (
+	// Hex codes for consistency across components
+	hexRoleSystem    = "#FFA726" // Amber
+	hexRoleUser      = "#66BB6A" // Muted Green
+	hexRoleAssistant = "#42A5F5" // Soft Blue
+	hexToolCall      = "#26C6DA" // Muted Cyan (consistent with agent.go title)
+	hexToolResponse  = "#9575CD" // Muted Purple
+	hexMedia         = "#26A69A" // Teal
 )
 
 func init() {
@@ -67,20 +70,37 @@ func setupColors() {
 	p := termenv.ColorProfile()
 	resetColor = "\033[0m"
 
-	if p == termenv.TrueColor {
-		errorColor = p.Color("#FF4500").Sequence(false)   // Orangered
-		successColor = p.Color("#32CD32").Sequence(false) // Limegreen
-		warnColor = p.Color("#FF8C00").Sequence(false)    // DarkOrange
-		infoColor = p.Color("#00CED1").Sequence(false)    // DarkCyan
-		debugColor = p.Color("#1E90FF").Sequence(false)   // DodgerBlue
+	// Helper to get full ANSI sequence for foreground color
+	fgSeq := func(hex string) string {
+		c := p.Color(hex)
+		if c == nil {
+			return ""
+		}
+		return "\033[" + c.Sequence(false) + "m"
+	}
 
-		cyanColor = p.Color("#00FFFF").Sequence(false)
-		bbColor = p.Color("#696969").Sequence(false)     // DimGray
-		hiBlueColor = p.Color("#00BFFF").Sequence(false) // DeepSkyBlue
+	if p == termenv.TrueColor {
+		errorColor = fgSeq("#FF4500")   // Orangered
+		successColor = fgSeq("#32CD32") // Limegreen
+		warnColor = fgSeq("#FF8C00")    // DarkOrange
+		infoColor = fgSeq("#00CED1")    // DarkCyan
+		debugColor = fgSeq("#1E90FF")   // DodgerBlue
+
+		cyanColor = fgSeq("#00FFFF")
+		bbColor = fgSeq("#696969")     // DimGray
+		hiBlueColor = fgSeq("#00BFFF") // DeepSkyBlue
 		dimColor = "\033[2m"
-		greyColor = p.Color("#808080").Sequence(false)
-		purpleColor = p.Color("#9370DB").Sequence(false) // MediumPurple
-		yellowColor = p.Color("#FFD700").Sequence(false) // Gold
+		greyColor = fgSeq("#808080")
+		purpleColor = fgSeq("#9370DB") // MediumPurple
+		yellowColor = fgSeq("#FFD700") // Gold
+
+		// Role colors (Muted & Professional)
+		roleSystemColor = fgSeq(hexRoleSystem)
+		roleUserColor = fgSeq(hexRoleUser)
+		roleAssistantColor = fgSeq(hexRoleAssistant)
+		toolCallColor = fgSeq(hexToolCall)
+		toolResponseColor = fgSeq(hexToolResponse)
+		mediaColor = fgSeq(hexMedia)
 	} else if p >= termenv.ANSI256 {
 		errorColor = "\033[31m"
 		successColor = "\033[32m"
@@ -95,6 +115,13 @@ func setupColors() {
 		greyColor = "\033[38;5;240m"
 		purpleColor = "\033[38;5;141m"
 		yellowColor = "\033[33m"
+
+		roleSystemColor = "\033[38;5;214m"   // Orange/Gold
+		roleUserColor = "\033[38;5;71m"      // Greenish
+		roleAssistantColor = "\033[38;5;75m" // Blueish
+		toolCallColor = "\033[38;5;80m"      // Cyan-ish
+		toolResponseColor = "\033[38;5;141m" // Purple-ish
+		mediaColor = "\033[38;5;37m"         // Teal/Cyan
 	} else {
 		errorColor = "\033[31m"
 		successColor = "\033[32m"
@@ -109,6 +136,13 @@ func setupColors() {
 		greyColor = "\033[90m"
 		purpleColor = "\033[35m"
 		yellowColor = "\033[33m"
+
+		roleSystemColor = "\033[33m"    // Yellow
+		roleUserColor = "\033[32m"      // Green
+		roleAssistantColor = "\033[34m" // Blue
+		toolCallColor = "\033[35m"      // Magenta
+		toolResponseColor = "\033[35m"  // Magenta
+		mediaColor = "\033[36m"         // Cyan
 	}
 
 	boldColor = "\033[1m"
@@ -128,19 +162,4 @@ func setupColors() {
 	booleanTrueColor = "\033[92m"  // Bright Green
 	booleanFalseColor = "\033[90m" // Bright Black
 	workflowResetColor = "\033[0m" // Reset
-
-	// Serializer colors (TrueColor)
-	messageColor = "\033[38;2;255;255;0m"      // Bright Yellow
-	systemColor = "\033[38;2;255;215;0m"       // Gold
-	userColor = "\033[38;2;0;255;0m"           // Lime
-	assistantColor = "\033[38;2;0;0;255m"      // Blue
-	modelColorSer = "\033[38;2;0;0;255m"       // Blue
-	functionColor = "\033[38;2;0;255;255m"     // Cyan
-	toolColor = "\033[38;2;0;255;255m"         // Cyan
-	functionCallColor = "\033[38;2;255;0;255m" // Magenta
-	functionRespColor = "\033[38;2;255;0;255m" // Magenta
-	imageColor = "\033[38;2;255;0;0m"          // Red
-	fileDataColor = "\033[38;2;255;0;0m"       // Red
-	ResetColor = "\033[0m"                     // Reset
-	GrayColor = "\033[38;2;128;128;128m"       // Gray
 }

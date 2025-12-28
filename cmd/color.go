@@ -252,17 +252,17 @@ var colorCmd = &cobra.Command{
 				name string
 				seq  string
 			}{
-				{"Orangered", "\033[38;2;255;69;0m"},
-				{"Limegreen", "\033[38;2;50;205;50m"},
-				{"DarkOrange", "\033[38;2;255;140;0m"},
-				{"DarkCyan", "\033[38;2;0;206;209m"},
-				{"DodgerBlue", "\033[38;2;30;144;255m"},
-				{"Cyan", "\033[38;2;0;255;255m"},
-				{"DimGray", "\033[38;2;105;105;105m"},
-				{"DeepSkyBlue", "\033[38;2;0;191;255m"},
-				{"Gray", "\033[38;2;128;128;128m"},
-				{"MediumPurple", "\033[38;2;147;112;219m"},
-				{"Gold", "\033[38;2;255;215;0m"},
+				{"RoleSystem", "\033[38;2;255;167;38m"},    // #FFA726
+				{"RoleUser", "\033[38;2;102;187;106m"},     // #66BB6A
+				{"RoleAssistant", "\033[38;2;66;165;245m"}, // #42A5F5
+				{"ToolCall", "\033[38;2;38;198;218m"},      // #26C6DA
+				{"ToolResponse", "\033[38;2;149;117;205m"}, // #9575CD
+				{"Media", "\033[38;2;38;166;154m"},         // #26A69A
+				{"Success", "\033[38;2;50;205;50m"},        // Limegreen
+				{"Error", "\033[38;2;255;69;0m"},           // Orangered
+				{"Gray", "\033[38;2;128;128;128m"},         // Gray
+				{"Purple", "\033[38;2;147;112;219m"},       // MediumPurple
+				{"Gold", "\033[38;2;255;215;0m"},           // Gold
 			}
 			for _, tc := range testColors {
 				fmt.Printf("%s%s%s ", tc.seq, tc.name, "\033[0m")

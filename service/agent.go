@@ -496,12 +496,12 @@ func (ag *Agent) WriteFunctionCall(text string) {
 			// Use lipgloss to render
 			style := lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color("63")). // Purple/Blue-ish
+				BorderForeground(lipgloss.Color(hexToolResponse)).
 				Padding(0, 1).
 				Margin(0, 0)
 
 			titleStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("86")). // Cyan
+				Foreground(lipgloss.Color(hexToolCall)).
 				Bold(true)
 
 			argsStyle := lipgloss.NewStyle().

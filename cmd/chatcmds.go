@@ -176,7 +176,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /template, /p [subcmd] - Manage templates (list, switch, add, etc.)")
 	fmt.Println("  /system, /S [subcmd] - Manage system prompts (list, switch, add, etc.)")
 	fmt.Println("  /search, /s [subcmd] - Manage search engines (list, switch, etc.)")
-	fmt.Println("  /tools, /t [on|off|skip|confirm] - Manage embedding tools")
+	fmt.Println("  /tools, /t [on|off] - Manage embedding tools")
 	fmt.Println("  /mcp [subcmd] - Manage MCP servers (on, off, list, etc.)")
 	fmt.Println("  /memory, /y [subcmd] - Manage memory (list, add, clear)")
 	fmt.Println("  /convo, /c [subcmd] - Manage conversations (list, info, remove, etc.)")
