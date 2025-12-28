@@ -37,7 +37,7 @@ func GetMcpFilePath() string {
 
 // GetMemoryFilePath returns the path to the memory file.
 func GetMemoryFilePath() string {
-	return filepath.Join(GetConfigDir(), "memory.json")
+	return filepath.Join(GetConfigDir(), "context.md")
 }
 
 // GetConvoDirPath returns the path to the conversation directory.
