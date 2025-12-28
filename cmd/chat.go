@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
@@ -25,38 +26,33 @@ have a continuous conversation with the model.`,
 		indicator := service.NewIndicator("Processing...")
 
 		var chatInfo *ChatInfo
+		store := data.NewConfigStore()
+
+		// If conversation flag is not provided, generate a new conversation name
+		if !cmd.Flags().Changed("conversation") {
+			convoName = GenerateChatFileName()
+		}
+
+		// If agent flag is provided, update the default agent
+		if cmd.Flags().Changed("agent") {
+			if store.GetAgent(agentName) == nil {
+				service.Warnf("Agent %s does not exist", agentName)
+				return
+			}
+			store.SetActiveAgent(agentName)
+		}
+
+		// Get active agent
+		activeAgent := store.GetActiveAgent()
+		if activeAgent == nil {
+			service.Warnf("No active agent found")
+			return
+		}
+
 		files := []*service.FileData{}
 		// Start a goroutine for your actual LLM work
 		done := make(chan bool)
 		go func() {
-
-			store := data.NewConfigStore()
-
-			// If agent flag is provided, update the default agent
-			if cmd.Flags().Changed("agent") {
-				if store.GetAgent(agentName) == nil {
-					service.Warnf("Agent %s does not exist", agentName)
-					return
-				}
-				store.SetActiveAgent(agentName)
-			}
-
-			// Get active agent
-			activeAgent := store.GetActiveAgent()
-			if activeAgent == nil {
-				service.Warnf("No active agent found")
-				return
-			}
-			// Build the ChatInfo object
-			chatInfo = buildChatInfo(activeAgent, files)
-			if chatInfo == nil {
-				return
-			}
-
-			// Always save a conversation file regardless of the flag
-			if !cmd.Flags().Changed("conversation") {
-				convoName = GenerateChatFileName()
-			}
 
 			// Process all prompt building
 			if cmd.Flags().Changed("attachment") {
@@ -73,6 +69,12 @@ have a continuous conversation with the model.`,
 		// Update the spinner until work is done
 		<-done
 		indicator.Stop()
+
+		// Build the ChatInfo object
+		chatInfo = buildChatInfo(activeAgent, files)
+		if chatInfo == nil {
+			return
+		}
 
 		// Start the REPL
 		chatInfo.startREPL()
@@ -101,7 +103,7 @@ func init() {
 type ChatInfo struct {
 	ModelProvider string
 	Files         []*service.FileData
-	Conversion    service.ConversationManager
+	ConvoMgr      service.ConversationManager
 	QuitFlag      bool   // for cmd /quit or /exit
 	EditorInput   string // for /e editor edit
 	outputFile    string
@@ -122,6 +124,13 @@ func buildChatInfo(agent *data.AgentConfig, files []*service.FileData) *ChatInfo
 		convoName = name
 	}
 
+	// Bugfix: Auto-detect provider if not set
+	// Legacy models don't have provider set
+	if agent.Model.Provider == "" {
+		service.Debugf("Auto-detecting provider for %s", agent.Model.Model)
+		agent.Model.Provider = service.DetectModelProvider(agent.Model.Endpoint, agent.Model.Model)
+	}
+
 	// Construct conversation manager
 	cm, err := service.ConstructConversationManager(convoName, agent.Model.Provider)
 	if err != nil {
@@ -132,7 +141,7 @@ func buildChatInfo(agent *data.AgentConfig, files []*service.FileData) *ChatInfo
 	ci := ChatInfo{
 		ModelProvider: agent.Model.Provider,
 		Files:         files,
-		Conversion:    cm,
+		ConvoMgr:      cm,
 		QuitFlag:      false,
 	}
 	return &ci
@@ -400,4 +409,14 @@ func (ci *ChatInfo) executeShellCommand(command string) {
 		fmt.Printf(cmdOutputColor+"%s\n"+resetColor, output)
 	}
 	fmt.Print(resetColor) // Reset color after command output
+}
+
+func GenerateChatFileName() string {
+	// Get the current time
+	currentTime := time.Now()
+
+	// Format the time as a string in the format "chat_YYYY-MM-DD_HH-MM-SS.json"
+	filename := fmt.Sprintf("chat_%s", currentTime.Format("2006-01-02_15-04-05"))
+
+	return filename
 }

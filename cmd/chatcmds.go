@@ -11,7 +11,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/activebook/gllm/service"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -243,12 +242,12 @@ func (ci *ChatInfo) showInfo() {
 		fmt.Println("Attachments: None")
 	}
 
-	fmt.Println(color.New(color.FgCyan, color.Bold).Sprint(strings.Repeat("=", 50)))
+	fmt.Println()
 }
 
 // showHistory displays conversation history
 func (ci *ChatInfo) showHistory(num int, chars int) {
-	convoPath := ci.Conversion.GetPath()
+	convoPath := ci.ConvoMgr.GetPath()
 
 	// Check if conversation exists
 	if _, err := os.Stat(convoPath); os.IsNotExist(err) {
@@ -280,7 +279,7 @@ func (ci *ChatInfo) showHistory(num int, chars int) {
 // clearContext clears the conversation context
 func (ci *ChatInfo) clearContext() {
 	// Empty the conversation history
-	err := ci.Conversion.Clear()
+	err := ci.ConvoMgr.Clear()
 	if err != nil {
 		service.Errorf("Error clearing context: %v\n", err)
 		return

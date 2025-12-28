@@ -107,6 +107,10 @@ var searchSwitchCmd = &cobra.Command{
 		} else {
 			fmt.Printf("Switched search engine to: %s\n", engine)
 		}
+
+		// List search tools
+		fmt.Println()
+		ListSearchTools()
 		return nil
 	},
 }

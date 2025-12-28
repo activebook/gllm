@@ -16,11 +16,7 @@ import (
 
 var (
 	versionFlag bool // To hold the version flag value
-
-	cfgFile           string // To hold the path to the config file if specified via flag
-	appConfigDir      string // Store the calculated config directory path
-	appConfigFilePath string // Store the calculated config file path
-	debugMode         bool   // Flag to enable debug logging
+	debugMode   bool // Flag to enable debug logging
 
 	// Global logger instance, configured by setupLogging
 	logger = service.GetLogger()

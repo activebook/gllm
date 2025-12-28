@@ -133,8 +133,7 @@ func ConstructConversationManager(convoName string, provider string) (Conversati
 		return &convo, nil
 
 	default:
-		convo := BaseConversation{}
-		return &convo, nil
+		return nil, fmt.Errorf("unknown provider: %s", provider)
 	}
 }
 

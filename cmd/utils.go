@@ -10,7 +10,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/bubbles/key"
@@ -120,16 +119,6 @@ func StartsWith(s string, prefix string) bool {
 
 func RemoveFirst(s string, prefix string) string {
 	return strings.TrimPrefix(s, prefix)
-}
-
-func GenerateChatFileName() string {
-	// Get the current time
-	currentTime := time.Now()
-
-	// Format the time as a string in the format "chat_YYYY-MM-DD_HH-MM-SS.json"
-	filename := fmt.Sprintf("chat_%s", currentTime.Format("2006-01-02_15-04-05"))
-
-	return filename
 }
 
 // convertUserInputToBool converts user-friendly strings to boolean values
