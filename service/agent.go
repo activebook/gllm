@@ -84,21 +84,17 @@ func constructModelInfo(model *data.Model) *ModelInfo {
 
 func constructSearchEngine(searchEngine *data.SearchEngine) *SearchEngine {
 	se := SearchEngine{}
+	se.Name = GetNoneSearchEngineName()
 	se.UseSearch = false
-	if searchEngine != nil {
+	if searchEngine != nil && searchEngine.Name != "" && searchEngine.Name != GetNoneSearchEngineName() {
 		se.UseSearch = true
 		se.Name = searchEngine.Name
-		if se.Name == "" {
-			se.UseSearch = false
-		}
 		se.ApiKey = searchEngine.Config["key"]
-		if se.ApiKey == "" && se.Name != "none" {
-			se.UseSearch = false
-		}
 		se.CxKey = searchEngine.Config["cx"]
 		se.DeepDive = searchEngine.DeepDive
 		se.MaxReferences = searchEngine.Reference
 	}
+	Debugf("Search engine: %v, %v", se.Name, se.UseSearch)
 	return &se
 }
 

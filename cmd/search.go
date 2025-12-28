@@ -121,10 +121,18 @@ var searchSetCmd = &cobra.Command{
 	Short: "Configure a search engine",
 	Long:  `Configure API keys and settings for a specific search engine (google, bing, tavily).`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		store := data.NewConfigStore()
 		var engine string
 		if len(args) > 0 {
 			engine = args[0]
 		} else {
+			activeAgent := store.GetActiveAgent()
+			if activeAgent != nil {
+				engine = activeAgent.Search.Name
+				if engine == "" {
+					engine = service.NoneSearchEngine
+				}
+			}
 			// Select engine to configure
 			err := huh.NewSelect[string]().
 				Title("Select Search Engine to Configure").
@@ -141,7 +149,6 @@ var searchSetCmd = &cobra.Command{
 		}
 
 		// Get all search engines
-		store := data.NewConfigStore()
 		engines := store.GetSearchEngines()
 		engineConfig := engines[engine]
 		if engineConfig == nil {
