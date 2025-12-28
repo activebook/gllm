@@ -90,6 +90,9 @@ func (m *MCPStore) Load() (map[string]*MCPServer, []string, error) {
 	// Convert to strongly-typed MCPServer structs
 	servers := make(map[string]*MCPServer)
 	for name, raw := range config.MCPServers {
+		if raw.Type == "" {
+			raw.Type = "stdio"
+		}
 		servers[name] = &MCPServer{
 			Name:        name,
 			Command:     raw.Command,
@@ -328,6 +331,9 @@ func (m *MCPStore) LoadFromPath(path string) (map[string]*MCPServer, []string, e
 
 	servers := make(map[string]*MCPServer)
 	for name, raw := range config.MCPServers {
+		if raw.Type == "" {
+			raw.Type = "stdio"
+		}
 		servers[name] = &MCPServer{
 			Name:        name,
 			Command:     raw.Command,

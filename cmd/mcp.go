@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/activebook/gllm/data"
@@ -35,10 +36,9 @@ Switch on/off to enable/disable all mcp servers`,
 }
 
 var mcpLoadCmd = &cobra.Command{
-	Use:     "load",
-	Aliases: []string{"ls", "show", "pr"},
-	Short:   "List all available MCP tools",
-	Long:    `Lists all tools available from configured MCP servers.`,
+	Use:   "load",
+	Short: "List all available MCP tools",
+	Long:  `Lists all tools available from configured MCP servers.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		all, _ := cmd.Flags().GetBool("all")
 		prompts, _ := cmd.Flags().GetBool("prompts")
@@ -84,7 +84,6 @@ var mcpLoadCmd = &cobra.Command{
 		}
 
 		fmt.Println("Available MCP Servers:")
-		fmt.Println()
 
 		for _, server := range servers {
 			status := switchOffColor + "Blocked" + resetColor
@@ -468,9 +467,10 @@ var mcpRemoveCmd = &cobra.Command{
 }
 
 var mcpListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List MCP servers",
-	Long:  `List all MCP servers in the configuration.`,
+	Use:     "list",
+	Aliases: []string{"ls", "show", "pr"},
+	Short:   "List MCP servers",
+	Long:    `List all MCP servers in the configuration.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		store := data.NewMCPStore()
 		servers, _, err := store.Load()
@@ -479,10 +479,36 @@ var mcpListCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Println("MCP servers:")
-		for name, server := range servers {
-			fmt.Printf("  %s: %s %t\n", name, server.Type, server.Allowed)
+		if len(servers) == 0 {
+			fmt.Println("No MCP servers defined.")
+			return
 		}
+
+		fmt.Println("MCP servers:")
+
+		// Sort keys for consistent output
+		names := make([]string, 0, len(servers))
+		for name := range servers {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+
+		for _, name := range names {
+			server := servers[name]
+			indicator := "  "
+			pname := fmt.Sprintf("%-18s", name)
+			status := grayColor("(blocked)")
+
+			if server.Allowed {
+				indicator = highlightColor("* ")
+				pname = highlightColor(pname)
+				status = greenColor("(allowed)")
+			}
+
+			fmt.Printf("%s%s [%s] %s\n", indicator, pname, center(server.Type, 7), status)
+		}
+
+		fmt.Printf("\n(*) Indicates the allowed MCP server.\n")
 	},
 }
 
@@ -557,6 +583,17 @@ var mcpPathCmd = &cobra.Command{
 			fmt.Printf("MCP configuration file location: %s\n", configPath)
 		}
 	},
+}
+
+// center centers a string within a given width by adding spaces
+func center(s string, width int) string {
+	if len(s) > width {
+		return s
+	}
+	totalPad := width - len(s)
+	leftPad := totalPad / 2
+	rightPad := totalPad - leftPad
+	return strings.Repeat(" ", leftPad) + s + strings.Repeat(" ", rightPad)
 }
 
 func init() {
