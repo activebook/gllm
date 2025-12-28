@@ -659,9 +659,15 @@ func getFloat(m map[string]interface{}, key string, defaultVal float32) float32 
 
 func getPtrInt(m map[string]interface{}, key string) *int32 {
 	switch v := m[key].(type) {
+	case int:
+		vv := int32(v)
+		return &vv
 	case int32:
 		return &v
 	case int64:
+		vv := int32(v)
+		return &vv
+	case float64:
 		vv := int32(v)
 		return &vv
 	}

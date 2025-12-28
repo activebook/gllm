@@ -146,7 +146,7 @@ Example:
   gllm model add --name gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name, _ := cmd.Flags().GetString("name")
-		modelProvider, _ := cmd.Flags().GetString("provider")
+		provider, _ := cmd.Flags().GetString("provider")
 		endpoint, _ := cmd.Flags().GetString("endpoint")
 		key, _ := cmd.Flags().GetString("key")
 		model, _ := cmd.Flags().GetString("model")
@@ -157,8 +157,7 @@ Example:
 		store := data.NewConfigStore()
 
 		// Interactive mode if critical flags are missing
-		if name == "" || endpoint == "" || key == "" || model == "" {
-			var provider string
+		if name == "" || provider == "" || endpoint == "" || key == "" || model == "" {
 
 			// 1. Name
 			if name == "" {
@@ -223,8 +222,6 @@ Example:
 				defaultEndpoint = "https://openrouter.ai/api/v1"
 				defaultModel = "deepseek-r1"
 			}
-			// Update provider
-			modelProvider = provider
 
 			// 3. Endpoint, Key, Model ID
 			err = huh.NewForm(
@@ -334,7 +331,7 @@ Example:
 
 		// Create new model config
 		newModel := data.Model{
-			Provider: modelProvider,
+			Provider: provider,
 			Endpoint: endpoint,
 			Key:      key,
 			Model:    model,
@@ -501,6 +498,7 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 			modelConfig.Endpoint = endpoint
 			modelConfig.Key = key
 			modelConfig.Model = model
+			modelConfig.Provider = provider
 
 			if t, err := strconv.ParseFloat(tempStr, 32); err == nil {
 				modelConfig.Temp = float32(t)
@@ -527,6 +525,16 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 			}
 			if model, err := cmd.Flags().GetString("model"); err == nil && model != "" {
 				modelConfig.Model = model
+			}
+			if temp, err := cmd.Flags().GetFloat32("temp"); err == nil && temp != 0 {
+				modelConfig.Temp = temp
+			}
+			if topP, err := cmd.Flags().GetFloat32("top_p"); err == nil && topP != 0 {
+				modelConfig.TopP = topP
+			}
+			if seed, err := cmd.Flags().GetInt("seed"); err == nil && seed != 0 {
+				i32 := int32(seed)
+				modelConfig.Seed = &i32
 			}
 		}
 
