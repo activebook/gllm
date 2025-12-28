@@ -32,7 +32,7 @@ func GetConfigFilePath() string {
 
 // GetMcpFilePath returns the path to the mcp file.
 func GetMcpFilePath() string {
-	return filepath.Join(GetConfigDir(), "mcp.yaml")
+	return filepath.Join(GetConfigDir(), "mcp.json")
 }
 
 // GetMemoryFilePath returns the path to the memory file.
