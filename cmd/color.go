@@ -44,10 +44,10 @@ func setupColors() {
 
 	if p == termenv.TrueColor {
 		// Vibrant TrueColor (24-bit)
-		switchOffColor = p.Color("#808080").Sequence(false) // Grey
-		switchOnColor = p.Color("#00FF7F").Sequence(false)  // Spring Green
-		cmdOutputColor = p.Color("#FFFFE0").Sequence(false) // Light Yellow
-		cmdErrorColor = p.Color("#FF69B4").Sequence(false)  // Hot Pink
+		switchOffColor = "\033[38;2;128;128;128m" // Grey #808080
+		switchOnColor = "\033[38;2;0;255;127m"    // Spring Green #00FF7F
+		cmdOutputColor = "\033[38;2;255;255;224m" // Light Yellow #FFFFE0
+		cmdErrorColor = "\033[38;2;255;105;180m"  // Hot Pink #FF69B4
 	} else if p >= termenv.ANSI256 {
 		// ANSI 256 Color (8-bit)
 		switchOffColor = "\033[38;5;244m"
