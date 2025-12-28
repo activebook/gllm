@@ -505,7 +505,7 @@ var mcpListCmd = &cobra.Command{
 				status = greenColor("(allowed)")
 			}
 
-			fmt.Printf("%s%s [%s] %s\n", indicator, pname, center(server.Type, 7), status)
+			fmt.Printf("%s%s %-7s %s\n", indicator, pname, server.Type, status)
 		}
 
 		fmt.Printf("\n(*) Indicates the allowed MCP server.\n")
