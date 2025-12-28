@@ -195,6 +195,7 @@ Example:
 				huh.NewGroup(
 					huh.NewSelect[string]().
 						Title("Provider").
+						Description("Select the provider for the model.\nps. OpenAI Compatible means the model is compatible with OpenAI API, e.g. OpenRouter, Chinese Models, etc.").
 						Options(
 							huh.NewOption("OpenAI", service.ModelProviderOpenAI),
 							huh.NewOption("Anthropic", service.ModelProviderAnthropic),

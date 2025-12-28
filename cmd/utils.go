@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -16,7 +15,6 @@ import (
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/huh"
-	"github.com/ergochat/readline"
 )
 
 // readStdin checks if there's piped input and reads it
@@ -86,48 +84,6 @@ func readContentFromPath(source string) ([]byte, error) {
 		return []byte(datas[0]), nil
 	}
 	return os.ReadFile(source)
-}
-
-func validFilePath(filename string, force_overwritten bool) error {
-
-	var err error
-	// Check if file already exists
-	if _, err := os.Stat(filename); err == nil && !force_overwritten {
-		// File exists, ask for confirmation to overwrite
-		rl, err := readline.New("")
-		if err != nil {
-			return fmt.Errorf("error initializing readline: %v", err)
-		}
-		defer rl.Close()
-
-		// Use readline's prompt
-		rl.SetPrompt(fmt.Sprintf("File %s already exists. Do you want to overwrite it? (y/N): ", filename))
-
-		input, err := rl.Readline()
-		if err != nil {
-			return fmt.Errorf("error reading input: %v", err)
-		}
-		response := strings.ToLower(strings.TrimSpace(input))
-		if response != "y" && response != "yes" {
-			return fmt.Errorf("%s", "file not set. keeping current output file.")
-		}
-	} else if !os.IsNotExist(err) {
-		// There was an error checking the file (other than not existing)
-		return fmt.Errorf("error checking file %s: %v", filename, err)
-	}
-
-	// Try to create the file to check if we can write to it
-	dir := filepath.Dir(filename)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("error creating directory for %s: %v", filename, err)
-	}
-
-	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		return fmt.Errorf("error creating/opening file %s: %v", filename, err)
-	}
-	file.Close()
-	return nil
 }
 
 func createTempFile(pattern string) (string, error) {

@@ -249,8 +249,21 @@ func processQuery(prompt string, files []*service.FileData) {
 		yolo = true
 	}
 
-	// Call your LLM service here
+	// Get system prompt
 	sys_prompt := store.GetSystemPrompt(activeAgent.SystemPrompt)
+
+	// Get memory content
+	memStore := data.NewMemoryStore()
+	memoryContent := memStore.GetFormatted()
+	if memoryContent != "" {
+		sys_prompt += "\n\n" + memoryContent
+	}
+
+	// Load MCP config
+	mcpStore := data.NewMCPStore()
+	mcpConfig, _, _ := mcpStore.Load()
+
+	// Call your LLM service here
 	op := service.AgentOptions{
 		Prompt:         prompt,
 		SysPrompt:      sys_prompt,
@@ -267,6 +280,7 @@ func processQuery(prompt string, files []*service.FileData) {
 		OutputFile:     "",
 		QuietMode:      false,
 		ConvoName:      convoName,
+		MCPConfig:      mcpConfig,
 	}
 	err := service.CallAgent(&op)
 	if err != nil {

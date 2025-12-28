@@ -43,6 +43,15 @@ var mcpLoadCmd = &cobra.Command{
 		all, _ := cmd.Flags().GetBool("all")
 		prompts, _ := cmd.Flags().GetBool("prompts")
 		resources, _ := cmd.Flags().GetBool("resources")
+
+		// Load config from data store
+		store := data.NewMCPStore()
+		mcpConfig, _, err := store.Load()
+		if err != nil {
+			fmt.Printf("Error loading MCP config: %v\n", err)
+			return
+		}
+
 		// here we don't need to use the shared instance
 		// because we just need to check the available servers and tools
 		// not making any calls to the servers
@@ -56,7 +65,7 @@ var mcpLoadCmd = &cobra.Command{
 		}
 		indicator := service.NewIndicator("")
 		indicator.Start("MCP Loading...")
-		err := client.Init(service.MCPLoadOption{
+		err = client.Init(mcpConfig, service.MCPLoadOption{
 			LoadAll:       all,
 			LoadTools:     true,
 			LoadResources: resources,
@@ -215,39 +224,19 @@ var mcpAddCmd = &cobra.Command{
 			}
 		}
 
-		// Load existing config
-		config, err := service.LoadMCPServers()
-		if err != nil {
-			fmt.Printf("Error loading MCP config: %v\n", err)
-			return
-		}
-
-		// Initialize config if nil
-		if config == nil {
-			config = &service.MCPConfig{
-				MCPServers:      make(map[string]service.MCPServerConfig),
-				AllowMCPServers: []string{},
-			}
-		}
-
-		// Check if server already exists
-		if _, exists := config.MCPServers[name]; exists {
-			fmt.Printf("Error: MCP server '%s' already exists. Use 'set' to update it.\n", name)
-			return
-		}
-
 		// Create new server config
-		serverConfig := service.MCPServerConfig{
-			Name: name,
-			Type: serverType,
+		serverConfig := &data.MCPServer{
+			Name:    name,
+			Type:    serverType,
+			Allowed: true, // allow by default
 		}
 
 		// Set type-specific fields
 		switch serverType {
 		case "sse":
-			serverConfig.Url = url
+			serverConfig.URL = url
 		case "http":
-			serverConfig.HttpUrl = url
+			serverConfig.HTTPUrl = url
 		case "std", "local":
 			// Parse command into Command and Args
 			parts := strings.Fields(command)
@@ -281,15 +270,9 @@ var mcpAddCmd = &cobra.Command{
 			}
 		}
 
-		// Add to config
-		serverConfig.Allowed = true // allow by default
-		config.MCPServers[name] = serverConfig
-
-		// Add to allowed servers by default
-		config.AllowMCPServers = append(config.AllowMCPServers, name)
-
-		// Save config
-		err = service.SaveMCPServers(config)
+		// Add to store
+		store := data.NewMCPStore()
+		err := store.AddServer(serverConfig)
 		if err != nil {
 			fmt.Printf("Error saving MCP config: %v\n", err)
 			return
@@ -298,11 +281,11 @@ var mcpAddCmd = &cobra.Command{
 		fmt.Printf("Successfully added MCP server '%s':\n", name)
 		fmt.Printf("  Type: %s\n", serverConfig.Type)
 		fmt.Printf("  Allowed: %t\n", serverConfig.Allowed)
-		if serverConfig.Url != "" {
-			fmt.Printf("  URL: %s\n", serverConfig.Url)
+		if serverConfig.URL != "" {
+			fmt.Printf("  URL: %s\n", serverConfig.URL)
 		}
-		if serverConfig.HttpUrl != "" {
-			fmt.Printf("  HTTP URL: %s\n", serverConfig.HttpUrl)
+		if serverConfig.HTTPUrl != "" {
+			fmt.Printf("  HTTP URL: %s\n", serverConfig.HTTPUrl)
 		}
 		if serverConfig.Command != "" {
 			fmt.Printf("  Command: %s", serverConfig.Command)
@@ -344,17 +327,11 @@ var mcpSetCmd = &cobra.Command{
 			return
 		}
 
-		// Load existing config
-		config, err := service.LoadMCPServers()
+		// Load existing server
+		store := data.NewMCPStore()
+		existingServer, err := store.GetServer(name)
 		if err != nil {
-			fmt.Printf("Error loading MCP config: %v\n", err)
-			return
-		}
-
-		// Check if server exists
-		existingServer, exists := config.MCPServers[name]
-		if !exists {
-			fmt.Printf("Error: MCP server '%s' does not exist. Use 'add' to create a new server.\n", name)
+			fmt.Printf("Error: %v. Use 'add' to create a new server.\n", err)
 			return
 		}
 
@@ -378,15 +355,14 @@ var mcpSetCmd = &cobra.Command{
 			}
 		}
 
-		// Create updated server config based on existing
+		// Update server config
 		serverConfig := existingServer
-		serverConfig.Name = name
 
 		// Set type-specific fields only when flags are provided
 		if serverType == "sse" && urlChanged {
-			serverConfig.Url = url
+			serverConfig.URL = url
 		} else if serverType == "http" && urlChanged {
-			serverConfig.HttpUrl = url
+			serverConfig.HTTPUrl = url
 		} else if (serverType == "std" || serverType == "local") && commandChanged {
 			// Parse command into Command and Args
 			parts := strings.Fields(command)
@@ -426,36 +402,11 @@ var mcpSetCmd = &cobra.Command{
 
 		// Handle allow flag only when explicitly provided
 		if cmd.Flags().Changed("allow") {
-			if allow {
-				serverConfig.Allowed = true
-				// Check if already in AllowMCPServers
-				found := false
-				for _, allowed := range config.AllowMCPServers {
-					if allowed == name {
-						found = true
-						break
-					}
-				}
-				if !found {
-					config.AllowMCPServers = append(config.AllowMCPServers, name)
-				}
-			} else {
-				serverConfig.Allowed = false
-				// Remove from AllowMCPServers if present
-				for i, allowed := range config.AllowMCPServers {
-					if allowed == name {
-						config.AllowMCPServers = append(config.AllowMCPServers[:i], config.AllowMCPServers[i+1:]...)
-						break
-					}
-				}
-			}
+			serverConfig.Allowed = allow
 		}
 
-		// Update in config
-		config.MCPServers[name] = serverConfig
-
 		// Save config
-		err = service.SaveMCPServers(config)
+		err = store.UpdateServer(serverConfig)
 		if err != nil {
 			fmt.Printf("Error saving MCP config: %v\n", err)
 			return
@@ -464,11 +415,11 @@ var mcpSetCmd = &cobra.Command{
 		fmt.Printf("Successfully updated MCP server '%s':\n", name)
 		fmt.Printf("  Type: %s\n", serverConfig.Type)
 		fmt.Printf("  Allowed: %t\n", serverConfig.Allowed)
-		if serverConfig.Url != "" {
-			fmt.Printf("  URL: %s\n", serverConfig.Url)
+		if serverConfig.URL != "" {
+			fmt.Printf("  URL: %s\n", serverConfig.URL)
 		}
-		if serverConfig.HttpUrl != "" {
-			fmt.Printf("  HTTP URL: %s\n", serverConfig.HttpUrl)
+		if serverConfig.HTTPUrl != "" {
+			fmt.Printf("  HTTP URL: %s\n", serverConfig.HTTPUrl)
 		}
 		if serverConfig.Command != "" {
 			fmt.Printf("  Command: %s", serverConfig.Command)

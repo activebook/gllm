@@ -291,6 +291,7 @@ func (ci *ChatInfo) callAgent(input string) {
 		return
 	}
 
+	// Get template content
 	templateContent := store.GetTemplate(agent.Template)
 	appendText(&sb, templateContent)
 	appendText(&sb, input)
@@ -305,8 +306,21 @@ func (ci *ChatInfo) callAgent(input string) {
 		processedPrompt = prompt
 	}
 
+	// Get system prompt
 	sys_prompt := store.GetSystemPrompt(agent.SystemPrompt)
 
+	// Get memory content
+	memStore := data.NewMemoryStore()
+	memoryContent := memStore.GetFormatted()
+	if memoryContent != "" {
+		sys_prompt += "\n\n" + memoryContent
+	}
+
+	// Load MCP config
+	mcpStore := data.NewMCPStore()
+	mcpConfig, _, _ := mcpStore.Load()
+
+	// Call agent
 	op := service.AgentOptions{
 		Prompt:         processedPrompt,
 		SysPrompt:      sys_prompt,
@@ -323,6 +337,7 @@ func (ci *ChatInfo) callAgent(input string) {
 		OutputFile:     ci.outputFile,
 		QuietMode:      false,
 		ConvoName:      convoName,
+		MCPConfig:      mcpConfig,
 	}
 
 	err = service.CallAgent(&op)

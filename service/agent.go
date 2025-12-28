@@ -149,6 +149,7 @@ type AgentOptions struct {
 	OutputFile     string
 	QuietMode      bool
 	ConvoName      string
+	MCPConfig      map[string]*data.MCPServer
 }
 
 func CallAgent(op *AgentOptions) error {
@@ -187,7 +188,7 @@ func CallAgent(op *AgentOptions) error {
 		if !op.QuietMode {
 			indicator.Start("Loading MCP servers...")
 		}
-		err := mc.Init(MCPLoadOption{
+		err := mc.Init(op.MCPConfig, MCPLoadOption{
 			LoadAll:   false,
 			LoadTools: true, // only load tools
 		}) // Load only allowed servers
