@@ -111,6 +111,23 @@ Configure your API keys and preferred models, then start chatting or executing c
 				prompt = readStdin()
 			}
 
+			store := data.NewConfigStore()
+			// If agent flag is provided, update the default agent
+			if cmd.Flags().Changed("agent") {
+				// Check if agent exists
+				if store.GetAgent(agentName) == nil {
+					service.Errorf("Agent %s does not exist", agentName)
+					return
+				}
+				store.SetActiveAgent(agentName)
+			}
+			// Get active agent
+			activeAgent := store.GetActiveAgent()
+			if activeAgent == nil {
+				service.Errorf("No active agent found")
+				return
+			}
+
 			// Create an indeterminate progress bar
 			indicator := service.NewIndicator("Processing...")
 
@@ -118,23 +135,6 @@ Configure your API keys and preferred models, then start chatting or executing c
 			// Start a goroutine for your actual LLM work
 			done := make(chan bool)
 			go func() {
-				store := data.NewConfigStore()
-				// If agent flag is provided, update the default agent
-				if cmd.Flags().Changed("agent") {
-					// Check if agent exists
-					if store.GetAgent(agentName) == nil {
-						service.Warnf("Agent %s does not exist", agentName)
-						return
-					}
-					store.SetActiveAgent(agentName)
-				}
-				// Get active agent
-				activeAgent := store.GetActiveAgent()
-				if activeAgent == nil {
-					service.Warnf("No active agent found")
-					return
-				}
-
 				// Process all prompt building
 				isThereAttachment := cmd.Flags().Changed("attachment")
 				prompt, files = buildPrompt(activeAgent, prompt, isThereAttachment)
