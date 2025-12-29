@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/muesli/termenv"
 	"golang.org/x/term"
 )
 
@@ -77,6 +78,9 @@ func getTputCols() int {
 // TerminalSupportsTrueColor detects if the terminal supports true color (24-bit)
 // Returns true if COLORTERM is set to "truecolor" or "24bit"
 func TerminalSupportsTrueColor() bool {
-	colorTerm := os.Getenv("COLORTERM")
-	return colorTerm == "truecolor" || colorTerm == "24bit"
+	/*
+		colorTerm := os.Getenv("COLORTERM")
+		return colorTerm == "truecolor" || colorTerm == "24bit"
+	*/
+	return termenv.ColorProfile() == termenv.TrueColor
 }

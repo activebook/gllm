@@ -37,7 +37,7 @@ const (
 	// - Video: 2Mbps (.25MB/s). 1MB = 4s. Gemini Video: 263 tokens/s. 4s * 263 = 1052 tokens.
 	// - Audio: 128kbps (16KB/s). 1MB = 64s. Gemini Audio: 32 tokens/s. 64s * 32 = 2048 tokens.
 	TokenCostVideoPerMBGemini   = 1000
-	TokenCostVideoPerMBOpenChat = 10000 // For base64 encoded video
+	TokenCostVideoPerMBOpenChat = 1000 // For base64 encoded video
 	TokenCostAudioPerMBGemini   = 2000
 )
 

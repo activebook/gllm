@@ -11,7 +11,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/activebook/gllm/service"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -23,6 +22,15 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func switchYoloMode() {
+	yoloFlag = !yoloFlag
+	if yoloFlag {
+		fmt.Printf("YOLO mode: %s\n", switchOnColor+"on"+resetColor)
+	} else {
+		fmt.Printf("YOLO mode: %s\n", switchOffColor+"off"+resetColor)
+	}
 }
 
 // runCommand executes a command with arguments
@@ -120,8 +128,11 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	case "/mcp":
 		runCommand(mcpCmd, parts[1:])
 
-	case "/memory", "/y":
+	case "/memory", "/r":
 		runCommand(memoryCmd, parts[1:])
+
+	case "/yolo", "/y":
+		switchYoloMode()
 
 	case "/convo", "/c":
 		runCommand(convoCmd, parts[1:])
@@ -177,9 +188,10 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /template, /p [subcmd] - Manage templates (list, switch, add, etc.)")
 	fmt.Println("  /system, /S [subcmd] - Manage system prompts (list, switch, add, etc.)")
 	fmt.Println("  /search, /s [subcmd] - Manage search engines (list, switch, etc.)")
-	fmt.Println("  /tools, /t [on|off|skip|confirm] - Manage embedding tools")
+	fmt.Println("  /tools, /t [on|off] - Manage embedding tools")
 	fmt.Println("  /mcp [subcmd] - Manage MCP servers (on, off, list, etc.)")
-	fmt.Println("  /memory, /y [subcmd] - Manage memory (list, add, clear)")
+	fmt.Println("  /memory, /r [subcmd] - Manage memory (list, add, clear)")
+	fmt.Println("  /yolo, /y - Toggle YOLO mode (non-interactive tool execution)")
 	fmt.Println("  /convo, /c [subcmd] - Manage conversations (list, info, remove, etc.)")
 	fmt.Println("  /think, /T [on|off] - Switch deep think mode")
 	fmt.Println("  /usage, /u [on|off] - Switch token usage display")
@@ -194,9 +206,6 @@ func (ci *ChatInfo) showHelp() {
 func (ci *ChatInfo) showInfo() {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
-	sectionColor := color.New(color.FgCyan, color.Bold).SprintFunc()
-	keyColor := color.New(color.FgMagenta, color.Bold).SprintFunc()
-
 	printSection := func(title string) {
 		fmt.Println()
 		fullTitle := fmt.Sprintf("=== %s ===", strings.ToUpper(title))
@@ -207,11 +216,13 @@ func (ci *ChatInfo) showInfo() {
 
 	// System prompt
 	printSection("SYSTEM PROMPT")
-	fmt.Printf("%s\n", GetEffectiveSystemPrompt())
+	systemCmd.Run(systemCmd, []string{})
+	w.Flush()
 
 	// Template
 	printSection("TEMPLATE")
-	fmt.Printf("%s\n", GetEffectiveTemplate())
+	templateCmd.Run(templateCmd, []string{})
+	w.Flush()
 
 	// Memory section (included in system prompt)
 	// printSection("Memory")
@@ -244,12 +255,12 @@ func (ci *ChatInfo) showInfo() {
 		fmt.Println("Attachments: None")
 	}
 
-	fmt.Println(color.New(color.FgCyan, color.Bold).Sprint(strings.Repeat("=", 50)))
+	fmt.Println()
 }
 
 // showHistory displays conversation history
 func (ci *ChatInfo) showHistory(num int, chars int) {
-	convoPath := ci.Conversion.GetPath()
+	convoPath := ci.ConvoMgr.GetPath()
 
 	// Check if conversation exists
 	if _, err := os.Stat(convoPath); os.IsNotExist(err) {
@@ -268,12 +279,10 @@ func (ci *ChatInfo) showHistory(num int, chars int) {
 	// Display conversation details
 	fmt.Printf("Name: %s\n", convoName)
 
-	switch ci.Provider {
-	case service.ModelGemini:
+	switch ci.ModelProvider {
+	case service.ModelProviderGemini:
 		service.DisplayGeminiConversationLog(data, num, chars)
-	case service.ModelOpenChat:
-		service.DisplayOpenAIConversationLog(data, num, chars)
-	case service.ModelOpenAI, service.ModelMistral, service.ModelOpenAICompatible:
+	case service.ModelProviderOpenAI, service.ModelProviderMistral, service.ModelProviderOpenAICompatible:
 		service.DisplayOpenAIConversationLog(data, num, chars)
 	default:
 		fmt.Println("Unknown provider")
@@ -283,7 +292,7 @@ func (ci *ChatInfo) showHistory(num int, chars int) {
 // clearContext clears the conversation context
 func (ci *ChatInfo) clearContext() {
 	// Empty the conversation history
-	err := ci.Conversion.Clear()
+	err := ci.ConvoMgr.Clear()
 	if err != nil {
 		service.Errorf("Error clearing context: %v\n", err)
 		return

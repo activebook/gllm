@@ -6,16 +6,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-)
-
-// Color definitions for memory command output
-var (
-	memoryHeaderColor = color.New(color.FgCyan, color.Bold).SprintFunc()
-	memoryItemColor   = color.New(color.FgGreen).SprintFunc()
 )
 
 var memoryCmd = &cobra.Command{
@@ -29,7 +23,8 @@ Use subcommands to list, add, or clear memories,
 or use 'memory path' to see where the memory file is located.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Show current memory status
-		memories, err := service.LoadMemory()
+		store := data.NewMemoryStore()
+		memories, err := store.Load()
 		if err != nil {
 			service.Errorf("Error loading memory: %v\n", err)
 			return
@@ -63,7 +58,8 @@ Example:
   gllm memory list
   gllm memory list --verbose`,
 	Run: func(cmd *cobra.Command, args []string) {
-		memories, err := service.LoadMemory()
+		store := data.NewMemoryStore()
+		memories, err := store.Load()
 		if err != nil {
 			service.Errorf("Error loading memories: %v\n", err)
 			return
@@ -138,7 +134,8 @@ Examples:
 			return
 		}
 
-		err := service.AddMemory(memory)
+		store := data.NewMemoryStore()
+		err := store.Add(memory)
 		if err != nil {
 			service.Errorf("Error adding memory: %v\n", err)
 			return
@@ -161,7 +158,8 @@ Example:
 		force, _ := cmd.Flags().GetBool("force")
 
 		if !force {
-			memories, err := service.LoadMemory()
+			store := data.NewMemoryStore()
+			memories, err := store.Load()
 			if err != nil {
 				service.Errorf("Error loading memories: %v\n", err)
 				return
@@ -189,7 +187,8 @@ Example:
 			}
 		}
 
-		err := service.ClearMemory()
+		store := data.NewMemoryStore()
+		err := store.Clear()
 		if err != nil {
 			service.Errorf("Error clearing memories: %v\n", err)
 			return
@@ -204,12 +203,13 @@ var memoryPathCmd = &cobra.Command{
 	Short: "Show the location of the memory file",
 	Long:  `Display the full path to the memory file. You can manually edit this file.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		memoryPath := service.GetMemoryPath()
+		store := data.NewMemoryStore()
+		memoryPath := store.GetPath()
 
 		// Check if file exists
 		if _, err := os.Stat(memoryPath); os.IsNotExist(err) {
 			// Create the file if it doesn't exist
-			err := service.SaveMemory([]string{})
+			err := store.Save([]string{})
 			if err != nil {
 				service.Errorf("Error initializing memory file: %v\n", err)
 				return

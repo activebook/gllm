@@ -127,9 +127,9 @@ func (ag *Agent) GenerateOpenAIStream() error {
 	// Initialize the Client
 	ctx := context.Background()
 	// Create a client config with custom base URL
-	config := openai.DefaultConfig(ag.ApiKey)
-	if ag.EndPoint != "" {
-		config.BaseURL = ag.EndPoint
+	config := openai.DefaultConfig(ag.Model.ApiKey)
+	if ag.Model.EndPoint != "" {
+		config.BaseURL = ag.Model.EndPoint
 	}
 	client := openai.NewClientWithConfig(config)
 
@@ -158,7 +158,7 @@ func (ag *Agent) GenerateOpenAIStream() error {
 		notify:     ag.NotifyChan,
 		data:       ag.DataChan,
 		proceed:    ag.ProceedChan,
-		search:     &ag.SearchEngine,
+		search:     ag.SearchEngine,
 		toolsUse:   &ag.ToolsUse,
 		queries:    make([]string, 0),
 		references: make([]map[string]interface{}, 0), // Updated to match new field type
@@ -199,7 +199,7 @@ type OpenAI struct {
 func (oa *OpenAI) process(ag *Agent) error {
 	// Context Management
 	truncated := false
-	cm := NewContextManagerForModel(ag.ModelName, StrategyTruncateOldest)
+	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
 
 	// Recursively process the conversation
 	// Because the model can call tools multiple times
@@ -225,17 +225,18 @@ func (oa *OpenAI) process(ag *Agent) error {
 
 		// Create the request
 		req := openai.ChatCompletionRequest{
-			Model:       ag.ModelName,
-			Temperature: ag.Temperature,
-			TopP:        ag.TopP,
+			Model:       ag.Model.ModelName,
+			Temperature: ag.Model.Temperature,
+			TopP:        ag.Model.TopP,
 			Messages:    messages,
 			Tools:       oa.tools,
 			Stream:      true,
 		}
 
 		// Add seed if provided
-		if ag.Seed != nil {
-			req.Seed = ag.Seed
+		if ag.Model.Seed != nil {
+			seedInt32 := int(*ag.Model.Seed)
+			req.Seed = &seedInt32
 		}
 
 		// Add reasoning effort if think mode is enabled

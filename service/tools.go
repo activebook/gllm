@@ -12,6 +12,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/activebook/gllm/data"
 )
 
 // Tool robustness constants
@@ -1054,7 +1056,7 @@ func copyFile(src, dst string) error {
 
 // listMemoryToolCallImpl handles the list_memory tool call
 func listMemoryToolCallImpl() (string, error) {
-	memories, err := LoadMemory()
+	memories, err := data.NewMemoryStore().Load()
 	if err != nil {
 		return fmt.Sprintf("Error loading memories: %v", err), nil
 	}
@@ -1080,22 +1082,40 @@ func saveMemoryToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 		return "", fmt.Errorf("memories parameter not found in arguments")
 	}
 
+	store := data.NewMemoryStore()
+
 	// Empty string means clear all memories
 	if strings.TrimSpace(memories) == "" {
-		err := ClearMemory()
+		err := store.Clear()
 		if err != nil {
 			return fmt.Sprintf("Error clearing memories: %v", err), nil
 		}
 		return "Successfully cleared all memories", nil
 	}
 
+	// Calculate new memories from content
+	lines := strings.Split(memories, "\n")
+	var newMemories []string
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "- ") {
+			memory := strings.TrimPrefix(line, "- ")
+			if memory != "" {
+				newMemories = append(newMemories, memory)
+			}
+		} else if line != "" && !strings.HasPrefix(line, "#") {
+			newMemories = append(newMemories, line)
+		}
+	}
+
 	// Replace all memories with new content
-	err := ReplaceAllMemories(memories)
+	err := store.Save(newMemories)
 	if err != nil {
 		return fmt.Sprintf("Error updating memories: %v", err), nil
 	}
 
 	// Count how many memories were saved
-	savedMemories, _ := LoadMemory()
+	savedMemories, _ := store.Load()
 	return fmt.Sprintf("Successfully updated memories (%d items saved)", len(savedMemories)), nil
 }

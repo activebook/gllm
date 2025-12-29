@@ -120,9 +120,9 @@ func TestEstimateGeminiMessageTokens_Media(t *testing.T) {
 		},
 	}
 	tokensImage := EstimateGeminiMessageTokens(msgImage)
-	// Expect TokenCostImageGemini (258) + overhead
-	if tokensImage < 258 || tokensImage > 300 {
-		t.Errorf("EstimateGeminiMessageTokens(Image) = %v, expected ~258", tokensImage)
+	// Expect TokenCostImageGemini (1000) + overhead (~6)
+	if tokensImage < 1000 || tokensImage > 1100 {
+		t.Errorf("EstimateGeminiMessageTokens(Image) = %v, expected ~1006", tokensImage)
 	}
 
 	// Test Audio (1MB)

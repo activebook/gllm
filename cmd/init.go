@@ -1,3 +1,4 @@
+// File: cmd/init.go
 package cmd
 
 import (
@@ -5,10 +6,10 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // initCmd represents the init command
@@ -34,8 +35,8 @@ func buildToolsOptions() []huh.Option[string] {
 	toolsList := service.GetAllEmbeddingTools()
 	var options []huh.Option[string]
 	for _, tool := range toolsList {
-		// All tools selected by default for new agents
-		options = append(options, huh.NewOption(tool, tool).Selected(true))
+		// All tools not selected by default for new agents
+		options = append(options, huh.NewOption(tool, tool).Selected(false))
 	}
 	sort.Slice(options, func(i, j int) bool {
 		return options[i].Key < options[j].Key
@@ -112,55 +113,72 @@ func RunInitWizard() error {
 	// Determine default model based on provider
 	defaultModelName := ""
 	defaultEndpoint := ""
+	defaultProvider := service.ModelProviderOpenAI
 	switch provider {
 	case "openai":
 		defaultEndpoint = "https://api.openai.com/v1"
 		defaultModelName = "gpt-5.2"
+		defaultProvider = service.ModelProviderOpenAI
 	case "anthropic":
 		defaultEndpoint = "https://api.anthropic.com/v1"
 		defaultModelName = "claude-4-5-sonnet"
+		defaultProvider = service.ModelProviderAnthropic
 	case "gemini":
 		defaultEndpoint = "https://generativelanguage.googleapis.com"
 		defaultModelName = "gemini-flash-latest"
+		defaultProvider = service.ModelProviderGemini
 	case "xai":
 		defaultEndpoint = "https://api.x.ai/v1"
 		defaultModelName = "grok-4-1-fast"
+		defaultProvider = service.ModelProviderOpenAICompatible
 	case "groq":
 		defaultEndpoint = "https://api.groq.com/openai/v1"
 		defaultModelName = "openai/gpt-oss-120b"
+		defaultProvider = service.ModelProviderOpenAICompatible
 	case "mistral":
 		defaultEndpoint = "https://api.mistral.ai/v1"
 		defaultModelName = "mistral-large-latest"
+		defaultProvider = service.ModelProviderOpenAICompatible
 	case "deepseek":
 		defaultEndpoint = "https://api.deepseek.com"
 		defaultModelName = "deepseek-chat"
+		defaultProvider = service.ModelProviderOpenAICompatible
 	case "alibaba":
 		defaultEndpoint = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 		defaultModelName = "qwen3-max"
+		defaultProvider = service.ModelProviderOpenAICompatible
 	case "bytedance":
 		defaultEndpoint = "https://ark.cn-beijing.volces.com/api/v3"
 		defaultModelName = "doubao-seed-1-8-251215"
+		defaultProvider = service.ModelProviderOpenAICompatible
 	case "zai":
 		defaultEndpoint = "https://api.z.ai/api/paas/v4"
 		defaultModelName = "glm-4.6"
+		defaultProvider = service.ModelProviderOpenAICompatible
 	case "moonshot":
 		defaultEndpoint = "https://api.moonshot.cn/v1"
 		defaultModelName = "kimi-k2-0905-preview"
+		defaultProvider = service.ModelProviderOpenAICompatible
 	case "minimax":
 		defaultEndpoint = "https://api.minimax.io/v1"
 		defaultModelName = "minimax-m2"
+		defaultProvider = service.ModelProviderOpenAICompatible
 	case "meituan":
 		defaultEndpoint = "https://api.longcat.chat/openai/v1"
 		defaultModelName = "longcat-flash-chat"
+		defaultProvider = service.ModelProviderOpenAICompatible
 	case "xiaomi":
 		defaultEndpoint = "https://api.xiaomimimo.com/v1"
 		defaultModelName = "mimo-v2-flash"
+		defaultProvider = service.ModelProviderOpenAICompatible
 	case "openrouter":
 		defaultEndpoint = "https://openrouter.ai/api/v1"
 		defaultModelName = "openai/gpt-oss-20b:free"
+		defaultProvider = service.ModelProviderOpenAICompatible
 	case "other":
 		defaultEndpoint = "https://api.tokenfactory.nebius.com/v1"
 		defaultModelName = "openai/gpt-oss-120b"
+		defaultProvider = service.ModelProviderOpenAICompatible
 	}
 
 	// Group 2: Details
@@ -230,7 +248,6 @@ func RunInitWizard() error {
 		huh.NewGroup(
 			huh.NewConfirm().
 				Title("Save Configuration?").
-				Description(fmt.Sprintf("This will write to %s", getDefaultConfigFilePath())).
 				Value(&confirm),
 		),
 	).Run()
@@ -244,67 +261,44 @@ func RunInitWizard() error {
 		return nil
 	}
 
-	// Apply default if user left model empty but we have a suggestion
-	if model == "" && defaultModelName != "" {
-		model = defaultModelName
-	}
-
-	// Create the configuration structure
-	// We create a model named "default" (or use the provider name?)
-	// Let's use the provider name as the model alias for simplicity, e.g. "openai"
-	// But "default" is clearer for the *first* setup.
-	modelAlias := provider
-
-	// Existing models map
-	modelsMap := viper.GetStringMap("models")
-	if modelsMap == nil {
-		modelsMap = make(map[string]interface{})
-	}
-
 	// New model config
-	newModel := map[string]interface{}{
-		"endpoint": endpoint,
-		"key":      apiKey,
-		"model":    model,
+	newModel := data.Model{
+		Name:     agentName, // Agent name is used as model name
+		Provider: defaultProvider,
+		Endpoint: endpoint,
+		Key:      apiKey,
+		Model:    model,
+		Temp:     1.0,
+		TopP:     1.0,
 	}
 
-	// Encode the alias
-	encodedAlias := encodeModelName(modelAlias)
-	modelsMap[encodedAlias] = newModel
-
-	viper.Set("models", modelsMap)
+	// Save Model via data layer
+	store := data.NewConfigStore()
+	if err := store.SetModel(newModel.Name, &newModel); err != nil {
+		return fmt.Errorf("failed to save model: %w", err)
+	}
 
 	// Setup agent config
-	agentConfig := make(map[string]interface{})
-	agentConfig["model"] = encodedAlias
-
-	// Save selected tools as array
-	agentConfig["tools"] = selectedTools
-
-	// Save other capabilities as booleans
-	for _, f := range selectedFeatures {
-		agentConfig[f] = true
+	agentConfig := &data.AgentConfig{
+		Model:    newModel,
+		Tools:    selectedTools,
+		Think:    contains(selectedFeatures, "think"),
+		Usage:    contains(selectedFeatures, "usage"),
+		Markdown: contains(selectedFeatures, "markdown"),
 	}
 
-	// Add Agent
-	agentsMap := viper.GetStringMap("agents")
-	if agentsMap == nil {
-		agentsMap = make(map[string]interface{})
+	// Save Agent via data layer
+	if err := store.SetAgent(agentName, agentConfig); err != nil {
+		return fmt.Errorf("failed to save agent: %w", err)
 	}
-	agentsMap[agentName] = agentConfig
-	viper.Set("agents", agentsMap)
 
 	// Set Active Agent
-	viper.Set("agent", agentName)
-
-	// Save
-	if err := writeConfig(); err != nil {
-		return fmt.Errorf("failed to save config: %w", err)
+	if err := store.SetActiveAgent(agentName); err != nil {
+		return fmt.Errorf("failed to set active agent: %w", err)
 	}
 
 	fmt.Printf("\n")
-	// Use service.Green for success message if available, or just fmt
-	fmt.Printf("✅ Configuration saved to %s\n", viper.ConfigFileUsed())
+	fmt.Printf("✅ Configuration saved to %s\n", store.ConfigFileUsed())
 	fmt.Printf("🎉 You are ready to go! Try running: gllm \"Hello World\"\n")
 
 	return nil

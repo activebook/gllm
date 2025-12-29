@@ -68,7 +68,7 @@ func (cm *ContextManager) PrepareOpenAIMessages(messages []openai.ChatCompletion
 	// Calculate current token usage using cache
 	currentTokens := cm.estimateOpenAIMessagesWithCache(messages) + toolTokens
 	// Debug logging (uses nil-safe wrapper)
-	Debugf("Token count: %d MaxInputTokens[80%]: %d", currentTokens, cm.MaxInputTokens)
+	Debugf("Token count: %d MaxInputTokens[80%%]: %d", currentTokens, cm.MaxInputTokens)
 	if currentTokens <= cm.MaxInputTokens {
 		return messages, false
 	}
@@ -243,7 +243,7 @@ func (cm *ContextManager) PrepareOpenChatMessages(messages []*model.ChatCompleti
 	// Calculate current token usage using cache
 	currentTokens := cm.estimateOpenChatMessagesWithCache(messages) + toolTokens
 	// Debug logging (uses nil-safe wrapper)
-	Debugf("Token count: %d MaxInputTokens[80%]: %d", currentTokens, cm.MaxInputTokens)
+	Debugf("Token count: %d MaxInputTokens[80%%]: %d", currentTokens, cm.MaxInputTokens)
 	if currentTokens <= cm.MaxInputTokens {
 		return messages, false
 	}
@@ -451,7 +451,7 @@ func (cm *ContextManager) PrepareGeminiMessages(messages []*genai.Content, syste
 
 	currentTokens := cm.estimateGeminiMessagesWithCache(messages) + totalOverhead
 	// Debug logging (uses nil-safe wrapper)
-	Debugf("Token count: %d MaxInputTokens[80%]: %d", currentTokens, cm.MaxInputTokens)
+	Debugf("Token count: %d MaxInputTokens[80%%]: %d", currentTokens, cm.MaxInputTokens)
 	if currentTokens <= cm.MaxInputTokens {
 		return messages, false
 	}

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/activebook/gllm/data"
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -100,7 +101,7 @@ func GetMCPClient() *MCPClient {
 // url → SSEClientTransport
 // command → StdioClientTransport
 // Only want list all servers, unless loadAll is false, then only load allowed servers
-func (mc *MCPClient) Init(option MCPLoadOption) error {
+func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOption) error {
 	if mc.client != nil {
 		// already initialized
 		return nil
@@ -112,30 +113,20 @@ func (mc *MCPClient) Init(option MCPLoadOption) error {
 	// Create a new client, with no features.
 	mc.client = mcp.NewClient(&mcp.Implementation{Name: "mcp-client", Version: "v1.0.0"}, nil)
 
-	var err error
-	config, err := LoadMCPServers()
-	if err != nil {
-		return err
-	}
-
-	if config == nil {
-		//return fmt.Errorf("no MCP configuration found")
-		return nil
-	}
-
 	// Load mcp servers
-	servers := []*MCPServer{}
+	mcServers := []*MCPServer{}
 	// Connect to each server based on its type
-	for serverName, server := range config.MCPServers {
+	for serverName, server := range servers {
 		// Skip if not in allowed list (if allow list is not empty)
 		if !server.Allowed && !option.LoadAll {
 			continue
 		}
 
 		// Connect and add session
-		if server.Type == "sse" || server.Url != "" || server.BaseUrl != "" {
+		var err error
+		if server.Type == "sse" || server.URL != "" || server.BaseURL != "" {
 			// Add SSE server
-			err = mc.AddSseServer(serverName, server.BaseUrl, server.Headers)
+			err = mc.AddSseServer(serverName, server.BaseURL, server.Headers)
 		} else if server.Type == "std" || server.Type == "local" || server.Command != "" {
 			// Add stdio server
 			dir := server.WorkDir
@@ -143,9 +134,9 @@ func (mc *MCPClient) Init(option MCPLoadOption) error {
 				dir = server.Cwd
 			}
 			err = mc.AddStdServer(serverName, server.Command, server.Env, dir, server.Args...)
-		} else if server.Type == "http" || server.HttpUrl != "" {
+		} else if server.Type == "http" || server.HTTPUrl != "" {
 			// Add HTTP server
-			err = mc.AddHttpServer(serverName, server.HttpUrl, server.Headers)
+			err = mc.AddHttpServer(serverName, server.HTTPUrl, server.Headers)
 		}
 
 		if err != nil {
@@ -177,11 +168,11 @@ func (mc *MCPClient) Init(option MCPLoadOption) error {
 		}
 
 		// Add server to servers
-		servers = append(servers, &MCPServer{
+		mcServers = append(mcServers, &MCPServer{
 			Name: serverName, Allowed: server.Allowed,
 			Tools: tools, Prompts: prompts, Resources: resources})
 	}
-	mc.servers = servers
+	mc.servers = mcServers
 	return nil
 }
 

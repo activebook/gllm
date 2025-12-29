@@ -8,45 +8,13 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
+	"strconv"
 	"strings"
-	"time"
 
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/huh"
-	"github.com/ergochat/readline"
-	"github.com/spf13/viper"
 )
-
-// writeConfig saves the current viper configuration to the determined config file path.
-// It handles creation of the directory if needed.
-func writeConfig() error {
-	// Get the path where viper is currently configured to write
-	// If --config flag was used, it respects that. Otherwise, uses the default path.
-	configFile := viper.ConfigFileUsed()
-	if configFile == "" {
-		// If no config file was used (e.g., it didn't exist), use the default path
-		configFile = getDefaultConfigFilePath()
-		// We need to explicitly tell Viper to write to this file
-		viper.SetConfigFile(configFile)
-	}
-
-	// Ensure the directory exists
-	configDir := filepath.Dir(configFile)
-	if err := os.MkdirAll(configDir, 0750); err != nil { // Use 0750 for permissions
-		return fmt.Errorf("failed to create config directory '%s': %w", configDir, err)
-	}
-
-	// Write the config file
-	// Use WriteConfigAs to ensure it writes even if the file doesn't exist yet
-	//logger.Debugln("Saving configuration to:", configFile) // Debug message
-	if err := viper.WriteConfigAs(configFile); err != nil {
-		return fmt.Errorf("failed to write configuration file '%s': %w", configFile, err)
-	}
-
-	return nil
-}
 
 // readStdin checks if there's piped input and reads it
 // This is a more robust way to check if stdin is being piped.
@@ -89,6 +57,17 @@ func checkIsLink(source string) bool {
 	return strings.HasPrefix(source, "http") || strings.HasPrefix(source, "https")
 }
 
+// Appends text to builder with proper newline handling
+func appendText(builder *strings.Builder, text string) {
+	if text == "" {
+		return
+	}
+	builder.WriteString(text)
+	if !strings.HasSuffix(text, "\n") {
+		builder.WriteString("\n\n")
+	}
+}
+
 // readContentFromPath reads content from a specified source path.
 // If the source is "-", it reads from standard input (os.Stdin).
 // Otherwise, it reads from the file at the given path.
@@ -104,48 +83,6 @@ func readContentFromPath(source string) ([]byte, error) {
 		return []byte(datas[0]), nil
 	}
 	return os.ReadFile(source)
-}
-
-func validFilePath(filename string, force_overwritten bool) error {
-
-	var err error
-	// Check if file already exists
-	if _, err := os.Stat(filename); err == nil && !force_overwritten {
-		// File exists, ask for confirmation to overwrite
-		rl, err := readline.New("")
-		if err != nil {
-			return fmt.Errorf("error initializing readline: %v", err)
-		}
-		defer rl.Close()
-
-		// Use readline's prompt
-		rl.SetPrompt(fmt.Sprintf("File %s already exists. Do you want to overwrite it? (y/N): ", filename))
-
-		input, err := rl.Readline()
-		if err != nil {
-			return fmt.Errorf("error reading input: %v", err)
-		}
-		response := strings.ToLower(strings.TrimSpace(input))
-		if response != "y" && response != "yes" {
-			return fmt.Errorf("%s", "file not set. keeping current output file.")
-		}
-	} else if !os.IsNotExist(err) {
-		// There was an error checking the file (other than not existing)
-		return fmt.Errorf("error checking file %s: %v", filename, err)
-	}
-
-	// Try to create the file to check if we can write to it
-	dir := filepath.Dir(filename)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("error creating directory for %s: %v", filename, err)
-	}
-
-	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		return fmt.Errorf("error creating/opening file %s: %v", filename, err)
-	}
-	file.Close()
-	return nil
 }
 
 func createTempFile(pattern string) (string, error) {
@@ -184,16 +121,6 @@ func RemoveFirst(s string, prefix string) string {
 	return strings.TrimPrefix(s, prefix)
 }
 
-func GenerateChatFileName() string {
-	// Get the current time
-	currentTime := time.Now()
-
-	// Format the time as a string in the format "chat_YYYY-MM-DD_HH-MM-SS.json"
-	filename := fmt.Sprintf("chat_%s", currentTime.Format("2006-01-02_15-04-05"))
-
-	return filename
-}
-
 // convertUserInputToBool converts user-friendly strings to boolean values
 // Handles: on/off, enable/disable, true/false, 1/0
 func convertUserInputToBool(input string) (bool, error) {
@@ -210,88 +137,6 @@ func convertUserInputToBool(input string) (bool, error) {
 // Define the hardcoded default system prompt
 const defaultSystemPromptContent = "You are a helpful assistant."
 const defaultTemplateContent = ""
-
-// GetAgentString retrieves a string value from the current agent configuration
-func GetAgentString(key string) string {
-	config := service.GetCurrentAgentConfig()
-	if v, ok := config[key]; ok {
-		if s, ok := v.(string); ok {
-			return s
-		}
-	}
-	return ""
-}
-
-// GetAgentBool retrieves a boolean value from the current agent configuration
-func GetAgentBool(key string) bool {
-	config := service.GetCurrentAgentConfig()
-	if v, ok := config[key]; ok {
-		if b, ok := v.(bool); ok {
-			return b
-		}
-	}
-	return false
-}
-
-// GetAgentInt retrieves an integer value from the current agent configuration
-func GetAgentInt(key string) int {
-	config := service.GetCurrentAgentConfig()
-	if v, ok := config[key]; ok {
-		// Handle various number types that might be coming from Viper/JSON
-		switch val := v.(type) {
-		case int:
-			return val
-		case float64:
-			return int(val)
-		case int64:
-			return int(val)
-		}
-	}
-	return 0
-}
-
-// GetAgentStringSlice retrieves a string slice value from the current agent configuration
-func GetAgentStringSlice(key string) []string {
-	config := service.GetCurrentAgentConfig()
-	if v, ok := config[key]; ok {
-		// Handle various slice types that might be coming from Viper/YAML
-		switch val := v.(type) {
-		case []string:
-			return val
-		case []interface{}:
-			result := make([]string, 0, len(val))
-			for _, item := range val {
-				if s, ok := item.(string); ok {
-					result = append(result, s)
-				}
-			}
-			return result
-		}
-	}
-	return nil
-}
-
-// SetAgentValue updates a specific key in the current agent's configuration
-func SetAgentValue(key string, value interface{}) error {
-	name := service.GetCurrentAgentName()
-	if name == "unknown" {
-		return fmt.Errorf("no active agent found")
-	}
-
-	config, err := service.GetAgent(name)
-	if err != nil {
-		return fmt.Errorf("failed to get agent '%s': %w", name, err)
-	}
-
-	config[key] = value
-
-	// fmt.Printf("DEBUG: Setting agent value key=%s, value=%v\n", key, value)
-	if err := service.SetAgent(name, config); err != nil {
-		return fmt.Errorf("failed to save agent '%s': %w", name, err)
-	}
-
-	return nil
-}
 
 // GetHuhKeyMap returns a custom keymap for huh forms
 // Specifically disables the Editor key binding for Text fields as it interferes with input
@@ -311,4 +156,17 @@ func GetHuhKeyMap() *huh.KeyMap {
 	keyMap.Text.Editor = key.NewBinding(key.WithDisabled())
 
 	return keyMap
+}
+
+func validateInt(s string) error {
+	_, err := strconv.Atoi(s)
+	if err != nil {
+		return fmt.Errorf("must be a valid number")
+	}
+	return nil
+}
+
+func toInt(s string) int {
+	v, _ := strconv.Atoi(s)
+	return v
 }

@@ -150,9 +150,9 @@ func (ag *Agent) GenerateOpenChatStream() error {
 	ctx := context.Background()
 	// Create a client config with custom base URL
 	client := arkruntime.NewClientWithApiKey(
-		ag.ApiKey,
+		ag.Model.ApiKey,
 		arkruntime.WithTimeout(30*time.Minute),
-		arkruntime.WithBaseUrl(ag.EndPoint),
+		arkruntime.WithBaseUrl(ag.Model.EndPoint),
 	)
 
 	// Create a tool with the function
@@ -180,7 +180,7 @@ func (ag *Agent) GenerateOpenChatStream() error {
 		notify:     ag.NotifyChan,
 		data:       ag.DataChan,
 		proceed:    ag.ProceedChan,
-		search:     &ag.SearchEngine,
+		search:     ag.SearchEngine,
 		toolsUse:   &ag.ToolsUse,
 		queries:    make([]string, 0),
 		references: make([]map[string]interface{}, 0), // Updated to match new field type
@@ -221,7 +221,7 @@ type OpenChat struct {
 func (c *OpenChat) process(ag *Agent) error {
 	// Context Management
 	truncated := false
-	cm := NewContextManagerForModel(ag.ModelName, StrategyTruncateOldest)
+	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
 
 	// For some models, there isn't thinking property
 	// So we need to check whether to add it or not
@@ -267,9 +267,9 @@ func (c *OpenChat) process(ag *Agent) error {
 
 		// Create the request with thinking mode
 		req := model.CreateChatCompletionRequest{
-			Model:           ag.ModelName,
-			Temperature:     &ag.Temperature,
-			TopP:            &ag.TopP,
+			Model:           ag.Model.ModelName,
+			Temperature:     &ag.Model.Temperature,
+			TopP:            &ag.Model.TopP,
 			Messages:        messages,
 			Tools:           c.tools,
 			Thinking:        thinking,

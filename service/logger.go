@@ -26,36 +26,55 @@ func InitLogger() {
 	logger.SetOutput(os.Stderr)
 	logger.SetLevel(log.InfoLevel) // Default to Info level initially
 	logger.SetFormatter(&log.TextFormatter{
+		DisableColors:    false,
 		DisableTimestamp: true, // Remove timestamp numbers like [0000]
 	})
 }
 
 func Infof(format string, args ...interface{}) {
 	if logger != nil {
-		logger.Infof(cyanColor+format+resetColor, args...)
+		logger.Infof(format, args...)
 	}
 }
 
 func Successf(format string, args ...interface{}) {
 	if logger != nil {
-		logger.Infof(completeColor+format+resetColor, args...)
+		logger.Infof(format, args...)
 	}
 }
 
 func Debugf(format string, args ...interface{}) {
 	if logger != nil {
-		logger.Debugf(debugColor+format+resetColor, args...)
+		logger.Debugf(format, args...)
+	}
+}
+
+func Debugln(args ...interface{}) {
+	if logger != nil {
+		logger.Debugln(args...)
 	}
 }
 
 func Warnf(format string, args ...interface{}) {
 	if logger != nil {
-		logger.Warnf(warnColor+format+resetColor, args...)
+		logger.Warnf(format, args...)
+	}
+}
+
+func Warnln(args ...interface{}) {
+	if logger != nil {
+		logger.Warnln(args...)
 	}
 }
 
 func Errorf(format string, args ...interface{}) {
 	if logger != nil {
-		logger.Errorf(errorColor+format+resetColor, args...)
+		logger.Errorf(format, args...)
+	}
+}
+
+func Errorln(args ...interface{}) {
+	if logger != nil {
+		logger.Errorln(args...)
 	}
 }

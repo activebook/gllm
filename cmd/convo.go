@@ -19,10 +19,11 @@ var (
 
 // convoCmd represents the convo command
 var convoCmd = &cobra.Command{
-	Use:   "convo",
-	Short: "Manage conversations",
-	Long:  `Commands to list, remove, and show details of conversations.`,
-	Args:  cobra.NoArgs,
+	Use:     "convo",
+	Aliases: []string{"cv", "conversation"},
+	Short:   "Manage conversations",
+	Long:    `Commands to list, remove, and show details of conversations.`,
+	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return convoListCmd.RunE(cmd, args)
 	},
@@ -393,11 +394,9 @@ Using the --message-chars (-c) flag, set the maximum length of each message's co
 
 		// Process and display messages based on provider
 		switch provider {
-		case service.ModelGemini:
+		case service.ModelProviderGemini:
 			service.DisplayGeminiConversationLog(data, convoMessageCount, convoMessageLength)
-		case service.ModelOpenChat:
-			service.DisplayOpenAIConversationLog(data, convoMessageCount, convoMessageLength)
-		case service.ModelOpenAI, service.ModelMistral, service.ModelOpenAICompatible:
+		case service.ModelProviderOpenAI, service.ModelProviderMistral, service.ModelProviderOpenAICompatible:
 			service.DisplayOpenAIConversationLog(data, convoMessageCount, convoMessageLength)
 		default:
 			fmt.Println("Unknown conversation format.")
