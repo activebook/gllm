@@ -39,7 +39,7 @@ Status:
 %s
 %s`
 
-	ToolUserConfirmPrompt = "Apply this change? (Yes/No): "
+	ToolUserConfirmPrompt = "Do you want to proceed?"
 
 	// ToolRespConfirmEdityFile is the template for the response to the user before modifying a file, including the diff.
 	ToolRespDiscardEditFile = "Based on your request, the OPERATION is CANCELLED: " +
