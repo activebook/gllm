@@ -24,6 +24,15 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
+func switchYoloMode() {
+	yoloFlag = !yoloFlag
+	if yoloFlag {
+		fmt.Printf("YOLO mode: %s\n", switchOnColor+"on"+resetColor)
+	} else {
+		fmt.Printf("YOLO mode: %s\n", switchOffColor+"off"+resetColor)
+	}
+}
+
 // runCommand executes a command with arguments
 func runCommand(cmd *cobra.Command, args []string) {
 	if len(args) == 0 {
@@ -119,8 +128,11 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	case "/mcp":
 		runCommand(mcpCmd, parts[1:])
 
-	case "/memory", "/y":
+	case "/memory", "/r":
 		runCommand(memoryCmd, parts[1:])
+
+	case "/yolo", "/y":
+		switchYoloMode()
 
 	case "/convo", "/c":
 		runCommand(convoCmd, parts[1:])
@@ -178,7 +190,8 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /search, /s [subcmd] - Manage search engines (list, switch, etc.)")
 	fmt.Println("  /tools, /t [on|off] - Manage embedding tools")
 	fmt.Println("  /mcp [subcmd] - Manage MCP servers (on, off, list, etc.)")
-	fmt.Println("  /memory, /y [subcmd] - Manage memory (list, add, clear)")
+	fmt.Println("  /memory, /r [subcmd] - Manage memory (list, add, clear)")
+	fmt.Println("  /yolo, /y - Toggle YOLO mode (non-interactive tool execution)")
 	fmt.Println("  /convo, /c [subcmd] - Manage conversations (list, info, remove, etc.)")
 	fmt.Println("  /think, /T [on|off] - Switch deep think mode")
 	fmt.Println("  /usage, /u [on|off] - Switch token usage display")
