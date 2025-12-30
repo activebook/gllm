@@ -370,6 +370,7 @@ func CallAgent(op *AgentOptions) error {
 				ag.CompleteReasoning()
 				proceedCh <- true
 			case StatusFunctionCalling:
+				ag.WriteEnd() // ensure previous data ends with newline, because function call box starts a new line
 				ag.WriteFunctionCall(notify.Data)
 				// ag.StartIndicator("Function Calling...")
 				proceedCh <- true

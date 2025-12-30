@@ -703,17 +703,26 @@ to the specified one for all subsequent operations.`,
 			if len(modelsMap) == 0 {
 				return fmt.Errorf("no models found")
 			}
-			var options []huh.Option[string]
-			for m := range modelsMap {
-				options = append(options, huh.NewOption(m, m))
-			}
-			sort.Slice(options, func(i, j int) bool { return options[i].Key < options[j].Key })
-
 			// Default to current model
 			model := GetEffectModel()
 			if model != nil {
 				name = model.Name
 			}
+
+			// Sort alphabetically but keep current model on top
+			var options []huh.Option[string]
+			for m := range modelsMap {
+				options = append(options, huh.NewOption(m, m))
+			}
+			sort.Slice(options, func(i, j int) bool {
+				if options[i].Key == name {
+					return true
+				}
+				if options[j].Key == name {
+					return false
+				}
+				return options[i].Key < options[j].Key
+			})
 
 			err := huh.NewSelect[string]().
 				Title("Select Model").

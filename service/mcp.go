@@ -127,7 +127,7 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 		if server.Type == "sse" || server.URL != "" || server.BaseURL != "" {
 			// Add SSE server
 			err = mc.AddSseServer(serverName, server.BaseURL, server.Headers)
-		} else if server.Type == "std" || server.Type == "local" || server.Command != "" {
+		} else if server.Type == "stdio" || server.Type == "std" || server.Type == "local" || server.Command != "" {
 			// Add stdio server
 			dir := server.WorkDir
 			if dir == "" {
@@ -240,10 +240,12 @@ func (mc *MCPClient) AddStdServer(name string, cmd string, env map[string]string
 	// "--" is a common convention in Unix-like systems to prevent arguments starting with - from being misinterpreted as flags or options.
 	// Cobra handles "--" internally by stopping flag parsing when encountered and excluding it from the arguments passed to the command handler, ensuring that subsequent arguments are treated as positional regardless of leading - characters.
 
+	// Don't use _mcp-filter for now to simplify debugging
+	// transport := &mcp.CommandTransport{Command: exec.Command(cmd, args...)}
+
 	// Construct new args: _mcp-filter, --, cmd, args...
 	newArgs := []string{"_mcp-filter", "--", cmd}
 	newArgs = append(newArgs, args...)
-
 	// Use ExecutorPath which points to the current binary
 	transport := &mcp.CommandTransport{Command: exec.Command(ExecutorPath, newArgs...)}
 
