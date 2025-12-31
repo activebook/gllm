@@ -381,7 +381,16 @@ var agentSetCmd = &cobra.Command{
 			for n := range agents {
 				sortedNames = append(sortedNames, n)
 			}
-			sort.Strings(sortedNames)
+			// Sort names alphabetically and keep selected agent at top if exists
+			sort.Slice(sortedNames, func(i, j int) bool {
+				if sortedNames[i] == name {
+					return true
+				}
+				if sortedNames[j] == name {
+					return false
+				}
+				return sortedNames[i] < sortedNames[j]
+			})
 
 			for _, n := range sortedNames {
 				options = append(options, huh.NewOption(n, n))

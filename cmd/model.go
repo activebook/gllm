@@ -377,7 +377,15 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 			for m := range modelsMap {
 				options = append(options, huh.NewOption(m, m))
 			}
-			sort.Slice(options, func(i, j int) bool { return options[i].Key < options[j].Key })
+			sort.Slice(options, func(i, j int) bool {
+				if options[i].Key == name {
+					return true
+				}
+				if options[j].Key == name {
+					return false
+				}
+				return options[i].Key < options[j].Key
+			})
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Edit").

@@ -94,7 +94,7 @@ func (mr *Markdown) Render(r Render) {
 
 	// Print a separator or message
 
-	prefix := "\n\n**• MARKDOWN OUTPUT •**\n===\n" // Using backticks for highlighting in Markdown
+	prefix := "\n\n**• Task Completed •**\n===\n" // Using backticks for highlighting in Markdown
 	output = prefix + output
 
 	// Render the Markdown using glamour
