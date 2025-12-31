@@ -247,6 +247,13 @@ func (c *OpenChat) process(ag *Agent) error {
 			}
 		}
 
+		// Note on Thinking Mode:
+		// While we set up the request correctly here with model.Thinking, the Volcengine SDK (openchat.go)
+		// handles the response parsing. If the SDK does not correctly map the API's "reasoning_content" field
+		// (or if the API uses a different field than the SDK expects), thinking tokens will not be visible.
+		// In contrast, openai.go uses the generic go-openai library which handles standard "reasoning_content" fields
+		// robustly. If thinking tokens are missing in OpenChat, switch to provider: openai.
+
 		// Get all history messages
 		messages, _ := ag.Convo.GetMessages().([]*model.ChatCompletionMessage)
 
