@@ -63,7 +63,10 @@ func constructModelInfo(model *data.Model) *ModelInfo {
 	provider := model.Provider
 	if provider == "" {
 		// Auto-detect provider if not set
+		Debugf("Auto-detecting provider for %s", model.Model)
 		provider = DetectModelProvider(model.Endpoint, model.Model)
+	} else {
+		Debugf("Provider: [%s]", provider)
 	}
 	mi.ModelName = model.Model
 	mi.Provider = provider

@@ -129,6 +129,8 @@ func buildChatInfo(agent *data.AgentConfig, files []*service.FileData) *ChatInfo
 	if agent.Model.Provider == "" {
 		service.Debugf("Auto-detecting provider for %s", agent.Model.Model)
 		agent.Model.Provider = service.DetectModelProvider(agent.Model.Endpoint, agent.Model.Model)
+	} else {
+		service.Debugf("Provider: [%s]", agent.Model.Provider)
 	}
 
 	// Construct conversation manager
