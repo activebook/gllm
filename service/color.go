@@ -33,6 +33,9 @@ var (
 	inCallingColor   string
 	completeColor    string
 
+	// Task completion color
+	taskCompleteColor string
+
 	// Workflow colors
 	agentNameColor     string
 	agentRoleColor     string
@@ -94,6 +97,9 @@ func setupColors() {
 		purpleColor = fgSeq("#9370DB") // MediumPurple
 		yellowColor = fgSeq("#FFD700") // Gold
 
+		// Task completion color (Spring Green, matching switchOnColor)
+		taskCompleteColor = fgSeq("#89D184")
+
 		// Role colors (Muted & Professional)
 		roleSystemColor = fgSeq(hexRoleSystem)
 		roleUserColor = fgSeq(hexRoleUser)
@@ -116,6 +122,9 @@ func setupColors() {
 		purpleColor = "\033[38;5;141m"
 		yellowColor = "\033[33m"
 
+		// Task completion color (matching switchOnColor)
+		taskCompleteColor = "\033[38;5;82m"
+
 		roleSystemColor = "\033[38;5;214m"   // Orange/Gold
 		roleUserColor = "\033[38;5;71m"      // Greenish
 		roleAssistantColor = "\033[38;5;75m" // Blueish
@@ -136,6 +145,9 @@ func setupColors() {
 		greyColor = "\033[90m"
 		purpleColor = "\033[35m"
 		yellowColor = "\033[33m"
+
+		// Task completion color (matching switchOnColor)
+		taskCompleteColor = "\033[92m"
 
 		roleSystemColor = "\033[33m"    // Yellow
 		roleUserColor = "\033[32m"      // Green

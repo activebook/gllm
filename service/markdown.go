@@ -92,10 +92,9 @@ func (mr *Markdown) Render(r Render) {
 	// Only gemini has citations
 	//output = removeCitations(output)
 
-	// Print a separator or message
-
-	prefix := "\n\n**• Task Completed •**\n===\n" // Using backticks for highlighting in Markdown
-	output = prefix + output
+	// Print the colored task completion message directly
+	r.Writeln("")
+	r.Writeln(taskCompleteColor + "✓ Task Completed" + resetColor)
 
 	// Render the Markdown using glamour
 	tr, _ := glamour.NewTermRenderer(
