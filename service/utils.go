@@ -101,7 +101,8 @@ func HasContent(s *string) bool {
 }
 
 func EndWithNewline(s string) bool {
-	return strings.HasSuffix(s, "\n")
+	// Check if the string ends with a newline or empty line
+	return strings.HasSuffix(s, "\n") || strings.HasSuffix(s, "\r\n") || strings.TrimSpace(s) == ""
 }
 
 func FormatMinutesSeconds(d time.Duration) string {

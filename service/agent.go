@@ -63,7 +63,10 @@ func constructModelInfo(model *data.Model) *ModelInfo {
 	provider := model.Provider
 	if provider == "" {
 		// Auto-detect provider if not set
+		Debugf("Auto-detecting provider for %s", model.Model)
 		provider = DetectModelProvider(model.Endpoint, model.Model)
+	} else {
+		Debugf("Provider: [%s]", provider)
 	}
 	mi.ModelName = model.Model
 	mi.Provider = provider
@@ -370,6 +373,7 @@ func CallAgent(op *AgentOptions) error {
 				ag.CompleteReasoning()
 				proceedCh <- true
 			case StatusFunctionCalling:
+				ag.WriteEnd() // ensure previous data ends with newline, because function call box starts a new line
 				ag.WriteFunctionCall(notify.Data)
 				// ag.StartIndicator("Function Calling...")
 				proceedCh <- true
@@ -442,6 +446,7 @@ WriteReasoning writes the provided reasoning text to both the standard output an
 func (ag *Agent) WriteReasoning(text string) {
 	if ag.Std != nil {
 		ag.Std.Writef("%s%s", inReasoningColor, text)
+		ag.LastWrittenData = text
 	}
 	if ag.OutputFile != nil {
 		ag.OutputFile.Writef("%s", text)

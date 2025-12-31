@@ -617,7 +617,6 @@ var mcpSwitchCmd = &cobra.Command{
 		for name := range servers {
 			names = append(names, name)
 		}
-		sort.Strings(names)
 
 		// Build options and pre-select allowed ones
 		var options []huh.Option[string]
@@ -630,6 +629,27 @@ var mcpSwitchCmd = &cobra.Command{
 				selected = append(selected, name)
 			}
 		}
+
+		// Sort options by name alphabetically and keep selected ones at top
+		sort.Slice(options, func(i, j int) bool {
+			iSelected := false
+			jSelected := false
+			for _, s := range selected {
+				if options[i].Value == s {
+					iSelected = true
+				}
+				if options[j].Value == s {
+					jSelected = true
+				}
+			}
+			if iSelected && !jSelected {
+				return true
+			}
+			if !iSelected && jSelected {
+				return false
+			}
+			return options[i].Value < options[j].Value
+		})
 
 		err = huh.NewMultiSelect[string]().
 			Title("Select MCP servers to allow").
