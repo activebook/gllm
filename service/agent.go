@@ -446,6 +446,7 @@ WriteReasoning writes the provided reasoning text to both the standard output an
 func (ag *Agent) WriteReasoning(text string) {
 	if ag.Std != nil {
 		ag.Std.Writef("%s%s", inReasoningColor, text)
+		ag.LastWrittenData = text
 	}
 	if ag.OutputFile != nil {
 		ag.OutputFile.Writef("%s", text)
