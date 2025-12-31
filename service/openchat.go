@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -223,10 +224,6 @@ func (c *OpenChat) process(ag *Agent) error {
 	truncated := false
 	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
 
-	// For some models, there isn't thinking property
-	// So we need to check whether to add it or not
-	thinkProperty := true
-
 	// Recursively process the conversation
 	// Because the model can call tools multiple times
 	i := 0
@@ -238,19 +235,25 @@ func (c *OpenChat) process(ag *Agent) error {
 		// Set whether to use thinking mode
 		var thinking *model.Thinking
 		var reasoningEffort *model.ReasoningEffort
-		if thinkProperty {
-			if ag.ThinkMode {
-				thinking = &model.Thinking{
-					Type: model.ThinkingTypeEnabled,
-				}
-				reasoningEffort = Ptr(model.ReasoningEffortHigh)
-			} else {
-				// For some models, it must explicitly tell it not to use thinking mode
-				thinking = &model.Thinking{
-					Type: model.ThinkingTypeDisabled,
-				}
+		if ag.ThinkMode {
+			thinking = &model.Thinking{
+				Type: model.ThinkingTypeEnabled,
+			}
+			reasoningEffort = Ptr(model.ReasoningEffortHigh)
+		} else {
+			// For some models, it must explicitly tell it not to use thinking mode
+			thinking = &model.Thinking{
+				Type: model.ThinkingTypeDisabled,
 			}
 		}
+
+		// Note on Thinking Mode:
+		// While we set up the request correctly here with model.Thinking, the Volcengine SDK (openchat.go)
+		// handles the response parsing. If the SDK does not correctly map the API's "reasoning_content" field
+		// (or if the API uses a different field than the SDK expects), thinking tokens will not be visible.
+		// In contrast, openai.go uses the generic go-openai library which handles standard "reasoning_content" fields
+		// robustly. If thinking tokens are missing in OpenChat, switch to provider: openai.
+
 		// Get all history messages
 		messages, _ := ag.Convo.GetMessages().([]*model.ChatCompletionMessage)
 
@@ -283,19 +286,23 @@ func (c *OpenChat) process(ag *Agent) error {
 
 		// Make the streaming request
 		stream, err := c.client.CreateChatCompletionStream(c.op.ctx, req)
-
-		// If thinking mode caused an error, try again without thinking mode
-		if err != nil && req.Thinking != nil {
-			// Create request without thinking mode
-			// Because some models don't support the thinking property
-			req.Thinking = nil
-			stream, err = c.client.CreateChatCompletionStream(c.op.ctx, req)
-			if err != nil {
-				return fmt.Errorf("stream creation error: %v", err)
+		if err != nil {
+			// Try to extract detailed API error information
+			var apiErr *model.APIError
+			if errors.As(err, &apiErr) {
+				// APIError contains detailed error information (code and message)
+				return fmt.Errorf("stream creation error: code=%s, message=%s", apiErr.Code, apiErr.Message)
 			}
-			// This model cannot add thinking property
-			thinkProperty = false
-		} else if err != nil {
+			// Fallback to checking for generic RequestError
+			var reqErr *model.RequestError
+			if errors.As(err, &reqErr) {
+				// Check for 400 Bad Request which often implies invalid parameters or unsupported features (like tools)
+				if reqErr.HTTPStatusCode == 400 && len(c.tools) > 0 {
+					return fmt.Errorf("stream creation error: %v (Hint: The model might not support the requested tools/function calling. Try disabling tools or switching models)", err)
+				}
+			}
+
+			// Fallback to generic error
 			return fmt.Errorf("stream creation error: %v", err)
 		}
 		defer stream.Close()
@@ -323,7 +330,17 @@ func (c *OpenChat) process(ag *Agent) error {
 				toolMessage, err := c.processToolCall(toolCall)
 				if err != nil {
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
-					// Send error info to user but continue processing other tool calls
+					// IMPORTANT: Still add an error response message to maintain conversation integrity
+					// The API requires every tool_call to have a corresponding tool response
+					errorMessage := &model.ChatCompletionMessage{
+						Role:       model.ChatMessageRoleTool,
+						ToolCallID: toolCall.ID,
+						Name:       Ptr(""),
+						Content: &model.ChatCompletionMessageContent{
+							StringValue: volcengine.String(fmt.Sprintf("Tool call failed: %v. Please try a different approach or different tool instead of retrying with the same arguments.", err)),
+						},
+					}
+					ag.Convo.Push(errorMessage)
 					continue
 				}
 				// Add the tool response to the conversation
@@ -500,7 +517,15 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 	// Add tool calls to the assistant message if there are any
 	if len(toolCalls) > 0 {
 		var assistantToolCalls []*model.ToolCall
-		for _, tc := range toolCalls {
+		for id, tc := range toolCalls {
+			// Sanitize arguments to handle cases like "}{" or trailing garbage
+			cleanedArgs := sanitizeToolArgs(tc.Function.Arguments)
+			if cleanedArgs != tc.Function.Arguments {
+				Debugf("Sanitized tool arguments for %s: %s -> %s", tc.Function.Name, tc.Function.Arguments, cleanedArgs)
+				tc.Function.Arguments = cleanedArgs
+				// Update the map as well so local execution uses the clean version
+				toolCalls[id] = tc
+			}
 			assistantToolCalls = append(assistantToolCalls, &tc)
 		}
 		assistantMessage.ToolCalls = assistantToolCalls
@@ -514,7 +539,9 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	// Parse the query from the arguments
 	var argsMap map[string]interface{}
 	if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &argsMap); err != nil {
-		return nil, fmt.Errorf("error parsing arguments: %v", err)
+		// Log the malformed JSON for debugging
+		Debugf("Failed to parse tool call arguments. Function: %s, Raw arguments: %s", toolCall.Function.Name, toolCall.Function.Arguments)
+		return nil, fmt.Errorf("error parsing arguments: %v (raw: %s)", err, toolCall.Function.Arguments)
 	}
 
 	var filteredArgs map[string]interface{}
@@ -618,4 +645,25 @@ func (ag *Agent) getOpenChatMCPTools() []*model.Tool {
 		}
 	}
 	return tools
+}
+
+// sanitizeToolArgs attempts to clean up malformed JSON tool arguments
+// It primarily handles cases where the model outputs multiple JSON objects or trailing garbage
+// e.g. Log Evidence: Raw arguments: {"command": "...", ...}{}
+func sanitizeToolArgs(args string) string {
+	if args == "" {
+		return args
+	}
+	// Try to decode as a single JSON object
+	var obj map[string]interface{}
+	dec := json.NewDecoder(strings.NewReader(args))
+	if err := dec.Decode(&obj); err == nil {
+		// If successfully decoded one object, re-marshal it
+		// This strictly keeps only the valid JSON object and removes any trailing data
+		if cleaned, err := json.Marshal(obj); err == nil {
+			return string(cleaned)
+		}
+	}
+	// If decoding fails, return original and let downstream handle the error
+	return args
 }
