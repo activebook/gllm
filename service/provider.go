@@ -82,6 +82,7 @@ var modelPatterns = map[string]string{
 // This dual detection handles Chinese models hosted on US platforms (AWS, CoreWeave, etc.)
 func DetectModelProvider(endPoint string, modelName string) string {
 	if endPoint == "" && len(modelName) == 0 {
+		Debugf("Model Provider[%s] - Model[%s]\n", ModelProviderOpenAICompatible, modelName)
 		return ModelProviderOpenAICompatible
 	}
 
