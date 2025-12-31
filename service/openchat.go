@@ -286,6 +286,15 @@ func (c *OpenChat) process(ag *Agent) error {
 				// APIError contains detailed error information (code and message)
 				return fmt.Errorf("stream creation error: code=%s, message=%s", apiErr.Code, apiErr.Message)
 			}
+			// Fallback to checking for generic RequestError
+			var reqErr *model.RequestError
+			if errors.As(err, &reqErr) {
+				// Check for 400 Bad Request which often implies invalid parameters or unsupported features (like tools)
+				if reqErr.HTTPStatusCode == 400 && len(c.tools) > 0 {
+					return fmt.Errorf("stream creation error: %v (Hint: The model might not support the requested tools/function calling. Try disabling tools or switching models)", err)
+				}
+			}
+
 			// Fallback to generic error
 			return fmt.Errorf("stream creation error: %v", err)
 		}
