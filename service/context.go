@@ -623,16 +623,25 @@ func GetCurrentTokenCountGemini(messages []*genai.Content) int {
 // =============================================================================
 
 // PrepareAnthropicMessages processes messages to fit within context window limits.
-func (cm *ContextManager) PrepareAnthropicMessages(messages []anthropic.MessageParam, tools []anthropic.ToolUnionParam) ([]anthropic.MessageParam, bool) {
+func (cm *ContextManager) PrepareAnthropicMessages(messages []anthropic.MessageParam, systemPrompt string, tools []anthropic.ToolUnionParam) ([]anthropic.MessageParam, bool) {
 	if cm.Strategy == StrategyNone || len(messages) == 0 {
 		return messages, false
+	}
+
+	// Calculate tokens for system prompt (passed separately)
+	sysTokens := 0
+	if systemPrompt != "" {
+		sysTokens = EstimateTokens(systemPrompt) + MessageOverheadTokens
 	}
 
 	// Estimate tool tokens
 	toolTokens := EstimateAnthropicToolTokens(tools)
 
+	// Add tool tokens to the total overhead
+	totalOverhead := sysTokens + toolTokens
+
 	// Calculate current token usage using cache
-	currentTokens := cm.estimateAnthropicMessagesWithCache(messages) + toolTokens
+	currentTokens := cm.estimateAnthropicMessagesWithCache(messages) + totalOverhead
 	// Debug logging (uses nil-safe wrapper)
 	Debugf("Token count: %d MaxInputTokens[80%%]: %d", currentTokens, cm.MaxInputTokens)
 	if currentTokens <= cm.MaxInputTokens {
@@ -640,7 +649,7 @@ func (cm *ContextManager) PrepareAnthropicMessages(messages []anthropic.MessageP
 	}
 
 	// Need to truncate
-	return cm.truncateAnthropicMessages(messages, toolTokens)
+	return cm.truncateAnthropicMessages(messages, totalOverhead)
 }
 
 // estimateAnthropicMessagesWithCache uses global cache for token estimation
@@ -654,7 +663,7 @@ func (cm *ContextManager) estimateAnthropicMessagesWithCache(messages []anthropi
 }
 
 // truncateAnthropicMessages removes oldest messages while preserving critical ones.
-func (cm *ContextManager) truncateAnthropicMessages(messages []anthropic.MessageParam, toolTokens int) ([]anthropic.MessageParam, bool) {
+func (cm *ContextManager) truncateAnthropicMessages(messages []anthropic.MessageParam, totalOverhead int) ([]anthropic.MessageParam, bool) {
 	if len(messages) == 0 {
 		return messages, false
 	}
@@ -664,7 +673,7 @@ func (cm *ContextManager) truncateAnthropicMessages(messages []anthropic.Message
 	// However, if we preserve the FIRST user message, that's often good practice.
 	// But usually we just truncate oldest user/assistant pairs.
 
-	availableTokens := cm.MaxInputTokens - toolTokens
+	availableTokens := cm.MaxInputTokens - totalOverhead
 
 	// Build token counts
 	tokenCounts := make([]int, len(messages))
