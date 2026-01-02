@@ -39,6 +39,7 @@ func (ag *Agent) GenerateAnthropicStream() error {
 	// Initialize the Client
 	ctx := context.Background()
 
+	// Set both APIKey and AuthToken to ensure it works on X-Api-Key or Bearer
 	opts := []option.RequestOption{
 		option.WithAPIKey(ag.Model.ApiKey),
 		option.WithAuthToken(ag.Model.ApiKey),
@@ -48,18 +49,7 @@ func (ag *Agent) GenerateAnthropicStream() error {
 		opts = append(opts, option.WithBaseURL(ag.Model.EndPoint))
 	}
 
-	// Use custom client to disable compression if needed, but standard client might be fine now
-	// If the user said "it works", we might not need the header stripping anymore?
-	// But let's keep the client modification minimal. The user confirmed WithAuthToken was the key.
-	// However, the streaming issues I saw were related to headers/headers causing GZIP or proxy issues.
-	// I should check if I should keep the DisableCompression transport but without logging.
-
-	// Actually, I will just keep the standard client creation but possibly with headers if they help.
-	// The LoggingTransport also removed Accept-Encoding and X-Stainless.
-	// I'll assume standard client + DisableCompression is the safest bet given my findings.
-
-	// When we call client.Messages.NewStreaming, inside it, it would set anthropic-version to 2023-06-01
-
+	// When we call client.Messages.NewStreaming, inside it, it would set anthropic-version to 2023-06-01 automatically
 	client := anthropic.NewClient(opts...)
 
 	// Create tools

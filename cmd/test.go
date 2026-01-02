@@ -8,8 +8,9 @@ import (
 
 // testCmd represents the test command
 var testCmd = &cobra.Command{
-	Use:   "test [test_name]",
-	Short: "Run various test functions",
+	Use:    "test [test_name]",
+	Hidden: true,
+	Short:  "Run various test functions",
 	Long: `Run different test functions for gllm functionality.
 Available tests: mcp, channels, atref, all`,
 	Args: cobra.MaximumNArgs(1),
@@ -33,6 +34,8 @@ func runTests(testName string) {
 		// test.TestChannelsD()
 	case "atref":
 		// test.TestAtRefProcessor()
+	case "anthropic":
+		// test.TestAnthropic()
 	case "all":
 		fmt.Println("Running all tests...")
 	default:
@@ -42,5 +45,6 @@ func runTests(testName string) {
 }
 
 func init() {
-	//rootCmd.AddCommand(testCmd)
+	// After testing, comment out this line, and all test package to prevent compile test package
+	// rootCmd.AddCommand(testCmd)
 }
