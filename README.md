@@ -5,6 +5,7 @@
 ## 🚀 Features
 
 - **Flexible Model Selection**: Easily configure and switch between different LLMs.
+- **Multi-API compatibility**: Compatible with OpenAI API, Anthropic API, and Google Gemini API.
 - **Interactive Chat Mode**: Start real-time conversations with AI models.
 - **Editor Integration**: Use your preferred text editor for comfortable multi-line input in chat mode.
 - **Prompt Templates & System Prompts**: Manage reusable prompts and instructions.
