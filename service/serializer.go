@@ -491,6 +491,14 @@ func DisplayAnthropicConversationLog(data []byte, msgCount int, msgLength int) {
 					fmt.Printf("%s", TruncateString(v.Text, msgLength))
 				} else if v := block.OfImage; v != nil {
 					fmt.Printf("%s[Image]%s", ContentTypeColors["image"], resetColor)
+				} else if v := block.OfThinking; v != nil {
+					fmt.Printf("\n    %sThinking ↓%s", completeColor, resetColor)
+					fmt.Printf("\n    %s%s%s", inReasoningColor, TruncateString(v.Thinking, msgLength), resetColor)
+					fmt.Printf("\n    %s✓%s", completeColor, resetColor)
+				} else if v := block.OfRedactedThinking; v != nil {
+					fmt.Printf("\n    %sThinking (Redacted) ↓%s", completeColor, resetColor)
+					fmt.Printf("\n    %s%s%s", inReasoningColor, TruncateString(v.Data, msgLength), resetColor)
+					fmt.Printf("\n    %s✓%s", completeColor, resetColor)
 				} else if v := block.OfToolUse; v != nil {
 					fmt.Printf(" %s[Tool Use: %s]%s", ContentTypeColors["function_call"], v.Name, resetColor)
 					// Input
