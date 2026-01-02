@@ -219,6 +219,11 @@ var DefaultLimitsModern = ModelLimits{
 	MaxOutputTokens: 8192,
 }
 
+// IsModelGemini3 checks if the model name is a Gemini 3 model
+func IsModelGemini3(modelName string) bool {
+	return strings.Contains(modelName, "gemini-3")
+}
+
 // GetModelLimits retrieves the limits for a given model name.
 // It performs exact match first, then pattern matching, then returns defaults.
 func GetModelLimits(modelName string) ModelLimits {
