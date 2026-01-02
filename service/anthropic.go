@@ -45,7 +45,7 @@ func (ag *Agent) GenerateAnthropicStream() error {
 	ctx := context.Background()
 
 	opts := []option.RequestOption{
-		// option.WithAPIKey(ag.Model.ApiKey),
+		option.WithAPIKey(ag.Model.ApiKey),
 		option.WithAuthToken(ag.Model.ApiKey),
 	}
 
