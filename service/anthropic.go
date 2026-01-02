@@ -133,6 +133,9 @@ func (a *Anthropic) process(ag *Agent) error {
 		i++
 		a.op.status.ChangeTo(a.op.notify, StreamNotify{Status: StatusProcessing}, a.op.proceed)
 
+		// Context Management
+		cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
+
 		messages, _ := ag.Convo.GetMessages().([]anthropic.MessageParam)
 
 		// Bugfix:
@@ -155,11 +158,18 @@ func (a *Anthropic) process(ag *Agent) error {
 			}
 		}
 
+		// Apply context window management
+		truncated := false
+		cleanMessages, truncated = cm.PrepareAnthropicMessages(cleanMessages, ag.SystemPrompt, a.tools)
+		if truncated {
+			ag.Warn("Context trimmed to fit model limits")
+		}
+
 		// Create params
 		params := anthropic.MessageNewParams{
 			Model:     anthropic.Model(ag.Model.ModelName),
 			Messages:  cleanMessages,
-			MaxTokens: 4096,
+			MaxTokens: int64(cm.MaxOutputTokens), // Use ContextManager limit
 			System: []anthropic.TextBlockParam{{
 				Text: ag.SystemPrompt,
 				Type: constant.Text("text"),
@@ -169,9 +179,8 @@ func (a *Anthropic) process(ag *Agent) error {
 
 		// Enable Thinking if requested
 		if ag.ThinkMode {
-			// Set a default budget of 2048 tokens or use a config if available (using 2048 as a safe default for now)
 			// The user mentioned 1024 or higher is required.
-			params.Thinking = anthropic.ThinkingConfigParamOfEnabled(2048)
+			params.Thinking = anthropic.ThinkingConfigParamOfEnabled(32768)
 		}
 
 		// Temperature/TopP
