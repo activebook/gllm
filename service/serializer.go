@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/anthropics/anthropic-sdk-go"
 )
 
 var (
@@ -392,6 +394,121 @@ func DisplayOpenAIConversationLog(data []byte, msgCount int, msgLength int) {
 				fmt.Printf(" %s[Response to tool call: %s]%s", ContentTypeColors["function_response"], msg.ToolCallId, resetColor)
 			}
 
+			fmt.Println()
+			fmt.Println()
+		}
+
+		if len(messages) > messageLimit {
+			fmt.Printf("  %s... and %d old messages before%s\n", greyColor, len(messages)-messageLimit, resetColor)
+		}
+	}
+}
+
+// Display summary of Anthropic conversation
+func DisplayAnthropicConversationLog(data []byte, msgCount int, msgLength int) {
+	var messages []anthropic.MessageParam
+	if err := json.Unmarshal(data, &messages); err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing Anthropic messages: %v\n", err)
+		return
+	}
+
+	// Summary section
+	fmt.Println("Summary:")
+	fmt.Printf("  %sMessages: %d%s\n", resetColor, len(messages), resetColor)
+
+	var userCount, assistantCount int
+	var toolUseCount, toolResultCount int
+
+	for _, msg := range messages {
+		// Role is param.Field[string] or similar usually, but in MessageParam it is MessageParamRole (string alias)
+		// Wait, MessageParam definition:
+		// Role MessageParamRole `json:"role,omitzero,required"`
+		// MessageParamRole is string.
+		// However, it is a Field? No, earlier doc said "Role MessageParamRole".
+		// But let's check if it needs `.Value` access.
+		// Earlier `service/anthropic.go` used `anthropic.Model(ag.Model.ModelName)` which returns simple type?
+		// No, `MessageNewParams` used `F(...)`.
+		// `MessageParam` is used for HISTORY (Input).
+		// Let's verify if `MessageParam` fields are `param.Field` or direct values?
+		// "go doc ... MessageParam" earlier showed:
+		// Role MessageParamRole
+		// Content []ContentBlockParamUnion
+		// So they are DIRECT values, not `param.Field`.
+
+		switch msg.Role {
+		case anthropic.MessageParamRoleUser:
+			userCount++
+		case anthropic.MessageParamRoleAssistant:
+			assistantCount++
+		}
+
+		for _, block := range msg.Content {
+			if block.OfToolUse != nil {
+				toolUseCount++
+			} else if block.OfToolResult != nil {
+				toolResultCount++
+			}
+		}
+	}
+
+	fmt.Printf("  %sUser messages: %d%s\n", RoleColors["user"], userCount, resetColor)
+	fmt.Printf("  %sAssistant messages: %d%s\n", RoleColors["assistant"], assistantCount, resetColor)
+	if toolUseCount > 0 {
+		fmt.Printf("  %sTool uses: %d%s\n", ContentTypeColors["function_call"], toolUseCount, resetColor)
+	}
+	if toolResultCount > 0 {
+		fmt.Printf("  %sTool results: %d%s\n", ContentTypeColors["function_response"], toolResultCount, resetColor)
+	}
+
+	// Conversation preview
+	if len(messages) > 0 {
+		fmt.Println("\nConversation Preview: Recent")
+		messageLimit := min(msgCount, len(messages))
+		start := len(messages) - messageLimit
+		if start > 0 {
+			fmt.Printf("  %s... (%d) old messages ...%s\n", greyColor, start, resetColor)
+			fmt.Println()
+		}
+
+		for i := start; i < len(messages); i++ {
+			msg := messages[i]
+			role := string(msg.Role)
+
+			// Color
+			roleColor := RoleColors[role]
+			if roleColor == "" {
+				// Map anthropic specific roles if needed, but user/assistant match
+				roleColor = resetColor
+			}
+			fmt.Printf("  %s%s%s: ", roleColor, role, resetColor)
+
+			for j, block := range msg.Content {
+				if j > 0 {
+					// fmt.Print(" + ")
+				}
+
+				if v := block.OfText; v != nil {
+					fmt.Printf("%s", TruncateString(v.Text, msgLength))
+				} else if v := block.OfImage; v != nil {
+					fmt.Printf("%s[Image]%s", ContentTypeColors["image"], resetColor)
+				} else if v := block.OfToolUse; v != nil {
+					fmt.Printf(" %s[Tool Use: %s]%s", ContentTypeColors["function_call"], v.Name, resetColor)
+					// Input
+					inputJSON, _ := json.Marshal(v.Input)
+					fmt.Printf(" input: %s", TruncateString(string(inputJSON), msgLength))
+				} else if v := block.OfToolResult; v != nil {
+					fmt.Printf(" %s[Tool Result: ID=%s]%s", ContentTypeColors["function_response"], v.ToolUseID, resetColor)
+					// Content
+					contentJSON, _ := json.Marshal(v.Content)
+					fmt.Printf(" content: %s", TruncateString(string(contentJSON), msgLength))
+				} else {
+					fmt.Print("[Unknown Block]")
+				}
+
+				if j < len(msg.Content)-1 {
+					fmt.Print("\n    ") // Indent for next block
+				}
+			}
 			fmt.Println()
 			fmt.Println()
 		}
