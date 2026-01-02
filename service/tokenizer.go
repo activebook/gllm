@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 
+	anthropic "github.com/anthropics/anthropic-sdk-go"
 	openai "github.com/sashabaranov/go-openai"
 	openchat "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"google.golang.org/genai"
@@ -345,6 +346,66 @@ func EstimateGeminiMessageTokens(msg *genai.Content) int {
 	return tokens
 }
 
+// EstimateAnthropicMessageTokens estimates tokens for an Anthropic message.
+func EstimateAnthropicMessageTokens(msg anthropic.MessageParam) int {
+	tokens := MessageOverheadTokens
+
+	for _, block := range msg.Content {
+		// Text Content
+		if block.OfText != nil {
+			tokens += EstimateTokens(block.OfText.Text)
+		}
+
+		// Thinking Content
+		if block.OfThinking != nil {
+			tokens += EstimateTokens(block.OfThinking.Thinking)
+		}
+		if block.OfRedactedThinking != nil {
+			tokens += EstimateTokens(block.OfRedactedThinking.Data)
+		}
+
+		// Tool Use
+		if block.OfToolUse != nil {
+			tokens += ToolCallOverhead
+			tokens += EstimateTokens(block.OfToolUse.Name)
+			// Input is interface{}, convert to JSON string to estimate
+			tokens += EstimateJSONTokens(block.OfToolUse.Input)
+		}
+
+		// Tool Result
+		if block.OfToolResult != nil {
+			tokens += ToolCallOverhead
+			tokens += EstimateTokens(block.OfToolResult.ToolUseID)
+			// Use generic JSON estimation for robustness as Content structure varies
+			tokens += EstimateJSONTokens(block.OfToolResult.Content)
+		}
+
+		// Image
+		if block.OfImage != nil {
+			// ImageBlockParam { Source: ImageBlockParamSourceUnion ... }
+			// Try to access Base64 via OfBase64 if available, otherwise fallback to JSON size
+			if block.OfImage.Source.OfBase64 != nil {
+				tokens += TokenCostImageDefault
+				tokens += EstimateTokens(string(block.OfImage.Source.OfBase64.MediaType))
+			} else {
+				// Fallback
+				tokens += EstimateJSONTokens(block.OfImage.Source)
+			}
+		}
+
+		// Document
+		if block.OfDocument != nil {
+			// DocumentBlockParam { Source: ... }
+			// Usually base64 PDFs.
+			// Heuristic: 1MB ~= 1000 tokens? Or stick to TokenCostImageDefault for now?
+			// Let's estimate based on source data length if string.
+			tokens += EstimateJSONTokens(block.OfDocument.Source)
+		}
+	}
+
+	return tokens
+}
+
 // EstimateOpenAIMessagesTokens estimates total tokens for a slice of OpenAI messages.
 func EstimateOpenAIMessagesTokens(messages []openai.ChatCompletionMessage) int {
 	total := 0
@@ -371,6 +432,16 @@ func EstimateGeminiMessagesTokens(messages []*genai.Content) int {
 		total += EstimateGeminiMessageTokens(msg)
 	}
 	// Add base overhead
+	return total + MessageOverheadTokens
+}
+
+// EstimateAnthropicMessagesTokens estimates total tokens for a slice of Anthropic messages.
+func EstimateAnthropicMessagesTokens(messages []anthropic.MessageParam) int {
+	total := 0
+	for _, msg := range messages {
+		total += EstimateAnthropicMessageTokens(msg)
+	}
+	// Add base overhead for the conversation
 	return total + MessageOverheadTokens
 }
 
@@ -406,5 +477,14 @@ func EstimateOpenChatToolTokens(tools []*openchat.Tool) int {
 	if len(tools) == 0 {
 		return 0
 	}
+	return EstimateJSONTokens(tools)
+}
+
+// EstimateAnthropicToolTokens estimates tokens for a slice of Anthropic tools.
+func EstimateAnthropicToolTokens(tools []anthropic.ToolUnionParam) int {
+	if len(tools) == 0 {
+		return 0
+	}
+	// Tools are defined as JSON schemas
 	return EstimateJSONTokens(tools)
 }

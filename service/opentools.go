@@ -3,7 +3,11 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/packages/param"
+	"github.com/anthropics/anthropic-sdk-go/shared/constant"
 	"github.com/sashabaranov/go-openai"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"github.com/volcengine/volcengine-go-sdk/volcengine"
@@ -181,6 +185,37 @@ func (ot *OpenTool) ToOpenChatTool() *model.Tool {
 			Parameters:  ot.Function.Parameters,
 		},
 	}
+}
+
+// ToAnthropicTool converts a GenericTool to an anthropic.ToolUnionParam
+func (ot *OpenTool) ToAnthropicTool() anthropic.ToolUnionParam {
+	schema := anthropic.ToolInputSchemaParam{
+		Type:       constant.Object("object"),
+		Properties: ot.Function.Parameters["properties"],
+		// Handle Required
+		// ot.Function.Parameters might have "required" which is []interface{} usually from JSON
+		// We need []string
+	}
+
+	if req, ok := ot.Function.Parameters["required"]; ok {
+		if reqSlice, ok := req.([]interface{}); ok {
+			var required []string
+			for _, r := range reqSlice {
+				if s, ok := r.(string); ok {
+					required = append(required, s)
+				}
+			}
+			schema.Required = required
+		} else if reqSlice, ok := req.([]string); ok {
+			schema.Required = reqSlice
+		}
+	}
+
+	t := anthropic.ToolUnionParamOfTool(schema, ot.Function.Name)
+	if t.OfTool != nil && ot.Function.Description != "" {
+		t.OfTool.Description = param.NewOpt(ot.Function.Description)
+	}
+	return t
 }
 
 // ToGeminiFunctions converts a GenericTool to a genai.Tool
@@ -1254,6 +1289,10 @@ func (op *OpenProcessor) OpenAIMCPToolCall(toolCall openai.ToolCall, argsMap *ma
 			output += content + "\n"
 		case MCPResponseImage:
 			output += content + "\n"
+			output += fmt.Sprintf("![Image](%s)\n", content)
+		case MCPResponseAudio:
+			output += content + "\n"
+			output += fmt.Sprintf("![Audio](%s)\n", content)
 		default:
 			// Unknown file type, skip
 			// Don't deal with pdf, xls
@@ -1308,45 +1347,36 @@ func (op *OpenProcessor) OpenChatMCPToolCall(toolCall *model.ToolCall, argsMap *
 	}
 
 	// OpenChat supports text, image, audio toolcall responses
-	parts := []*model.ChatCompletionMessageContentPart{}
+	// But to be robust and consistent with OpenAI(which strictly requires string),
+	// We convert all content to a single string value.
+	var mergedText strings.Builder
 	for i, content := range result.Contents {
+		if i > 0 {
+			mergedText.WriteString("\n")
+		}
 		switch result.Types[i] {
 		case MCPResponseText:
-			part := model.ChatCompletionMessageContentPart{
-				Type: model.ChatCompletionMessageContentPartTypeText,
-				Text: content,
-			}
-			parts = append(parts, &part)
+			mergedText.WriteString(content)
 		case MCPResponseImage:
-			part := model.ChatCompletionMessageContentPart{
-				Type: model.ChatCompletionMessageContentPartTypeImageURL,
-				ImageURL: &model.ChatMessageImageURL{
-					URL: content,
-				},
-			}
-			parts = append(parts, &part)
+			mergedText.WriteString(fmt.Sprintf("![Image](%s)", content))
 		case MCPResponseAudio:
-			part := model.ChatCompletionMessageContentPart{
-				Type: model.ChatCompletionMessageContentPartTypeVideoURL,
-				ImageURL: &model.ChatMessageImageURL{
-					URL: content,
-				},
-			}
-			parts = append(parts, &part)
+			mergedText.WriteString(fmt.Sprintf("![Audio](%s)", content))
 		default:
 			// Unknown file type, skip
-			// Don't deal with pdf, xls
 		}
 	}
 
+	// Bugfix: only return as string value directly
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Name:       Ptr(""),
 		Content: &model.ChatCompletionMessageContent{
-			ListValue: parts,
+			StringValue: volcengine.String(mergedText.String()),
 		},
 	}
+
+	Debugf("OpenChatMCPToolCall Response: %s", *toolMessage.Content.StringValue)
 	return &toolMessage, nil
 }
 

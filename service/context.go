@@ -3,6 +3,7 @@ package service
 import (
 	"strings"
 
+	"github.com/anthropics/anthropic-sdk-go"
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"google.golang.org/genai"
@@ -27,18 +28,20 @@ const (
 
 // ContextManager handles context window limits for LLM conversations
 type ContextManager struct {
-	MaxInputTokens int                // Maximum input tokens allowed
-	Strategy       TruncationStrategy // Strategy for handling overflow
-	BufferPercent  float64            // Safety buffer (0.0-1.0)
+	MaxInputTokens  int                // Maximum input tokens allowed
+	MaxOutputTokens int                // Maximum output tokens allowed (new field for Anthropic)
+	Strategy        TruncationStrategy // Strategy for handling overflow
+	BufferPercent   float64            // Safety buffer (0.0-1.0)
 }
 
 // NewContextManager creates a context manager with the given model limits
 func NewContextManager(limits ModelLimits, strategy TruncationStrategy) *ContextManager {
 	bufferPercent := DefaultBufferPercent
 	return &ContextManager{
-		MaxInputTokens: limits.MaxInputTokens(bufferPercent),
-		Strategy:       strategy,
-		BufferPercent:  bufferPercent,
+		MaxInputTokens:  limits.MaxInputTokens(bufferPercent),
+		MaxOutputTokens: limits.MaxOutputTokens,
+		Strategy:        strategy,
+		BufferPercent:   bufferPercent,
 	}
 }
 
@@ -613,4 +616,190 @@ func (cm *ContextManager) gatherToolPairGemini(messages []*genai.Content, callIn
 // GetCurrentTokenCountGemini returns the current token count for Gemini messages
 func GetCurrentTokenCountGemini(messages []*genai.Content) int {
 	return EstimateGeminiMessagesTokens(messages)
+}
+
+// =============================================================================
+// Anthropic Message Handling
+// =============================================================================
+
+// PrepareAnthropicMessages processes messages to fit within context window limits.
+func (cm *ContextManager) PrepareAnthropicMessages(messages []anthropic.MessageParam, systemPrompt string, tools []anthropic.ToolUnionParam) ([]anthropic.MessageParam, bool) {
+	if cm.Strategy == StrategyNone || len(messages) == 0 {
+		return messages, false
+	}
+
+	// Calculate tokens for system prompt (passed separately)
+	sysTokens := 0
+	if systemPrompt != "" {
+		sysTokens = EstimateTokens(systemPrompt) + MessageOverheadTokens
+	}
+
+	// Estimate tool tokens
+	toolTokens := EstimateAnthropicToolTokens(tools)
+
+	// Add tool tokens to the total overhead
+	totalOverhead := sysTokens + toolTokens
+
+	// Calculate current token usage using cache
+	currentTokens := cm.estimateAnthropicMessagesWithCache(messages) + totalOverhead
+	// Debug logging (uses nil-safe wrapper)
+	Debugf("Token count: %d MaxInputTokens[80%%]: %d", currentTokens, cm.MaxInputTokens)
+	if currentTokens <= cm.MaxInputTokens {
+		return messages, false
+	}
+
+	// Need to truncate
+	return cm.truncateAnthropicMessages(messages, totalOverhead)
+}
+
+// estimateAnthropicMessagesWithCache uses global cache for token estimation
+func (cm *ContextManager) estimateAnthropicMessagesWithCache(messages []anthropic.MessageParam) int {
+	cache := GetGlobalTokenCache()
+	total := 0
+	for _, msg := range messages {
+		total += cache.GetOrComputeAnthropicTokens(msg)
+	}
+	return total + MessageOverheadTokens // Add conversation overhead
+}
+
+// truncateAnthropicMessages removes oldest messages while preserving critical ones.
+func (cm *ContextManager) truncateAnthropicMessages(messages []anthropic.MessageParam, totalOverhead int) ([]anthropic.MessageParam, bool) {
+	if len(messages) == 0 {
+		return messages, false
+	}
+
+	// Anthropic messages don't strictly have "system" role in MessageParam list usually
+	// The "System" prompt is separate in MessageNewParams, but here we deal with "User" and "Assistant" history.
+	// However, if we preserve the FIRST user message, that's often good practice.
+	// But usually we just truncate oldest user/assistant pairs.
+
+	availableTokens := cm.MaxInputTokens - totalOverhead
+
+	// Build token counts
+	tokenCounts := make([]int, len(messages))
+	historyTokens := 0
+	cache := GetGlobalTokenCache()
+	for i, msg := range messages {
+		tokenCounts[i] = cache.GetOrComputeAnthropicTokens(msg)
+		historyTokens += tokenCounts[i]
+	}
+
+	truncated := false
+	for historyTokens > availableTokens && len(messages) > 0 {
+		removed := false
+		// Remove items from start (index 0)
+		// We should try to preserve tool pairs if possible, similar to other models.
+
+		for i := 0; i < len(messages); i++ {
+			// Check tool pair logic (assuming helper exists or we simplify)
+			// Anthropic tool use: Assistant (tool_use) -> User (tool_result)
+			// We should remove them as a pair.
+
+			pairIndices := cm.findToolPairAnthropic(messages, i)
+			if len(pairIndices) > 0 {
+				// Remove pair
+				tokensRemoved := 0
+				for j := len(pairIndices) - 1; j >= 0; j-- {
+					idx := pairIndices[j]
+					if idx < len(tokenCounts) {
+						tokensRemoved += tokenCounts[idx]
+						messages = append(messages[:idx], messages[idx+1:]...)
+						tokenCounts = append(tokenCounts[:idx], tokenCounts[idx+1:]...)
+					}
+				}
+				historyTokens -= tokensRemoved
+				truncated = true
+				removed = true
+				break
+			}
+
+			// Regular message
+			// Check if message is a Tool Use or Tool Result NOT captured by pair logic
+			// (Should be captured, but if solitary, just remove)
+			historyTokens -= tokenCounts[i]
+			messages = append(messages[:i], messages[i+1:]...)
+			tokenCounts = append(tokenCounts[:i], tokenCounts[i+1:]...)
+			truncated = true
+			removed = true
+			break
+		}
+		if !removed {
+			break
+		}
+	}
+
+	return messages, truncated
+}
+
+func (cm *ContextManager) findToolPairAnthropic(messages []anthropic.MessageParam, index int) []int {
+	if index >= len(messages) {
+		return nil
+	}
+	msg := messages[index]
+
+	// Helper to check for content blocks
+	hasToolUse := false
+	hasToolResult := false
+	var toolUseID string
+
+	for _, block := range msg.Content {
+		if block.OfToolUse != nil {
+			hasToolUse = true
+			toolUseID = block.OfToolUse.ID
+			break // Assuming one tool use per message for simplicity of pair finding, though parallel is possible
+		}
+		if block.OfToolResult != nil {
+			hasToolResult = true
+			toolUseID = block.OfToolResult.ToolUseID
+			break
+		}
+	}
+
+	// Case 1: Message is Tool Result (User) -> Find preceding Assistant Tool Use
+	if hasToolResult && msg.Role == anthropic.MessageParamRoleUser {
+		// Look backwards for the tool use
+		for i := index - 1; i >= 0; i-- {
+			prevMsg := messages[i]
+			if prevMsg.Role == anthropic.MessageParamRoleAssistant {
+				for _, b := range prevMsg.Content {
+					if b.OfToolUse != nil && b.OfToolUse.ID == toolUseID {
+						return []int{i, index} // Found unique pair (Assistant, User)
+						// Note: This simplistic logic assumes 1:1. Parallel tool calls might be trickier.
+						// But removing just this pair is a safe start.
+					}
+				}
+			}
+		}
+		// If not found, it's an orphan result, safe to remove itself
+		return []int{index}
+	}
+
+	// Case 2: Message is Tool Use (Assistant) -> Find following User Tool Result
+	if hasToolUse && msg.Role == anthropic.MessageParamRoleAssistant {
+		indices := []int{index}
+		// Look forward for the tool result
+		// A single Assistant message might have multiple tool uses.
+		// We should gather ALL results.
+		// But `findToolPair` contract usually returns a group to remove.
+		// Let's gather all subsequent results.
+		for j := index + 1; j < len(messages); j++ {
+			nextMsg := messages[j]
+			if nextMsg.Role == anthropic.MessageParamRoleUser {
+				for _, b := range nextMsg.Content {
+					if b.OfToolResult != nil {
+						// Is this result for one of the tool uses in `msg`?
+						// Need to check all tool uses in `msg`.
+						// For now, simpler: if it's a tool result, assume it's related if usage pattern holds.
+						// More strictly: check IDs.
+						if b.OfToolResult.ToolUseID == toolUseID {
+							indices = append(indices, j)
+						}
+					}
+				}
+			}
+		}
+		return indices
+	}
+
+	return nil
 }

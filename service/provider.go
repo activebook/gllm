@@ -9,8 +9,7 @@ const (
 	ModelProviderGemini           string = "gemini" // for google gemini models
 	ModelProviderOpenAI           string = "openai"
 	ModelProviderOpenAICompatible string = "openchat"
-	ModelProviderAnthropic        string = "anthropic"
-	ModelProviderMistral          string = "mistral" // for mistral models
+	ModelProviderAnthropic        string = "anthropic" // for anthropic models (official sdk)
 	ModelProviderUnknown          string = "unknown"
 )
 
@@ -21,12 +20,6 @@ var providerDomains = map[string]string{
 	"google.com":     ModelProviderGemini,
 	"ai.google.dev":  ModelProviderGemini,
 
-	// Mistral domains
-	"mistral.ai":  ModelProviderMistral,
-	"mistral.com": ModelProviderMistral,
-	"codestral":   ModelProviderMistral,
-	"magistral":   ModelProviderMistral,
-
 	// Explicit OpenAI domains
 	"openai.com":       ModelProviderOpenAI,
 	"api.openai.com":   ModelProviderOpenAI,
@@ -35,6 +28,10 @@ var providerDomains = map[string]string{
 	"openai.azure.com": ModelProviderOpenAI,
 	"modelscope.ai":    ModelProviderOpenAI,
 	"zenmux.ai":        ModelProviderOpenAI,
+
+	// Anthropic domains
+	"anthropic.com":     ModelProviderAnthropic,
+	"api.anthropic.com": ModelProviderAnthropic,
 
 	// Chinese/Other domains
 	".cn":              ModelProviderOpenAICompatible,
@@ -75,6 +72,8 @@ var modelPatterns = map[string]string{
 	"abab":     ModelProviderOpenAICompatible, // MiniMax ABAB models
 	"yi-":      ModelProviderOpenAICompatible, // 01.AI Yi models (with hyphen to avoid false matches)
 	"yi_":      ModelProviderOpenAICompatible, // 01.AI Yi models (with underscore)
+
+	"claude": ModelProviderAnthropic, // Anthropic Claude models
 }
 
 // DetectModelProvider detects the model provider based on endpoint and model name.

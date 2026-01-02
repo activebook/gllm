@@ -105,6 +105,11 @@ var DefaultModelLimits = map[string]ModelLimits{
 	"mimo-v2-flash": {ContextWindow: 256000, MaxOutputTokens: 8192},
 
 	/*
+	 * Kuaishou Models
+	 */
+	"kat-coder": {ContextWindow: 256000, MaxOutputTokens: 32768},
+
+	/*
 	 * zAI Models
 	 */
 	"glm-4.6":     {ContextWindow: 200000, MaxOutputTokens: 16384},
@@ -217,6 +222,11 @@ var DefaultLimitsModern = ModelLimits{
 	// Default for modern generation models
 	ContextWindow:   128000,
 	MaxOutputTokens: 8192,
+}
+
+// IsModelGemini3 checks if the model name is a Gemini 3 model
+func IsModelGemini3(modelName string) bool {
+	return strings.Contains(modelName, "gemini-3")
 }
 
 // GetModelLimits retrieves the limits for a given model name.

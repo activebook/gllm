@@ -396,8 +396,10 @@ Using the --message-chars (-c) flag, set the maximum length of each message's co
 		switch provider {
 		case service.ModelProviderGemini:
 			service.DisplayGeminiConversationLog(data, convoMessageCount, convoMessageLength)
-		case service.ModelProviderOpenAI, service.ModelProviderMistral, service.ModelProviderOpenAICompatible:
+		case service.ModelProviderOpenAI, service.ModelProviderOpenAICompatible:
 			service.DisplayOpenAIConversationLog(data, convoMessageCount, convoMessageLength)
+		case service.ModelProviderAnthropic:
+			service.DisplayAnthropicConversationLog(data, convoMessageCount, convoMessageLength)
 		default:
 			fmt.Println("Unknown conversation format.")
 		}

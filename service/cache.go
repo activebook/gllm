@@ -2,8 +2,10 @@ package service
 
 import (
 	"encoding/json"
+	"fmt"
 	"sync"
 
+	anthropic "github.com/anthropics/anthropic-sdk-go"
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"google.golang.org/genai"
@@ -151,6 +153,19 @@ func GetGeminiMessageKey(msg *genai.Content) string {
 	return string(data)
 }
 
+// GetAnthropicMessageKey generates a cache key for an Anthropic message.
+func GetAnthropicMessageKey(msg anthropic.MessageParam) string {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		// Fallback: role + content length/summary?
+		// Since content is complex blocks, marshalling failure is rare unless interface{}
+		// If it fails, we fall back to a simple string rep or just don't cache effectively (misses)
+		// But let's try to make something unique.
+		return string(msg.Role) + fmt.Sprintf("%v", msg.Content)
+	}
+	return string(data)
+}
+
 // =============================================================================
 // Global Token Cache Instance
 // =============================================================================
@@ -207,6 +222,17 @@ func (tc *TokenCache) GetOrComputeGeminiTokens(msg *genai.Content) int {
 		return count
 	}
 	count := EstimateGeminiMessageTokens(msg)
+	tc.Set(key, count)
+	return count
+}
+
+// GetOrComputeAnthropicTokens retrieves cached tokens or computes and caches them.
+func (tc *TokenCache) GetOrComputeAnthropicTokens(msg anthropic.MessageParam) int {
+	key := GetAnthropicMessageKey(msg)
+	if count, found := tc.Get(key); found {
+		return count
+	}
+	count := EstimateAnthropicMessageTokens(msg)
 	tc.Set(key, count)
 	return count
 }

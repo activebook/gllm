@@ -282,8 +282,10 @@ func (ci *ChatInfo) showHistory(num int, chars int) {
 	switch ci.ModelProvider {
 	case service.ModelProviderGemini:
 		service.DisplayGeminiConversationLog(data, num, chars)
-	case service.ModelProviderOpenAI, service.ModelProviderMistral, service.ModelProviderOpenAICompatible:
+	case service.ModelProviderOpenAI, service.ModelProviderOpenAICompatible:
 		service.DisplayOpenAIConversationLog(data, num, chars)
+	case service.ModelProviderAnthropic:
+		service.DisplayAnthropicConversationLog(data, num, chars)
 	default:
 		fmt.Println("Unknown provider")
 	}

@@ -106,7 +106,7 @@ func ConstructConversationManager(convoName string, provider string) (Conversati
 		}
 		return &convo, nil
 
-	case ModelProviderOpenAI, ModelProviderMistral:
+	case ModelProviderOpenAI:
 		// Used for OpenAI compatible models
 		convo := OpenAIConversation{}
 		err := convo.Open(convoName)
@@ -118,6 +118,15 @@ func ConstructConversationManager(convoName string, provider string) (Conversati
 	case ModelProviderGemini:
 		// Used for Gemini
 		convo := Gemini2Conversation{}
+		err := convo.Open(convoName)
+		if err != nil {
+			return nil, err
+		}
+		return &convo, nil
+
+	case ModelProviderAnthropic:
+		// Used for Anthropic
+		convo := AnthropicConversation{}
 		err := convo.Open(convoName)
 		if err != nil {
 			return nil, err
@@ -267,7 +276,7 @@ func CallAgent(op *AgentOptions) error {
 				// Send error through channel instead of returning
 				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 			}
-		case ModelProviderOpenAI, ModelProviderMistral:
+		case ModelProviderOpenAI:
 			// Used for OpenAI compatible models
 			if err := ag.GenerateOpenAIStream(); err != nil {
 				// Send error through channel instead of returning
@@ -275,6 +284,11 @@ func CallAgent(op *AgentOptions) error {
 			}
 		case ModelProviderGemini:
 			if err := ag.GenerateGemini2Stream(); err != nil {
+				// Send error through channel instead of returning
+				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
+			}
+		case ModelProviderAnthropic:
+			if err := ag.GenerateAnthropicStream(); err != nil {
 				// Send error through channel instead of returning
 				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 			}
