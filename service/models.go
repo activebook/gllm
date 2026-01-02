@@ -105,6 +105,11 @@ var DefaultModelLimits = map[string]ModelLimits{
 	"mimo-v2-flash": {ContextWindow: 256000, MaxOutputTokens: 8192},
 
 	/*
+	 * Kuaishou Models
+	 */
+	"kat-coder": {ContextWindow: 256000, MaxOutputTokens: 32768},
+
+	/*
 	 * zAI Models
 	 */
 	"glm-4.6":     {ContextWindow: 200000, MaxOutputTokens: 16384},
