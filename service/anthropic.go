@@ -14,11 +14,6 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/shared/constant"
 )
 
-type UsageStats struct {
-	InputTokens  int64
-	OutputTokens int64
-}
-
 func (ag *Agent) getAnthropicFilePart(file *FileData) *anthropic.ContentBlockParamUnion {
 	format := file.Format()
 	// Handle based on file type
@@ -52,9 +47,6 @@ func (ag *Agent) GenerateAnthropicStream() error {
 	if ag.Model.EndPoint != "" {
 		opts = append(opts, option.WithBaseURL(ag.Model.EndPoint))
 	}
-	// Try to mimic curl headers to ensure proxy behaves correctly
-	// opts = append(opts, option.WithHeader("User-Agent", "curl/8.7.1"))
-	// opts = append(opts, option.WithHeader("Accept", "*/*"))
 
 	// Use custom client to disable compression if needed, but standard client might be fine now
 	// If the user said "it works", we might not need the header stripping anymore?
@@ -65,6 +57,8 @@ func (ag *Agent) GenerateAnthropicStream() error {
 	// Actually, I will just keep the standard client creation but possibly with headers if they help.
 	// The LoggingTransport also removed Accept-Encoding and X-Stainless.
 	// I'll assume standard client + DisableCompression is the safest bet given my findings.
+
+	// When we call client.Messages.NewStreaming, inside it, it would set anthropic-version to 2023-06-01
 
 	client := anthropic.NewClient(opts...)
 
@@ -244,14 +238,14 @@ func (a *Anthropic) process(ag *Agent) error {
 	return nil
 }
 
-func (a *Anthropic) processStream(stream *ssestream.Stream[anthropic.MessageStreamEventUnion]) (anthropic.MessageParam, []anthropic.ToolUseBlockParam, UsageStats, error) {
+func (a *Anthropic) processStream(stream *ssestream.Stream[anthropic.MessageStreamEventUnion]) (anthropic.MessageParam, []anthropic.ToolUseBlockParam, *TokenUsage, error) {
 	var contentBuilder strings.Builder
 	var thinkingBuilder strings.Builder
 	var thinkingSignature string
 	var currentToolUse *anthropic.ToolUseBlockParam
 	var toolCalls []anthropic.ToolUseBlockParam
 	var currentInputBuilder strings.Builder // For accumulating JSON input
-	var usage UsageStats
+	usage := NewTokenUsage()
 
 	var contentBlocks []anthropic.ContentBlockParamUnion
 	var currentBlockType string
@@ -265,8 +259,14 @@ func (a *Anthropic) processStream(stream *ssestream.Stream[anthropic.MessageStre
 		switch event.Type {
 		case "message_start":
 			evt := event.AsMessageStart()
-			usage.InputTokens += evt.Message.Usage.InputTokens
-			usage.OutputTokens += evt.Message.Usage.OutputTokens
+			usage.RecordTokenUsage(
+				int(evt.Message.Usage.InputTokens),
+				int(evt.Message.Usage.OutputTokens),
+				int(evt.Message.Usage.CacheReadInputTokens),
+				0,
+				int(evt.Message.Usage.InputTokens+evt.Message.Usage.OutputTokens),
+			)
+			// Debugf("Anthropic Usage(message start): %v", evt.Message.Usage)
 		case "content_block_start":
 			evt := event.AsContentBlockStart()
 			block := evt.ContentBlock
@@ -336,8 +336,14 @@ func (a *Anthropic) processStream(stream *ssestream.Stream[anthropic.MessageStre
 
 		case "message_delta":
 			evt := event.AsMessageDelta()
-			usage.OutputTokens += evt.Usage.OutputTokens
-			usage.InputTokens += evt.Usage.InputTokens
+			usage.RecordTokenUsage(
+				int(evt.Usage.InputTokens),
+				int(evt.Usage.OutputTokens),
+				int(evt.Usage.CacheReadInputTokens),
+				0,
+				int(evt.Usage.InputTokens+evt.Usage.OutputTokens),
+			)
+			// Debugf("Anthropic Usage(message delta): %v", evt.Usage)
 
 		case "message_stop":
 			// Finished
@@ -503,14 +509,14 @@ func (ag *Agent) getAnthropicMCPTools() []anthropic.ToolUnionParam {
 	return tools
 }
 
-func addUpAnthropicTokenUsage(ag *Agent, usage UsageStats) {
-	if ag.TokenUsage != nil {
+func addUpAnthropicTokenUsage(ag *Agent, usage *TokenUsage) {
+	if ag.TokenUsage != nil && usage != nil {
 		ag.TokenUsage.RecordTokenUsage(
-			int(usage.InputTokens),
-			int(usage.OutputTokens),
-			0, // Anthropic doesn't expose cached tokens in standard usage yet?
-			0, // Reasoning tokens if any
-			int(usage.InputTokens+usage.OutputTokens),
+			usage.InputTokens,
+			usage.OutputTokens,
+			usage.CachedTokens,
+			usage.ThoughtTokens,
+			usage.TotalTokens,
 		)
 	}
 }
