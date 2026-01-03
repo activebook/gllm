@@ -32,6 +32,9 @@ func init() {
 		"function_response": toolResponseColor,
 		"image":             mediaColor,
 		"file_data":         mediaColor,
+		"reasoning":         reasoningColor,
+		"reasoning_content": inReasoningColor,
+		"reset":             resetColor,
 	}
 }
 
@@ -329,9 +332,9 @@ func RenderOpenAIConversationLog(data []byte) string {
 
 			// Output the reasoning content if it exists
 			if msg.ReasonContent != "" {
-				sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", completeColor, resetColor))
-				sb.WriteString(fmt.Sprintf("\n    %s%s%s", inReasoningColor, msg.ReasonContent, resetColor))
-				sb.WriteString(fmt.Sprintf("\n    %s✓%s\n", completeColor, resetColor))
+				sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
+				sb.WriteString(fmt.Sprintf("\n    %s%s%s", ContentTypeColors["reasoning_content"], msg.ReasonContent, ContentTypeColors["reset"]))
+				sb.WriteString(fmt.Sprintf("\n    %s✓%s\n", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 			}
 
 			if msg.Content != "" {
@@ -450,13 +453,13 @@ func RenderAnthropicConversationLog(data []byte) string {
 				} else if v := block.OfImage; v != nil {
 					sb.WriteString(fmt.Sprintf("%s[Image]%s", ContentTypeColors["image"], resetColor))
 				} else if v := block.OfThinking; v != nil {
-					sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", completeColor, resetColor))
-					sb.WriteString(fmt.Sprintf("\n    %s%s%s", inReasoningColor, v.Thinking, resetColor))
-					sb.WriteString(fmt.Sprintf("\n    %s✓%s", completeColor, resetColor))
+					sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
+					sb.WriteString(fmt.Sprintf("\n    %s%s%s", ContentTypeColors["reasoning_content"], v.Thinking, ContentTypeColors["reset"]))
+					sb.WriteString(fmt.Sprintf("\n    %s✓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 				} else if v := block.OfRedactedThinking; v != nil {
-					sb.WriteString(fmt.Sprintf("\n    %sThinking (Redacted) ↓%s", completeColor, resetColor))
-					sb.WriteString(fmt.Sprintf("\n    %s%s%s", inReasoningColor, v.Data, resetColor))
-					sb.WriteString(fmt.Sprintf("\n    %s✓%s", completeColor, resetColor))
+					sb.WriteString(fmt.Sprintf("\n    %sThinking (Redacted) ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
+					sb.WriteString(fmt.Sprintf("\n    %s%s%s", ContentTypeColors["reasoning_content"], v.Data, ContentTypeColors["reset"]))
+					sb.WriteString(fmt.Sprintf("\n    %s✓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 				} else if v := block.OfToolUse; v != nil {
 					sb.WriteString(fmt.Sprintf(" %s[Tool Use: %s]%s", ContentTypeColors["function_call"], v.Name, resetColor))
 					// Input

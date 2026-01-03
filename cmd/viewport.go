@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/reflow/wrap"
 )
 
 var (
@@ -58,14 +59,20 @@ func (m ViewportModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		footerHeight := lipgloss.Height(m.footerView())
 		verticalMarginHeight := headerHeight + footerHeight
 
+		// Fix Details: I switched from wordwrap to github.com/muesli/reflow/wrap.
+		// The wrap package uses a hard-wrapping strategy that correctly calculates character widths (handling East Asian Widths),
+		// so lines will now break correctly for Chinese, Japanese, and other multi-byte characters.
 		if !m.ready {
 			m.viewport = viewport.New(msg.Width, msg.Height-verticalMarginHeight)
 			m.viewport.YPosition = headerHeight
-			m.viewport.SetContent(m.content)
+			wrappedContent := wrap.String(m.content, msg.Width)
+			m.viewport.SetContent(wrappedContent)
 			m.ready = true
 		} else {
 			m.viewport.Width = msg.Width
 			m.viewport.Height = msg.Height - verticalMarginHeight
+			wrappedContent := wrap.String(m.content, msg.Width)
+			m.viewport.SetContent(wrappedContent)
 		}
 	}
 
@@ -90,13 +97,7 @@ func (m ViewportModel) headerView() string {
 
 func (m ViewportModel) footerView() string {
 	info := infoStyle.Render(fmt.Sprintf("%3.f%%", m.viewport.ScrollPercent()*100))
-	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(info)))
-	return lipgloss.JoinHorizontal(lipgloss.Center, line, info)
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
+	tips := "space/f/d: Next • b/u: Prev • j/k: Scroll • q: Quit"
+	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(info)-lipgloss.Width(tips)-2))
+	return lipgloss.JoinHorizontal(lipgloss.Center, line, " "+tips+" ", info)
 }
