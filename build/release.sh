@@ -23,6 +23,30 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
+# Check for help flag
+if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
+  cat << 'EOF'
+Usage: ./build/release.sh [version]
+Example: ./build/release.sh v1.13.0
+         ./build/release.sh (auto-suggests next patch version)
+
+This script will:
+1. Perform pre-flight checks (dependencies, git status).
+2. Determine the target version (argument or auto-suggestion).
+3. Validate the version (must be > latest tag).
+4. Generate a changelog since the last tag.
+5. Optionally run in --dry-run mode.
+6. Prompt for final confirmation, showing the changelog.
+7. Create and push a git tag.
+8. Run goreleaser to publish the release.
+
+It also includes two helper modes:
+--cleanup: Interactively deletes a release to recover from a failure.
+--dry-run: Runs all checks without making any changes.
+EOF
+  exit 0
+fi
+
 # --- Configuration ---
 # Determine the absolute path of the project root, assuming the script is in a subdirectory (e.g., /build)
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
