@@ -282,7 +282,7 @@ func (ci *ChatInfo) showHistory() {
 
 	// Show viewport
 	m := NewViewportModel(ci.ModelProvider, content, func() string {
-		return fmt.Sprintf("History: %s (%s)", convoName, ci.ModelProvider)
+		return fmt.Sprintf("Conversation: %s", convoName)
 	})
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
