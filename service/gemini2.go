@@ -447,12 +447,10 @@ func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Functi
 // Each of these interactions consumes tokens that should be tracked
 func (ag *Agent) addUpGemini2TokenUsage(resp *genai.GenerateContentResponse) {
 	if resp != nil && resp.UsageMetadata != nil && ag.TokenUsage != nil {
-		// Warnf("addUpTokenUsage - PromptTokenCount: %d, CandidatesTokenCount: %d, CachedContentTokenCount: %d, ThoughtsTokenCount: %d, TotalTokenCount: %d",
-		// 	resp.UsageMetadata.PromptTokenCount,
-		// 	resp.UsageMetadata.CandidatesTokenCount,
-		// 	resp.UsageMetadata.CachedContentTokenCount,
-		// 	resp.UsageMetadata.ThoughtsTokenCount,
-		// 	resp.UsageMetadata.TotalTokenCount)
+		// For gemini model, cache read tokens are not included in the usage metadata
+		// The total number of tokens for the entire request. This is the sum of `prompt_token_count`,
+		// `candidates_token_count`, `tool_use_prompt_token_count`, and `thoughts_token_count`.
+		ag.TokenUsage.CachedTokensInPrompt = true
 		ag.TokenUsage.RecordTokenUsage(int(resp.UsageMetadata.PromptTokenCount),
 			int(resp.UsageMetadata.CandidatesTokenCount),
 			int(resp.UsageMetadata.CachedContentTokenCount),

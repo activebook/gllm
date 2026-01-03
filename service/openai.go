@@ -531,7 +531,10 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 // New responses are generated based on tool call results
 // Each of these interactions consumes tokens that should be tracked
 func addUpOpenAITokenUsage(ag *Agent, resp *openai.ChatCompletionStreamResponse) {
-	//Warnf("addUpTokenUsage - PromptTokenCount: %d, CompletionTokenCount: %d, TotalTokenCount: %d", resp.Usage.PromptTokens, resp.Usage.CompletionTokens, resp.Usage.TotalTokens)
+	// For openai model, cache read tokens are not included in the usage
+	// Because cached tokens already in the prompt tokens, so we don't need to count them
+	// Thought tokens are also included in the prompt tokens
+	// So the total tokens is the sum of prompt tokens and completion tokens
 	if resp != nil && resp.Usage != nil && ag.TokenUsage != nil {
 		cachedTokens := 0
 		thoughtTokens := 0
@@ -541,6 +544,7 @@ func addUpOpenAITokenUsage(ag *Agent, resp *openai.ChatCompletionStreamResponse)
 		if resp.Usage.CompletionTokensDetails != nil {
 			thoughtTokens = int(resp.Usage.CompletionTokensDetails.ReasoningTokens)
 		}
+		ag.TokenUsage.CachedTokensInPrompt = true
 		ag.TokenUsage.RecordTokenUsage(
 			int(resp.Usage.PromptTokens),
 			int(resp.Usage.CompletionTokens),

@@ -249,12 +249,14 @@ func (a *Anthropic) processStream(stream *ssestream.Stream[anthropic.MessageStre
 		switch event.Type {
 		case "message_start":
 			evt := event.AsMessageStart()
+			// For anthropic model, cache read tokens are included in the message usage
+			// Because cached tokens are not in the prompt tokens, so we need to count them
 			usage.RecordTokenUsage(
 				int(evt.Message.Usage.InputTokens),
 				int(evt.Message.Usage.OutputTokens),
 				int(evt.Message.Usage.CacheReadInputTokens),
 				0,
-				int(evt.Message.Usage.InputTokens+evt.Message.Usage.OutputTokens),
+				int(evt.Message.Usage.InputTokens+evt.Message.Usage.OutputTokens+evt.Message.Usage.CacheReadInputTokens),
 			)
 			// Debugf("Anthropic Usage(message start): %v", evt.Message.Usage)
 		case "content_block_start":
@@ -326,12 +328,14 @@ func (a *Anthropic) processStream(stream *ssestream.Stream[anthropic.MessageStre
 
 		case "message_delta":
 			evt := event.AsMessageDelta()
+			// For anthropic model, cache read tokens are included in the message usage
+			// Because cached tokens are not in the prompt tokens, so we need to count them
 			usage.RecordTokenUsage(
 				int(evt.Usage.InputTokens),
 				int(evt.Usage.OutputTokens),
 				int(evt.Usage.CacheReadInputTokens),
 				0,
-				int(evt.Usage.InputTokens+evt.Usage.OutputTokens),
+				int(evt.Usage.InputTokens+evt.Usage.OutputTokens+evt.Usage.CacheReadInputTokens),
 			)
 			// Debugf("Anthropic Usage(message delta): %v", evt.Usage)
 
@@ -502,7 +506,13 @@ func (ag *Agent) getAnthropicMCPTools() []anthropic.ToolUnionParam {
 }
 
 func addUpAnthropicTokenUsage(ag *Agent, usage *TokenUsage) {
+	// Anthropic doesn't include cached tokens in the prompt tokens
+	// So we need to set CachedTokensInPrompt to false
+	// Anthropic model doesn't include Thought Tokens (always be 0)
+	// and Cached Tokens are not included in the Input Tokens
+	// so total tokens = input tokens + output tokens + cached tokens
 	if ag.TokenUsage != nil && usage != nil {
+		ag.TokenUsage.CachedTokensInPrompt = false
 		ag.TokenUsage.RecordTokenUsage(
 			usage.InputTokens,
 			usage.OutputTokens,
