@@ -5,12 +5,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"text/tabwriter"
 
 	"github.com/activebook/gllm/service"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
@@ -90,19 +90,9 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		ci.showHelp()
 
 	case "/history", "/h":
-		num := 20
-		chars := 200
-		if len(parts) > 1 {
-			if n, err := strconv.Atoi(parts[1]); err == nil && n > 0 {
-				num = n
-			}
-		}
-		if len(parts) > 2 {
-			if c, err := strconv.Atoi(parts[2]); err == nil && c > 0 {
-				chars = c
-			}
-		}
-		ci.showHistory(num, chars)
+		// Arguments (num, chars) are deprecated/ignored in viewport mode
+		// We could implement "--raw" here later
+		ci.showHistory()
 
 	case "/clear", "/reset":
 		ci.clearContext()
@@ -182,7 +172,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /clear, /reset - Clear conversation history")
 	fmt.Println("  /help, /? - Show this help message")
 	fmt.Println("  /info, /i - Show current settings")
-	fmt.Println("  /history, /h [num] [chars] - Show recent conversation history")
+	fmt.Println("  /history, /h - Show recent conversation history")
 	fmt.Println("  /model, /m [subcmd] - Manage models (list, switch, add, etc.)")
 	fmt.Println("  /agent, /g [subcmd] - Manage agents (list, switch, add, etc.)")
 	fmt.Println("  /template, /p [subcmd] - Manage templates (list, switch, add, etc.)")
@@ -258,8 +248,8 @@ func (ci *ChatInfo) showInfo() {
 	fmt.Println()
 }
 
-// showHistory displays conversation history
-func (ci *ChatInfo) showHistory(num int, chars int) {
+// showHistory displays conversation history using TUI viewport
+func (ci *ChatInfo) showHistory() {
 	convoPath := ci.ConvoMgr.GetPath()
 
 	// Check if conversation exists
@@ -276,18 +266,28 @@ func (ci *ChatInfo) showHistory(num int, chars int) {
 	}
 
 	convoName := strings.TrimSuffix(filepath.Base(convoPath), filepath.Ext(convoPath))
-	// Display conversation details
-	fmt.Printf("Name: %s\n", convoName)
+	var content string
 
 	switch ci.ModelProvider {
 	case service.ModelProviderGemini:
-		service.DisplayGeminiConversationLog(data, num, chars)
+		content = service.RenderGeminiConversationLog(data)
 	case service.ModelProviderOpenAI, service.ModelProviderOpenAICompatible:
-		service.DisplayOpenAIConversationLog(data, num, chars)
+		content = service.RenderOpenAIConversationLog(data)
 	case service.ModelProviderAnthropic:
-		service.DisplayAnthropicConversationLog(data, num, chars)
+		content = service.RenderAnthropicConversationLog(data)
 	default:
 		fmt.Println("Unknown provider")
+		return
+	}
+
+	// Show viewport
+	m := NewViewportModel(ci.ModelProvider, content, func() string {
+		return fmt.Sprintf("Conversation: %s", convoName)
+	})
+
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		service.Errorf("Error running viewport: %v", err)
 	}
 }
 

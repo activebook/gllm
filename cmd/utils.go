@@ -57,15 +57,28 @@ func checkIsLink(source string) bool {
 	return strings.HasPrefix(source, "http") || strings.HasPrefix(source, "https")
 }
 
+type TextBuilder struct {
+	builder  strings.Builder
+	lastChar byte
+}
+
 // Appends text to builder with proper newline handling
-func appendText(builder *strings.Builder, text string) {
+func (tb *TextBuilder) appendText(text string) {
 	if text == "" {
 		return
 	}
-	builder.WriteString(text)
-	if !strings.HasSuffix(text, "\n") {
-		builder.WriteString("\n\n")
+	if tb.builder.Len() > 0 && tb.lastChar != '\n' {
+		tb.builder.WriteString("\n")
+		tb.lastChar = '\n'
 	}
+	tb.builder.WriteString(text)
+	if len(text) > 0 {
+		tb.lastChar = text[len(text)-1]
+	}
+}
+
+func (tb *TextBuilder) String() string {
+	return tb.builder.String()
 }
 
 // readContentFromPath reads content from a specified source path.

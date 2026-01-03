@@ -592,8 +592,18 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		// Handle MCP tool calls
 		msg, err = c.op.OpenChatMCPToolCall(&toolCall, &argsMap)
 	} else {
-		msg = nil
-		err = fmt.Errorf("unknown function name: %s", toolCall.Function.Name)
+		// Unknown function: return error message to model and warn user
+		errorMsg := fmt.Sprintf("Error: Unknown function '%s'. This function is not available. Please use one of the available functions from the tool list.", toolCall.Function.Name)
+		msg = &model.ChatCompletionMessage{
+			Role: "tool",
+			Content: &model.ChatCompletionMessageContent{
+				StringValue: volcengine.String(errorMsg),
+			},
+			ToolCallID: toolCall.ID,
+		}
+		// Warn the user
+		c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", toolCall.Function.Name)}, nil)
+		err = nil // Don't stop conversation - let model see the error and adjust
 	}
 
 	// Function call is done
@@ -607,8 +617,12 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 // New responses are generated based on tool call results
 // Each of these interactions consumes tokens that should be tracked
 func (ag *Agent) addUpOpenChatTokenUsage(resp *model.ChatCompletionStreamResponse) {
-	//Warnf("addUpTokenUsage - PromptTokenCount: %d, CompletionTokenCount: %d, TotalTokenCount: %d", resp.Usage.PromptTokens, resp.Usage.CompletionTokens, resp.Usage.TotalTokens)
+	// For openchat model, cache read tokens are not included in the usage
+	// Because cached tokens already in the prompt tokens, so we don't need to count them
+	// Thought tokens are also included in the prompt tokens
+	// So the total tokens is the sum of prompt tokens and completion tokens
 	if resp != nil && resp.Usage != nil && ag.TokenUsage != nil {
+		ag.TokenUsage.CachedTokensInPrompt = true
 		ag.TokenUsage.RecordTokenUsage(int(resp.Usage.PromptTokens),
 			int(resp.Usage.CompletionTokens),
 			int(resp.Usage.PromptTokensDetails.CachedTokens),

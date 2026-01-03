@@ -29,9 +29,9 @@ var (
 	resetColor string
 
 	// Agent-specific colors
+	reasoningColor   string
 	inReasoningColor string
 	inCallingColor   string
-	completeColor    string
 
 	// Task completion color
 	taskCompleteColor string
@@ -161,9 +161,9 @@ func setupColors() {
 	underlineColor = "\033[4m"
 
 	// Agent-specific colors (fixed ANSI)
+	reasoningColor = "\033[32m"   // Green
 	inReasoningColor = "\033[90m" // Bright Black
 	inCallingColor = "\033[36m"   // Cyan
-	completeColor = "\033[32m"    // Green
 
 	// Workflow colors (fixed ANSI)
 	agentNameColor = "\033[95m"    // Bright Magenta

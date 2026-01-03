@@ -287,8 +287,6 @@ func (ci *ChatInfo) startWithLocalCommand(line string) bool {
 }
 
 func (ci *ChatInfo) callAgent(input string) {
-	var sb strings.Builder
-
 	yolo := false
 	if yoloFlag {
 		yolo = true
@@ -302,13 +300,15 @@ func (ci *ChatInfo) callAgent(input string) {
 		return
 	}
 
+	tb := TextBuilder{}
+
 	// Get template content
 	templateContent := store.GetTemplate(agent.Template)
-	appendText(&sb, templateContent)
-	appendText(&sb, input)
+	tb.appendText(templateContent)
+	tb.appendText(input)
 
 	//Process @ references in prompt
-	prompt := sb.String()
+	prompt := tb.String()
 	atRefProcessor := service.NewAtRefProcessor()
 	processedPrompt, err := atRefProcessor.ProcessText(prompt)
 	if err != nil {

@@ -13,23 +13,36 @@ type TokenUsage struct {
 	CachedTokens  int
 	ThoughtTokens int
 	TotalTokens   int
+	// For providers like Anthropic, cached tokens are not included in the prompt tokens
+	// OpenAI, OpenChat and Gemini all include cached tokens in the prompt tokens
+	CachedTokensInPrompt bool
 }
 
 const ()
 
 func NewTokenUsage() *TokenUsage {
 	return &TokenUsage{
-		InputTokens:   0,
-		OutputTokens:  0,
-		CachedTokens:  0,
-		ThoughtTokens: 0,
-		TotalTokens:   0,
+		InputTokens:          0,
+		OutputTokens:         0,
+		CachedTokens:         0,
+		ThoughtTokens:        0,
+		TotalTokens:          0,
+		CachedTokensInPrompt: true,
 	}
 }
 
 func (tu *TokenUsage) getTokenUsageTip() string {
 	if tu.TotalTokens > 0 {
-		cachedPercentage := float64(tu.CachedTokens) / float64(tu.TotalTokens) * 100
+		cachedPercentage := 0.0
+		if tu.InputTokens > 0 {
+			if tu.CachedTokensInPrompt {
+				// Cached tokens are included in the input tokens, so we don't need to add them
+				cachedPercentage = float64(tu.CachedTokens) / float64(tu.InputTokens) * 100
+			} else {
+				// Cached tokens are not included in the input tokens, so we need to add them
+				cachedPercentage = float64(tu.CachedTokens) / float64(tu.InputTokens+tu.CachedTokens) * 100
+			}
+		}
 		return fmt.Sprintf(
 			bbColor+"\n"+
 				"┌──────────────────────────────────────────────────────────────────────────────────────────┐\n"+
@@ -49,7 +62,16 @@ func (tu *TokenUsage) getTokenUsageTip() string {
 
 func (tu *TokenUsage) getTokenUsageBox() string {
 	if tu.TotalTokens > 0 {
-		cachedPercentage := float64(tu.CachedTokens) / float64(tu.TotalTokens) * 100
+		cachedPercentage := 0.0
+		if tu.InputTokens > 0 {
+			if tu.CachedTokensInPrompt {
+				// Cached tokens are included in the input tokens, so we don't need to add them
+				cachedPercentage = float64(tu.CachedTokens) / float64(tu.InputTokens) * 100
+			} else {
+				// Cached tokens are not included in the input tokens, so we need to add them
+				cachedPercentage = float64(tu.CachedTokens) / float64(tu.InputTokens+tu.CachedTokens) * 100
+			}
+		}
 		return fmt.Sprintf(
 			bbColor+"\n"+
 				"┌───────────────┬────────────┐\n"+
@@ -118,8 +140,14 @@ func (tu *TokenUsage) renderLipgloss() string {
 
 	// Data preparation
 	cachedPercentage := 0.0
-	if tu.TotalTokens > 0 {
-		cachedPercentage = float64(tu.CachedTokens) / float64(tu.TotalTokens) * 100
+	if tu.InputTokens > 0 {
+		if tu.CachedTokensInPrompt {
+			// Cached tokens are included in the input tokens, so we don't need to add them
+			cachedPercentage = float64(tu.CachedTokens) / float64(tu.InputTokens) * 100
+		} else {
+			// Cached tokens are not included in the input tokens, so we need to add them
+			cachedPercentage = float64(tu.CachedTokens) / float64(tu.InputTokens+tu.CachedTokens) * 100
+		}
 	}
 
 	// Headers

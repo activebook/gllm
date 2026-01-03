@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/service"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -393,15 +394,28 @@ Using the --message-chars (-c) flag, set the maximum length of each message's co
 		provider := service.DetectMessageProvider(data)
 
 		// Process and display messages based on provider
+		// Process and display messages based on provider
+		var content string
 		switch provider {
 		case service.ModelProviderGemini:
-			service.DisplayGeminiConversationLog(data, convoMessageCount, convoMessageLength)
+			content = service.RenderGeminiConversationLog(data)
 		case service.ModelProviderOpenAI, service.ModelProviderOpenAICompatible:
-			service.DisplayOpenAIConversationLog(data, convoMessageCount, convoMessageLength)
+			content = service.RenderOpenAIConversationLog(data)
 		case service.ModelProviderAnthropic:
-			service.DisplayAnthropicConversationLog(data, convoMessageCount, convoMessageLength)
+			content = service.RenderAnthropicConversationLog(data)
 		default:
 			fmt.Println("Unknown conversation format.")
+			return nil
+		}
+
+		// Show viewport
+		m := NewViewportModel(provider, content, func() string {
+			return fmt.Sprintf("Conversation: %s", convoName)
+		})
+
+		p := tea.NewProgram(m, tea.WithAltScreen())
+		if _, err := p.Run(); err != nil {
+			return fmt.Errorf("error running viewport: %v", err)
 		}
 		return nil
 	},

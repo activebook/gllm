@@ -438,7 +438,7 @@ It writes a status message to both Std and OutputFile if they are available.
 */
 func (ag *Agent) StartReasoning() {
 	if ag.Std != nil {
-		ag.Std.Writeln(completeColor + "Thinking ↓")
+		ag.Std.Writeln(reasoningColor + "Thinking ↓")
 	}
 	if ag.OutputFile != nil {
 		ag.OutputFile.Writeln("Thinking ↓")
@@ -447,7 +447,7 @@ func (ag *Agent) StartReasoning() {
 
 func (ag *Agent) CompleteReasoning() {
 	if ag.Std != nil {
-		ag.Std.Writeln(resetColor + completeColor + "✓" + resetColor)
+		ag.Std.Writeln(resetColor + reasoningColor + "✓" + resetColor)
 	}
 	if ag.OutputFile != nil {
 		ag.OutputFile.Writeln("✓")

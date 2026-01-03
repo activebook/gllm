@@ -197,14 +197,14 @@ func batchAttachments(files *[]*service.FileData) {
 }
 
 func buildPrompt(agent *data.AgentConfig, prompt string, isThereAttachment bool) (string, []*service.FileData) {
-	var sb strings.Builder
+	tb := TextBuilder{}
 	files := []*service.FileData{}
 
 	// Get template content
 	store := data.NewConfigStore()
 	templateContent := store.GetTemplate(agent.Template)
-	appendText(&sb, templateContent)
-	appendText(&sb, prompt)
+	tb.appendText(templateContent)
+	tb.appendText(prompt)
 
 	if isThereAttachment {
 		// Process attachments
@@ -213,12 +213,12 @@ func buildPrompt(agent *data.AgentConfig, prompt string, isThereAttachment bool)
 		// No attachments specified, try stdin
 		stdinContent := readStdin()
 		if len(stdinContent) > 0 {
-			appendText(&sb, stdinContent)
+			tb.appendText(stdinContent)
 		}
 	}
 
 	// Process @ references in prompt
-	finalPrompt := sb.String()
+	finalPrompt := tb.String()
 	atRefProcessor := service.NewAtRefProcessor()
 	processedPrompt, err := atRefProcessor.ProcessText(finalPrompt)
 	if err != nil {

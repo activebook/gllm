@@ -3,7 +3,6 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
@@ -33,6 +32,9 @@ func init() {
 		"function_response": toolResponseColor,
 		"image":             mediaColor,
 		"file_data":         mediaColor,
+		"reasoning":         reasoningColor,
+		"reasoning_content": inReasoningColor,
+		"reset":             resetColor,
 	}
 }
 
@@ -45,6 +47,7 @@ type GeminiMessage struct {
 type GeminiPart struct {
 	Type             string                  `json:"type"` // text, function_call, function_response, image, file_data, etc.
 	Text             string                  `json:"text,omitempty"`
+	Thought          bool                    `json:"thought,omitempty"`          // for reasoning
 	Name             string                  `json:"name,omitempty"`             // for function calls
 	Args             map[string]interface{}  `json:"args,omitempty"`             // for function calls
 	InlineData       *GeminiInlineData       `json:"inlineData,omitempty"`       // for inline images
@@ -69,8 +72,9 @@ type GeminiInlineData struct {
 
 // OpenAI message format with enhanced support for function calls and files
 type OpenAIMessage struct {
-	Role          string              `json:"role"`    // system, user, assistant
-	Content       interface{}         `json:"content"` // can be string or array for multimodal content
+	Role          string `json:"role"`    // system, user, assistant
+	Content       string `json:"content"` // can be string or array for multimodal content
+	MultiContent  []OpenAIContentItem
 	ReasonContent string              `json:"reasoning_content,omitempty"`
 	Name          string              `json:"name,omitempty"`
 	FunctionCall  *OpenAIFunctionCall `json:"function_call,omitempty"`
@@ -100,6 +104,18 @@ type OpenAIImageURL struct {
 	Url string `json:"url"` // Can be data URL or HTTP URL
 }
 
+// Anthropic message format
+type AnthropicMessage struct {
+	Role    string                  `json:"role"`
+	Content []AnthropicContentBlock `json:"content"`
+}
+
+type AnthropicContentBlock struct {
+	Type   string      `json:"type"` // text, tool_use, tool_result, thinking
+	Text   string      `json:"text,omitempty"`
+	Source interface{} `json:"source,omitempty"` // for image
+}
+
 // Detects the conversation provider based on message format
 func DetectMessageProvider(data []byte) string {
 	// Try to unmarshal as array of messages
@@ -112,36 +128,82 @@ func DetectMessageProvider(data []byte) string {
 		return ModelProviderUnknown
 	}
 
+	// Try to detect OpenAI format (fallback)
+	var openaiMsg OpenAIMessage
+	if err := json.Unmarshal(messages[0], &openaiMsg); err == nil {
+		// OpenAI messages must have a role and content or multi-content
+		if openaiMsg.Role != "" && (openaiMsg.Content != "" || openaiMsg.MultiContent != nil) {
+			return ModelProviderOpenAI
+		}
+	}
+
 	// Try to detect Gemini format
 	var geminiMsg GeminiMessage
 	if err := json.Unmarshal(messages[0], &geminiMsg); err == nil {
+		// Gemini messages must have a role and parts array
 		if geminiMsg.Role != "" && len(geminiMsg.Parts) > 0 {
 			return ModelProviderGemini
 		}
 	}
 
-	// Try to detect OpenAI format
-	var openaiMsg OpenAIMessage
-	if err := json.Unmarshal(messages[0], &openaiMsg); err == nil {
-		if openaiMsg.Role != "" {
-			return ModelProviderOpenAI
+	// Try to detect Anthropic format
+	var anthropicMsg AnthropicMessage
+	if err := json.Unmarshal(messages[0], &anthropicMsg); err == nil {
+		// Anthropic messages must have a role and content must be an array of blocks
+		if anthropicMsg.Role != "" && len(anthropicMsg.Content) > 0 {
+			return ModelProviderAnthropic
 		}
 	}
 
 	return ModelProviderUnknown
 }
 
-// Display summary of Gemini conversation
-func DisplayGeminiConversationLog(data []byte, msgCount int, msgLength int) {
+// styleEachRune applies color to each rune individually except newlines.
+// This ensures color is preserved across terminal wrapping and scrolling.
+// Added indent parameter to support multi-line indentation.
+func styleEachRune(text string, color string, indent string) string {
+	// trim leading and trailing newlines
+	text = strings.Trim(text, "\n")
+	var sb strings.Builder
+	reset := resetColor
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		if i > 0 {
+			sb.WriteRune('\n')
+			sb.WriteString(indent)
+		}
+		for _, r := range line {
+			sb.WriteString(color)
+			sb.WriteRune(r)
+			sb.WriteString(reset)
+		}
+	}
+	return sb.String()
+}
+
+// indentText ensures every line in the text is prefixed with the given indent.
+func indentText(text string, indent string) string {
+	text = strings.Trim(text, "\n")
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		if i > 0 {
+			lines[i] = indent + line
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// RenderGeminiConversationLog returns a string summary of Gemini conversation
+func RenderGeminiConversationLog(data []byte) string {
+	var sb strings.Builder
 	var messages []GeminiMessage
 	if err := json.Unmarshal(data, &messages); err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing Gemini messages: %v\n", err)
-		return
+		return fmt.Sprintf("Error parsing Gemini messages: %v\n", err)
 	}
 
-	// Summary section (keeping it simple for now)
-	fmt.Println("Summary:")
-	fmt.Printf("  %sMessages: %d%s\n", resetColor, len(messages), resetColor)
+	// Summary section
+	sb.WriteString("Summary:\n")
+	sb.WriteString(fmt.Sprintf("  %sMessages: %d%s\n", resetColor, len(messages), resetColor))
 
 	var userCount, modelCount, functionCallCount, functionResponseCount, imageCount, fileCount int
 	for _, msg := range messages {
@@ -168,97 +230,88 @@ func DisplayGeminiConversationLog(data []byte, msgCount int, msgLength int) {
 		}
 	}
 
-	fmt.Printf("  %sUser messages: %d%s\n", RoleColors["user"], userCount, resetColor)
-	fmt.Printf("  %sModel responses: %d%s\n", RoleColors["model"], modelCount, resetColor)
+	sb.WriteString(fmt.Sprintf("  %sUser messages: %d%s\n", RoleColors["user"], userCount, resetColor))
+	sb.WriteString(fmt.Sprintf("  %sModel responses: %d%s\n", RoleColors["model"], modelCount, resetColor))
 	if functionCallCount > 0 {
-		fmt.Printf("  %sFunction calls: %d%s\n", ContentTypeColors["function_call"], functionCallCount, resetColor)
+		sb.WriteString(fmt.Sprintf("  %sFunction calls: %d%s\n", ContentTypeColors["function_call"], functionCallCount, resetColor))
 	}
 	if functionResponseCount > 0 {
-		fmt.Printf("  %sFunction responses: %d%s\n", ContentTypeColors["function_response"], functionResponseCount, resetColor)
+		sb.WriteString(fmt.Sprintf("  %sFunction responses: %d%s\n", ContentTypeColors["function_response"], functionResponseCount, resetColor))
 	}
 	if imageCount > 0 {
-		fmt.Printf("  %sImages: %d%s\n", ContentTypeColors["image"], imageCount, resetColor)
+		sb.WriteString(fmt.Sprintf("  %sImages: %d%s\n", ContentTypeColors["image"], imageCount, resetColor))
 	}
 	if fileCount > 0 {
-		fmt.Printf("  %sFiles: %d%s\n", ContentTypeColors["file_data"], fileCount, resetColor)
+		sb.WriteString(fmt.Sprintf("  %sFiles: %d%s\n", ContentTypeColors["file_data"], fileCount, resetColor))
 	}
 
-	// Conversation preview with colors
+	// Conversation content
 	if len(messages) > 0 {
-		fmt.Println("\nConversation Preview:")
-		messageLimit := min(msgCount, len(messages))
-		// Adjust start index to show recent messages
-		start := len(messages) - messageLimit
-		if start > 0 {
-			fmt.Printf("  %s... (%d) old messages ...%s\n", greyColor, start, resetColor)
-			fmt.Println()
-		}
-		for i := start; i < len(messages); i++ {
-			msg := messages[i]
-			// Apply color to role, default to no color if role not found
+		sb.WriteString("\nConversation Content:\n")
+		for _, msg := range messages {
+			// Apply color to role
 			roleColor := RoleColors[msg.Role]
 			if roleColor == "" {
 				roleColor = ""
 			}
-			fmt.Printf("  %s%s%s: ", roleColor, msg.Role, resetColor)
+			sb.WriteString(fmt.Sprintf("  %s%s%s: ", roleColor, msg.Role, resetColor))
 
 			if len(msg.Parts) > 0 {
 				for j, part := range msg.Parts {
 					if j > 0 {
-						fmt.Print(" + ")
+						sb.WriteString("    ")
 					}
 					switch {
 					case part.FunctionCall != nil:
-						fmt.Printf("%s[Function call: %s]%s", ContentTypeColors["function_call"], part.FunctionCall.Name, resetColor)
+						sb.WriteString(fmt.Sprintf("\n    %s[Function call: %s]%s", ContentTypeColors["function_call"], part.FunctionCall.Name, resetColor))
 						if len(part.FunctionCall.Arguments) > 0 {
-							argStr, _ := json.Marshal(part.FunctionCall.Arguments)
-							fmt.Printf(" args: %s", TruncateString(string(argStr), msgLength))
+							argStr, _ := json.MarshalIndent(part.FunctionCall.Arguments, "    ", "  ")
+							sb.WriteString(fmt.Sprintf("\n    args: %s", string(argStr)))
 						}
 					case part.FunctionResponse != nil:
-						fmt.Printf("%s[Function response]%s", ContentTypeColors["function_response"], resetColor)
-						respPreview, _ := json.Marshal(part.FunctionResponse.Response)
-						fmt.Printf(" data: %s", TruncateString(string(respPreview), msgLength))
+						sb.WriteString(fmt.Sprintf("\n    %s[Function response]%s", ContentTypeColors["function_response"], resetColor))
+						respPreview, _ := json.MarshalIndent(part.FunctionResponse.Response, "    ", "  ")
+						sb.WriteString(fmt.Sprintf("\n    data: %s", string(respPreview)))
 					case part.InlineData != nil:
 						mimeType := part.InlineData.MimeType
 						if strings.HasPrefix(mimeType, "image/") {
-							fmt.Printf("%s[Image content]%s", ContentTypeColors["image"], resetColor)
+							sb.WriteString(fmt.Sprintf("\n    %s[Image content]%s", ContentTypeColors["image"], resetColor))
 						} else {
-							fmt.Printf("%s[File]%s", ContentTypeColors["file_data"], resetColor)
+							sb.WriteString(fmt.Sprintf("\n    %s[File]%s", ContentTypeColors["file_data"], resetColor))
 						}
+					case part.Thought:
+						sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
+						sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(part.Text, ContentTypeColors["reasoning_content"], "    ")))
+						sb.WriteString(fmt.Sprintf("\n    %s✓%s\n", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 					default:
 						if part.Text != "" {
-							// For gemini2, there is not a specific type for text, so we use the default text type
-							preview := TruncateString(part.Text, msgLength)
-							fmt.Printf("%s", preview)
+							sb.WriteString("\n    ")
+							sb.WriteString(indentText(part.Text, "    "))
 						} else {
-							fmt.Printf("[%s content]", part.Type)
+							sb.WriteString(fmt.Sprintf("[%s content]", part.Type))
 						}
 					}
-					fmt.Println()
 				}
-				fmt.Println()
+				sb.WriteString("\n\n")
 			} else {
-				fmt.Println("[Empty message]")
+				sb.WriteString("\n    [Empty message]\n\n")
 			}
 		}
-
-		if len(messages) > messageLimit {
-			fmt.Printf("  %s... and %d old messages before%s\n", greyColor, len(messages)-messageLimit, resetColor)
-		}
 	}
+	return sb.String()
 }
 
-// Display summary of OpenAI conversation
-func DisplayOpenAIConversationLog(data []byte, msgCount int, msgLength int) {
+// RenderOpenAIConversationLog returns a string summary of OpenAI conversation
+func RenderOpenAIConversationLog(data []byte) string {
+	var sb strings.Builder
 	var messages []OpenAIMessage
 	if err := json.Unmarshal(data, &messages); err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing OpenAI messages: %v\n", err)
-		return
+		return fmt.Sprintf("Error parsing OpenAI messages: %v\n", err)
 	}
 
 	// Summary section
-	fmt.Println("Summary:")
-	fmt.Printf("  %sMessages: %d%s\n", resetColor, len(messages), resetColor)
+	sb.WriteString("Summary:\n")
+	sb.WriteString(fmt.Sprintf("  %sMessages: %d%s\n", resetColor, len(messages), resetColor))
 
 	var systemCount, userCount, assistantCount int
 	var functionCallCount, functionResponseCount, imageCount int
@@ -279,162 +332,118 @@ func DisplayOpenAIConversationLog(data []byte, msgCount int, msgLength int) {
 		if len(msg.ToolCalls) > 0 {
 			functionCallCount += len(msg.ToolCalls)
 		}
-		if contentItems, ok := msg.Content.([]interface{}); ok {
-			for _, item := range contentItems {
-				if contentMap, ok := item.(map[string]interface{}); ok {
-					if contentType, ok := contentMap["type"].(string); ok && contentType == "image_url" {
-						imageCount++
-					}
-				}
+
+		for _, item := range msg.MultiContent {
+			if item.Type == "image_url" {
+				imageCount++
 			}
 		}
 	}
 
-	fmt.Printf("  %sSystem messages: %d%s\n", RoleColors["system"], systemCount, resetColor)
-	fmt.Printf("  %sUser messages: %d%s\n", RoleColors["user"], userCount, resetColor)
-	fmt.Printf("  %sAssistant responses: %d%s\n", RoleColors["assistant"], assistantCount, resetColor)
+	sb.WriteString(fmt.Sprintf("  %sSystem messages: %d%s\n", RoleColors["system"], systemCount, resetColor))
+	sb.WriteString(fmt.Sprintf("  %sUser messages: %d%s\n", RoleColors["user"], userCount, resetColor))
+	sb.WriteString(fmt.Sprintf("  %sAssistant responses: %d%s\n", RoleColors["assistant"], assistantCount, resetColor))
 	if functionCallCount > 0 {
-		fmt.Printf("  %sFunction/tool calls: %d%s\n", ContentTypeColors["function_call"], functionCallCount, resetColor)
+		sb.WriteString(fmt.Sprintf("  %sFunction/tool calls: %d%s\n", ContentTypeColors["function_call"], functionCallCount, resetColor))
 	}
 	if functionResponseCount > 0 {
-		fmt.Printf("  %sFunction/tool responses: %d%s\n", ContentTypeColors["function_response"], functionResponseCount, resetColor)
+		sb.WriteString(fmt.Sprintf("  %sFunction/tool responses: %d%s\n", ContentTypeColors["function_response"], functionResponseCount, resetColor))
 	}
 	if imageCount > 0 {
-		fmt.Printf("  %sImages: %d%s\n", ContentTypeColors["image"], imageCount, resetColor)
+		sb.WriteString(fmt.Sprintf("  %sImages: %d%s\n", ContentTypeColors["image"], imageCount, resetColor))
 	}
 
-	// Conversation preview with colors
+	// Conversation content
 	if len(messages) > 0 {
-		fmt.Println("\nConversation Preview: Recent")
-		messageLimit := min(msgCount, len(messages))
-		// Adjust start index to show recent messages
-		start := len(messages) - messageLimit
-		if start > 0 {
-			fmt.Printf("  %s... (%d) old messages ...%s\n", greyColor, start, resetColor)
-			fmt.Println()
-		}
-		for i := start; i < len(messages); i++ {
-			msg := messages[i]
+		sb.WriteString("\nConversation Content:\n")
+		for _, msg := range messages {
 			// Apply color to role
 			roleColor := RoleColors[msg.Role]
 			if roleColor == "" {
 				roleColor = ""
 			}
-			fmt.Printf("  %s%s%s", roleColor, msg.Role, resetColor)
+			sb.WriteString(fmt.Sprintf("  %s%s%s", roleColor, msg.Role, resetColor))
 
 			if msg.Name != "" {
-				fmt.Printf(" (%s)", msg.Name)
+				sb.WriteString(fmt.Sprintf(" (%s)", msg.Name))
 			}
-			fmt.Print(": ")
+			sb.WriteString(": ")
 
 			// Output the reasoning content if it exists
 			if msg.ReasonContent != "" {
-				fmt.Printf("\n    %sThinking ↓%s", completeColor, resetColor)
-				fmt.Printf("\n    %s%s%s", inReasoningColor, TruncateString(msg.ReasonContent, msgLength), resetColor)
-				fmt.Printf("\n    %s✓%s\n", completeColor, resetColor)
-				fmt.Printf("    ")
+				sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
+				sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(msg.ReasonContent, ContentTypeColors["reasoning_content"], "    ")))
+				sb.WriteString(fmt.Sprintf("\n    %s✓%s\n", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 			}
 
-			switch content := msg.Content.(type) {
-			case string:
-				preview := TruncateString(content, msgLength)
-				fmt.Printf("%s", preview)
-			case []interface{}:
-				fmt.Print("[Multimodal content: ")
-				for j, item := range content {
+			if msg.Content != "" {
+				sb.WriteString("\n    ")
+				sb.WriteString(indentText(msg.Content, "    "))
+			}
+
+			if len(msg.MultiContent) > 0 {
+				sb.WriteString("\n    [Multimodal content: ")
+				for j, item := range msg.MultiContent {
 					if j > 0 {
-						fmt.Print(", ")
+						sb.WriteString(", ")
 					}
-					if contentMap, ok := item.(map[string]interface{}); ok {
-						if contentType, ok := contentMap["type"].(string); ok {
-							switch contentType {
-							case "text":
-								if text, ok := contentMap["text"].(string); ok {
-									fmt.Printf("text (%s)", TruncateString(text, msgLength))
-								}
-							case "image_url":
-								fmt.Printf("%simage%s", ContentTypeColors["image"], resetColor)
-							default:
-								fmt.Print(contentType)
-							}
-						}
+					if item.Type == "text" {
+						sb.WriteString(fmt.Sprintf("\n    text (%s)", indentText(item.Text, "    ")))
+					}
+					if item.Type == "image_url" {
+						sb.WriteString(fmt.Sprintf("\n    %simage%s", ContentTypeColors["image"], resetColor))
 					}
 				}
-				fmt.Print("]")
-			case nil:
-				if msg.Role == "assistant" {
-					fmt.Print("[No text content]")
-				}
-			default:
-				fmt.Print("[Unknown content format]")
+				sb.WriteString("]")
 			}
 
 			// Function call details
 			if msg.FunctionCall != nil {
-				fmt.Printf(" %s[Function call: %s]%s", ContentTypeColors["function_call"], msg.FunctionCall.Name, resetColor)
+				sb.WriteString(fmt.Sprintf("\n    %s[Function call: %s]%s", ContentTypeColors["function_call"], msg.FunctionCall.Name, resetColor))
 				if msg.FunctionCall.Arguments != "" {
-					fmt.Printf(" args: %s", TruncateString(msg.FunctionCall.Arguments, msgLength))
+					sb.WriteString(fmt.Sprintf(" args: %s", msg.FunctionCall.Arguments))
 				}
 			}
 
 			// Tool call details
 			if len(msg.ToolCalls) > 0 {
-				fmt.Printf(" %s[Tool calls: ", ContentTypeColors["function_call"])
+				sb.WriteString(fmt.Sprintf("\n    %s[Tool calls: ", ContentTypeColors["function_call"]))
 				for j, tool := range msg.ToolCalls {
 					if j > 0 {
-						fmt.Print(", ")
+						sb.WriteString(", ")
 					}
-					fmt.Printf("%s (id: %s)", tool.Function.Name, tool.Id)
+					sb.WriteString(fmt.Sprintf("%s (id: %s)", tool.Function.Name, tool.Id))
 				}
-				fmt.Printf("]%s", resetColor)
+				sb.WriteString(fmt.Sprintf("]%s", resetColor))
 			}
 
 			// Tool response details
 			if msg.ToolCallId != "" {
-				fmt.Printf(" %s[Response to tool call: %s]%s", ContentTypeColors["function_response"], msg.ToolCallId, resetColor)
+				sb.WriteString(fmt.Sprintf("\n    %s[Response to tool call: %s]%s", ContentTypeColors["function_response"], msg.ToolCallId, resetColor))
 			}
 
-			fmt.Println()
-			fmt.Println()
-		}
-
-		if len(messages) > messageLimit {
-			fmt.Printf("  %s... and %d old messages before%s\n", greyColor, len(messages)-messageLimit, resetColor)
+			sb.WriteString("\n\n")
 		}
 	}
+	return sb.String()
 }
 
-// Display summary of Anthropic conversation
-func DisplayAnthropicConversationLog(data []byte, msgCount int, msgLength int) {
+// RenderAnthropicConversationLog returns a string summary of Anthropic conversation
+func RenderAnthropicConversationLog(data []byte) string {
+	var sb strings.Builder
 	var messages []anthropic.MessageParam
 	if err := json.Unmarshal(data, &messages); err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing Anthropic messages: %v\n", err)
-		return
+		return fmt.Sprintf("Error parsing Anthropic messages: %v\n", err)
 	}
 
 	// Summary section
-	fmt.Println("Summary:")
-	fmt.Printf("  %sMessages: %d%s\n", resetColor, len(messages), resetColor)
+	sb.WriteString("Summary:\n")
+	sb.WriteString(fmt.Sprintf("  %sMessages: %d%s\n", resetColor, len(messages), resetColor))
 
 	var userCount, assistantCount int
 	var toolUseCount, toolResultCount int
 
 	for _, msg := range messages {
-		// Role is param.Field[string] or similar usually, but in MessageParam it is MessageParamRole (string alias)
-		// Wait, MessageParam definition:
-		// Role MessageParamRole `json:"role,omitzero,required"`
-		// MessageParamRole is string.
-		// However, it is a Field? No, earlier doc said "Role MessageParamRole".
-		// But let's check if it needs `.Value` access.
-		// Earlier `service/anthropic.go` used `anthropic.Model(ag.Model.ModelName)` which returns simple type?
-		// No, `MessageNewParams` used `F(...)`.
-		// `MessageParam` is used for HISTORY (Input).
-		// Let's verify if `MessageParam` fields are `param.Field` or direct values?
-		// "go doc ... MessageParam" earlier showed:
-		// Role MessageParamRole
-		// Content []ContentBlockParamUnion
-		// So they are DIRECT values, not `param.Field`.
-
 		switch msg.Role {
 		case anthropic.MessageParamRoleUser:
 			userCount++
@@ -451,78 +460,68 @@ func DisplayAnthropicConversationLog(data []byte, msgCount int, msgLength int) {
 		}
 	}
 
-	fmt.Printf("  %sUser messages: %d%s\n", RoleColors["user"], userCount, resetColor)
-	fmt.Printf("  %sAssistant messages: %d%s\n", RoleColors["assistant"], assistantCount, resetColor)
+	sb.WriteString(fmt.Sprintf("  %sUser messages: %d%s\n", RoleColors["user"], userCount, resetColor))
+	sb.WriteString(fmt.Sprintf("  %sAssistant messages: %d%s\n", RoleColors["assistant"], assistantCount, resetColor))
 	if toolUseCount > 0 {
-		fmt.Printf("  %sTool uses: %d%s\n", ContentTypeColors["function_call"], toolUseCount, resetColor)
+		sb.WriteString(fmt.Sprintf("  %sTool uses: %d%s\n", ContentTypeColors["function_call"], toolUseCount, resetColor))
 	}
 	if toolResultCount > 0 {
-		fmt.Printf("  %sTool results: %d%s\n", ContentTypeColors["function_response"], toolResultCount, resetColor)
+		sb.WriteString(fmt.Sprintf("  %sTool results: %d%s\n", ContentTypeColors["function_response"], toolResultCount, resetColor))
 	}
 
-	// Conversation preview
+	// Conversation content
 	if len(messages) > 0 {
-		fmt.Println("\nConversation Preview: Recent")
-		messageLimit := min(msgCount, len(messages))
-		start := len(messages) - messageLimit
-		if start > 0 {
-			fmt.Printf("  %s... (%d) old messages ...%s\n", greyColor, start, resetColor)
-			fmt.Println()
-		}
-
-		for i := start; i < len(messages); i++ {
-			msg := messages[i]
+		sb.WriteString("\nConversation Content:\n")
+		for _, msg := range messages {
 			role := string(msg.Role)
 
 			// Color
 			roleColor := RoleColors[role]
 			if roleColor == "" {
-				// Map anthropic specific roles if needed, but user/assistant match
 				roleColor = resetColor
 			}
-			fmt.Printf("  %s%s%s: ", roleColor, role, resetColor)
+			sb.WriteString(fmt.Sprintf("  %s%s%s: ", roleColor, role, resetColor))
 
 			for j, block := range msg.Content {
 				if j > 0 {
-					// fmt.Print(" + ")
+					sb.WriteString("\n    ") // Indent for subsequent blocks
 				}
 
 				if v := block.OfText; v != nil {
-					fmt.Printf("%s", TruncateString(v.Text, msgLength))
+					if j == 0 {
+						sb.WriteString("\n    ")
+					}
+					sb.WriteString(indentText(v.Text, "    "))
 				} else if v := block.OfImage; v != nil {
-					fmt.Printf("%s[Image]%s", ContentTypeColors["image"], resetColor)
+					sb.WriteString(fmt.Sprintf("\n    %s[Image]%s", ContentTypeColors["image"], resetColor))
 				} else if v := block.OfThinking; v != nil {
-					fmt.Printf("\n    %sThinking ↓%s", completeColor, resetColor)
-					fmt.Printf("\n    %s%s%s", inReasoningColor, TruncateString(v.Thinking, msgLength), resetColor)
-					fmt.Printf("\n    %s✓%s", completeColor, resetColor)
+					sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
+					sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(v.Thinking, ContentTypeColors["reasoning_content"], "    ")))
+					sb.WriteString(fmt.Sprintf("\n    %s✓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 				} else if v := block.OfRedactedThinking; v != nil {
-					fmt.Printf("\n    %sThinking (Redacted) ↓%s", completeColor, resetColor)
-					fmt.Printf("\n    %s%s%s", inReasoningColor, TruncateString(v.Data, msgLength), resetColor)
-					fmt.Printf("\n    %s✓%s", completeColor, resetColor)
+					sb.WriteString(fmt.Sprintf("\n    %sThinking (Redacted) ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
+					sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(v.Data, ContentTypeColors["reasoning_content"], "    ")))
+					sb.WriteString(fmt.Sprintf("\n    %s✓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 				} else if v := block.OfToolUse; v != nil {
-					fmt.Printf(" %s[Tool Use: %s]%s", ContentTypeColors["function_call"], v.Name, resetColor)
+					sb.WriteString(fmt.Sprintf("\n    %s[Tool Use: %s]%s", ContentTypeColors["function_call"], v.Name, resetColor))
 					// Input
-					inputJSON, _ := json.Marshal(v.Input)
-					fmt.Printf(" input: %s", TruncateString(string(inputJSON), msgLength))
+					inputJSON, _ := json.MarshalIndent(v.Input, "    ", "  ")
+					sb.WriteString(fmt.Sprintf("\n    input: %s", string(inputJSON)))
 				} else if v := block.OfToolResult; v != nil {
-					fmt.Printf(" %s[Tool Result: ID=%s]%s", ContentTypeColors["function_response"], v.ToolUseID, resetColor)
+					sb.WriteString(fmt.Sprintf("\n    %s[Tool Result: ID=%s]%s", ContentTypeColors["function_response"], v.ToolUseID, resetColor))
 					// Content
-					contentJSON, _ := json.Marshal(v.Content)
-					fmt.Printf(" content: %s", TruncateString(string(contentJSON), msgLength))
+					contentJSON, _ := json.MarshalIndent(v.Content, "    ", "  ")
+					sb.WriteString(fmt.Sprintf("\n    content: %s", string(contentJSON)))
 				} else {
-					fmt.Print("[Unknown Block]")
+					sb.WriteString("\n    [Unknown Block]")
 				}
 
 				if j < len(msg.Content)-1 {
-					fmt.Print("\n    ") // Indent for next block
+					sb.WriteString("\n    ") // Indent for next block
 				}
 			}
-			fmt.Println()
-			fmt.Println()
-		}
-
-		if len(messages) > messageLimit {
-			fmt.Printf("  %s... and %d old messages before%s\n", greyColor, len(messages)-messageLimit, resetColor)
+			sb.WriteString("\n\n")
 		}
 	}
+	return sb.String()
 }

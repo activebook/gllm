@@ -73,6 +73,9 @@ func GenerateTempFileName() string {
 // Helper function to truncate strings with ellipsis
 func TruncateString(s string, maxLen int) string {
 	s = strings.TrimSpace(s)
+	if maxLen < 0 {
+		return s
+	}
 	if len(s) <= maxLen {
 		return s
 	}
