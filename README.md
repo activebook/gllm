@@ -185,6 +185,14 @@ You can maintain a conversation across multiple commands by assigning a name to 
   gllm "Tell me more about his policies." -c my_convo
   ```
 
+- **Conversation Management:**
+
+  ```sh
+  gllm convo list
+  gllm convo info my_convo
+  gllm convo remove my_convo
+  ```
+
 #### 2. Chat Style (interactive session)
 
 For a more interactive experience, you can use the `chat` command to enter a real-time chat session.
