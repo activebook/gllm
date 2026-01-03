@@ -428,9 +428,11 @@ func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Functi
 			Name: call.Name,
 			Response: map[string]any{
 				"content": nil,
-				"error":   fmt.Sprintf("unknown or built-in tool call: %v", call.Name),
+				"error":   fmt.Sprintf("Error: Unknown function '%s'. This function is not available. Please use one of the available functions from the tool list.", call.Name),
 			},
 		}, nil
+		// Warn the user
+		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", call.Name)}, nil)
 	}
 
 	// Function call is done

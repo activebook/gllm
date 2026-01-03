@@ -427,9 +427,11 @@ func (a *Anthropic) processToolCall(toolCall anthropic.ToolUseBlockParam) (anthr
 		// Handle MCP tool calls
 		msg, err = a.op.AnthropicMCPToolCall(toolCall, &argsMap)
 	} else {
-		err = fmt.Errorf("unknown tool: %s", toolCall.Name)
-		toolResult := anthropic.NewToolResultBlock(toolCall.ID, fmt.Sprintf("Error: %v", err), true)
+		errorMsg := fmt.Sprintf("Error: Unknown function '%s'. This function is not available. Please use one of the available functions from the tool list.", toolCall.Name)
+		toolResult := anthropic.NewToolResultBlock(toolCall.ID, errorMsg, true)
 		msg = anthropic.NewUserMessage(toolResult)
+		// Warn the user
+		a.op.status.ChangeTo(a.op.notify, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", toolCall.Name)}, nil)
 		err = nil // Error is captured in the tool result
 	}
 

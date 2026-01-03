@@ -508,8 +508,16 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 		// Handle MCP tool calls
 		msg, err = oa.op.OpenAIMCPToolCall(toolCall, &argsMap)
 	} else {
-		msg = openai.ChatCompletionMessage{}
-		err = fmt.Errorf("unknown function name: %s", toolCall.Function.Name)
+		// Unknown function: return error message to model and warn user
+		errorMsg := fmt.Sprintf("Error: Unknown function '%s'. This function is not available. Please use one of the available functions from the tool list.", toolCall.Function.Name)
+		msg = openai.ChatCompletionMessage{
+			Role:       openai.ChatMessageRoleTool,
+			Content:    errorMsg,
+			ToolCallID: toolCall.ID,
+		}
+		// Warn the user
+		oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", toolCall.Function.Name)}, nil)
+		err = nil // Don't stop conversation - let model see the error and adjust
 	}
 
 	// Function call is done

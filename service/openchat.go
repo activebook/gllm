@@ -592,8 +592,18 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		// Handle MCP tool calls
 		msg, err = c.op.OpenChatMCPToolCall(&toolCall, &argsMap)
 	} else {
-		msg = nil
-		err = fmt.Errorf("unknown function name: %s", toolCall.Function.Name)
+		// Unknown function: return error message to model and warn user
+		errorMsg := fmt.Sprintf("Error: Unknown function '%s'. This function is not available. Please use one of the available functions from the tool list.", toolCall.Function.Name)
+		msg = &model.ChatCompletionMessage{
+			Role: "tool",
+			Content: &model.ChatCompletionMessageContent{
+				StringValue: volcengine.String(errorMsg),
+			},
+			ToolCallID: toolCall.ID,
+		}
+		// Warn the user
+		c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", toolCall.Function.Name)}, nil)
+		err = nil // Don't stop conversation - let model see the error and adjust
 	}
 
 	// Function call is done
