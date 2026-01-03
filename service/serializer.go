@@ -160,21 +160,37 @@ func DetectMessageProvider(data []byte) string {
 
 // styleEachRune applies color to each rune individually except newlines.
 // This ensures color is preserved across terminal wrapping and scrolling.
-func styleEachRune(text string, color string) string {
+// Added indent parameter to support multi-line indentation.
+func styleEachRune(text string, color string, indent string) string {
 	// trim leading and trailing newlines
 	text = strings.Trim(text, "\n")
 	var sb strings.Builder
 	reset := resetColor
-	for _, r := range text {
-		if r == '\n' {
-			sb.WriteRune(r)
-			continue
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		if i > 0 {
+			sb.WriteRune('\n')
+			sb.WriteString(indent)
 		}
-		sb.WriteString(color)
-		sb.WriteRune(r)
-		sb.WriteString(reset)
+		for _, r := range line {
+			sb.WriteString(color)
+			sb.WriteRune(r)
+			sb.WriteString(reset)
+		}
 	}
 	return sb.String()
+}
+
+// indentText ensures every line in the text is prefixed with the given indent.
+func indentText(text string, indent string) string {
+	text = strings.Trim(text, "\n")
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		if i > 0 {
+			lines[i] = indent + line
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // RenderGeminiConversationLog returns a string summary of Gemini conversation
@@ -247,29 +263,30 @@ func RenderGeminiConversationLog(data []byte) string {
 					}
 					switch {
 					case part.FunctionCall != nil:
-						sb.WriteString(fmt.Sprintf("%s[Function call: %s]%s", ContentTypeColors["function_call"], part.FunctionCall.Name, resetColor))
+						sb.WriteString(fmt.Sprintf("\n    %s[Function call: %s]%s", ContentTypeColors["function_call"], part.FunctionCall.Name, resetColor))
 						if len(part.FunctionCall.Arguments) > 0 {
 							argStr, _ := json.MarshalIndent(part.FunctionCall.Arguments, "    ", "  ")
-							sb.WriteString(fmt.Sprintf(" args: %s", string(argStr)))
+							sb.WriteString(fmt.Sprintf("\n    args: %s", string(argStr)))
 						}
 					case part.FunctionResponse != nil:
-						sb.WriteString(fmt.Sprintf("%s[Function response]%s", ContentTypeColors["function_response"], resetColor))
+						sb.WriteString(fmt.Sprintf("\n    %s[Function response]%s", ContentTypeColors["function_response"], resetColor))
 						respPreview, _ := json.MarshalIndent(part.FunctionResponse.Response, "    ", "  ")
-						sb.WriteString(fmt.Sprintf(" data: %s", string(respPreview)))
+						sb.WriteString(fmt.Sprintf("\n    data: %s", string(respPreview)))
 					case part.InlineData != nil:
 						mimeType := part.InlineData.MimeType
 						if strings.HasPrefix(mimeType, "image/") {
-							sb.WriteString(fmt.Sprintf("%s[Image content]%s", ContentTypeColors["image"], resetColor))
+							sb.WriteString(fmt.Sprintf("\n    %s[Image content]%s", ContentTypeColors["image"], resetColor))
 						} else {
-							sb.WriteString(fmt.Sprintf("%s[File]%s", ContentTypeColors["file_data"], resetColor))
+							sb.WriteString(fmt.Sprintf("\n    %s[File]%s", ContentTypeColors["file_data"], resetColor))
 						}
 					case part.Thought:
 						sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
-						sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(part.Text, ContentTypeColors["reasoning_content"])))
+						sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(part.Text, ContentTypeColors["reasoning_content"], "    ")))
 						sb.WriteString(fmt.Sprintf("\n    %s✓%s\n", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 					default:
 						if part.Text != "" {
-							sb.WriteString(part.Text)
+							sb.WriteString("\n    ")
+							sb.WriteString(indentText(part.Text, "    "))
 						} else {
 							sb.WriteString(fmt.Sprintf("[%s content]", part.Type))
 						}
@@ -277,7 +294,7 @@ func RenderGeminiConversationLog(data []byte) string {
 				}
 				sb.WriteString("\n\n")
 			} else {
-				sb.WriteString("[Empty message]\n\n")
+				sb.WriteString("\n    [Empty message]\n\n")
 			}
 		}
 	}
@@ -355,25 +372,26 @@ func RenderOpenAIConversationLog(data []byte) string {
 			// Output the reasoning content if it exists
 			if msg.ReasonContent != "" {
 				sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
-				sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(msg.ReasonContent, ContentTypeColors["reasoning_content"])))
+				sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(msg.ReasonContent, ContentTypeColors["reasoning_content"], "    ")))
 				sb.WriteString(fmt.Sprintf("\n    %s✓%s\n", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 			}
 
 			if msg.Content != "" {
-				sb.WriteString(msg.Content)
+				sb.WriteString("\n    ")
+				sb.WriteString(indentText(msg.Content, "    "))
 			}
 
 			if len(msg.MultiContent) > 0 {
-				sb.WriteString("[Multimodal content: ")
+				sb.WriteString("\n    [Multimodal content: ")
 				for j, item := range msg.MultiContent {
 					if j > 0 {
 						sb.WriteString(", ")
 					}
 					if item.Type == "text" {
-						sb.WriteString(fmt.Sprintf("text (%s)", item.Text))
+						sb.WriteString(fmt.Sprintf("\n    text (%s)", indentText(item.Text, "    ")))
 					}
 					if item.Type == "image_url" {
-						sb.WriteString(fmt.Sprintf("%simage%s", ContentTypeColors["image"], resetColor))
+						sb.WriteString(fmt.Sprintf("\n    %simage%s", ContentTypeColors["image"], resetColor))
 					}
 				}
 				sb.WriteString("]")
@@ -381,7 +399,7 @@ func RenderOpenAIConversationLog(data []byte) string {
 
 			// Function call details
 			if msg.FunctionCall != nil {
-				sb.WriteString(fmt.Sprintf(" %s[Function call: %s]%s", ContentTypeColors["function_call"], msg.FunctionCall.Name, resetColor))
+				sb.WriteString(fmt.Sprintf("\n    %s[Function call: %s]%s", ContentTypeColors["function_call"], msg.FunctionCall.Name, resetColor))
 				if msg.FunctionCall.Arguments != "" {
 					sb.WriteString(fmt.Sprintf(" args: %s", msg.FunctionCall.Arguments))
 				}
@@ -389,7 +407,7 @@ func RenderOpenAIConversationLog(data []byte) string {
 
 			// Tool call details
 			if len(msg.ToolCalls) > 0 {
-				sb.WriteString(fmt.Sprintf(" %s[Tool calls: ", ContentTypeColors["function_call"]))
+				sb.WriteString(fmt.Sprintf("\n    %s[Tool calls: ", ContentTypeColors["function_call"]))
 				for j, tool := range msg.ToolCalls {
 					if j > 0 {
 						sb.WriteString(", ")
@@ -401,7 +419,7 @@ func RenderOpenAIConversationLog(data []byte) string {
 
 			// Tool response details
 			if msg.ToolCallId != "" {
-				sb.WriteString(fmt.Sprintf(" %s[Response to tool call: %s]%s", ContentTypeColors["function_response"], msg.ToolCallId, resetColor))
+				sb.WriteString(fmt.Sprintf("\n    %s[Response to tool call: %s]%s", ContentTypeColors["function_response"], msg.ToolCallId, resetColor))
 			}
 
 			sb.WriteString("\n\n")
@@ -466,33 +484,36 @@ func RenderAnthropicConversationLog(data []byte) string {
 
 			for j, block := range msg.Content {
 				if j > 0 {
-					// sb.WriteString(" + ")
+					sb.WriteString("\n    ") // Indent for subsequent blocks
 				}
 
 				if v := block.OfText; v != nil {
-					sb.WriteString(v.Text)
+					if j == 0 {
+						sb.WriteString("\n    ")
+					}
+					sb.WriteString(indentText(v.Text, "    "))
 				} else if v := block.OfImage; v != nil {
-					sb.WriteString(fmt.Sprintf("%s[Image]%s", ContentTypeColors["image"], resetColor))
+					sb.WriteString(fmt.Sprintf("\n    %s[Image]%s", ContentTypeColors["image"], resetColor))
 				} else if v := block.OfThinking; v != nil {
 					sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
-					sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(v.Thinking, ContentTypeColors["reasoning_content"])))
+					sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(v.Thinking, ContentTypeColors["reasoning_content"], "    ")))
 					sb.WriteString(fmt.Sprintf("\n    %s✓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 				} else if v := block.OfRedactedThinking; v != nil {
 					sb.WriteString(fmt.Sprintf("\n    %sThinking (Redacted) ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
-					sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(v.Data, ContentTypeColors["reasoning_content"])))
+					sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(v.Data, ContentTypeColors["reasoning_content"], "    ")))
 					sb.WriteString(fmt.Sprintf("\n    %s✓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 				} else if v := block.OfToolUse; v != nil {
-					sb.WriteString(fmt.Sprintf(" %s[Tool Use: %s]%s", ContentTypeColors["function_call"], v.Name, resetColor))
+					sb.WriteString(fmt.Sprintf("\n    %s[Tool Use: %s]%s", ContentTypeColors["function_call"], v.Name, resetColor))
 					// Input
 					inputJSON, _ := json.MarshalIndent(v.Input, "    ", "  ")
-					sb.WriteString(fmt.Sprintf(" input: %s", string(inputJSON)))
+					sb.WriteString(fmt.Sprintf("\n    input: %s", string(inputJSON)))
 				} else if v := block.OfToolResult; v != nil {
-					sb.WriteString(fmt.Sprintf(" %s[Tool Result: ID=%s]%s", ContentTypeColors["function_response"], v.ToolUseID, resetColor))
+					sb.WriteString(fmt.Sprintf("\n    %s[Tool Result: ID=%s]%s", ContentTypeColors["function_response"], v.ToolUseID, resetColor))
 					// Content
 					contentJSON, _ := json.MarshalIndent(v.Content, "    ", "  ")
-					sb.WriteString(fmt.Sprintf(" content: %s", string(contentJSON)))
+					sb.WriteString(fmt.Sprintf("\n    content: %s", string(contentJSON)))
 				} else {
-					sb.WriteString("[Unknown Block]")
+					sb.WriteString("\n    [Unknown Block]")
 				}
 
 				if j < len(msg.Content)-1 {

@@ -67,13 +67,13 @@ func (m ViewportModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.ready {
 			m.viewport = viewport.New(msg.Width, msg.Height-verticalMarginHeight)
 			m.viewport.YPosition = headerHeight
-			wrappedContent := wrap.String(m.content, msg.Width)
+			wrappedContent := wrapWithIndentation(m.content, msg.Width)
 			m.viewport.SetContent(wrappedContent)
 			m.ready = true
 		} else {
 			m.viewport.Width = msg.Width
 			m.viewport.Height = msg.Height - verticalMarginHeight
-			wrappedContent := wrap.String(m.content, msg.Width)
+			wrappedContent := wrapWithIndentation(m.content, msg.Width)
 			m.viewport.SetContent(wrappedContent)
 		}
 	}
@@ -82,6 +82,43 @@ func (m ViewportModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 
 	return m, tea.Batch(cmds...)
+}
+
+func wrapWithIndentation(s string, width int) string {
+	lines := strings.Split(s, "\n")
+	var wrappedLines []string
+	for _, line := range lines {
+		if lipgloss.Width(line) <= width {
+			wrappedLines = append(wrappedLines, line)
+			continue
+		}
+
+		// Find leading whitespace
+		var indent string
+		for _, r := range line {
+			if r == ' ' || r == '\t' {
+				indent += string(r)
+			} else {
+				break
+			}
+		}
+
+		indentWidth := lipgloss.Width(indent)
+		// If indent is too wide, or we have no content after indent, just wrap normally
+		if indentWidth >= width-10 || indentWidth >= width {
+			wrappedLines = append(wrappedLines, wrap.String(line, width))
+			continue
+		}
+
+		content := line[len(indent):]
+		wrappedContent := wrap.String(content, width-indentWidth)
+		contentLines := strings.Split(wrappedContent, "\n")
+
+		for _, cl := range contentLines {
+			wrappedLines = append(wrappedLines, indent+cl)
+		}
+	}
+	return strings.Join(wrappedLines, "\n")
 }
 
 func (m ViewportModel) View() string {
