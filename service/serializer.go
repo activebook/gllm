@@ -69,8 +69,9 @@ type GeminiInlineData struct {
 
 // OpenAI message format with enhanced support for function calls and files
 type OpenAIMessage struct {
-	Role          string              `json:"role"`    // system, user, assistant
-	Content       interface{}         `json:"content"` // can be string or array for multimodal content
+	Role          string `json:"role"`    // system, user, assistant
+	Content       string `json:"content"` // can be string or array for multimodal content
+	MultiContent  []OpenAIContentItem
 	ReasonContent string              `json:"reasoning_content,omitempty"`
 	Name          string              `json:"name,omitempty"`
 	FunctionCall  *OpenAIFunctionCall `json:"function_call,omitempty"`
@@ -100,6 +101,18 @@ type OpenAIImageURL struct {
 	Url string `json:"url"` // Can be data URL or HTTP URL
 }
 
+// Anthropic message format
+type AnthropicMessage struct {
+	Role    string                  `json:"role"`
+	Content []AnthropicContentBlock `json:"content"`
+}
+
+type AnthropicContentBlock struct {
+	Type   string      `json:"type"` // text, tool_use, tool_result, thinking
+	Text   string      `json:"text,omitempty"`
+	Source interface{} `json:"source,omitempty"` // for image
+}
+
 // Detects the conversation provider based on message format
 func DetectMessageProvider(data []byte) string {
 	// Try to unmarshal as array of messages
@@ -112,19 +125,30 @@ func DetectMessageProvider(data []byte) string {
 		return ModelProviderUnknown
 	}
 
+	// Try to detect OpenAI format (fallback)
+	var openaiMsg OpenAIMessage
+	if err := json.Unmarshal(messages[0], &openaiMsg); err == nil {
+		// OpenAI messages must have a role and content or multi-content
+		if openaiMsg.Role != "" && (openaiMsg.Content != "" || openaiMsg.MultiContent != nil) {
+			return ModelProviderOpenAI
+		}
+	}
+
 	// Try to detect Gemini format
 	var geminiMsg GeminiMessage
 	if err := json.Unmarshal(messages[0], &geminiMsg); err == nil {
+		// Gemini messages must have a role and parts array
 		if geminiMsg.Role != "" && len(geminiMsg.Parts) > 0 {
 			return ModelProviderGemini
 		}
 	}
 
-	// Try to detect OpenAI format
-	var openaiMsg OpenAIMessage
-	if err := json.Unmarshal(messages[0], &openaiMsg); err == nil {
-		if openaiMsg.Role != "" {
-			return ModelProviderOpenAI
+	// Try to detect Anthropic format
+	var anthropicMsg AnthropicMessage
+	if err := json.Unmarshal(messages[0], &anthropicMsg); err == nil {
+		// Anthropic messages must have a role and content must be an array of blocks
+		if anthropicMsg.Role != "" && len(anthropicMsg.Content) > 0 {
+			return ModelProviderAnthropic
 		}
 	}
 
@@ -140,6 +164,7 @@ func DisplayGeminiConversationLog(data []byte, msgCount int, msgLength int) {
 	}
 
 	// Summary section (keeping it simple for now)
+	fmt.Println("Provider: Gemini")
 	fmt.Println("Summary:")
 	fmt.Printf("  %sMessages: %d%s\n", resetColor, len(messages), resetColor)
 
@@ -257,6 +282,7 @@ func DisplayOpenAIConversationLog(data []byte, msgCount int, msgLength int) {
 	}
 
 	// Summary section
+	fmt.Println("Provider: OpenAI")
 	fmt.Println("Summary:")
 	fmt.Printf("  %sMessages: %d%s\n", resetColor, len(messages), resetColor)
 
@@ -279,13 +305,10 @@ func DisplayOpenAIConversationLog(data []byte, msgCount int, msgLength int) {
 		if len(msg.ToolCalls) > 0 {
 			functionCallCount += len(msg.ToolCalls)
 		}
-		if contentItems, ok := msg.Content.([]interface{}); ok {
-			for _, item := range contentItems {
-				if contentMap, ok := item.(map[string]interface{}); ok {
-					if contentType, ok := contentMap["type"].(string); ok && contentType == "image_url" {
-						imageCount++
-					}
-				}
+
+		for _, item := range msg.MultiContent {
+			if item.Type == "image_url" {
+				imageCount++
 			}
 		}
 	}
@@ -335,38 +358,25 @@ func DisplayOpenAIConversationLog(data []byte, msgCount int, msgLength int) {
 				fmt.Printf("    ")
 			}
 
-			switch content := msg.Content.(type) {
-			case string:
-				preview := TruncateString(content, msgLength)
+			if msg.Content != "" {
+				preview := TruncateString(msg.Content, msgLength)
 				fmt.Printf("%s", preview)
-			case []interface{}:
+			}
+
+			if len(msg.MultiContent) > 0 {
 				fmt.Print("[Multimodal content: ")
-				for j, item := range content {
+				for j, item := range msg.MultiContent {
 					if j > 0 {
 						fmt.Print(", ")
 					}
-					if contentMap, ok := item.(map[string]interface{}); ok {
-						if contentType, ok := contentMap["type"].(string); ok {
-							switch contentType {
-							case "text":
-								if text, ok := contentMap["text"].(string); ok {
-									fmt.Printf("text (%s)", TruncateString(text, msgLength))
-								}
-							case "image_url":
-								fmt.Printf("%simage%s", ContentTypeColors["image"], resetColor)
-							default:
-								fmt.Print(contentType)
-							}
-						}
+					if item.Type == "text" {
+						fmt.Printf("text (%s)", TruncateString(item.Text, msgLength))
+					}
+					if item.Type == "image_url" {
+						fmt.Printf("%simage%s", ContentTypeColors["image"], resetColor)
 					}
 				}
 				fmt.Print("]")
-			case nil:
-				if msg.Role == "assistant" {
-					fmt.Print("[No text content]")
-				}
-			default:
-				fmt.Print("[Unknown content format]")
 			}
 
 			// Function call details
@@ -413,6 +423,7 @@ func DisplayAnthropicConversationLog(data []byte, msgCount int, msgLength int) {
 	}
 
 	// Summary section
+	fmt.Println("Provider: Anthropic")
 	fmt.Println("Summary:")
 	fmt.Printf("  %sMessages: %d%s\n", resetColor, len(messages), resetColor)
 
@@ -420,21 +431,6 @@ func DisplayAnthropicConversationLog(data []byte, msgCount int, msgLength int) {
 	var toolUseCount, toolResultCount int
 
 	for _, msg := range messages {
-		// Role is param.Field[string] or similar usually, but in MessageParam it is MessageParamRole (string alias)
-		// Wait, MessageParam definition:
-		// Role MessageParamRole `json:"role,omitzero,required"`
-		// MessageParamRole is string.
-		// However, it is a Field? No, earlier doc said "Role MessageParamRole".
-		// But let's check if it needs `.Value` access.
-		// Earlier `service/anthropic.go` used `anthropic.Model(ag.Model.ModelName)` which returns simple type?
-		// No, `MessageNewParams` used `F(...)`.
-		// `MessageParam` is used for HISTORY (Input).
-		// Let's verify if `MessageParam` fields are `param.Field` or direct values?
-		// "go doc ... MessageParam" earlier showed:
-		// Role MessageParamRole
-		// Content []ContentBlockParamUnion
-		// So they are DIRECT values, not `param.Field`.
-
 		switch msg.Role {
 		case anthropic.MessageParamRoleUser:
 			userCount++
