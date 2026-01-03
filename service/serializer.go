@@ -186,7 +186,6 @@ func RenderGeminiConversationLog(data []byte) string {
 	}
 
 	// Summary section
-	sb.WriteString("Provider: Gemini\n")
 	sb.WriteString("Summary:\n")
 	sb.WriteString(fmt.Sprintf("  %sMessages: %d%s\n", resetColor, len(messages), resetColor))
 
@@ -294,7 +293,6 @@ func RenderOpenAIConversationLog(data []byte) string {
 	}
 
 	// Summary section
-	sb.WriteString("Provider: OpenAI\n")
 	sb.WriteString("Summary:\n")
 	sb.WriteString(fmt.Sprintf("  %sMessages: %d%s\n", resetColor, len(messages), resetColor))
 
@@ -421,7 +419,6 @@ func RenderAnthropicConversationLog(data []byte) string {
 	}
 
 	// Summary section
-	sb.WriteString("Provider: Anthropic\n")
 	sb.WriteString("Summary:\n")
 	sb.WriteString(fmt.Sprintf("  %sMessages: %d%s\n", resetColor, len(messages), resetColor))
 

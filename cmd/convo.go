@@ -409,7 +409,7 @@ Using the --message-chars (-c) flag, set the maximum length of each message's co
 		}
 
 		// Show viewport
-		m := NewViewportModel(content, func() string {
+		m := NewViewportModel(provider, content, func() string {
 			return fmt.Sprintf("Conversation: %s", convoName)
 		})
 

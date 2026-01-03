@@ -26,13 +26,15 @@ var (
 
 type ViewportModel struct {
 	viewport   viewport.Model
+	provider   string
 	content    string
 	ready      bool
 	headerFunc func() string
 }
 
-func NewViewportModel(content string, headerFunc func() string) ViewportModel {
+func NewViewportModel(provider string, content string, headerFunc func() string) ViewportModel {
 	return ViewportModel{
+		provider:   provider,
 		content:    content,
 		headerFunc: headerFunc,
 	}
@@ -91,13 +93,14 @@ func (m ViewportModel) View() string {
 
 func (m ViewportModel) headerView() string {
 	title := titleStyle.Render(m.headerFunc())
-	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(title)))
-	return lipgloss.JoinHorizontal(lipgloss.Center, title, line)
+	pdinfo := fmt.Sprintf("── [%s] ──", m.provider)
+	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(title)-lipgloss.Width(pdinfo)))
+	return lipgloss.JoinHorizontal(lipgloss.Center, title, line, pdinfo)
 }
 
 func (m ViewportModel) footerView() string {
 	info := infoStyle.Render(fmt.Sprintf("%3.f%%", m.viewport.ScrollPercent()*100))
-	tips := "space/f/d: Next • b/u: Prev • j/k: Scroll • q: Quit"
-	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(info)-lipgloss.Width(tips)-2))
-	return lipgloss.JoinHorizontal(lipgloss.Center, line, " "+tips+" ", info)
+	tips := "─ space/f/d: Next • b/u: Prev • j/k: Scroll • q: Quit ─"
+	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(info)-lipgloss.Width(tips)))
+	return lipgloss.JoinHorizontal(lipgloss.Center, line, tips, info)
 }

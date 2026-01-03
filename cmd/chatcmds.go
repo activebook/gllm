@@ -281,7 +281,7 @@ func (ci *ChatInfo) showHistory() {
 	}
 
 	// Show viewport
-	m := NewViewportModel(content, func() string {
+	m := NewViewportModel(ci.ModelProvider, content, func() string {
 		return fmt.Sprintf("History: %s (%s)", convoName, ci.ModelProvider)
 	})
 
