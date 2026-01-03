@@ -47,6 +47,7 @@ type GeminiMessage struct {
 type GeminiPart struct {
 	Type             string                  `json:"type"` // text, function_call, function_response, image, file_data, etc.
 	Text             string                  `json:"text,omitempty"`
+	Thought          bool                    `json:"thought,omitempty"`          // for reasoning
 	Name             string                  `json:"name,omitempty"`             // for function calls
 	Args             map[string]interface{}  `json:"args,omitempty"`             // for function calls
 	InlineData       *GeminiInlineData       `json:"inlineData,omitempty"`       // for inline images
@@ -157,6 +158,25 @@ func DetectMessageProvider(data []byte) string {
 	return ModelProviderUnknown
 }
 
+// styleEachRune applies color to each rune individually except newlines.
+// This ensures color is preserved across terminal wrapping and scrolling.
+func styleEachRune(text string, color string) string {
+	// trim leading and trailing newlines
+	text = strings.Trim(text, "\n")
+	var sb strings.Builder
+	reset := resetColor
+	for _, r := range text {
+		if r == '\n' {
+			sb.WriteRune(r)
+			continue
+		}
+		sb.WriteString(color)
+		sb.WriteRune(r)
+		sb.WriteString(reset)
+	}
+	return sb.String()
+}
+
 // RenderGeminiConversationLog returns a string summary of Gemini conversation
 func RenderGeminiConversationLog(data []byte) string {
 	var sb strings.Builder
@@ -224,7 +244,7 @@ func RenderGeminiConversationLog(data []byte) string {
 			if len(msg.Parts) > 0 {
 				for j, part := range msg.Parts {
 					if j > 0 {
-						sb.WriteString("\n    + ")
+						sb.WriteString("    ")
 					}
 					switch {
 					case part.FunctionCall != nil:
@@ -244,6 +264,10 @@ func RenderGeminiConversationLog(data []byte) string {
 						} else {
 							sb.WriteString(fmt.Sprintf("%s[File]%s", ContentTypeColors["file_data"], resetColor))
 						}
+					case part.Thought:
+						sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
+						sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(part.Text, ContentTypeColors["reasoning_content"])))
+						sb.WriteString(fmt.Sprintf("\n    %s✓%s\n", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 					default:
 						if part.Text != "" {
 							sb.WriteString(part.Text)
@@ -333,7 +357,7 @@ func RenderOpenAIConversationLog(data []byte) string {
 			// Output the reasoning content if it exists
 			if msg.ReasonContent != "" {
 				sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
-				sb.WriteString(fmt.Sprintf("\n    %s%s%s", ContentTypeColors["reasoning_content"], msg.ReasonContent, ContentTypeColors["reset"]))
+				sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(msg.ReasonContent, ContentTypeColors["reasoning_content"])))
 				sb.WriteString(fmt.Sprintf("\n    %s✓%s\n", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 			}
 
@@ -454,11 +478,11 @@ func RenderAnthropicConversationLog(data []byte) string {
 					sb.WriteString(fmt.Sprintf("%s[Image]%s", ContentTypeColors["image"], resetColor))
 				} else if v := block.OfThinking; v != nil {
 					sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
-					sb.WriteString(fmt.Sprintf("\n    %s%s%s", ContentTypeColors["reasoning_content"], v.Thinking, ContentTypeColors["reset"]))
+					sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(v.Thinking, ContentTypeColors["reasoning_content"])))
 					sb.WriteString(fmt.Sprintf("\n    %s✓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 				} else if v := block.OfRedactedThinking; v != nil {
 					sb.WriteString(fmt.Sprintf("\n    %sThinking (Redacted) ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
-					sb.WriteString(fmt.Sprintf("\n    %s%s%s", ContentTypeColors["reasoning_content"], v.Data, ContentTypeColors["reset"]))
+					sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(v.Data, ContentTypeColors["reasoning_content"])))
 					sb.WriteString(fmt.Sprintf("\n    %s✓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 				} else if v := block.OfToolUse; v != nil {
 					sb.WriteString(fmt.Sprintf(" %s[Tool Use: %s]%s", ContentTypeColors["function_call"], v.Name, resetColor))
