@@ -536,11 +536,37 @@ var modelInfoCmd = &cobra.Command{
 	Use:     "info NAME",
 	Aliases: []string{"in"},
 	Short:   "Show the detail of a specific model",
-	Args:    cobra.ExactArgs(1),
+	// Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		name := args[0]
 		store := data.NewConfigStore()
 		modelsMap := store.GetModels()
+		if len(modelsMap) == 0 {
+			return fmt.Errorf("there is no model yet.")
+		}
+		var name string
+		if len(args) > 0 {
+			name = args[0]
+		} else {
+			activeAgent := store.GetActiveAgent()
+			if activeAgent != nil {
+				name = activeAgent.Model.Name
+			}
+			// Select model
+			var options []huh.Option[string]
+			for n := range modelsMap {
+				options = append(options, huh.NewOption(n, n))
+			}
+			SortOptions(options, name)
+
+			err := huh.NewSelect[string]().
+				Title("Select Model to Check").
+				Options(options...).
+				Value(&name).
+				Run()
+			if err != nil {
+				return nil
+			}
+		}
 
 		// Try finding key
 		var modelName string

@@ -3,6 +3,7 @@ package cmd
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/activebook/gllm/data"
@@ -230,11 +231,37 @@ var systemInfoCmd = &cobra.Command{
 	Use:     "info NAME",
 	Aliases: []string{"in"},
 	Short:   "Show the content of a specific system prompt",
-	Args:    cobra.ExactArgs(1), // Requires exactly one argument (the name)
+	// Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		name := args[0]
 		store := data.NewConfigStore()
 		sysPrompts := store.GetSystemPrompts()
+		if len(sysPrompts) == 0 {
+			return fmt.Errorf("there is no system prompt yet.")
+		}
+		var name string
+		if len(args) > 0 {
+			name = args[0]
+		} else {
+			activeAgent := store.GetActiveAgent()
+			if activeAgent != nil {
+				name = activeAgent.SystemPrompt
+			}
+			// Select prompt to remove
+			var options []huh.Option[string]
+			for n := range sysPrompts {
+				options = append(options, huh.NewOption(n, n))
+			}
+			SortOptions(options, name)
+
+			err := huh.NewSelect[string]().
+				Title("Select System Prompt to Check").
+				Options(options...).
+				Value(&name).
+				Run()
+			if err != nil {
+				return nil
+			}
+		}
 
 		content, exists := sysPrompts[name]
 		if !exists {
@@ -351,12 +378,13 @@ var systemSwitchCmd = &cobra.Command{
 			for n := range sysPrompts {
 				names = append(names, n)
 			}
-
-			// Add "None" option
-			// bugfix: must set a non-empty value, otherwise the sort will fail
-			options = append(options, huh.NewOption("None", " "))
 			for _, n := range names {
 				options = append(options, huh.NewOption(n, n))
+			}
+			// Add "None" option, if there isn't one
+			if !slices.Contains(names, "None") {
+				// bugfix: must set a non-empty value, otherwise the sort will fail
+				options = append(options, huh.NewOption("None", " "))
 			}
 
 			SortOptions(options, currentName)

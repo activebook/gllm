@@ -796,31 +796,45 @@ var agentInfoCmd = &cobra.Command{
 	Aliases: []string{"show", "details"},
 	Short:   "Show detailed information about an agent",
 	Long:    `Display detailed configuration information for a specific agent.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		store := data.NewConfigStore()
+		agents := store.GetAllAgents()
+		if len(agents) == 0 {
+			return fmt.Errorf("no agents found")
+		}
+
 		var name string
 		if len(args) > 0 {
 			name = args[0]
 		} else {
-			// Default to active agent
 			name = store.GetActiveAgentName()
-			if name == "" {
-				fmt.Println("No active agent.")
-				return
+
+			// Select agent to check
+			var options []huh.Option[string]
+			for n := range agents {
+				options = append(options, huh.NewOption(n, n))
+			}
+			SortOptions(options, name)
+
+			err := huh.NewSelect[string]().
+				Title("Select Agent to Check").
+				Options(options...).
+				Value(&name).
+				Run()
+			if err != nil {
+				return err
 			}
 		}
 
 		agentConfig := store.GetAgent(name)
 		if agentConfig == nil {
-			fmt.Printf("Agent '%s' not found.\n", name)
-			return
+			return fmt.Errorf("agent '%s' not found", name)
 		}
 
 		fmt.Printf("Agent '%s' configuration:\n", name)
-		fmt.Println()
-
 		// Display configuration using the same formatting as add/set commands
 		printAgentConfigDetails(agentConfig, "  ")
+		return nil
 	},
 }
 

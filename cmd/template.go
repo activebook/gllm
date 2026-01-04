@@ -3,6 +3,7 @@ package cmd
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/activebook/gllm/data"
@@ -225,18 +226,44 @@ var templateInfoCmd = &cobra.Command{
 	Use:     "info NAME",
 	Aliases: []string{"in"},
 	Short:   "Show the content of a specific template prompt",
-	Args:    cobra.ExactArgs(1), // Requires exactly one argument (the name)
+	// Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		name := args[0]
 		store := data.NewConfigStore()
 		templates := store.GetTemplates()
+		if len(templates) == 0 {
+			return fmt.Errorf("there is no template prompt yet.")
+		}
+		var name string
+		if len(args) > 0 {
+			name = args[0]
+		} else {
+			activeAgent := store.GetActiveAgent()
+			if activeAgent != nil {
+				name = activeAgent.Template
+			}
+			// Select prompt
+			var options []huh.Option[string]
+			for n := range templates {
+				options = append(options, huh.NewOption(n, n))
+			}
+			SortOptions(options, name)
+
+			err := huh.NewSelect[string]().
+				Title("Select Template to Check").
+				Options(options...).
+				Value(&name).
+				Run()
+			if err != nil {
+				return nil
+			}
+		}
 
 		content, exists := templates[name]
 		if !exists {
-			return fmt.Errorf("template prompt named '%s' not found", name)
+			return fmt.Errorf("template prompt named '%s' not found.", name)
 		}
 
-		fmt.Printf("template prompt '%s':\n---\n%s\n---\n", name, content)
+		fmt.Printf("Template prompt '%s':\n---\n%s\n---\n", name, content)
 		return nil
 	},
 }
@@ -341,13 +368,13 @@ var templateSwitchCmd = &cobra.Command{
 			for n := range templates {
 				names = append(names, n)
 			}
-
-			// Add "None" option
-			// bugfix: must set a non-empty value, otherwise the sort will fail
-			options = append(options, huh.NewOption("None", " "))
-
 			for _, n := range names {
 				options = append(options, huh.NewOption(n, n))
+			}
+			// Add "None" option, if there isn't one
+			if !slices.Contains(names, "None") {
+				// bugfix: must set a non-empty value, otherwise the sort will fail
+				options = append(options, huh.NewOption("None", " "))
 			}
 			SortOptions(options, currentName)
 
