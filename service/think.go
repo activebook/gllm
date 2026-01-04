@@ -172,8 +172,10 @@ func (t ThinkingLevel) ToGeminiConfig(modelName string) *genai.ThinkingConfig {
 		var budget int32
 		switch t {
 		case ThinkingLevelLow:
-			budget = 1024
-		case ThinkingLevelMedium, ThinkingLevelHigh:
+			budget = 4096
+		case ThinkingLevelMedium:
+			budget = 16384
+		case ThinkingLevelHigh:
 			budget = -1 // dynamic allocation
 		}
 		config.ThinkingBudget = &budget
