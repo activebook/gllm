@@ -318,8 +318,8 @@ var agentAddCmd = &cobra.Command{
 					Title("Capabilities").
 					Options(
 						huh.NewOption("Enable MCP", "mcp"),
-						huh.NewOption("Show Usage", "usage"),
-						huh.NewOption("Render Markdown", "markdown"),
+						huh.NewOption("Show Usage Stats", "usage"),
+						huh.NewOption("Markdown Output", "markdown"),
 					).
 					Value(&capabilities),
 			),
@@ -636,8 +636,8 @@ var agentSetCmd = &cobra.Command{
 		}
 		capsOpts := []huh.Option[string]{
 			huh.NewOption("Enable MCP", "mcp").Selected(capsSet["mcp"]),
-			huh.NewOption("Show Usage", "usage").Selected(capsSet["usage"]),
-			huh.NewOption("Render Markdown", "markdown").Selected(capsSet["markdown"]),
+			huh.NewOption("Show Usage Stats", "usage").Selected(capsSet["usage"]),
+			huh.NewOption("Markdown Output", "markdown").Selected(capsSet["markdown"]),
 		}
 		sort.Slice(capsOpts, func(i, j int) bool {
 			iSelected := capsSet[capsOpts[i].Value]

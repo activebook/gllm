@@ -253,9 +253,9 @@ func RunInitWizard() error {
 				Title("Agent Capabilities").
 				Description("Select additional features to enable").
 				Options(
-					huh.NewOption("MCP Enabled", "mcp").Selected(true),
 					huh.NewOption("Token Usage Stats", "usage").Selected(true),
 					huh.NewOption("Markdown Output", "markdown").Selected(true),
+					huh.NewOption("MCP Enabled", "mcp").Selected(false),
 				).
 				Value(&selectedFeatures),
 		),
