@@ -523,6 +523,22 @@ var agentSetCmd = &cobra.Command{
 			return toolsOptions[i].Key < toolsOptions[j].Key
 		})
 
+		// Think
+		// Current level for pre-selection
+		currentThinkLevel := service.ParseThinkingLevel(think)
+		thinkOptions := []huh.Option[string]{
+			huh.NewOption("Off - Disable thinking", "off").Selected(currentThinkLevel == service.ThinkingLevelOff),
+			huh.NewOption("Low - Minimal reasoning", "low").Selected(currentThinkLevel == service.ThinkingLevelLow),
+			huh.NewOption("Medium - Moderate reasoning", "medium").Selected(currentThinkLevel == service.ThinkingLevelMedium),
+			huh.NewOption("High - Maximum reasoning", "high").Selected(currentThinkLevel == service.ThinkingLevelHigh),
+		}
+		sort.Slice(thinkOptions, func(i, j int) bool {
+			if thinkOptions[i].Value == string(currentThinkLevel) {
+				return true
+			}
+			return i < j
+		})
+
 		// Build form
 		// Model
 		err := huh.NewForm(
@@ -595,19 +611,12 @@ var agentSetCmd = &cobra.Command{
 		}
 
 		// Thinking Level
-		// Current level for pre-selection
-		currentThinkLevel := service.ParseThinkingLevel(think)
 		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewSelect[string]().
 					Title("Thinking Level").
 					Description("Select the thinking level for this agent").
-					Options(
-						huh.NewOption("Off - Disable thinking", "off").Selected(currentThinkLevel == service.ThinkingLevelOff),
-						huh.NewOption("Low - Minimal reasoning", "low").Selected(currentThinkLevel == service.ThinkingLevelLow),
-						huh.NewOption("Medium - Moderate reasoning", "medium").Selected(currentThinkLevel == service.ThinkingLevelMedium),
-						huh.NewOption("High - Maximum reasoning", "high").Selected(currentThinkLevel == service.ThinkingLevelHigh),
-					).
+					Options(thinkOptions...).
 					Value(&think),
 			),
 		).Run()
@@ -932,11 +941,11 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 		toolsSlice += fmt.Sprintf("\n%s  - %s", spaceholder, tool)
 	}
 	fmt.Printf("%sTools:%s\n", spaceholder, toolsSlice)
+	fmt.Printf("%sThink: %v\n", spaceholder, agent.Think)
 
 	fmt.Printf("%sMCP: %v\n", spaceholder, agent.MCP)
 	fmt.Printf("%sUsage: %v\n", spaceholder, agent.Usage)
 	fmt.Printf("%sMarkdown: %v\n", spaceholder, agent.Markdown)
-	fmt.Printf("%sThink: %v\n", spaceholder, agent.Think)
 	fmt.Printf("%sMax Recursions: %d\n", spaceholder, agent.MaxRecursions)
 }
 

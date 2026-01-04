@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
@@ -74,6 +75,13 @@ var thinkSwitchCmd = &cobra.Command{
 			huh.NewOption("Medium - Moderate reasoning", "medium").Selected(currentLevel == service.ThinkingLevelMedium),
 			huh.NewOption("High - Maximum reasoning", "high").Selected(currentLevel == service.ThinkingLevelHigh),
 		}
+		// Sort options by Selected at first
+		sort.Slice(options, func(i, j int) bool {
+			if options[i].Value == string(currentLevel) {
+				return true
+			}
+			return i < j
+		})
 
 		form := huh.NewForm(
 			huh.NewGroup(
@@ -83,7 +91,6 @@ var thinkSwitchCmd = &cobra.Command{
 					Value(&selected),
 			),
 		)
-
 		if err := form.Run(); err != nil {
 			return
 		}
