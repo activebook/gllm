@@ -269,7 +269,13 @@ func (ci *ChatInfo) showHistory() {
 
 	// Detect provider based on message format
 	provider := service.DetectMessageProvider(data)
-	if provider != ci.ModelProvider {
+
+	// Check compatibility: OpenAI and OpenAI Compatible are compatible
+	isCompatible := provider == ci.ModelProvider ||
+		(provider == service.ModelProviderOpenAI && ci.ModelProvider == service.ModelProviderOpenAICompatible) ||
+		(provider == service.ModelProviderOpenAICompatible && ci.ModelProvider == service.ModelProviderOpenAI)
+
+	if !isCompatible {
 		// Warn about potential incompatibility if providers differ
 		service.Warnf("Conversation '%s' [%s] is not compatible with the current model provider [%s].\n", convoName, provider, ci.ModelProvider)
 	}
@@ -283,7 +289,7 @@ func (ci *ChatInfo) showHistory() {
 	case service.ModelProviderAnthropic:
 		content = service.RenderAnthropicConversationLog(data)
 	default:
-		fmt.Println("Unknown conversation format.")
+		fmt.Println("No available conversation yet.")
 		return
 	}
 
