@@ -79,6 +79,8 @@ func DetectAnthropicKeyMessage(msg *anthropic.MessageParam) bool {
 	}
 	for _, block := range msg.Content {
 		if v := block.OfText; v != nil {
+			// For pure text content, Anthropic and OpenAI multimodal messages have identical JSON structure
+			// So we need to check for other fields to determine if it's Anthropic
 			continue
 		} else if v := block.OfImage; v != nil {
 			return true
@@ -110,21 +112,6 @@ func DetectMessageProvider(data []byte) string {
 		return provider
 	}
 
-	// Try to detect OpenAI format (fallback)
-	var openaiMsg openai.ChatCompletionMessage
-	for _, msg := range messages {
-		if err := json.Unmarshal(msg, &openaiMsg); err == nil {
-			// OpenAI messages must have a role
-			if DetectOpenAIKeyMessage(&openaiMsg) {
-				provider = ModelProviderOpenAI
-				break
-			}
-		}
-	}
-	if provider != ModelProviderUnknown {
-		return provider
-	}
-
 	// Try to detect Gemini format
 	var geminiMsg gemini.Content
 	for _, msg := range messages {
@@ -133,6 +120,9 @@ func DetectMessageProvider(data []byte) string {
 			// If parts length aren't 0, then it must be gemini
 			if DetectGeminiKeyMessage(&geminiMsg) {
 				provider = ModelProviderGemini
+				break
+			} else {
+				// The first message can detect gemini or not, if not, break
 				break
 			}
 		}
@@ -145,9 +135,29 @@ func DetectMessageProvider(data []byte) string {
 	var anthropicMsg anthropic.MessageParam
 	for _, msg := range messages {
 		if err := json.Unmarshal(msg, &anthropicMsg); err == nil {
-			// Anthropic messages must have a role
+			// For Anthropic messages, we must find the first key message
 			if DetectAnthropicKeyMessage(&anthropicMsg) {
 				provider = ModelProviderAnthropic
+				break
+			}
+		}
+	}
+	if provider != ModelProviderUnknown {
+		return provider
+	}
+
+	// Try to detect OpenAI format (fallback)
+	var openaiMsg openai.ChatCompletionMessage
+	for _, msg := range messages {
+		if err := json.Unmarshal(msg, &openaiMsg); err == nil {
+			// OpenAI messages must have a role
+			if DetectOpenAIKeyMessage(&openaiMsg) {
+				provider = ModelProviderOpenAI
+				break
+			} else if openaiMsg.Role != "" && (openaiMsg.Content != "" || len(openaiMsg.MultiContent) > 0) {
+				// If role exists, check whether it's pure text content
+				// If so, we can also consider it OpenAI
+				provider = ModelProviderOpenAI
 				break
 			}
 		}
