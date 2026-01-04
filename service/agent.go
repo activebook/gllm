@@ -45,7 +45,7 @@ type Agent struct {
 	ToolsUse        ToolsUse            // Use tools
 	EnabledTools    []string            // List of enabled embedding tools
 	UseCodeTool     bool                // Use code tool
-	ThinkMode       bool                // Think mode
+	ThinkingLevel   ThinkingLevel       // Thinking level: off, low, medium, high
 	MCPClient       *MCPClient          // MCP client for MCP tools
 	MaxRecursions   int                 // Maximum number of recursions for model calls
 	Markdown        *Markdown           // Markdown renderer
@@ -145,7 +145,7 @@ type AgentOptions struct {
 	ModelInfo      *data.Model
 	SearchEngine   *data.SearchEngine
 	MaxRecursions  int
-	ThinkMode      bool
+	ThinkingLevel  string
 	EnabledTools   []string // List of enabled embedding tools
 	UseMCP         bool
 	YoloMode       bool // Whether to automatically approve tools
@@ -168,6 +168,9 @@ func CallAgent(op *AgentOptions) error {
 
 	// Set up code tool settings
 	exeCode := IsCodeExecutionEnabled()
+
+	// Set up thinking level
+	thinkingLevel := ParseThinkingLevel(op.ThinkingLevel)
 
 	// Create a channel to receive notifications
 	notifyCh := make(chan StreamNotify, 10) // Buffer to prevent blocking(used for status updates)
@@ -242,7 +245,7 @@ func CallAgent(op *AgentOptions) error {
 		EnabledTools:  op.EnabledTools,
 		UseCodeTool:   exeCode,
 		MCPClient:     mc,
-		ThinkMode:     op.ThinkMode,
+		ThinkingLevel: thinkingLevel,
 		MaxRecursions: op.MaxRecursions,
 		Markdown:      markdown,
 		TokenUsage:    tu,

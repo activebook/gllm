@@ -232,21 +232,6 @@ func (c *OpenChat) process(ag *Agent) error {
 		//Debugf("Processing conversation at times: %d\n", i)
 		c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusProcessing}, c.op.proceed)
 
-		// Set whether to use thinking mode
-		var thinking *model.Thinking
-		var reasoningEffort *model.ReasoningEffort
-		if ag.ThinkMode {
-			thinking = &model.Thinking{
-				Type: model.ThinkingTypeEnabled,
-			}
-			reasoningEffort = Ptr(model.ReasoningEffortHigh)
-		} else {
-			// For some models, it must explicitly tell it not to use thinking mode
-			thinking = &model.Thinking{
-				Type: model.ThinkingTypeDisabled,
-			}
-		}
-
 		// Note on Thinking Mode:
 		// While we set up the request correctly here with model.Thinking, the Volcengine SDK (openchat.go)
 		// handles the response parsing. If the SDK does not correctly map the API's "reasoning_content" field
@@ -267,6 +252,9 @@ func (c *OpenChat) process(ag *Agent) error {
 			// Update the conversation with truncated messages
 			ag.Convo.SetMessages(messages)
 		}
+
+		// Set thinking mode using ThinkingLevel conversion
+		thinking, reasoningEffort := ag.ThinkingLevel.ToOpenChatParams()
 
 		// Create the request with thinking mode
 		req := model.CreateChatCompletionRequest{

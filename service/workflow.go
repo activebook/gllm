@@ -36,7 +36,7 @@ type WorkflowAgent struct {
 	Template      string
 	SystemPrompt  string
 	EnabledTools  []string
-	Think         bool
+	Think         string
 	MCP           bool
 	Usage         bool
 	Markdown      bool
@@ -135,14 +135,9 @@ func promptUserForConfirmation(agent *WorkflowAgent) bool {
 	}
 	fmt.Printf("   %sMCP enabled:%s %s%s%s\n", mcpColor, workflowResetColor, mcpColor, mcpStatus, workflowResetColor)
 
-	// Format think mode status
-	thinkStatus := "false"
-	thinkColor := booleanFalseColor
-	if agent.Think {
-		thinkStatus = "true"
-		thinkColor = booleanTrueColor
-	}
-	fmt.Printf("   %sThink mode:%s %s%s%s\n", thinkColor, workflowResetColor, thinkColor, thinkStatus, workflowResetColor)
+	// Format think mode status - now displays thinking level
+	thinkLevel := ParseThinkingLevel(agent.Think)
+	fmt.Printf("   %sThink level:%s %s\n", booleanTrueColor, workflowResetColor, thinkLevel.Display())
 
 	// Format usage tracking status
 	usageStatus := "false"
@@ -511,7 +506,7 @@ func executeAgent(agent *WorkflowAgent, prompt string) error {
 		ModelInfo:      agent.Model,
 		SearchEngine:   agent.Search,
 		MaxRecursions:  agent.MaxRecursions,
-		ThinkMode:      agent.Think,
+		ThinkingLevel:  agent.Think,
 		EnabledTools:   agent.EnabledTools,
 		UseMCP:         agent.MCP,
 		YoloMode:       true, // Always skip tools confirmation

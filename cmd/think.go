@@ -5,79 +5,102 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
 
 var thinkCmd = &cobra.Command{
-	Use:   "think",
-	Short: "Enable/Disable deep think mode",
-	Long:  `Deep think mode enhances the model's reasoning capabilities.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(cmd.Long)
-		fmt.Println()
+	Use:   "think [off|low|medium|high]",
+	Short: "View or set thinking level",
+	Long: `View or set the thinking/reasoning level for the active agent.
+	
+Thinking levels:
+  off    - Disable thinking mode
+  low    - Minimal reasoning effort
+  medium - Moderate reasoning effort  
+  high   - Maximum reasoning effort
 
+The actual behavior depends on the model provider:
+  OpenAI:    Maps to reasoning_effort parameter
+  Anthropic: Maps to thinking budget tokens
+  Gemini:    Maps to ThinkingLevel or ThinkingBudget`,
+	Run: func(cmd *cobra.Command, args []string) {
 		store := data.NewConfigStore()
 		agent := store.GetActiveAgent()
 		if agent == nil {
-			fmt.Println(switchOffColor + "off" + resetColor)
+			fmt.Println("No active agent found")
 			return
 		}
-		if agent.Think {
-			fmt.Printf("Deep think mode: %s\n", switchOnColor+"on"+resetColor)
-		} else {
-			fmt.Printf("Deep think mode: %s\n", switchOffColor+"off"+resetColor)
+
+		// If argument provided, set that level directly
+		if len(args) > 0 {
+			level := service.ParseThinkingLevel(args[0])
+			agent.Think = string(level)
+			if err := store.SetAgent(agent.Name, agent); err != nil {
+				service.Errorf("failed to save thinking level: %v", err)
+				return
+			}
+			fmt.Printf("Thinking level: %s\n", level.Display())
+			return
 		}
+
+		// No argument - display current level
+		level := service.ParseThinkingLevel(agent.Think)
+		fmt.Printf("Thinking level: %s\n", level.Display())
 	},
 }
 
-var thinkOnCmd = &cobra.Command{
-	Use:   "on",
-	Short: "Enable deep think mode",
-	Long:  `Enable deep think mode which enhances the model's reasoning capabilities.`,
+var thinkSwitchCmd = &cobra.Command{
+	Use:     "switch",
+	Aliases: []string{"sw"},
+	Short:   "Interactively select thinking level",
+	Long:    `Opens an interactive selector to choose the thinking level.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Set the agent.think flag to true in the configuration
 		store := data.NewConfigStore()
 		agent := store.GetActiveAgent()
 		if agent == nil {
-			fmt.Println(switchOffColor + "off" + resetColor)
+			fmt.Println("No active agent found")
 			return
 		}
-		agent.Think = true
+
+		// Current level for pre-selection
+		currentLevel := service.ParseThinkingLevel(agent.Think)
+
+		// Interactive selection
+		var selected string
+		options := []huh.Option[string]{
+			huh.NewOption("Off - Disable thinking", "off").Selected(currentLevel == service.ThinkingLevelOff),
+			huh.NewOption("Low - Minimal reasoning", "low").Selected(currentLevel == service.ThinkingLevelLow),
+			huh.NewOption("Medium - Moderate reasoning", "medium").Selected(currentLevel == service.ThinkingLevelMedium),
+			huh.NewOption("High - Maximum reasoning", "high").Selected(currentLevel == service.ThinkingLevelHigh),
+		}
+
+		form := huh.NewForm(
+			huh.NewGroup(
+				huh.NewSelect[string]().
+					Title("Select thinking level").
+					Options(options...).
+					Value(&selected),
+			),
+		)
+
+		if err := form.Run(); err != nil {
+			return
+		}
+
+		level := service.ParseThinkingLevel(selected)
+		agent.Think = string(level)
 		if err := store.SetAgent(agent.Name, agent); err != nil {
-			service.Errorf("failed to save think mode: %v", err)
+			service.Errorf("failed to save thinking level: %v", err)
 			return
 		}
-
-		fmt.Printf("Deep think mode %s\n", switchOnColor+"on"+resetColor)
-	},
-}
-
-var thinkOffCmd = &cobra.Command{
-	Use:   "off",
-	Short: "Disable deep think mode",
-	Long:  `Disable deep think mode to return to normal operation.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		// Set the agent.think flag to false in the configuration
-		store := data.NewConfigStore()
-		agent := store.GetActiveAgent()
-		if agent == nil {
-			fmt.Println(switchOffColor + "off" + resetColor)
-			return
-		}
-		agent.Think = false
-		if err := store.SetAgent(agent.Name, agent); err != nil {
-			service.Errorf("failed to save think mode: %v", err)
-			return
-		}
-
-		fmt.Printf("Deep think mode %s\n", switchOffColor+"off"+resetColor)
+		fmt.Printf("Thinking level: %s\n", level.Display())
 	},
 }
 
 func init() {
-	// Add subcommands to the main think command
-	thinkCmd.AddCommand(thinkOnCmd)
-	thinkCmd.AddCommand(thinkOffCmd)
+	// Add switch subcommand
+	thinkCmd.AddCommand(thinkSwitchCmd)
 
 	// Add the main think command to the root command
 	rootCmd.AddCommand(thinkCmd)

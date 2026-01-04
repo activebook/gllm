@@ -96,29 +96,18 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	}
 
 	// Configure Model Parameters
+	thinking := ag.ThinkingLevel.ToGeminiConfig(ag.Model.ModelName)
+
 	// Create the model and generate content
 	config := genai.GenerateContentConfig{
-		Temperature: &ag.Model.Temperature,
-		TopP:        &ag.Model.TopP,
-		ThinkingConfig: &genai.ThinkingConfig{
-			// Let model decide how to allocate tokens
-			IncludeThoughts: ag.ThinkMode,
-		},
-		Tools: []*genai.Tool{
+		Temperature:    &ag.Model.Temperature,
+		TopP:           &ag.Model.TopP,
+		ThinkingConfig: thinking,
+		Tools:          []*genai.Tool{
 			// Placeholder
 			//{CodeExecution: &genai.ToolCodeExecution{}},
 			//{GoogleSearch: &genai.GoogleSearch{}},
 		},
-	}
-
-	// Bugfix: You can only set only one of thinking budget and thinking level.
-	if IsModelGemini3(ag.Model.ModelName) && ag.ThinkMode {
-		// "LOW", "HIGH" (Pro/Flash) or "MINIMAL", "MEDIUM" (Flash only).
-		config.ThinkingConfig.ThinkingLevel = genai.ThinkingLevelHigh
-	} else if ag.ThinkMode {
-		// -1 (or not setting it): Uses Auto/Dynamic mode (limits to ~8k tokens).
-		thinkingBudgetVal := int32(-1)
-		config.ThinkingConfig.ThinkingBudget = &thinkingBudgetVal
 	}
 
 	// Add seed if provided

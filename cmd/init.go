@@ -280,9 +280,14 @@ func RunInitWizard() error {
 
 	// Setup agent config
 	agentConfig := &data.AgentConfig{
-		Model:    newModel,
-		Tools:    selectedTools,
-		Think:    contains(selectedFeatures, "think"),
+		Model: newModel,
+		Tools: selectedTools,
+		Think: func() string {
+			if contains(selectedFeatures, "think") {
+				return "high"
+			}
+			return "off"
+		}(),
 		Usage:    contains(selectedFeatures, "usage"),
 		Markdown: contains(selectedFeatures, "markdown"),
 	}

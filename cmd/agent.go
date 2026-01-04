@@ -108,7 +108,7 @@ var agentAddCmd = &cobra.Command{
 			sysPrompt     string
 			usage         bool
 			markdown      bool
-			think         bool
+			think         string
 			maxRecursions string
 		)
 
@@ -321,7 +321,7 @@ var agentAddCmd = &cobra.Command{
 			case "markdown":
 				markdown = true
 			case "think":
-				think = true
+				think = "off" // When selected in capabilities, default to off
 			}
 		}
 
@@ -447,7 +447,7 @@ var agentSetCmd = &cobra.Command{
 		if agent.Markdown {
 			capabilities = append(capabilities, "markdown")
 		}
-		if agent.Think {
+		if agent.Think != "" && agent.Think != "off" {
 			capabilities = append(capabilities, "think")
 		}
 
@@ -633,11 +633,11 @@ var agentSetCmd = &cobra.Command{
 			recursionVal = 10
 		}
 
-		// Process capabilities to booleans
+		// Process capabilities - think uses string level
 		mcpEnabled := false
 		usageEnabled := false
 		markdownEnabled := false
-		thinkEnabled := false
+		var thinkLevel string
 		for _, cap := range capabilities {
 			switch cap {
 			case "mcp":
@@ -647,8 +647,14 @@ var agentSetCmd = &cobra.Command{
 			case "markdown":
 				markdownEnabled = true
 			case "think":
-				thinkEnabled = true
+				thinkLevel = agent.Think // Preserve existing level, or use 'high' if new
+				if thinkLevel == "" || thinkLevel == "off" {
+					thinkLevel = "high"
+				}
 			}
+		}
+		if thinkLevel == "" {
+			thinkLevel = "off" // Not selected in capabilities
 		}
 
 		agentConfig := &data.AgentConfig{
@@ -658,7 +664,7 @@ var agentSetCmd = &cobra.Command{
 			MCP:           mcpEnabled,
 			Usage:         usageEnabled,
 			Markdown:      markdownEnabled,
-			Think:         thinkEnabled,
+			Think:         thinkLevel,
 			Search:        data.SearchEngine{Name: search},
 			Template:      template,
 			SystemPrompt:  sysPrompt,

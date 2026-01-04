@@ -161,11 +161,8 @@ func (a *Anthropic) process(ag *Agent) error {
 			Tools: a.tools, // []ToolUnionParam
 		}
 
-		// Enable Thinking if requested
-		if ag.ThinkMode {
-			// The user mentioned 1024 or higher is required.
-			params.Thinking = anthropic.ThinkingConfigParamOfEnabled(32768)
-		}
+		// Enable Thinking if requested, with budget based on level
+		params.Thinking = ag.ThinkingLevel.ToAnthropicParams()
 
 		// Temperature/TopP
 		if ag.Model.Temperature > 0 {

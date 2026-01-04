@@ -183,7 +183,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /memory, /r [subcmd] - Manage memory (list, add, clear)")
 	fmt.Println("  /yolo, /y - Toggle YOLO mode (non-interactive tool execution)")
 	fmt.Println("  /convo, /c [subcmd] - Manage conversations (list, info, remove, etc.)")
-	fmt.Println("  /think, /T [on|off] - Switch deep think mode")
+	fmt.Println("  /think, /T [off|low|medium|high|sw] - Set thinking level (sw for interactive)")
 	fmt.Println("  /usage, /u [on|off] - Switch token usage display")
 	fmt.Println("  /markdown, /k [on|off] - Switch markdown rendering")
 	fmt.Println("  /editor, /e [subcmd] - Manage editor or open for multi-line input")
