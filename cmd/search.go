@@ -81,6 +81,7 @@ var searchSwitchCmd = &cobra.Command{
 			}
 
 			// Interactive select
+			SortOptions(options, engine)
 			err := huh.NewSelect[string]().
 				Title("Switch Search Engine").
 				Description("Select the search engine to use for the current agent").
@@ -134,13 +135,16 @@ var searchSetCmd = &cobra.Command{
 				}
 			}
 			// Select engine to configure
+			options := []huh.Option[string]{
+				huh.NewOption("Google", service.GoogleSearchEngine),
+				huh.NewOption("Bing", service.BingSearchEngine),
+				huh.NewOption("Tavily", service.TavilySearchEngine),
+			}
+			SortOptions(options, engine)
+
 			err := huh.NewSelect[string]().
 				Title("Select Search Engine to Configure").
-				Options(
-					huh.NewOption("Google", service.GoogleSearchEngine),
-					huh.NewOption("Bing", service.BingSearchEngine),
-					huh.NewOption("Tavily", service.TavilySearchEngine),
-				).
+				Options(options...).
 				Value(&engine).
 				Run()
 			if err != nil {

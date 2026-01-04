@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/wrap"
 )
@@ -140,4 +142,48 @@ func (m ViewportModel) footerView() string {
 	tips := "─ space/f/d: Next • b/u: Prev • j/k: Scroll • q: Quit ─"
 	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(info)-lipgloss.Width(tips)))
 	return lipgloss.JoinHorizontal(lipgloss.Center, line, tips, info)
+}
+
+// SortOptions sorts options for huh.Select, pinning the selected value to the top
+// and sorting the rest alphabetically (case-sensitive).
+func SortOptions(options []huh.Option[string], selected string) {
+	sort.Slice(options, func(i, j int) bool {
+		// 1. If keys are identical, they are not less than each other
+		if options[i].Key == options[j].Key {
+			return false
+		}
+		// 2. Pin selected item to top
+		if options[i].Value == selected {
+			return true
+		}
+		if options[j].Value == selected {
+			return false
+		}
+		// 3. Case-insensitive alphabetical sort for the rest
+		// return strings.ToLower(options[i].Key) < strings.ToLower(options[j].Key)
+		return (options[i].Key) < (options[j].Key)
+	})
+}
+
+// SortMultiOptions sorts options for huh.MultiSelect, pinning selected values to the top
+// and sorting the rest alphabetically (case-sensitive).
+func SortMultiOptions(options []huh.Option[string], selected []string) {
+	selectedSet := make(map[string]bool)
+	for _, s := range selected {
+		selectedSet[s] = true
+	}
+
+	sort.Slice(options, func(i, j int) bool {
+		iSelected := selectedSet[options[i].Value]
+		jSelected := selectedSet[options[j].Value]
+
+		// 1. Selected items come first
+		if iSelected != jSelected {
+			return iSelected
+		}
+
+		// 2. Case-insensitive alphabetical sort for the rest
+		// return strings.ToLower(options[i].Key) < strings.ToLower(options[j].Key)
+		return (options[i].Key) < (options[j].Key)
+	})
 }

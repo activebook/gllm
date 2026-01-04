@@ -377,15 +377,7 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 			for m := range modelsMap {
 				options = append(options, huh.NewOption(m, m))
 			}
-			sort.Slice(options, func(i, j int) bool {
-				if options[i].Key == name {
-					return true
-				}
-				if options[j].Key == name {
-					return false
-				}
-				return options[i].Key < options[j].Key
-			})
+			SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Edit").
@@ -544,11 +536,37 @@ var modelInfoCmd = &cobra.Command{
 	Use:     "info NAME",
 	Aliases: []string{"in"},
 	Short:   "Show the detail of a specific model",
-	Args:    cobra.ExactArgs(1),
+	// Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		name := args[0]
 		store := data.NewConfigStore()
 		modelsMap := store.GetModels()
+		if len(modelsMap) == 0 {
+			return fmt.Errorf("there is no model yet.")
+		}
+		var name string
+		if len(args) > 0 {
+			name = args[0]
+		} else {
+			activeAgent := store.GetActiveAgent()
+			if activeAgent != nil {
+				name = activeAgent.Model.Name
+			}
+			// Select model
+			var options []huh.Option[string]
+			for n := range modelsMap {
+				options = append(options, huh.NewOption(n, n))
+			}
+			SortOptions(options, name)
+
+			err := huh.NewSelect[string]().
+				Title("Select Model to Check").
+				Options(options...).
+				Value(&name).
+				Run()
+			if err != nil {
+				return nil
+			}
+		}
 
 		// Try finding key
 		var modelName string
@@ -600,11 +618,16 @@ gllm model remove gpt4 --force`,
 				fmt.Println("No models to remove.")
 				return nil
 			}
+			activeAgent := store.GetActiveAgent()
+			if activeAgent != nil {
+				name = activeAgent.Model.Name
+			}
+
 			var options []huh.Option[string]
 			for m := range modelsMap {
 				options = append(options, huh.NewOption(m, m))
 			}
-			sort.Slice(options, func(i, j int) bool { return options[i].Key < options[j].Key })
+			SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Remove").
@@ -722,15 +745,7 @@ to the specified one for all subsequent operations.`,
 			for m := range modelsMap {
 				options = append(options, huh.NewOption(m, m))
 			}
-			sort.Slice(options, func(i, j int) bool {
-				if options[i].Key == name {
-					return true
-				}
-				if options[j].Key == name {
-					return false
-				}
-				return options[i].Key < options[j].Key
-			})
+			SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Model").

@@ -126,9 +126,7 @@ var agentAddCmd = &cobra.Command{
 			modelOptions = append(modelOptions, huh.NewOption(m, m))
 		}
 		// Sort models
-		sort.Slice(modelOptions, func(i, j int) bool {
-			return modelOptions[i].Key < modelOptions[j].Key
-		})
+		SortOptions(modelOptions, "")
 
 		// Templates
 		templatesMap := store.GetTemplates()
@@ -137,9 +135,7 @@ var agentAddCmd = &cobra.Command{
 		for t := range templatesMap {
 			templateOptions = append(templateOptions, huh.NewOption(t, t))
 		}
-		sort.Slice(templateOptions, func(i, j int) bool {
-			return templateOptions[i].Key < templateOptions[j].Key
-		})
+		SortOptions(templateOptions, "")
 
 		// System Prompts
 		sysPromptsMap := store.GetSystemPrompts()
@@ -148,9 +144,7 @@ var agentAddCmd = &cobra.Command{
 		for s := range sysPromptsMap {
 			sysPromptOptions = append(sysPromptOptions, huh.NewOption(s, s))
 		}
-		sort.Slice(sysPromptOptions, func(i, j int) bool {
-			return sysPromptOptions[i].Key < sysPromptOptions[j].Key
-		})
+		SortOptions(sysPromptOptions, "")
 
 		// Search Engines
 		engines := store.GetSearchEngines()
@@ -159,9 +153,7 @@ var agentAddCmd = &cobra.Command{
 		for s := range engines {
 			searchOptions = append(searchOptions, huh.NewOption(s, s))
 		}
-		sort.Slice(searchOptions, func(i, j int) bool {
-			return searchOptions[i].Key < searchOptions[j].Key
-		})
+		SortOptions(searchOptions, "")
 
 		// Tools
 		toolsList := service.GetAllEmbeddingTools()
@@ -169,9 +161,7 @@ var agentAddCmd = &cobra.Command{
 		for _, s := range toolsList {
 			toolsOptions = append(toolsOptions, huh.NewOption(s, s))
 		}
-		sort.Slice(toolsOptions, func(i, j int) bool {
-			return toolsOptions[i].Key < toolsOptions[j].Key
-		})
+		SortOptions(toolsOptions, "")
 
 		// Build form
 
@@ -393,24 +383,11 @@ var agentSetCmd = &cobra.Command{
 
 			var options []huh.Option[string]
 
-			sortedNames := make([]string, 0, len(agents))
 			for n := range agents {
-				sortedNames = append(sortedNames, n)
-			}
-			// Sort names alphabetically and keep selected agent at top if exists
-			sort.Slice(sortedNames, func(i, j int) bool {
-				if sortedNames[i] == name {
-					return true
-				}
-				if sortedNames[j] == name {
-					return false
-				}
-				return sortedNames[i] < sortedNames[j]
-			})
-
-			for _, n := range sortedNames {
 				options = append(options, huh.NewOption(n, n))
 			}
+			// Sort names alphabetically and keep selected agent at top if exists
+			SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent to Edit").
@@ -472,31 +449,31 @@ var agentSetCmd = &cobra.Command{
 		for name := range modelsMap {
 			modelOptions = append(modelOptions, huh.NewOption(name, name))
 		}
-		sort.Slice(modelOptions, func(i, j int) bool { return modelOptions[i].Key < modelOptions[j].Key })
+		SortOptions(modelOptions, model)
 
 		templatesMap := store.GetTemplates()
 		var templateOptions []huh.Option[string]
-		templateOptions = append(templateOptions, huh.NewOption("None", ""))
+		templateOptions = append(templateOptions, huh.NewOption("None", " "))
 		for t := range templatesMap {
 			templateOptions = append(templateOptions, huh.NewOption(t, t))
 		}
-		sort.Slice(templateOptions, func(i, j int) bool { return templateOptions[i].Key < templateOptions[j].Key })
+		SortOptions(templateOptions, template)
 
 		sysPromptsMap := store.GetSystemPrompts()
 		var sysPromptOptions []huh.Option[string]
-		sysPromptOptions = append(sysPromptOptions, huh.NewOption("None", ""))
+		sysPromptOptions = append(sysPromptOptions, huh.NewOption("None", " "))
 		for s := range sysPromptsMap {
 			sysPromptOptions = append(sysPromptOptions, huh.NewOption(s, s))
 		}
-		sort.Slice(sysPromptOptions, func(i, j int) bool { return sysPromptOptions[i].Key < sysPromptOptions[j].Key })
+		SortOptions(sysPromptOptions, sysPrompt)
 
 		engines := store.GetSearchEngines()
 		var searchOptions []huh.Option[string]
-		searchOptions = append(searchOptions, huh.NewOption("None", ""))
+		searchOptions = append(searchOptions, huh.NewOption("None", " "))
 		for s := range engines {
 			searchOptions = append(searchOptions, huh.NewOption(s, s))
 		}
-		sort.Slice(searchOptions, func(i, j int) bool { return searchOptions[i].Key < searchOptions[j].Key })
+		SortOptions(searchOptions, search)
 
 		// Tools - build options with pre-selected state
 		toolsList := service.GetAllEmbeddingTools()
@@ -513,15 +490,7 @@ var agentSetCmd = &cobra.Command{
 			toolsOptions = append(toolsOptions, opt)
 		}
 		// Sort: selected items first, then alphabetically within each group
-		// This fixes the huh MultiSelect UI issue where scroll starts at last selected item
-		sort.Slice(toolsOptions, func(i, j int) bool {
-			iSelected := toolsSet[toolsOptions[i].Value]
-			jSelected := toolsSet[toolsOptions[j].Value]
-			if iSelected != jSelected {
-				return iSelected // selected items come first
-			}
-			return toolsOptions[i].Key < toolsOptions[j].Key
-		})
+		SortMultiOptions(toolsOptions, tools)
 
 		// Think
 		// Current level for pre-selection
@@ -532,12 +501,7 @@ var agentSetCmd = &cobra.Command{
 			huh.NewOption("Medium - Moderate reasoning", "medium").Selected(currentThinkLevel == service.ThinkingLevelMedium),
 			huh.NewOption("High - Maximum reasoning", "high").Selected(currentThinkLevel == service.ThinkingLevelHigh),
 		}
-		sort.Slice(thinkOptions, func(i, j int) bool {
-			if thinkOptions[i].Value == string(currentThinkLevel) {
-				return true
-			}
-			return i < j
-		})
+		SortOptions(thinkOptions, think)
 
 		// Build form
 		// Model
@@ -648,14 +612,7 @@ var agentSetCmd = &cobra.Command{
 			huh.NewOption("Show Usage Stats", "usage").Selected(capsSet["usage"]),
 			huh.NewOption("Markdown Output", "markdown").Selected(capsSet["markdown"]),
 		}
-		sort.Slice(capsOpts, func(i, j int) bool {
-			iSelected := capsSet[capsOpts[i].Value]
-			jSelected := capsSet[capsOpts[j].Value]
-			if iSelected != jSelected {
-				return iSelected // selected items come first
-			}
-			return capsOpts[i].Key < capsOpts[j].Key
-		})
+		SortMultiOptions(capsOpts, capabilities)
 		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewMultiSelect[string]().
@@ -740,7 +697,7 @@ var agentRemoveCmd = &cobra.Command{
 			for n := range agents {
 				options = append(options, huh.NewOption(n, n))
 			}
-			sort.Slice(options, func(i, j int) bool { return options[i].Key < options[j].Key })
+			SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent to Remove").
@@ -806,24 +763,11 @@ tools, search settings, and other preferences to match the selected agent.`,
 
 			var options []huh.Option[string]
 
-			sortedNames := make([]string, 0, len(agents))
 			for n := range agents {
-				sortedNames = append(sortedNames, n)
-			}
-			// Sort names alphabetically and keep selected agent at top if exists
-			sort.Slice(sortedNames, func(i, j int) bool {
-				if sortedNames[i] == name {
-					return true
-				}
-				if sortedNames[j] == name {
-					return false
-				}
-				return sortedNames[i] < sortedNames[j]
-			})
-
-			for _, n := range sortedNames {
 				options = append(options, huh.NewOption(n, n))
 			}
+			// Sort names alphabetically and keep selected agent at top if exists
+			SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent").
@@ -852,31 +796,45 @@ var agentInfoCmd = &cobra.Command{
 	Aliases: []string{"show", "details"},
 	Short:   "Show detailed information about an agent",
 	Long:    `Display detailed configuration information for a specific agent.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		store := data.NewConfigStore()
+		agents := store.GetAllAgents()
+		if len(agents) == 0 {
+			return fmt.Errorf("no agents found")
+		}
+
 		var name string
 		if len(args) > 0 {
 			name = args[0]
 		} else {
-			// Default to active agent
 			name = store.GetActiveAgentName()
-			if name == "" {
-				fmt.Println("No active agent.")
-				return
+
+			// Select agent to check
+			var options []huh.Option[string]
+			for n := range agents {
+				options = append(options, huh.NewOption(n, n))
+			}
+			SortOptions(options, name)
+
+			err := huh.NewSelect[string]().
+				Title("Select Agent to Check").
+				Options(options...).
+				Value(&name).
+				Run()
+			if err != nil {
+				return err
 			}
 		}
 
 		agentConfig := store.GetAgent(name)
 		if agentConfig == nil {
-			fmt.Printf("Agent '%s' not found.\n", name)
-			return
+			return fmt.Errorf("agent '%s' not found", name)
 		}
 
 		fmt.Printf("Agent '%s' configuration:\n", name)
-		fmt.Println()
-
 		// Display configuration using the same formatting as add/set commands
 		printAgentConfigDetails(agentConfig, "  ")
+		return nil
 	},
 }
 
