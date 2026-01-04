@@ -19,7 +19,7 @@ type AgentConfig struct {
 	MCP           bool         // Whether MCP is enabled
 	Usage         bool         // Whether to show usage statistics
 	Markdown      bool         // Whether to render markdown
-	Think         bool         // Whether think mode is enabled
+	Think         string       // Thinking level: off, low, medium, high
 	Search        SearchEngine // Search engine reference
 	Template      string       // Template reference
 	SystemPrompt  string       // System prompt reference
@@ -488,7 +488,7 @@ func (c *ConfigStore) parseAgentConfig(name string, config interface{}) *AgentCo
 		MCP:           getBool(configMap, "mcp"),
 		Usage:         getBool(configMap, "usage"),
 		Markdown:      getBool(configMap, "markdown"),
-		Think:         getBool(configMap, "think"),
+		Think:         getString(configMap, "think"),
 		Search:        c.getSearchEngineFromAgentMap(configMap, "search"),
 		Template:      getString(configMap, "template"),
 		SystemPrompt:  getString(configMap, "system_prompt"),
@@ -624,6 +624,25 @@ func getBool(m map[string]interface{}, key string) bool {
 		return v
 	}
 	return false
+}
+
+// getThinkingLevel extracts the thinking level from a config map.
+// Supports backward compatibility with old boolean format (true -> "high", false -> "off").
+func getThinkingLevel(m map[string]interface{}, key string) string {
+	val := m[key]
+	switch v := val.(type) {
+	case string:
+		// New string format: off, low, medium, high
+		return v
+	case bool:
+		// Old boolean format for backward compatibility
+		if v {
+			return "high"
+		}
+		return "off"
+	default:
+		return "off"
+	}
 }
 
 func getInt(m map[string]interface{}, key string, defaultVal int) int {

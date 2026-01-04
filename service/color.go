@@ -33,6 +33,12 @@ var (
 	inReasoningColor string
 	inCallingColor   string
 
+	// Thinking level colors
+	reasoningColorOff  string
+	reasoningColorLow  string
+	reasoningColorMed  string
+	reasoningColorHigh string
+
 	// Task completion color
 	taskCompleteColor string
 
@@ -164,6 +170,12 @@ func setupColors() {
 	reasoningColor = "\033[32m"   // Green
 	inReasoningColor = "\033[90m" // Bright Black
 	inCallingColor = "\033[36m"   // Cyan
+
+	// Thinking level colors
+	reasoningColorOff = "\033[90m"  // Bright Black (dim/off)
+	reasoningColorLow = "\033[91m"  // Bright Red
+	reasoningColorMed = "\033[93m"  // Bright Yellow
+	reasoningColorHigh = "\033[92m" // Bright Green
 
 	// Workflow colors (fixed ANSI)
 	agentNameColor = "\033[95m"    // Bright Magenta

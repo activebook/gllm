@@ -239,9 +239,9 @@ func (oa *OpenAI) process(ag *Agent) error {
 			req.Seed = &seedInt32
 		}
 
-		// Add reasoning effort if think mode is enabled
-		if ag.ThinkMode {
-			req.ReasoningEffort = "high"
+		// Add reasoning effort if thinking is enabled
+		if effort := ag.ThinkingLevel.ToOpenAIReasoningEffort(); effort != "" {
+			req.ReasoningEffort = effort
 		}
 		if ag.TokenUsage != nil {
 			req.StreamOptions = &openai.StreamOptions{IncludeUsage: true}

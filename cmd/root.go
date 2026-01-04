@@ -279,7 +279,7 @@ func processQuery(prompt string, files []*service.FileData) {
 		ModelInfo:      &activeAgent.Model,
 		SearchEngine:   &activeAgent.Search,
 		MaxRecursions:  activeAgent.MaxRecursions,
-		ThinkMode:      activeAgent.Think,
+		ThinkingLevel:  activeAgent.Think,
 		EnabledTools:   activeAgent.Tools,
 		UseMCP:         activeAgent.MCP,
 		YoloMode:       yolo,

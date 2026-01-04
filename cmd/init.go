@@ -48,14 +48,15 @@ func buildToolsOptions() []huh.Option[string] {
 // Exported so it can be called from root.go
 func RunInitWizard() error {
 	var (
-		agentName        string
-		provider         string
-		endpoint         string
-		apiKey           string
-		model            string
-		confirm          bool
-		selectedFeatures []string
-		selectedTools    []string
+		agentName             string
+		provider              string
+		endpoint              string
+		apiKey                string
+		model                 string
+		confirm               bool
+		selectedFeatures      []string
+		selectedTools         []string
+		selectedThinkingLevel string
 	)
 
 	// Group 1: Provider selection
@@ -233,15 +234,28 @@ func RunInitWizard() error {
 				Options(buildToolsOptions()...).
 				Value(&selectedTools),
 		),
-		// Group 4: Capabilities
+		// Group 4: Thinking Level
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Thinking Level").
+				Description("Select the thinking level for this agent").
+				Options(
+					huh.NewOption("Off - Disable thinking", "off").Selected(true),
+					huh.NewOption("Low - Minimal reasoning", "low").Selected(false),
+					huh.NewOption("Medium - Moderate reasoning", "medium").Selected(false),
+					huh.NewOption("High - Maximum reasoning", "high").Selected(false),
+				).
+				Value(&selectedThinkingLevel),
+		),
+		// Group 5: Capabilities
 		huh.NewGroup(
 			huh.NewMultiSelect[string]().
 				Title("Agent Capabilities").
 				Description("Select additional features to enable").
 				Options(
-					huh.NewOption("Thinking Mode", "think").Selected(true),
 					huh.NewOption("Token Usage Stats", "usage").Selected(true),
 					huh.NewOption("Markdown Output", "markdown").Selected(true),
+					huh.NewOption("MCP Enabled", "mcp").Selected(false),
 				).
 				Value(&selectedFeatures),
 		),
@@ -282,7 +296,8 @@ func RunInitWizard() error {
 	agentConfig := &data.AgentConfig{
 		Model:    newModel,
 		Tools:    selectedTools,
-		Think:    contains(selectedFeatures, "think"),
+		Think:    selectedThinkingLevel,
+		MCP:      contains(selectedFeatures, "mcp"),
 		Usage:    contains(selectedFeatures, "usage"),
 		Markdown: contains(selectedFeatures, "markdown"),
 	}

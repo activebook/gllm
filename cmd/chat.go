@@ -351,7 +351,7 @@ func (ci *ChatInfo) callAgent(input string) {
 		ModelInfo:      &agent.Model,
 		SearchEngine:   &agent.Search,
 		MaxRecursions:  agent.MaxRecursions,
-		ThinkMode:      agent.Think,
+		ThinkingLevel:  agent.Think,
 		EnabledTools:   agent.Tools,
 		UseMCP:         agent.MCP,
 		YoloMode:       yolo,

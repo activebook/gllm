@@ -34,7 +34,7 @@ func init() {
 	workflowAddCmd.Flags().StringP("role", "r", "master", "Role of the agent (master/worker)")
 	workflowAddCmd.Flags().StringP("input", "i", "", "Input directory")
 	workflowAddCmd.Flags().StringP("output", "o", "", "Output directory")
-	workflowAddCmd.Flags().StringP("think", "T", "", "Think mode (on/off)")
+	workflowAddCmd.Flags().StringP("think", "T", "", "Think level (off/low/medium/high)")
 	workflowAddCmd.Flags().StringP("pass", "", "", "Pass through agent")
 
 	workflowAddCmd.MarkFlagRequired("name")
@@ -53,7 +53,7 @@ func init() {
 	workflowSetCmd.Flags().StringP("role", "r", "", "Role of the agent (master/worker)")
 	workflowSetCmd.Flags().StringP("input", "i", "", "Input directory")
 	workflowSetCmd.Flags().StringP("output", "o", "", "Output directory")
-	workflowSetCmd.Flags().StringP("think", "T", "", "Think mode (on/off)")
+	workflowSetCmd.Flags().StringP("think", "T", "", "Think level (off/low/medium/high)")
 	workflowSetCmd.Flags().StringP("pass", "", "", "Pass through agent")
 
 	// Add flags to the start command
@@ -365,11 +365,9 @@ gllm workflow add --name planner --model groq-oss --tools enabled --template pla
 			newAgent["output"] = output
 		}
 		if think != "" {
-			if boolVal, err := convertUserInputToBool(think); err == nil {
-				newAgent["think"] = boolVal
-			} else {
-				newAgent["think"] = false
-			}
+			// Parse and normalize thinking level
+			level := service.ParseThinkingLevel(think)
+			newAgent["think"] = string(level)
 		}
 
 		if pass != "" {
@@ -677,11 +675,9 @@ gllm workflow set planner --model groq-oss --role master`,
 		}
 
 		if think, err := cmd.Flags().GetString("think"); err == nil && think != "" {
-			if boolVal, err := convertUserInputToBool(think); err == nil {
-				agentMap["think"] = boolVal
-			} else {
-				agentMap["think"] = false
-			}
+			// Parse and normalize thinking level
+			level := service.ParseThinkingLevel(think)
+			agentMap["think"] = string(level)
 			updated = true
 		}
 
@@ -1036,9 +1032,22 @@ func printAgentDetails(agent map[string]interface{}) {
 	}
 
 	if think, exists := agent["think"]; exists {
-		fmt.Printf("  Think: %v\n", think)
+		var levelStr string
+		switch v := think.(type) {
+		case string:
+			levelStr = v
+		case bool:
+			if v {
+				levelStr = "high"
+			} else {
+				levelStr = "off"
+			}
+		default:
+			levelStr = "off"
+		}
+		fmt.Printf("  Think: %s\n", service.ParseThinkingLevel(levelStr).Display())
 	} else {
-		fmt.Printf("  Think: false\n")
+		fmt.Printf("  Think: off\n")
 	}
 
 	if pass, exists := agent["pass"]; exists {
