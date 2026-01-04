@@ -121,9 +121,15 @@ func (t ThinkingLevel) ToAnthropicParams() anthropic.ThinkingConfigParamUnion {
 		disable := anthropic.NewThinkingConfigDisabledParam()
 		return anthropic.ThinkingConfigParamUnion{OfDisabled: &disable}
 	case ThinkingLevelLow:
+		return anthropic.ThinkingConfigParamOfEnabled(4096)
+	case ThinkingLevelMedium:
 		return anthropic.ThinkingConfigParamOfEnabled(16384)
 	case ThinkingLevelHigh:
-		return anthropic.ThinkingConfigParamOfEnabled(32768)
+		// Large budgets: For thinking budgets above 32k,
+		// we recommend using batch processing to avoid networking issues.
+		// Requests pushing the model to think above 32k tokens
+		// causes long running requests that might run up against system timeouts and open connection limits.
+		return anthropic.ThinkingConfigParamOfEnabled(31999)
 	default:
 		disable := anthropic.NewThinkingConfigDisabledParam()
 		return anthropic.ThinkingConfigParamUnion{OfDisabled: &disable}
