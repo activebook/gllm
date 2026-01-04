@@ -266,9 +266,16 @@ func (ci *ChatInfo) showHistory() {
 	}
 
 	convoName := strings.TrimSuffix(filepath.Base(convoPath), filepath.Ext(convoPath))
-	var content string
 
-	switch ci.ModelProvider {
+	// Detect provider based on message format
+	provider := service.DetectMessageProvider(data)
+	if provider != ci.ModelProvider {
+		// Warn about potential incompatibility if providers differ
+		service.Warnf("Conversation '%s' [%s] is not compatible with the current model provider [%s].\n", convoName, provider, ci.ModelProvider)
+	}
+
+	var content string
+	switch provider {
 	case service.ModelProviderGemini:
 		content = service.RenderGeminiConversationLog(data)
 	case service.ModelProviderOpenAI, service.ModelProviderOpenAICompatible:
@@ -276,12 +283,12 @@ func (ci *ChatInfo) showHistory() {
 	case service.ModelProviderAnthropic:
 		content = service.RenderAnthropicConversationLog(data)
 	default:
-		fmt.Println("Unknown provider")
+		fmt.Println("Unknown conversation format.")
 		return
 	}
 
 	// Show viewport
-	m := NewViewportModel(ci.ModelProvider, content, func() string {
+	m := NewViewportModel(provider, content, func() string {
 		return fmt.Sprintf("Conversation: %s", convoName)
 	})
 
