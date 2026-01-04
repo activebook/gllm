@@ -102,13 +102,13 @@ var agentAddCmd = &cobra.Command{
 		var (
 			model         string
 			tools         []string
+			think         string
 			mcp           bool
 			search        string
 			template      string
 			sysPrompt     string
 			usage         bool
 			markdown      bool
-			think         string
 			maxRecursions string
 		)
 
@@ -275,7 +275,26 @@ var agentAddCmd = &cobra.Command{
 			return
 		}
 
-		// 7. Max Recursions
+		// 7. Thinking Level
+		err = huh.NewForm(
+			huh.NewGroup(
+				huh.NewSelect[string]().
+					Title("Thinking Level").
+					Description("Select the thinking level for this agent").
+					Options(
+						huh.NewOption("Off - Disable thinking", "off").Selected(true),
+						huh.NewOption("Low - Minimal reasoning", "low").Selected(false),
+						huh.NewOption("Medium - Moderate reasoning", "medium").Selected(false),
+						huh.NewOption("High - Maximum reasoning", "high").Selected(false),
+					).
+					Value(&think),
+			),
+		).Run()
+		if err != nil {
+			return
+		}
+
+		// 8. Max Recursions
 		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewInput().
@@ -301,7 +320,6 @@ var agentAddCmd = &cobra.Command{
 						huh.NewOption("Enable MCP", "mcp"),
 						huh.NewOption("Show Usage", "usage"),
 						huh.NewOption("Render Markdown", "markdown"),
-						huh.NewOption("Think Mode", "think"),
 					).
 					Value(&capabilities),
 			),
@@ -320,8 +338,6 @@ var agentAddCmd = &cobra.Command{
 				usage = true
 			case "markdown":
 				markdown = true
-			case "think":
-				think = "off" // When selected in capabilities, default to off
 			}
 		}
 
@@ -419,6 +435,7 @@ var agentSetCmd = &cobra.Command{
 			model         string
 			search        string
 			tools         []string
+			think         string
 			template      string
 			sysPrompt     string
 			maxRecursions string
@@ -429,6 +446,7 @@ var agentSetCmd = &cobra.Command{
 		model = agent.Model.Name
 		search = agent.Search.Name
 		tools = agent.Tools
+		think = agent.Think
 		template = agent.Template
 		sysPrompt = agent.SystemPrompt
 		if agent.MaxRecursions > 0 {
@@ -446,9 +464,6 @@ var agentSetCmd = &cobra.Command{
 		}
 		if agent.Markdown {
 			capabilities = append(capabilities, "markdown")
-		}
-		if agent.Think != "" && agent.Think != "off" {
-			capabilities = append(capabilities, "think")
 		}
 
 		// Reuse options logic - access data layer directly
@@ -579,6 +594,27 @@ var agentSetCmd = &cobra.Command{
 			return
 		}
 
+		// Thinking Level
+		// Current level for pre-selection
+		currentThinkLevel := service.ParseThinkingLevel(think)
+		err = huh.NewForm(
+			huh.NewGroup(
+				huh.NewSelect[string]().
+					Title("Thinking Level").
+					Description("Select the thinking level for this agent").
+					Options(
+						huh.NewOption("Off - Disable thinking", "off").Selected(currentThinkLevel == service.ThinkingLevelOff),
+						huh.NewOption("Low - Minimal reasoning", "low").Selected(currentThinkLevel == service.ThinkingLevelLow),
+						huh.NewOption("Medium - Moderate reasoning", "medium").Selected(currentThinkLevel == service.ThinkingLevelMedium),
+						huh.NewOption("High - Maximum reasoning", "high").Selected(currentThinkLevel == service.ThinkingLevelHigh),
+					).
+					Value(&think),
+			),
+		).Run()
+		if err != nil {
+			return
+		}
+
 		// Max Recursions
 		err = huh.NewForm(
 			huh.NewGroup(
@@ -602,7 +638,6 @@ var agentSetCmd = &cobra.Command{
 			huh.NewOption("Enable MCP", "mcp").Selected(capsSet["mcp"]),
 			huh.NewOption("Show Usage", "usage").Selected(capsSet["usage"]),
 			huh.NewOption("Render Markdown", "markdown").Selected(capsSet["markdown"]),
-			huh.NewOption("Think Mode", "think").Selected(capsSet["think"]),
 		}
 		sort.Slice(capsOpts, func(i, j int) bool {
 			iSelected := capsSet[capsOpts[i].Value]
@@ -637,7 +672,6 @@ var agentSetCmd = &cobra.Command{
 		mcpEnabled := false
 		usageEnabled := false
 		markdownEnabled := false
-		var thinkLevel string
 		for _, cap := range capabilities {
 			switch cap {
 			case "mcp":
@@ -646,15 +680,7 @@ var agentSetCmd = &cobra.Command{
 				usageEnabled = true
 			case "markdown":
 				markdownEnabled = true
-			case "think":
-				thinkLevel = agent.Think // Preserve existing level, or use 'high' if new
-				if thinkLevel == "" || thinkLevel == "off" {
-					thinkLevel = "high"
-				}
 			}
-		}
-		if thinkLevel == "" {
-			thinkLevel = "off" // Not selected in capabilities
 		}
 
 		agentConfig := &data.AgentConfig{
@@ -664,7 +690,7 @@ var agentSetCmd = &cobra.Command{
 			MCP:           mcpEnabled,
 			Usage:         usageEnabled,
 			Markdown:      markdownEnabled,
-			Think:         thinkLevel,
+			Think:         think,
 			Search:        data.SearchEngine{Name: search},
 			Template:      template,
 			SystemPrompt:  sysPrompt,
