@@ -377,15 +377,7 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 			for m := range modelsMap {
 				options = append(options, huh.NewOption(m, m))
 			}
-			sort.Slice(options, func(i, j int) bool {
-				if options[i].Key == name {
-					return true
-				}
-				if options[j].Key == name {
-					return false
-				}
-				return options[i].Key < options[j].Key
-			})
+			SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Edit").
@@ -600,11 +592,16 @@ gllm model remove gpt4 --force`,
 				fmt.Println("No models to remove.")
 				return nil
 			}
+			activeAgent := store.GetActiveAgent()
+			if activeAgent != nil {
+				name = activeAgent.Model.Name
+			}
+
 			var options []huh.Option[string]
 			for m := range modelsMap {
 				options = append(options, huh.NewOption(m, m))
 			}
-			sort.Slice(options, func(i, j int) bool { return options[i].Key < options[j].Key })
+			SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Remove").
@@ -722,15 +719,7 @@ to the specified one for all subsequent operations.`,
 			for m := range modelsMap {
 				options = append(options, huh.NewOption(m, m))
 			}
-			sort.Slice(options, func(i, j int) bool {
-				if options[i].Key == name {
-					return true
-				}
-				if options[j].Key == name {
-					return false
-				}
-				return options[i].Key < options[j].Key
-			})
+			SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Model").

@@ -105,6 +105,7 @@ gllm convo remove "2 - 5" --force`,
 				}
 				options = append(options, huh.NewOption(label, c.Name))
 			}
+			SortOptions(options, "")
 
 			var selected []string
 			err = huh.NewMultiSelect[string]().
@@ -344,6 +345,7 @@ Using the --message-chars (-c) flag, set the maximum length of each message's co
 				}
 				options = append(options, huh.NewOption(label, c.Name))
 			}
+			SortOptions(options, "")
 
 			err = huh.NewSelect[string]().
 				Title("Select Conversation").
@@ -453,6 +455,7 @@ var convoRenameCmd = &cobra.Command{
 					}
 					options = append(options, huh.NewOption(label, c.Name))
 				}
+				SortOptions(options, "")
 
 				err = huh.NewSelect[string]().
 					Title("Select Conversation to Rename").

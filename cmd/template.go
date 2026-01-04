@@ -177,14 +177,10 @@ Example:
 			}
 			// Select prompt
 			var options []huh.Option[string]
-			var names []string
 			for n := range templates {
-				names = append(names, n)
-			}
-			sort.Strings(names)
-			for _, n := range names {
 				options = append(options, huh.NewOption(n, n))
 			}
+			SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Template to Edit").
@@ -264,15 +260,11 @@ var templateRemoveCmd = &cobra.Command{
 			if activeAgent != nil {
 				name = activeAgent.Template
 			}
-			var names []string
-			for n := range templates {
-				names = append(names, n)
-			}
-			sort.Strings(names)
 			var options []huh.Option[string]
-			for _, n := range names {
+			for n := range templates {
 				options = append(options, huh.NewOption(n, n))
 			}
+			SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Template to Remove").
@@ -349,17 +341,15 @@ var templateSwitchCmd = &cobra.Command{
 			for n := range templates {
 				names = append(names, n)
 			}
-			sort.Strings(names)
 
-			options = append(options, huh.NewOption("None", ""))
+			// Add "None" option
+			// bugfix: must set a non-empty value, otherwise the sort will fail
+			options = append(options, huh.NewOption("None", " "))
 
 			for _, n := range names {
-				label := n
-				if n == currentName {
-					label = highlightColor(n + " (active)")
-				}
-				options = append(options, huh.NewOption(label, n))
+				options = append(options, huh.NewOption(n, n))
 			}
+			SortOptions(options, currentName)
 
 			name = currentName
 

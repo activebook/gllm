@@ -3,7 +3,6 @@ package cmd
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/activebook/gllm/data"
@@ -35,12 +34,9 @@ func buildToolsOptions() []huh.Option[string] {
 	toolsList := service.GetAllEmbeddingTools()
 	var options []huh.Option[string]
 	for _, tool := range toolsList {
-		// All tools not selected by default for new agents
-		options = append(options, huh.NewOption(tool, tool).Selected(false))
+		// All tools selected by default for new agents
+		options = append(options, huh.NewOption(tool, tool).Selected(true))
 	}
-	sort.Slice(options, func(i, j int) bool {
-		return options[i].Key < options[j].Key
-	})
 	return options
 }
 
@@ -231,7 +227,11 @@ func RunInitWizard() error {
 			huh.NewMultiSelect[string]().
 				Title("Tools").
 				Description("Select which tools to enable for this agent").
-				Options(buildToolsOptions()...).
+				Options(func() []huh.Option[string] {
+					opts := buildToolsOptions()
+					SortMultiOptions(opts, []string{}) // No tools selected by default
+					return opts
+				}()...).
 				Value(&selectedTools),
 		),
 		// Group 4: Thinking Level
@@ -253,9 +253,9 @@ func RunInitWizard() error {
 				Title("Agent Capabilities").
 				Description("Select additional features to enable").
 				Options(
+					huh.NewOption("MCP Enabled", "mcp").Selected(true),
 					huh.NewOption("Token Usage Stats", "usage").Selected(true),
 					huh.NewOption("Markdown Output", "markdown").Selected(true),
-					huh.NewOption("MCP Enabled", "mcp").Selected(false),
 				).
 				Value(&selectedFeatures),
 		),

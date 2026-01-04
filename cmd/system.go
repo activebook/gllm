@@ -180,15 +180,11 @@ Example:
 				name = activeAgent.SystemPrompt
 			}
 			// Select prompt
-			var names []string
-			for n := range sysPrompts {
-				names = append(names, n)
-			}
-			sort.Strings(names)
 			var options []huh.Option[string]
-			for _, n := range names {
+			for n := range sysPrompts {
 				options = append(options, huh.NewOption(n, n))
 			}
+			SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select System Prompt to Edit").
@@ -271,15 +267,11 @@ var systemRemoveCmd = &cobra.Command{
 				name = activeAgent.SystemPrompt
 			}
 			// Select prompt to remove
-			var names []string
-			for n := range sysPrompts {
-				names = append(names, n)
-			}
-			sort.Strings(names)
 			var options []huh.Option[string]
-			for _, n := range names {
+			for n := range sysPrompts {
 				options = append(options, huh.NewOption(n, n))
 			}
+			SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select System Prompt to Remove").
@@ -359,18 +351,15 @@ var systemSwitchCmd = &cobra.Command{
 			for n := range sysPrompts {
 				names = append(names, n)
 			}
-			sort.Strings(names)
 
 			// Add "None" option
-			options = append(options, huh.NewOption("None", ""))
-
+			// bugfix: must set a non-empty value, otherwise the sort will fail
+			options = append(options, huh.NewOption("None", " "))
 			for _, n := range names {
-				label := n
-				if n == currentName {
-					label = highlightColor(n + " (active)")
-				}
-				options = append(options, huh.NewOption(label, n))
+				options = append(options, huh.NewOption(n, n))
 			}
+
+			SortOptions(options, currentName)
 
 			name = currentName // Pre-fill with current
 

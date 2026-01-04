@@ -631,25 +631,7 @@ var mcpSwitchCmd = &cobra.Command{
 		}
 
 		// Sort options by name alphabetically and keep selected ones at top
-		sort.Slice(options, func(i, j int) bool {
-			iSelected := false
-			jSelected := false
-			for _, s := range selected {
-				if options[i].Value == s {
-					iSelected = true
-				}
-				if options[j].Value == s {
-					jSelected = true
-				}
-			}
-			if iSelected && !jSelected {
-				return true
-			}
-			if !iSelected && jSelected {
-				return false
-			}
-			return options[i].Value < options[j].Value
-		})
+		SortMultiOptions(options, selected)
 
 		err = huh.NewMultiSelect[string]().
 			Title("Select MCP servers to allow").

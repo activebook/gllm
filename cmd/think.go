@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
@@ -68,20 +67,15 @@ var thinkSwitchCmd = &cobra.Command{
 		currentLevel := service.ParseThinkingLevel(agent.Think)
 
 		// Interactive selection
-		var selected string
+		selected := currentLevel.String()
 		options := []huh.Option[string]{
-			huh.NewOption("Off - Disable thinking", "off").Selected(currentLevel == service.ThinkingLevelOff),
-			huh.NewOption("Low - Minimal reasoning", "low").Selected(currentLevel == service.ThinkingLevelLow),
-			huh.NewOption("Medium - Moderate reasoning", "medium").Selected(currentLevel == service.ThinkingLevelMedium),
-			huh.NewOption("High - Maximum reasoning", "high").Selected(currentLevel == service.ThinkingLevelHigh),
+			huh.NewOption("Off - Disable thinking", "off"),
+			huh.NewOption("Low - Minimal reasoning", "low"),
+			huh.NewOption("Medium - Moderate reasoning", "medium"),
+			huh.NewOption("High - Maximum reasoning", "high"),
 		}
 		// Sort options by Selected at first
-		sort.Slice(options, func(i, j int) bool {
-			if options[i].Value == string(currentLevel) {
-				return true
-			}
-			return i < j
-		})
+		SortOptions(options, selected)
 
 		form := huh.NewForm(
 			huh.NewGroup(

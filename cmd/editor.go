@@ -71,12 +71,9 @@ var editorSwitchCmd = &cobra.Command{
 
 			var options []huh.Option[string]
 			for _, ed := range installed {
-				label := ed
-				if ed == name {
-					label = highlightColor(ed + " (active)")
-				}
-				options = append(options, huh.NewOption(label, ed))
+				options = append(options, huh.NewOption(ed, ed))
 			}
+			SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Preferred Editor").
