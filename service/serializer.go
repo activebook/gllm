@@ -45,6 +45,10 @@ func DetectOpenAIKeyMessage(msg *openai.ChatCompletionMessage) bool {
 	if msg.Role == "" {
 		return false
 	}
+	// SystemRole is unique to OpenAI
+	if msg.Role == openai.ChatMessageRoleSystem {
+		return true
+	}
 	// ReasoningContent is unique to OpenAI
 	if msg.ReasoningContent != "" {
 		return true
