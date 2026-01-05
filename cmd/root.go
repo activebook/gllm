@@ -98,6 +98,21 @@ Configure your API keys and preferred models, then start chatting or executing c
 				return
 			}
 
+			// If conversation flag is not provided, generate a new conversation name
+			if !cmd.Flags().Changed("conversation") {
+				convoName = GenerateChatFileName()
+			} else {
+				// Bugfix: When convoName is an index number, and use it to find convo file
+				name, err := service.FindConvosByIndex(convoName)
+				if err != nil {
+					service.Errorf("error finding conversation: %v\n", err)
+					return
+				}
+				if name != "" {
+					convoName = name
+				}
+			}
+
 			prompt := ""
 			// If prompt is provided, append it to the full prompt
 			if len(args) > 0 {
