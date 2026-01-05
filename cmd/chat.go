@@ -11,6 +11,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -23,7 +24,7 @@ var chatCmd = &cobra.Command{
 	Long: `Start an interactive chat session with the configured LLM.
 This provides a Read-Eval-Print-Loop (REPL) interface where you can
 have a continuous conversation with the model.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// Create an indeterminate progress bar
 		indicator := service.NewIndicator("Processing...")
 
@@ -33,22 +34,29 @@ have a continuous conversation with the model.`,
 		// If conversation flag is not provided, generate a new conversation name
 		if !cmd.Flags().Changed("conversation") {
 			convoName = GenerateChatFileName()
+		} else {
+			// Bugfix: When convoName is an index number, and use it to find convo file
+			// it will return the convo file(sorted by modified time)
+			// but if user mannually update other convo file, the modified time will change
+			// so the next time using index to load convo file, would load the wrong one
+			// How to fix:
+			// First, we need convert convoName
+			// And, keep that name, the next time, it willn't use the index to load convo file
+			name, err := service.FindConvosByIndex(convoName)
+			if err != nil {
+				return fmt.Errorf("error finding conversation: %v\n", err)
+			}
+			if name != "" {
+				convoName = name
+			}
 		}
 
 		// If agent flag is provided, update the default agent
 		if cmd.Flags().Changed("agent") {
 			if store.GetAgent(agentName) == nil {
-				service.Warnf("Agent %s does not exist", agentName)
-				return
+				return fmt.Errorf("agent %s does not exist", agentName)
 			}
 			store.SetActiveAgent(agentName)
-		}
-
-		// Get active agent
-		activeAgent := store.GetActiveAgent()
-		if activeAgent == nil {
-			service.Warnf("No active agent found")
-			return
 		}
 
 		files := []*service.FileData{}
@@ -73,13 +81,14 @@ have a continuous conversation with the model.`,
 		indicator.Stop()
 
 		// Build the ChatInfo object
-		chatInfo = buildChatInfo(activeAgent, files)
-		if chatInfo == nil {
-			return
+		chatInfo = &ChatInfo{
+			Files:    files,
+			QuitFlag: false,
 		}
 
 		// Start the REPL
 		chatInfo.startREPL()
+		return nil
 	},
 }
 
@@ -103,50 +112,17 @@ func init() {
 }
 
 type ChatInfo struct {
-	ModelProvider string
-	Files         []*service.FileData
-	ConvoMgr      service.ConversationManager
-	QuitFlag      bool   // for cmd /quit or /exit
-	EditorInput   string // for /e editor edit
-	outputFile    string
+	Files       []*service.FileData
+	QuitFlag    bool   // for cmd /quit or /exit
+	EditorInput string // for /e editor edit
+	outputFile  string
 }
 
-func buildChatInfo(agent *data.AgentConfig, files []*service.FileData) *ChatInfo {
-
-	// Bugfix:
-	// When convoName is an index number, and use it to find convo file
-	// it will return the convo file(sorted by modified time)
-	// but if user mannually update other convo file, the modified time will change
-	// so the next time using index to load convo file, would load the wrong one
-	// How to fix:
-	// First, we need convert convoName
-	// And, keep that name, the next time, it willn't use the index to load convo file
-	name, _ := service.FindConvosByIndex(convoName)
-	if name != "" {
-		convoName = name
-	}
-
-	// Bugfix: Auto-detect provider if not set
-	// Legacy models don't have provider set
-	if agent.Model.Provider == "" {
-		service.Debugf("Auto-detecting provider for %s", agent.Model.Model)
-		agent.Model.Provider = service.DetectModelProvider(agent.Model.Endpoint, agent.Model.Model)
-	} else {
-		service.Debugf("Provider: [%s]", agent.Model.Provider)
-	}
-
-	// Construct conversation manager
-	cm, err := service.ConstructConversationManager(convoName, agent.Model.Provider)
-	if err != nil {
-		service.Errorf("Error constructing conversation manager: %v\n", err)
-		return nil
-	}
+func buildChatInfo(files []*service.FileData) *ChatInfo {
 
 	ci := ChatInfo{
-		ModelProvider: agent.Model.Provider,
-		Files:         files,
-		ConvoMgr:      cm,
-		QuitFlag:      false,
+		Files:    files,
+		QuitFlag: false,
 	}
 	return &ci
 }
@@ -288,10 +264,85 @@ func (ci *ChatInfo) startWithLocalCommand(line string) bool {
 	return strings.HasPrefix(line, "!")
 }
 
+// clearContext clears the conversation context
+func (ci *ChatInfo) clearContext() {
+	agent := ci.getActiveAgent()
+	if agent == nil {
+		return
+	}
+	// Construct conversation manager
+	cm, err := service.ConstructConversationManager(convoName, agent.Model.Provider)
+	if err != nil {
+		service.Errorf("Error constructing conversation manager: %v\n", err)
+		return
+	}
+	// Clear conversation history
+	err = cm.Clear()
+	if err != nil {
+		service.Errorf("Error clearing context: %v\n", err)
+		return
+	}
+	// Empty attachments
+	ci.Files = []*service.FileData{}
+	fmt.Printf("Context cleared.\n")
+}
+
+// showHistory displays conversation history using TUI viewport
+func (ci *ChatInfo) showHistory() {
+
+	agent := ci.getActiveAgent()
+	if agent == nil {
+		return
+	}
+
+	convoData, convoName, err := ci.getConvoData(agent)
+	if err != nil {
+		service.Errorf("%v", err)
+		return
+	}
+
+	// Detect provider based on message format
+	isCompatible, provider, modelProvider := ci.checkConvoFormat(agent, convoData)
+	if !isCompatible {
+		// Warn about potential incompatibility if providers differ
+		service.Warnf("Conversation '%s' [%s] is not compatible with the current model provider [%s].\n", convoName, provider, modelProvider)
+	}
+
+	var content string
+	switch provider {
+	case service.ModelProviderGemini:
+		content = service.RenderGeminiConversationLog(convoData)
+	case service.ModelProviderOpenAI, service.ModelProviderOpenAICompatible:
+		content = service.RenderOpenAIConversationLog(convoData)
+	case service.ModelProviderAnthropic:
+		content = service.RenderAnthropicConversationLog(convoData)
+	default:
+		fmt.Println("No available conversation yet.")
+		return
+	}
+
+	// Show viewport
+	m := NewViewportModel(provider, content, func() string {
+		return fmt.Sprintf("Conversation: %s", convoName)
+	})
+
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		service.Errorf("Error running viewport: %v", err)
+	}
+}
+
 // Get conversation data
 // As soon as the function is called, these named returned variables are created and initialized to their zero value
-func (ci *ChatInfo) getConvoData() (data []byte, name string, err error) {
-	convoPath := ci.ConvoMgr.GetPath()
+func (ci *ChatInfo) getConvoData(agent *data.AgentConfig) (data []byte, name string, err error) {
+
+	// Construct conversation manager
+	cm, err := service.ConstructConversationManager(convoName, agent.Model.Provider)
+	if err != nil {
+		return nil, "", fmt.Errorf("error constructing conversation manager: %v\n", err)
+	}
+
+	convoPath := cm.GetPath()
 
 	// Check if conversation exists
 	if _, err := os.Stat(convoPath); os.IsNotExist(err) {
@@ -308,35 +359,65 @@ func (ci *ChatInfo) getConvoData() (data []byte, name string, err error) {
 	return data, name, nil
 }
 
-func (ci *ChatInfo) checkConvoFormat(data []byte) (isCompatible bool, provider string) {
+func (ci *ChatInfo) checkConvoFormat(agent *data.AgentConfig, convoData []byte) (isCompatible bool, provider string, modelProvider string) {
+
+	modelProvider = agent.Model.Provider
+
 	// Detect provider based on message format
-	provider = service.DetectMessageProvider(data)
+	provider = service.DetectMessageProvider(convoData)
 
 	// Check compatibility: OpenAI and OpenAI Compatible are compatible
-	isCompatible = provider == ci.ModelProvider
+	isCompatible = provider == modelProvider
 	if !isCompatible {
 		// OpenAI and OpenAI Compatible are compatible
 		// Using Anthropic and detected OpenAI Compatible (Pure text content) are compatible
 		isCompatible = provider == service.ModelProviderUnknown ||
-			(provider == service.ModelProviderOpenAI && ci.ModelProvider == service.ModelProviderOpenAICompatible) ||
-			(provider == service.ModelProviderOpenAICompatible && ci.ModelProvider == service.ModelProviderOpenAI) ||
-			(provider == service.ModelProviderOpenAICompatible && ci.ModelProvider == service.ModelProviderAnthropic)
+			(provider == service.ModelProviderOpenAI && modelProvider == service.ModelProviderOpenAICompatible) ||
+			(provider == service.ModelProviderOpenAICompatible && modelProvider == service.ModelProviderOpenAI) ||
+			(provider == service.ModelProviderOpenAICompatible && modelProvider == service.ModelProviderAnthropic)
 	}
 
-	return isCompatible, provider
+	return isCompatible, provider, modelProvider
+}
+
+func (ci *ChatInfo) getActiveAgent() *data.AgentConfig {
+	// Get ActiveAgent
+	store := data.NewConfigStore()
+	agent := store.GetActiveAgent()
+	if agent == nil {
+		service.Errorf("No active agent found")
+		return nil
+	}
+
+	// Bugfix: Auto-detect provider if not set
+	// Legacy models don't have provider set
+	if agent.Model.Provider == "" {
+		service.Debugf("Auto-detecting provider for %s", agent.Model.Model)
+		agent.Model.Provider = service.DetectModelProvider(agent.Model.Endpoint, agent.Model.Model)
+		store.SetModel(agent.Model.Name, &agent.Model)
+	} else {
+		service.Debugf("Provider: [%s]", agent.Model.Provider)
+	}
+
+	return agent
 }
 
 func (ci *ChatInfo) callAgent(input string) {
-	convoData, convoName, err := ci.getConvoData()
+	agent := ci.getActiveAgent()
+	if agent == nil {
+		return
+	}
+
+	convoData, convoName, err := ci.getConvoData(agent)
 	if err != nil {
 		service.Errorf("%v", err)
 		return
 	}
 
 	// Detect provider based on message format
-	isCompatible, provider := ci.checkConvoFormat(convoData)
+	isCompatible, provider, modelProvider := ci.checkConvoFormat(agent, convoData)
 	if !isCompatible {
-		service.Errorf("Conversation '%s' [%s] is not compatible with the current model provider [%s].\n", convoName, provider, ci.ModelProvider)
+		service.Errorf("Conversation '%s' [%s] is not compatible with the current model provider [%s].\n", convoName, provider, modelProvider)
 		return
 	}
 
@@ -345,17 +426,10 @@ func (ci *ChatInfo) callAgent(input string) {
 		yolo = true
 	}
 
-	// Get ActiveAgent
-	store := data.NewConfigStore()
-	agent := store.GetActiveAgent()
-	if agent == nil {
-		service.Errorf("No active agent found")
-		return
-	}
-
 	tb := TextBuilder{}
 
 	// Get template content
+	store := data.NewConfigStore()
 	templateContent := store.GetTemplate(agent.Template)
 	tb.appendText(templateContent)
 	tb.appendText(input)

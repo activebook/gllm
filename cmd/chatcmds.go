@@ -6,10 +6,8 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	"text/tabwriter"
 
 	"github.com/activebook/gllm/service"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
@@ -193,7 +191,6 @@ func (ci *ChatInfo) showHelp() {
 
 // showInfo displays current chat settings and information
 func (ci *ChatInfo) showInfo() {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
 	printSection := func(title string) {
 		fmt.Println()
@@ -206,12 +203,10 @@ func (ci *ChatInfo) showInfo() {
 	// System prompt
 	printSection("SYSTEM PROMPT")
 	systemCmd.Run(systemCmd, []string{})
-	w.Flush()
 
 	// Template
 	printSection("TEMPLATE")
 	templateCmd.Run(templateCmd, []string{})
-	w.Flush()
 
 	// Memory section (included in system prompt)
 	// printSection("Memory")
@@ -221,17 +216,14 @@ func (ci *ChatInfo) showInfo() {
 	// Search Engines section
 	printSection("Search Engines")
 	searchListCmd.Run(searchListCmd, []string{})
-	w.Flush()
 
 	// Plugins section
 	printSection("Tools")
 	ListAllTools()
-	w.Flush()
 
 	// Current Agent section
 	printSection("Agents")
 	agentCmd.Run(agentCmd, []string{})
-	w.Flush()
 
 	// Attachments
 	printSection("ATTACHMENTS")
@@ -245,58 +237,6 @@ func (ci *ChatInfo) showInfo() {
 	}
 
 	fmt.Println()
-}
-
-// showHistory displays conversation history using TUI viewport
-func (ci *ChatInfo) showHistory() {
-	convoData, convoName, err := ci.getConvoData()
-	if err != nil {
-		service.Errorf("%v", err)
-		return
-	}
-
-	// Detect provider based on message format
-	isCompatible, provider := ci.checkConvoFormat(convoData)
-	if !isCompatible {
-		// Warn about potential incompatibility if providers differ
-		service.Warnf("Conversation '%s' [%s] is not compatible with the current model provider [%s].\n", convoName, provider, ci.ModelProvider)
-	}
-
-	var content string
-	switch provider {
-	case service.ModelProviderGemini:
-		content = service.RenderGeminiConversationLog(convoData)
-	case service.ModelProviderOpenAI, service.ModelProviderOpenAICompatible:
-		content = service.RenderOpenAIConversationLog(convoData)
-	case service.ModelProviderAnthropic:
-		content = service.RenderAnthropicConversationLog(convoData)
-	default:
-		fmt.Println("No available conversation yet.")
-		return
-	}
-
-	// Show viewport
-	m := NewViewportModel(provider, content, func() string {
-		return fmt.Sprintf("Conversation: %s", convoName)
-	})
-
-	p := tea.NewProgram(m, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		service.Errorf("Error running viewport: %v", err)
-	}
-}
-
-// clearContext clears the conversation context
-func (ci *ChatInfo) clearContext() {
-	// Empty the conversation history
-	err := ci.ConvoMgr.Clear()
-	if err != nil {
-		service.Errorf("Error clearing context: %v\n", err)
-		return
-	}
-	// Empty attachments
-	ci.Files = []*service.FileData{}
-	fmt.Printf("Context cleared.\n")
 }
 
 func (ci *ChatInfo) handleEditor() {
