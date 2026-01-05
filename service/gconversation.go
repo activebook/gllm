@@ -16,26 +16,14 @@ type Gemini2Conversation struct {
 	Messages []*genai.Content
 }
 
-// NewGeminiConversation creates or returns the singleton instance
-func (g *Gemini2Conversation) Open(title string) error {
-	// check if it's an index
-	title, err := FindConvosByIndex(title)
-	if err != nil {
-		return err
-	}
-	// If title is still empty, no convo found
-	if title == "" {
-		return nil
-	}
-	// Set the name and path
-	g.BaseConversation = BaseConversation{
-		Name: title,
-	}
-	g.Messages = []*genai.Content{}
-	sanitized := GetSanitizeTitle(g.Name)
-	g.SetPath(sanitized)
-	return nil
-}
+// Open initializes a Gemini2Conversation with the provided title
+// func (g *Gemini2Conversation) Open(title string) error {
+// 	if err := g.BaseConversation.Open(title); err != nil {
+// 		return err
+// 	}
+// 	g.Messages = []*genai.Content{}
+// 	return nil
+// }
 
 // PushContents adds multiple content items to the history
 func (g *Gemini2Conversation) Push(messages ...interface{}) {

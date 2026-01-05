@@ -98,7 +98,24 @@ func (c *BaseConversation) GetMessages() interface{} {
 func (c *BaseConversation) SetMessages(messages interface{}) {
 }
 
+// Open initializes an OpenChatConversation with the provided title, resolving
+// an index to the actual conversation name if necessary. It resets the messages,
+// sanitizes the conversation name for the path, and sets the internal path accordingly.
+// Returns an error if the title cannot be resolved.
 func (c *BaseConversation) Open(title string) error {
+	// check if it's an index
+	title, err := FindConvosByIndex(title)
+	if err != nil {
+		return err
+	}
+	// If title is still empty, no convo found
+	if title == "" {
+		return nil
+	}
+	// Set the name and path
+	c.Name = title
+	sanitized := GetSanitizeTitle(c.Name)
+	c.SetPath(sanitized)
 	return nil
 }
 
@@ -133,29 +150,13 @@ type OpenChatConversation struct {
 	Messages []*model.ChatCompletionMessage
 }
 
-// Open initializes an OpenChatConversation with the provided title, resolving
-// an index to the actual conversation name if necessary. It resets the messages,
-// sanitizes the conversation name for the path, and sets the internal path accordingly.
-// Returns an error if the title cannot be resolved.
-func (c *OpenChatConversation) Open(title string) error {
-	// check if it's an index
-	title, err := FindConvosByIndex(title)
-	if err != nil {
-		return err
-	}
-	// If title is still empty, no convo found
-	if title == "" {
-		return nil
-	}
-	// Set the name and path
-	c.BaseConversation = BaseConversation{
-		Name: title,
-	}
-	c.Messages = []*model.ChatCompletionMessage{}
-	sanitized := GetSanitizeTitle(c.Name)
-	c.SetPath(sanitized)
-	return nil
-}
+// func (c *OpenChatConversation) Open(title string) error {
+// 	if err := c.BaseConversation.Open(title); err != nil {
+// 		return err
+// 	}
+// 	c.Messages = []*model.ChatCompletionMessage{}
+// 	return nil
+// }
 
 // PushMessages adds multiple messages to the conversation
 func (c *OpenChatConversation) Push(messages ...interface{}) {
@@ -247,25 +248,13 @@ type OpenAIConversation struct {
 	Messages []openai.ChatCompletionMessage
 }
 
-func (c *OpenAIConversation) Open(title string) error {
-	// check if it's an index
-	title, err := FindConvosByIndex(title)
-	if err != nil {
-		return err
-	}
-	// If title is still empty, no convo found
-	if title == "" {
-		return nil
-	}
-	// Set the name and path
-	c.BaseConversation = BaseConversation{
-		Name: title,
-	}
-	c.Messages = []openai.ChatCompletionMessage{}
-	sanitized := GetSanitizeTitle(c.Name)
-	c.SetPath(sanitized)
-	return nil
-}
+// func (c *OpenAIConversation) Open(title string) error {
+// 	if err := c.BaseConversation.Open(title); err != nil {
+// 		return err
+// 	}
+// 	c.Messages = []openai.ChatCompletionMessage{}
+// 	return nil
+// }
 
 // PushMessages adds multiple messages to the conversation
 func (c *OpenAIConversation) Push(messages ...interface{}) {
@@ -359,25 +348,13 @@ type AnthropicConversation struct {
 	Messages []anthropic.MessageParam
 }
 
-func (c *AnthropicConversation) Open(title string) error {
-	// check if it's an index
-	title, err := FindConvosByIndex(title)
-	if err != nil {
-		return err
-	}
-	// If title is still empty, no convo found
-	if title == "" {
-		return nil
-	}
-	// Set the name and path
-	c.BaseConversation = BaseConversation{
-		Name: title,
-	}
-	c.Messages = []anthropic.MessageParam{}
-	sanitized := GetSanitizeTitle(c.Name)
-	c.SetPath(sanitized)
-	return nil
-}
+// func (c *AnthropicConversation) Open(title string) error {
+// 	if err := c.BaseConversation.Open(title); err != nil {
+// 		return err
+// 	}
+// 	c.Messages = []anthropic.MessageParam{}
+// 	return nil
+// }
 
 // PushMessages adds multiple messages to the conversation
 func (c *AnthropicConversation) Push(messages ...interface{}) {
