@@ -360,6 +360,36 @@ func (ci *ChatInfo) getConvoData(agent *data.AgentConfig) (data []byte, name str
 	return data, name, nil
 }
 
+/*
+ * Write converted conversation data for provider
+ * data: converted conversation data, compatible to provider
+ * provider: model provider
+ */
+func (ci *ChatInfo) writeConvoData(data []byte, provider string) error {
+	// Construct conversation manager
+	cm, err := service.ConstructConversationManager(convoName, provider)
+	if err != nil {
+		return fmt.Errorf("error constructing conversation manager: %v\n", err)
+	}
+
+	convoPath := cm.GetPath()
+
+	// Check if conversation exists
+	var fi os.FileInfo
+	if fi, err = os.Stat(convoPath); os.IsNotExist(err) {
+		return fmt.Errorf("conversation '%s' not found.\n", convoPath)
+	}
+
+	// Write the conversation file
+	err = os.WriteFile(convoPath, data, fi.Mode())
+	if err != nil {
+		return fmt.Errorf("error writing conversation file: %v", err)
+	}
+
+	return nil
+}
+
+// Check if conversation data is compatible with the current model provider
 func (ci *ChatInfo) checkConvoFormat(agent *data.AgentConfig, convoData []byte) (isCompatible bool, provider string, modelProvider string) {
 
 	modelProvider = agent.Model.Provider
@@ -371,10 +401,12 @@ func (ci *ChatInfo) checkConvoFormat(agent *data.AgentConfig, convoData []byte) 
 	isCompatible = provider == modelProvider
 	if !isCompatible {
 		// OpenAI and OpenAI Compatible are compatible
+		// OpenAI Compatible and Anthropic are compatible on pure text contents
 		// Unknown provider is no message yet
 		isCompatible = provider == service.ModelProviderUnknown ||
 			(provider == service.ModelProviderOpenAI && modelProvider == service.ModelProviderOpenAICompatible) ||
-			(provider == service.ModelProviderOpenAICompatible && modelProvider == service.ModelProviderOpenAI)
+			(provider == service.ModelProviderOpenAICompatible && modelProvider == service.ModelProviderOpenAI) ||
+			(provider == service.ModelProviderOpenAICompatible && modelProvider == service.ModelProviderAnthropic)
 	}
 
 	return isCompatible, provider, modelProvider
@@ -409,6 +441,7 @@ func (ci *ChatInfo) callAgent(input string) {
 		return
 	}
 
+	// Get conversation data
 	convoData, convoName, err := ci.getConvoData(agent)
 	if err != nil {
 		service.Errorf("%v", err)
@@ -418,8 +451,20 @@ func (ci *ChatInfo) callAgent(input string) {
 	// Detect provider based on message format
 	isCompatible, provider, modelProvider := ci.checkConvoFormat(agent, convoData)
 	if !isCompatible {
-		service.Errorf("Conversation '%s' [%s] is not compatible with the current model provider [%s].\n", convoName, provider, modelProvider)
-		return
+		service.Debugf("Conversation '%s' [%s] is not compatible with the current model provider [%s].\n", convoName, provider, modelProvider)
+		// Convert conversation data to compatible format
+		convertData, err := service.ConvertMessages(convoData, provider, modelProvider)
+		if err != nil {
+			service.Errorf("%v", err)
+			return
+		}
+		// Write conversation data
+		err = ci.writeConvoData(convertData, modelProvider)
+		if err != nil {
+			service.Errorf("%v", err)
+			return
+		}
+		service.Debugf("Conversation '%s' converted to compatible format [%s].\n", convoName, modelProvider)
 	}
 
 	// Yolo flag

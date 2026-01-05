@@ -61,11 +61,6 @@ func DetectOpenAIKeyMessage(msg *openai.ChatCompletionMessage) bool {
 	if len(msg.ToolCalls) > 0 {
 		return true
 	}
-	// Because anthropic content is always an array,
-	// so if content is non-empty string, it's OpenAI
-	if msg.Content != "" {
-		return true
-	}
 	// ImageURL is unique to OpenAI
 	if len(msg.MultiContent) > 0 {
 		for _, content := range msg.MultiContent {
@@ -159,7 +154,10 @@ func DetectMessageProvider(data []byte) string {
 	}
 
 	// Try to detect Anthropic format
-	anthropicContentsOnly := true
+	// Bugfix:
+	// The Anthropic SDK has a custom decoder that automatically handles string content by converting it to an array of content blocks.
+	// So we cannot rely on Content[] along to detect whether it's anthropic or not
+	// Because "content": "hi" would be converted Content[{"text":"hi"}] automatically
 	var anthropicMsg anthropic.MessageParam
 	for _, msg := range messages {
 		if err := json.Unmarshal(msg, &anthropicMsg); err == nil {
@@ -170,24 +168,12 @@ func DetectMessageProvider(data []byte) string {
 			} else if anthropicMsg.Role != anthropic.MessageParamRoleUser && anthropicMsg.Role != anthropic.MessageParamRoleAssistant {
 				// If role is not user or assistant, it's not anthropic
 				// Remember: anthropic only has two roles, no system and tools
-				anthropicContentsOnly = false
-				provider = ModelProviderUnknown
-				break
-			} else if len(anthropicMsg.Content) == 0 {
-				// If content isn't array, it's not anthropic
-				// Remember: Anthropic content must be array
-				anthropicContentsOnly = false
 				provider = ModelProviderUnknown
 				break
 			}
 		}
 	}
 	if provider != ModelProviderUnknown {
-		return provider
-	}
-	// If all messages are array of content, it's anthropic
-	if anthropicContentsOnly {
-		provider = ModelProviderAnthropic
 		return provider
 	}
 
@@ -203,7 +189,7 @@ func DetectMessageProvider(data []byte) string {
 				// If role exists, check whether it's pure text content
 				// If so, we can consider it OpenAICompatible (Pure text content)
 				provider = ModelProviderOpenAICompatible
-				break
+				// don't break, continue to check the next message
 			}
 		}
 	}
@@ -436,19 +422,19 @@ func RenderOpenAIConversationLog(data []byte) string {
 			}
 
 			if len(msg.MultiContent) > 0 {
-				sb.WriteString("\n    [Multimodal content: ")
+				// sb.WriteString("\n    Multimodal content: ")
 				for j, item := range msg.MultiContent {
 					if j > 0 {
 						sb.WriteString(", ")
 					}
 					if item.Type == "text" {
-						sb.WriteString(fmt.Sprintf("\n    text (%s)", indentText(item.Text, "    ")))
+						sb.WriteString(fmt.Sprintf("\n    %s", indentText(item.Text, "    ")))
 					}
 					if item.Type == "image_url" {
 						sb.WriteString(fmt.Sprintf("\n    %simage%s", ContentTypeColors["image"], resetColor))
 					}
 				}
-				sb.WriteString("]")
+				// sb.WriteString("\n    ")
 			}
 
 			// Function call details
