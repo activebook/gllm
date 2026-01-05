@@ -153,6 +153,11 @@ func DetectMessageProvider(data []byte) string {
 			if DetectAnthropicKeyMessage(&anthropicMsg) {
 				provider = ModelProviderAnthropic
 				break
+			} else if anthropicMsg.Role != anthropic.MessageParamRoleUser && anthropicMsg.Role != anthropic.MessageParamRoleAssistant {
+				// If role is not user or assistant, it's not anthropic
+				// Remember: anthropic only has two roles, no system and tools
+				provider = ModelProviderUnknown
+				break
 			}
 		}
 	}

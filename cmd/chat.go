@@ -317,7 +317,8 @@ func (ci *ChatInfo) checkConvoFormat(data []byte) (isCompatible bool, provider s
 	if !isCompatible {
 		// OpenAI and OpenAI Compatible are compatible
 		// Using Anthropic and detected OpenAI Compatible (Pure text content) are compatible
-		isCompatible = (provider == service.ModelProviderOpenAI && ci.ModelProvider == service.ModelProviderOpenAICompatible) ||
+		isCompatible = provider == service.ModelProviderUnknown ||
+			(provider == service.ModelProviderOpenAI && ci.ModelProvider == service.ModelProviderOpenAICompatible) ||
 			(provider == service.ModelProviderOpenAICompatible && ci.ModelProvider == service.ModelProviderOpenAI) ||
 			(provider == service.ModelProviderOpenAICompatible && ci.ModelProvider == service.ModelProviderAnthropic)
 	}
