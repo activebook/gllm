@@ -106,6 +106,7 @@ func TestDetectMessageProvider(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := DetectMessageProvider([]byte(tt.input))
 			if got != tt.expected {
+				// t.Logf("DetectMessageProvider(%s) = %v, want %v", tt.input, got, tt.expected)
 				t.Errorf("DetectMessageProvider() = %v, want %v", got, tt.expected)
 			}
 		})
