@@ -41,6 +41,9 @@ func EnsureActiveAgent() (*data.AgentConfig, error) {
 
 // RunAgent executes the agent with the given parameters, handling all setup and compatibility checks.
 func RunAgent(prompt string, files []*service.FileData, convoName string, yolo bool, outputFile string) error {
+	// Create an indeterminate progress bar
+	indicator := service.NewIndicator("Processing...")
+
 	// Ensure Active Agent
 	agent, err := EnsureActiveAgent()
 	if err != nil {
@@ -69,6 +72,9 @@ func RunAgent(prompt string, files []*service.FileData, convoName string, yolo b
 	// Load MCP config
 	mcpStore := data.NewMCPStore()
 	mcpConfig, _, _ := mcpStore.Load()
+
+	// Stop indicator
+	indicator.Stop()
 
 	// Prepare Agent Options
 	op := service.AgentOptions{
