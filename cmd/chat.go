@@ -289,12 +289,13 @@ func (ci *ChatInfo) clearContext() {
 
 // showHistory displays conversation history using TUI viewport
 func (ci *ChatInfo) showHistory() {
-
+	// Get active agent
 	agent := ci.getActiveAgent()
 	if agent == nil {
 		return
 	}
 
+	// Get conversation data
 	convoData, convoName, err := ci.getConvoData(agent)
 	if err != nil {
 		service.Errorf("%v", err)
@@ -308,6 +309,7 @@ func (ci *ChatInfo) showHistory() {
 		service.Warnf("Conversation '%s' [%s] is not compatible with the current model provider [%s].\n", convoName, provider, modelProvider)
 	}
 
+	// Render conversation log
 	var content string
 	switch provider {
 	case service.ModelProviderGemini:
@@ -321,11 +323,10 @@ func (ci *ChatInfo) showHistory() {
 		return
 	}
 
-	// Show viewport
+	// Show viewport in full screen
 	m := NewViewportModel(provider, content, func() string {
 		return fmt.Sprintf("Conversation: %s", convoName)
 	})
-
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		service.Errorf("Error running viewport: %v", err)
@@ -370,11 +371,10 @@ func (ci *ChatInfo) checkConvoFormat(agent *data.AgentConfig, convoData []byte) 
 	isCompatible = provider == modelProvider
 	if !isCompatible {
 		// OpenAI and OpenAI Compatible are compatible
-		// Using Anthropic and detected OpenAI Compatible (Pure text content) are compatible
+		// Unknown provider is no message yet
 		isCompatible = provider == service.ModelProviderUnknown ||
 			(provider == service.ModelProviderOpenAI && modelProvider == service.ModelProviderOpenAICompatible) ||
-			(provider == service.ModelProviderOpenAICompatible && modelProvider == service.ModelProviderOpenAI) ||
-			(provider == service.ModelProviderOpenAICompatible && modelProvider == service.ModelProviderAnthropic)
+			(provider == service.ModelProviderOpenAICompatible && modelProvider == service.ModelProviderOpenAI)
 	}
 
 	return isCompatible, provider, modelProvider
@@ -403,6 +403,7 @@ func (ci *ChatInfo) getActiveAgent() *data.AgentConfig {
 }
 
 func (ci *ChatInfo) callAgent(input string) {
+	// Get active agent
 	agent := ci.getActiveAgent()
 	if agent == nil {
 		return
@@ -421,6 +422,7 @@ func (ci *ChatInfo) callAgent(input string) {
 		return
 	}
 
+	// Yolo flag
 	yolo := false
 	if yoloFlag {
 		yolo = true

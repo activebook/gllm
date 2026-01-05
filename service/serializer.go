@@ -61,6 +61,11 @@ func DetectOpenAIKeyMessage(msg *openai.ChatCompletionMessage) bool {
 	if len(msg.ToolCalls) > 0 {
 		return true
 	}
+	// Because anthropic content is always an array,
+	// so if content is non-empty string, it's OpenAI
+	if msg.Content != "" {
+		return true
+	}
 	// ImageURL is unique to OpenAI
 	if len(msg.MultiContent) > 0 {
 		for _, content := range msg.MultiContent {
@@ -154,6 +159,7 @@ func DetectMessageProvider(data []byte) string {
 	}
 
 	// Try to detect Anthropic format
+	anthropicContentsOnly := true
 	var anthropicMsg anthropic.MessageParam
 	for _, msg := range messages {
 		if err := json.Unmarshal(msg, &anthropicMsg); err == nil {
@@ -164,12 +170,24 @@ func DetectMessageProvider(data []byte) string {
 			} else if anthropicMsg.Role != anthropic.MessageParamRoleUser && anthropicMsg.Role != anthropic.MessageParamRoleAssistant {
 				// If role is not user or assistant, it's not anthropic
 				// Remember: anthropic only has two roles, no system and tools
+				anthropicContentsOnly = false
+				provider = ModelProviderUnknown
+				break
+			} else if len(anthropicMsg.Content) == 0 {
+				// If content isn't array, it's not anthropic
+				// Remember: Anthropic content must be array
+				anthropicContentsOnly = false
 				provider = ModelProviderUnknown
 				break
 			}
 		}
 	}
 	if provider != ModelProviderUnknown {
+		return provider
+	}
+	// If all messages are array of content, it's anthropic
+	if anthropicContentsOnly {
+		provider = ModelProviderAnthropic
 		return provider
 	}
 
