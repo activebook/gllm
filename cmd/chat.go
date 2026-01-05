@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -286,7 +288,57 @@ func (ci *ChatInfo) startWithLocalCommand(line string) bool {
 	return strings.HasPrefix(line, "!")
 }
 
+// Get conversation data
+// As soon as the function is called, these named returned variables are created and initialized to their zero value
+func (ci *ChatInfo) getConvoData() (data []byte, name string, err error) {
+	convoPath := ci.ConvoMgr.GetPath()
+
+	// Check if conversation exists
+	if _, err := os.Stat(convoPath); os.IsNotExist(err) {
+		return nil, "", fmt.Errorf("conversation '%s' not found.\n", convoPath)
+	}
+
+	// Read and parse the conversation file
+	data, err = os.ReadFile(convoPath)
+	if err != nil {
+		return nil, "", fmt.Errorf("error reading conversation file: %v", err)
+	}
+
+	name = strings.TrimSuffix(filepath.Base(convoPath), filepath.Ext(convoPath))
+	return data, name, nil
+}
+
+func (ci *ChatInfo) checkConvoFormat(data []byte) (isCompatible bool, provider string) {
+	// Detect provider based on message format
+	provider = service.DetectMessageProvider(data)
+
+	// Check compatibility: OpenAI and OpenAI Compatible are compatible
+	isCompatible = provider == ci.ModelProvider
+	if !isCompatible {
+		// OpenAI and OpenAI Compatible are compatible
+		// Anthropic and OpenAI Compatible (Pure text content) are compatible
+		isCompatible = (provider == service.ModelProviderOpenAI && ci.ModelProvider == service.ModelProviderOpenAICompatible) ||
+			(provider == service.ModelProviderOpenAICompatible && ci.ModelProvider == service.ModelProviderOpenAI) ||
+			(provider == service.ModelProviderOpenAICompatible && ci.ModelProvider == service.ModelProviderAnthropic)
+	}
+
+	return isCompatible, provider
+}
+
 func (ci *ChatInfo) callAgent(input string) {
+	convoData, convoName, err := ci.getConvoData()
+	if err != nil {
+		service.Errorf("%v", err)
+		return
+	}
+
+	// Detect provider based on message format
+	isCompatible, provider := ci.checkConvoFormat(convoData)
+	if !isCompatible {
+		service.Errorf("Conversation '%s' [%s] is not compatible with the current model provider [%s].\n", convoName, provider, ci.ModelProvider)
+		return
+	}
+
 	yolo := false
 	if yoloFlag {
 		yolo = true
@@ -296,7 +348,7 @@ func (ci *ChatInfo) callAgent(input string) {
 	store := data.NewConfigStore()
 	agent := store.GetActiveAgent()
 	if agent == nil {
-		service.Warnf("No active agent found")
+		service.Errorf("No active agent found")
 		return
 	}
 
@@ -312,7 +364,7 @@ func (ci *ChatInfo) callAgent(input string) {
 	atRefProcessor := service.NewAtRefProcessor()
 	processedPrompt, err := atRefProcessor.ProcessText(prompt)
 	if err != nil {
-		service.Warnf("Error processing @ references in prompt: %v", err)
+		service.Warnf("Skip processing @ references in prompt: %v", err)
 		// Continue with original prompt if processing fails
 		processedPrompt = prompt
 	}

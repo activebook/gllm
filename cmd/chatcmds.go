@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync"
 	"text/tabwriter"
@@ -250,31 +249,14 @@ func (ci *ChatInfo) showInfo() {
 
 // showHistory displays conversation history using TUI viewport
 func (ci *ChatInfo) showHistory() {
-	convoPath := ci.ConvoMgr.GetPath()
-
-	// Check if conversation exists
-	if _, err := os.Stat(convoPath); os.IsNotExist(err) {
-		service.Errorf("Conversation '%s' not found.\n", convoPath)
-		return
-	}
-
-	// Read and parse the conversation file
-	data, err := os.ReadFile(convoPath)
+	convoData, convoName, err := ci.getConvoData()
 	if err != nil {
-		service.Errorf("error reading conversation file: %v", err)
+		service.Errorf("%v", err)
 		return
 	}
-
-	convoName := strings.TrimSuffix(filepath.Base(convoPath), filepath.Ext(convoPath))
 
 	// Detect provider based on message format
-	provider := service.DetectMessageProvider(data)
-
-	// Check compatibility: OpenAI and OpenAI Compatible are compatible
-	isCompatible := provider == ci.ModelProvider ||
-		(provider == service.ModelProviderOpenAI && ci.ModelProvider == service.ModelProviderOpenAICompatible) ||
-		(provider == service.ModelProviderOpenAICompatible && ci.ModelProvider == service.ModelProviderOpenAI)
-
+	isCompatible, provider := ci.checkConvoFormat(convoData)
 	if !isCompatible {
 		// Warn about potential incompatibility if providers differ
 		service.Warnf("Conversation '%s' [%s] is not compatible with the current model provider [%s].\n", convoName, provider, ci.ModelProvider)
@@ -283,11 +265,11 @@ func (ci *ChatInfo) showHistory() {
 	var content string
 	switch provider {
 	case service.ModelProviderGemini:
-		content = service.RenderGeminiConversationLog(data)
+		content = service.RenderGeminiConversationLog(convoData)
 	case service.ModelProviderOpenAI, service.ModelProviderOpenAICompatible:
-		content = service.RenderOpenAIConversationLog(data)
+		content = service.RenderOpenAIConversationLog(convoData)
 	case service.ModelProviderAnthropic:
-		content = service.RenderAnthropicConversationLog(data)
+		content = service.RenderAnthropicConversationLog(convoData)
 	default:
 		fmt.Println("No available conversation yet.")
 		return

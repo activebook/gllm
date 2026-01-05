@@ -14,12 +14,12 @@ func TestDetectMessageProvider(t *testing.T) {
 		{
 			name:     "OpenAI Simple Text",
 			input:    `[{"role": "user", "content": "hello"}]`,
-			expected: ModelProviderOpenAI,
+			expected: ModelProviderOpenAICompatible,
 		},
 		{
 			name:     "OpenAI Multimodal Text",
 			input:    `[{"role": "user", "content": [{"type": "text", "text": "hello"}]}]`,
-			expected: ModelProviderOpenAI,
+			expected: ModelProviderOpenAICompatible,
 		},
 		{
 			name:     "OpenAI Multimodal Image",

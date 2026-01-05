@@ -57,6 +57,14 @@ func DetectOpenAIKeyMessage(msg *openai.ChatCompletionMessage) bool {
 	if len(msg.ToolCalls) > 0 {
 		return true
 	}
+	// ImageURL is unique to OpenAI
+	if len(msg.MultiContent) > 0 {
+		for _, content := range msg.MultiContent {
+			if content.ImageURL != nil {
+				return true
+			}
+		}
+	}
 	return false
 }
 
@@ -99,7 +107,13 @@ func DetectAnthropicKeyMessage(msg *anthropic.MessageParam) bool {
 	return false
 }
 
-// Detects the conversation provider based on message format
+/*
+ * Detects the conversation provider based on message format
+ * OpenAICompatible: OpenAI messages that are pure text content
+ * OpenAI: OpenAI messages that are unique to OpenAI
+ * Anthropic: Anthropic messages that are unique to Anthropic
+ * Gemini: Gemini messages that are unique to Gemini
+ */
 func DetectMessageProvider(data []byte) string {
 	// Try to unmarshal as array of messages
 	var messages []json.RawMessage
@@ -156,8 +170,8 @@ func DetectMessageProvider(data []byte) string {
 				break
 			} else if openaiMsg.Role != "" && (openaiMsg.Content != "" || len(openaiMsg.MultiContent) > 0) {
 				// If role exists, check whether it's pure text content
-				// If so, we can also consider it OpenAI
-				provider = ModelProviderOpenAI
+				// If so, we can consider it OpenAICompatible (Pure text content)
+				provider = ModelProviderOpenAICompatible
 				break
 			}
 		}
