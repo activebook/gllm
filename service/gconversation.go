@@ -17,14 +17,6 @@ type Gemini2Conversation struct {
 }
 
 // Open initializes a Gemini2Conversation with the provided title
-// func (g *Gemini2Conversation) Open(title string) error {
-// 	if err := g.BaseConversation.Open(title); err != nil {
-// 		return err
-// 	}
-// 	g.Messages = []*genai.Content{}
-// 	return nil
-// }
-
 // PushContents adds multiple content items to the history
 func (g *Gemini2Conversation) Push(messages ...interface{}) {
 	for _, msg := range messages {

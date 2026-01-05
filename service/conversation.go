@@ -150,14 +150,6 @@ type OpenChatConversation struct {
 	Messages []*model.ChatCompletionMessage
 }
 
-// func (c *OpenChatConversation) Open(title string) error {
-// 	if err := c.BaseConversation.Open(title); err != nil {
-// 		return err
-// 	}
-// 	c.Messages = []*model.ChatCompletionMessage{}
-// 	return nil
-// }
-
 // PushMessages adds multiple messages to the conversation
 func (c *OpenChatConversation) Push(messages ...interface{}) {
 	for _, msg := range messages {
@@ -247,14 +239,6 @@ type OpenAIConversation struct {
 	BaseConversation
 	Messages []openai.ChatCompletionMessage
 }
-
-// func (c *OpenAIConversation) Open(title string) error {
-// 	if err := c.BaseConversation.Open(title); err != nil {
-// 		return err
-// 	}
-// 	c.Messages = []openai.ChatCompletionMessage{}
-// 	return nil
-// }
 
 // PushMessages adds multiple messages to the conversation
 func (c *OpenAIConversation) Push(messages ...interface{}) {
@@ -347,14 +331,6 @@ type AnthropicConversation struct {
 	BaseConversation
 	Messages []anthropic.MessageParam
 }
-
-// func (c *AnthropicConversation) Open(title string) error {
-// 	if err := c.BaseConversation.Open(title); err != nil {
-// 		return err
-// 	}
-// 	c.Messages = []anthropic.MessageParam{}
-// 	return nil
-// }
 
 // PushMessages adds multiple messages to the conversation
 func (c *AnthropicConversation) Push(messages ...interface{}) {
