@@ -342,7 +342,7 @@ func (ci *ChatInfo) addAttachFiles(input string) {
 					}
 
 					// Process the attachment
-					file := processAttachment(filePath)
+					file := ProcessAttachment(filePath)
 					if file == nil {
 						service.Errorf("Error loading attachment: %s\n", filePath)
 						return

@@ -2,9 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -59,32 +57,12 @@ have a continuous conversation with the model.`,
 			store.SetActiveAgent(agentName)
 		}
 
-		files := []*service.FileData{}
-		// Start a goroutine for your actual LLM work
-		done := make(chan bool)
-		go func() {
-
-			// Process all prompt building
-			if cmd.Flags().Changed("attachment") {
-				// Process attachments
-				for _, attachment := range attachments {
-					fileData := processAttachment(attachment)
-					if fileData != nil {
-						files = append(files, fileData)
-					}
-				}
-			}
-			done <- true
-		}()
-		// Update the spinner until work is done
-		<-done
-		indicator.Stop()
-
 		// Build the ChatInfo object
 		chatInfo = &ChatInfo{
-			Files:    files,
 			QuitFlag: false,
 		}
+
+		indicator.Stop()
 
 		// Start the REPL
 		chatInfo.startREPL()
@@ -116,15 +94,6 @@ type ChatInfo struct {
 	QuitFlag    bool   // for cmd /quit or /exit
 	EditorInput string // for /e editor edit
 	outputFile  string
-}
-
-func buildChatInfo(files []*service.FileData) *ChatInfo {
-
-	ci := ChatInfo{
-		Files:    files,
-		QuitFlag: false,
-	}
-	return &ci
 }
 
 func (ci *ChatInfo) printWelcome() {
@@ -266,8 +235,9 @@ func (ci *ChatInfo) startWithLocalCommand(line string) bool {
 
 // clearContext clears the conversation context
 func (ci *ChatInfo) clearContext() {
-	agent := ci.getActiveAgent()
-	if agent == nil {
+	agent, err := EnsureActiveAgent()
+	if err != nil {
+		service.Errorf("%v", err)
 		return
 	}
 	// Construct conversation manager
@@ -290,20 +260,21 @@ func (ci *ChatInfo) clearContext() {
 // showHistory displays conversation history using TUI viewport
 func (ci *ChatInfo) showHistory() {
 	// Get active agent
-	agent := ci.getActiveAgent()
-	if agent == nil {
+	agent, err := EnsureActiveAgent()
+	if err != nil {
+		service.Errorf("%v", err)
 		return
 	}
 
 	// Get conversation data
-	convoData, convoName, err := ci.getConvoData(agent)
+	convoData, convoName, err := GetConvoData(convoName, agent.Model.Provider)
 	if err != nil {
 		service.Errorf("%v", err)
 		return
 	}
 
 	// Detect provider based on message format
-	isCompatible, provider, modelProvider := ci.checkConvoFormat(agent, convoData)
+	isCompatible, provider, modelProvider := CheckConvoFormat(agent, convoData)
 	if !isCompatible {
 		// Warn about potential incompatibility if providers differ
 		service.Warnf("Conversation '%s' [%s] is not compatible with the current model provider [%s].\n", convoName, provider, modelProvider)
@@ -333,221 +304,13 @@ func (ci *ChatInfo) showHistory() {
 	}
 }
 
-// Get conversation data
-// As soon as the function is called, these named returned variables are created and initialized to their zero value
-func (ci *ChatInfo) getConvoData(agent *data.AgentConfig) (data []byte, name string, err error) {
-
-	// Construct conversation manager
-	cm, err := service.ConstructConversationManager(convoName, agent.Model.Provider)
-	if err != nil {
-		return nil, "", fmt.Errorf("error constructing conversation manager: %v\n", err)
-	}
-
-	convoPath := cm.GetPath()
-
-	// Check if conversation exists
-	if _, err := os.Stat(convoPath); os.IsNotExist(err) {
-		return nil, "", fmt.Errorf("conversation '%s' not found.\n", convoPath)
-	}
-
-	// Read and parse the conversation file
-	data, err = os.ReadFile(convoPath)
-	if err != nil {
-		return nil, "", fmt.Errorf("error reading conversation file: %v", err)
-	}
-
-	name = strings.TrimSuffix(filepath.Base(convoPath), filepath.Ext(convoPath))
-	return data, name, nil
-}
-
-/*
- * Write converted conversation data for provider
- * data: converted conversation data, compatible to provider
- * provider: model provider
- */
-func (ci *ChatInfo) writeConvoData(data []byte, provider string) error {
-	// Construct conversation manager
-	cm, err := service.ConstructConversationManager(convoName, provider)
-	if err != nil {
-		return fmt.Errorf("error constructing conversation manager: %v\n", err)
-	}
-
-	convoPath := cm.GetPath()
-
-	// Check if conversation exists
-	var fi os.FileInfo
-	if fi, err = os.Stat(convoPath); os.IsNotExist(err) {
-		return fmt.Errorf("conversation '%s' not found.\n", convoPath)
-	}
-
-	// Write the conversation file
-	err = os.WriteFile(convoPath, data, fi.Mode())
-	if err != nil {
-		return fmt.Errorf("error writing conversation file: %v", err)
-	}
-
-	return nil
-}
-
-// Check if conversation data is compatible with the current model provider
-func (ci *ChatInfo) checkConvoFormat(agent *data.AgentConfig, convoData []byte) (isCompatible bool, provider string, modelProvider string) {
-
-	modelProvider = agent.Model.Provider
-
-	// Detect provider based on message format
-	provider = service.DetectMessageProvider(convoData)
-
-	// Check compatibility: OpenAI and OpenAI Compatible are compatible
-	isCompatible = provider == modelProvider
-	if !isCompatible {
-		// OpenAI and OpenAI Compatible are compatible
-		// OpenAI Compatible and Anthropic are compatible on pure text contents
-		// Unknown provider is no message yet
-		isCompatible = provider == service.ModelProviderUnknown ||
-			(provider == service.ModelProviderOpenAI && modelProvider == service.ModelProviderOpenAICompatible) ||
-			(provider == service.ModelProviderOpenAICompatible && modelProvider == service.ModelProviderOpenAI) ||
-			(provider == service.ModelProviderOpenAICompatible && modelProvider == service.ModelProviderAnthropic)
-	}
-
-	return isCompatible, provider, modelProvider
-}
-
-func (ci *ChatInfo) getActiveAgent() *data.AgentConfig {
-	// Get ActiveAgent
-	store := data.NewConfigStore()
-	agent := store.GetActiveAgent()
-	if agent == nil {
-		service.Errorf("No active agent found")
-		return nil
-	}
-
-	// Bugfix: Auto-detect provider if not set
-	// Legacy models don't have provider set
-	if agent.Model.Provider == "" {
-		service.Debugf("Auto-detecting provider for %s", agent.Model.Model)
-		agent.Model.Provider = service.DetectModelProvider(agent.Model.Endpoint, agent.Model.Model)
-		store.SetModel(agent.Model.Name, &agent.Model)
-	} else {
-		service.Debugf("Provider: [%s]", agent.Model.Provider)
-	}
-
-	return agent
-}
-
 func (ci *ChatInfo) callAgent(input string) {
-	// Get active agent
-	agent := ci.getActiveAgent()
-	if agent == nil {
-		return
-	}
-
-	// Get conversation data
-	convoData, convoName, err := ci.getConvoData(agent)
+	// Call agent using the shared runner
+	err := RunAgent(input, ci.Files, convoName, yoloFlag, ci.outputFile)
 	if err != nil {
 		service.Errorf("%v", err)
 		return
 	}
-
-	// Detect provider based on message format
-	isCompatible, provider, modelProvider := ci.checkConvoFormat(agent, convoData)
-	if !isCompatible {
-		service.Debugf("Conversation '%s' [%s] is not compatible with the current model provider [%s].\n", convoName, provider, modelProvider)
-		// Convert conversation data to compatible format
-		convertData, err := service.ConvertMessages(convoData, provider, modelProvider)
-		if err != nil {
-			service.Errorf("%v", err)
-			return
-		}
-		// Write conversation data
-		err = ci.writeConvoData(convertData, modelProvider)
-		if err != nil {
-			service.Errorf("%v", err)
-			return
-		}
-		service.Debugf("Conversation '%s' converted to compatible format [%s].\n", convoName, modelProvider)
-	}
-
-	// Yolo flag
-	yolo := false
-	if yoloFlag {
-		yolo = true
-	}
-
-	tb := TextBuilder{}
-
-	// Get template content
-	store := data.NewConfigStore()
-	templateContent := store.GetTemplate(agent.Template)
-	tb.appendText(templateContent)
-	tb.appendText(input)
-
-	//Process @ references in prompt
-	prompt := tb.String()
-	atRefProcessor := service.NewAtRefProcessor()
-	processedPrompt, err := atRefProcessor.ProcessText(prompt)
-	if err != nil {
-		service.Warnf("Skip processing @ references in prompt: %v", err)
-		// Continue with original prompt if processing fails
-		processedPrompt = prompt
-	}
-
-	// Get system prompt
-	sys_prompt := store.GetSystemPrompt(agent.SystemPrompt)
-
-	// Get memory content
-	memStore := data.NewMemoryStore()
-	memoryContent := memStore.GetFormatted()
-	if memoryContent != "" {
-		sys_prompt += "\n\n" + memoryContent
-	}
-
-	// Load MCP config
-	mcpStore := data.NewMCPStore()
-	mcpConfig, _, _ := mcpStore.Load()
-
-	// Check whether model is valid
-	if agent.Model.Name == "" {
-		service.Errorf("No model specified")
-		return
-	} else {
-		model := store.GetModel(agent.Model.Name)
-		if model == nil {
-			service.Errorf("Model %s not found", agent.Model.Name)
-			return
-		}
-	}
-
-	// Call agent
-	op := service.AgentOptions{
-		Prompt:         processedPrompt,
-		SysPrompt:      sys_prompt,
-		Files:          ci.Files,
-		ModelInfo:      &agent.Model,
-		SearchEngine:   &agent.Search,
-		MaxRecursions:  agent.MaxRecursions,
-		ThinkingLevel:  agent.Think,
-		EnabledTools:   agent.Tools,
-		UseMCP:         agent.MCP,
-		YoloMode:       yolo,
-		AppendUsage:    agent.Usage,
-		AppendMarkdown: agent.Markdown,
-		OutputFile:     ci.outputFile,
-		QuietMode:      false,
-		ConvoName:      convoName,
-		MCPConfig:      mcpConfig,
-	}
-
-	err = service.CallAgent(&op)
-	if err != nil {
-		service.Errorf("%v", err)
-		return
-	}
-
-	// We must reset the files after processing
-	// We shouldn't pass the files to the next call each time
-	// Because the files are already in the context of this conversation
-	// The same to system prompt and template
-	// We shouldn't pass the system prompt and template to the next call each time
 
 	// Reset the files after processing
 	ci.Files = []*service.FileData{}
