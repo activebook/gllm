@@ -77,6 +77,10 @@ func DetectGeminiKeyMessage(msg *gemini.Content) bool {
 	if msg.Role == "" {
 		return false
 	}
+	// RoleModel is unique to Gemini
+	if msg.Role == gemini.RoleModel {
+		return true
+	}
 	// Parts is unique to Gemini
 	if len(msg.Parts) > 0 {
 		return true
