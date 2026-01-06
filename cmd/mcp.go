@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -179,292 +181,6 @@ var mcpOffCmd = &cobra.Command{
 			return
 		}
 		fmt.Printf("MCP %s\n", switchOffColor+"disabled"+resetColor)
-	},
-}
-
-var mcpAddCmd = &cobra.Command{
-	Use:   "add",
-	Short: "Add a new MCP server",
-	Long:  `Add a new MCP server to the configuration. Requires name and type. For sse/http types, url is required. For std/local types, command is required.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		name, _ := cmd.Flags().GetString("name")
-		serverType, _ := cmd.Flags().GetString("type")
-		url, _ := cmd.Flags().GetString("url")
-		command, _ := cmd.Flags().GetString("command")
-		headers, _ := cmd.Flags().GetStringSlice("header")
-		envVars, _ := cmd.Flags().GetStringSlice("env")
-
-		// Validate required fields
-		if name == "" {
-			fmt.Println("Error: name is required")
-			return
-		}
-		if serverType == "" {
-			fmt.Println("Error: type is required")
-			return
-		}
-
-		// Validate type
-		validTypes := map[string]bool{"std": true, "local": true, "sse": true, "http": true}
-		if !validTypes[serverType] {
-			fmt.Println("Error: type must be one of: std, local, sse, http")
-			return
-		}
-
-		// Validate type-specific required fields
-		switch serverType {
-		case "sse", "http":
-			if url == "" {
-				fmt.Printf("Error: url is required for type %s\n", serverType)
-				return
-			}
-		case "std", "local":
-			if command == "" {
-				fmt.Printf("Error: command is required for type %s\n", serverType)
-				return
-			}
-		}
-
-		// Create new server config
-		serverConfig := &data.MCPServer{
-			Name:    name,
-			Type:    serverType,
-			Allowed: true, // allow by default
-		}
-
-		// Set type-specific fields
-		switch serverType {
-		case "sse":
-			serverConfig.URL = url
-		case "http":
-			serverConfig.HTTPUrl = url
-		case "std", "local":
-			// Parse command into Command and Args
-			parts := strings.Fields(command)
-			if len(parts) > 0 {
-				serverConfig.Command = parts[0]
-				if len(parts) > 1 {
-					serverConfig.Args = parts[1:]
-				}
-			}
-		}
-
-		// Parse headers
-		if len(headers) > 0 {
-			serverConfig.Headers = make(map[string]string)
-			for _, header := range headers {
-				parts := strings.SplitN(header, "=", 2)
-				if len(parts) == 2 {
-					serverConfig.Headers[parts[0]] = parts[1]
-				}
-			}
-		}
-
-		// Parse env vars
-		if len(envVars) > 0 {
-			serverConfig.Env = make(map[string]string)
-			for _, env := range envVars {
-				parts := strings.SplitN(env, "=", 2)
-				if len(parts) == 2 {
-					serverConfig.Env[parts[0]] = parts[1]
-				}
-			}
-		}
-
-		// Add to store
-		store := data.NewMCPStore()
-		err := store.AddServer(serverConfig)
-		if err != nil {
-			fmt.Printf("Error saving MCP config: %v\n", err)
-			return
-		}
-
-		fmt.Printf("Successfully added MCP server '%s':\n", name)
-		fmt.Printf("  Type: %s\n", serverConfig.Type)
-		fmt.Printf("  Allowed: %t\n", serverConfig.Allowed)
-		if serverConfig.URL != "" {
-			fmt.Printf("  URL: %s\n", serverConfig.URL)
-		}
-		if serverConfig.HTTPUrl != "" {
-			fmt.Printf("  HTTP URL: %s\n", serverConfig.HTTPUrl)
-		}
-		if serverConfig.Command != "" {
-			fmt.Printf("  Command: %s", serverConfig.Command)
-			if len(serverConfig.Args) > 0 {
-				fmt.Printf(" %s", strings.Join(serverConfig.Args, " "))
-			}
-			fmt.Println()
-		}
-		if len(serverConfig.Headers) > 0 {
-			fmt.Println("  Headers:")
-			for k, v := range serverConfig.Headers {
-				fmt.Printf("    %s: %s\n", k, v)
-			}
-		}
-		if len(serverConfig.Env) > 0 {
-			fmt.Println("  Environment:")
-			for k, v := range serverConfig.Env {
-				fmt.Printf("    %s: %s\n", k, v)
-			}
-		}
-	},
-}
-
-var mcpSetCmd = &cobra.Command{
-	Use:   "set",
-	Short: "Set/update an MCP server",
-	Long:  `Set or update an existing MCP server in the configuration. Requires name. Type is determined from existing server. Only validate required fields when they are being set.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		name, _ := cmd.Flags().GetString("name")
-		url, _ := cmd.Flags().GetString("url")
-		command, _ := cmd.Flags().GetString("command")
-		headers, _ := cmd.Flags().GetStringSlice("header")
-		envVars, _ := cmd.Flags().GetStringSlice("env")
-		allow, _ := cmd.Flags().GetBool("allow")
-
-		// Validate required fields
-		if name == "" {
-			fmt.Println("Error: name is required")
-			return
-		}
-
-		// Load existing server
-		store := data.NewMCPStore()
-		existingServer, err := store.GetServer(name)
-		if err != nil {
-			fmt.Printf("Error: %v. Use 'add' to create a new server.\n", err)
-			return
-		}
-
-		// Get type from existing server
-		serverType := existingServer.Type
-
-		// Validate type-specific required fields only when flags are provided
-		urlChanged := cmd.Flags().Changed("url")
-		commandChanged := cmd.Flags().Changed("command")
-
-		switch serverType {
-		case "sse", "http":
-			if urlChanged && url == "" {
-				fmt.Printf("Error: url is required for type %s\n", serverType)
-				return
-			}
-		case "std", "local":
-			if commandChanged && command == "" {
-				fmt.Printf("Error: command is required for type %s\n", serverType)
-				return
-			}
-		}
-
-		// Update server config
-		serverConfig := existingServer
-
-		// Set type-specific fields only when flags are provided
-		if serverType == "sse" && urlChanged {
-			serverConfig.URL = url
-		} else if serverType == "http" && urlChanged {
-			serverConfig.HTTPUrl = url
-		} else if (serverType == "std" || serverType == "local") && commandChanged {
-			// Parse command into Command and Args
-			parts := strings.Fields(command)
-			if len(parts) > 0 {
-				serverConfig.Command = parts[0]
-				if len(parts) > 1 {
-					serverConfig.Args = parts[1:]
-				}
-			}
-		}
-
-		// Parse headers (merge with existing) only when provided
-		if cmd.Flags().Changed("header") {
-			if serverConfig.Headers == nil {
-				serverConfig.Headers = make(map[string]string)
-			}
-			for _, header := range headers {
-				parts := strings.SplitN(header, "=", 2)
-				if len(parts) == 2 {
-					serverConfig.Headers[parts[0]] = parts[1]
-				}
-			}
-		}
-
-		// Parse env vars (merge with existing) only when provided
-		if cmd.Flags().Changed("env") {
-			if serverConfig.Env == nil {
-				serverConfig.Env = make(map[string]string)
-			}
-			for _, env := range envVars {
-				parts := strings.SplitN(env, "=", 2)
-				if len(parts) == 2 {
-					serverConfig.Env[parts[0]] = parts[1]
-				}
-			}
-		}
-
-		// Handle allow flag only when explicitly provided
-		if cmd.Flags().Changed("allow") {
-			serverConfig.Allowed = allow
-		}
-
-		// Save config
-		err = store.UpdateServer(serverConfig)
-		if err != nil {
-			fmt.Printf("Error saving MCP config: %v\n", err)
-			return
-		}
-
-		fmt.Printf("Successfully updated MCP server '%s':\n", name)
-		fmt.Printf("  Type: %s\n", serverConfig.Type)
-		fmt.Printf("  Allowed: %t\n", serverConfig.Allowed)
-		if serverConfig.URL != "" {
-			fmt.Printf("  URL: %s\n", serverConfig.URL)
-		}
-		if serverConfig.HTTPUrl != "" {
-			fmt.Printf("  HTTP URL: %s\n", serverConfig.HTTPUrl)
-		}
-		if serverConfig.Command != "" {
-			fmt.Printf("  Command: %s", serverConfig.Command)
-			if len(serverConfig.Args) > 0 {
-				fmt.Printf(" %s", strings.Join(serverConfig.Args, " "))
-			}
-			fmt.Println()
-		}
-		if len(serverConfig.Headers) > 0 {
-			fmt.Println("  Headers:")
-			for k, v := range serverConfig.Headers {
-				fmt.Printf("    %s: %s\n", k, v)
-			}
-		}
-		if len(serverConfig.Env) > 0 {
-			fmt.Println("  Environment:")
-			for k, v := range serverConfig.Env {
-				fmt.Printf("    %s: %s\n", k, v)
-			}
-		}
-	},
-}
-
-var mcpRemoveCmd = &cobra.Command{
-	Use:   "remove",
-	Short: "Remove an MCP server",
-	Long:  `Remove an MCP server from the configuration. Requires name of the server to remove.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		name, _ := cmd.Flags().GetString("name")
-
-		// Validate required fields
-		if name == "" {
-			fmt.Println("Error: name is required")
-			return
-		}
-
-		store := data.NewMCPStore()
-		err := store.RemoveServer(name)
-		if err != nil {
-			fmt.Printf("Error removing MCP server '%s': %v\n", name, err)
-			return
-		}
-
-		fmt.Printf("Successfully removed MCP server '%s'\n", name)
 	},
 }
 
@@ -664,44 +380,93 @@ var mcpSwitchCmd = &cobra.Command{
 	},
 }
 
-// center centers a string within a given width by adding spaces
-func center(s string, width int) string {
-	if len(s) > width {
-		return s
-	}
-	totalPad := width - len(s)
-	leftPad := totalPad / 2
-	rightPad := totalPad - leftPad
-	return strings.Repeat(" ", leftPad) + s + strings.Repeat(" ", rightPad)
+var mcpSetCmd = &cobra.Command{
+	Use:   "set",
+	Short: "Interactively edit the MCP configuration",
+	Long:  `Opens an interactive editor to modify the MCP configuration JSON directly.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		store := data.NewMCPStore()
+		configPath := store.GetPath()
+
+		// Ensure file exists
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			if err := store.CreateTemplate(); err != nil {
+				fmt.Printf("Error creating template: %v\n", err)
+				return
+			}
+		}
+
+		// Read content
+		contentBytes, err := os.ReadFile(configPath)
+		if err != nil {
+			fmt.Printf("Error reading config file: %v\n", err)
+			return
+		}
+		content := string(contentBytes)
+
+		// Count how many lines are in the content
+		lineCount := strings.Count(content, "\n")
+		fmt.Println("Line count:", lineCount)
+		height := 10
+		if lineCount > 10 {
+			height = lineCount + 5
+		}
+		if height > 40 {
+			height = 40
+		}
+		fmt.Println("Height:", height)
+
+		// Interactive edit
+		err = huh.NewText().
+			Title("Edit MCP Configuration (JSON)").
+			Description("Press enter to save, or Ctrl+C to cancel.").
+			Validate(func(v string) error {
+				if v == "" {
+					return errors.New("content cannot be empty")
+				}
+				// Validate JSON
+				var js map[string]interface{}
+				if err := json.Unmarshal([]byte(content), &js); err != nil {
+					return fmt.Errorf("invalid JSON content - %v", err)
+				}
+				return nil
+			}).
+			Value(&content).
+			WithHeight(height).
+			Run()
+
+		if err != nil {
+			fmt.Println("Edit cancelled.")
+			return
+		}
+
+		// Save content
+		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+			fmt.Printf("Error saving config file: %v\n", err)
+			return
+		}
+
+		fmt.Println("MCP configuration updated successfully.")
+
+		// Reload MCPs
+		mcpListCmd.Run(cmd, args)
+	},
 }
 
 func init() {
 	mcpLoadCmd.Flags().BoolP("all", "a", false, "List all mcp servers, including blocked ones")
 	mcpLoadCmd.Flags().BoolP("prompts", "p", false, "Include MCP prompts, if available")
 	mcpLoadCmd.Flags().BoolP("resources", "r", false, "Include MCP resources, if available")
-	mcpAddCmd.Flags().StringP("name", "n", "", "Name of the MCP server (required)")
-	mcpAddCmd.Flags().StringP("type", "t", "", "Type of the MCP server: std, local, sse, http (required)")
-	mcpAddCmd.Flags().StringP("url", "u", "", "URL for sse/http type servers")
-	mcpAddCmd.Flags().StringP("command", "c", "", "Command for std/local type servers")
-	mcpAddCmd.Flags().StringSliceP("header", "H", []string{}, "HTTP headers in key=value format (can be used multiple times)")
-	mcpAddCmd.Flags().StringSliceP("env", "e", []string{}, "Environment variables in key=value format (can be used multiple times)")
-	mcpSetCmd.Flags().StringP("name", "n", "", "Name of the MCP server (required)")
-	mcpSetCmd.Flags().StringP("url", "u", "", "URL for sse/http type servers")
-	mcpSetCmd.Flags().StringP("command", "c", "", "Command for std/local type servers")
-	mcpSetCmd.Flags().StringSliceP("header", "H", []string{}, "HTTP headers in key=value format (can be used multiple times)")
-	mcpSetCmd.Flags().StringSliceP("env", "e", []string{}, "Environment variables in key=value format (can be used multiple times)")
-	mcpSetCmd.Flags().BoolP("allow", "a", false, "Allow this MCP server to be used")
-	mcpRemoveCmd.Flags().StringP("name", "n", "", "Name of the MCP server to remove (required)")
+
 	mcpCmd.AddCommand(mcpLoadCmd)
 	mcpCmd.AddCommand(mcpListCmd)
 	mcpCmd.AddCommand(mcpOnCmd)
 	mcpCmd.AddCommand(mcpOffCmd)
-	mcpCmd.AddCommand(mcpAddCmd)
 	mcpCmd.AddCommand(mcpSwitchCmd)
-	mcpCmd.AddCommand(mcpSetCmd)
-	mcpCmd.AddCommand(mcpRemoveCmd)
 	mcpCmd.AddCommand(mcpExportCmd)
 	mcpCmd.AddCommand(mcpImportCmd)
 	mcpCmd.AddCommand(mcpPathCmd)
+	mcpCmd.AddCommand(mcpSetCmd)
+
 	rootCmd.AddCommand(mcpCmd)
 }
