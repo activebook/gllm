@@ -202,6 +202,9 @@ Example:
 							huh.NewOption("Other (OpenAI Compatible)", service.ModelProviderOpenAICompatible),
 						).
 						Value(&provider),
+					huh.NewNote().
+						Title("Tips").
+						Description("If you are using Chinese open-source models, then better choose 'Other (OpenAI Compatible)'"),
 				),
 			).Run()
 			if err != nil {
@@ -425,6 +428,9 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 							huh.NewOption("Other (OpenAI Compatible)", service.ModelProviderOpenAICompatible),
 						).
 						Value(&provider),
+					huh.NewNote().
+						Title("Tips").
+						Description("If you are using Chinese open-source models, then better choose 'Other (OpenAI Compatible)'"),
 				),
 				huh.NewGroup(
 					huh.NewInput().
