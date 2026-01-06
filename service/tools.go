@@ -1162,6 +1162,11 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 		return fmt.Sprintf("Agent '%s' not found. Use 'list' to see available agents.", name), nil
 	}
 
+	// If already in this agent, just return message
+	if store.GetActiveAgentName() == name {
+		return fmt.Sprintf("You are already using agent '%s'. No need to switch.", name), nil
+	}
+
 	// Set active agent
 	err := store.SetActiveAgent(name)
 	if err != nil {
