@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -391,7 +393,7 @@ var mcpSetCmd = &cobra.Command{
 		// Ensure file exists
 		if _, err := os.Stat(configPath); os.IsNotExist(err) {
 			if err := store.CreateTemplate(); err != nil {
-				fmt.Printf("Error creating template: %v\n", err)
+				service.Errorf("Error creating MCP configuration file: %v\n", err)
 				return
 			}
 		}
@@ -399,14 +401,13 @@ var mcpSetCmd = &cobra.Command{
 		// Read content
 		contentBytes, err := os.ReadFile(configPath)
 		if err != nil {
-			fmt.Printf("Error reading config file: %v\n", err)
+			service.Errorf("Error reading config file: %v", err)
 			return
 		}
 		content := string(contentBytes)
 
 		// Count how many lines are in the content
-		lineCount := strings.Count(content, "\n")
-		fmt.Println("Line count:", lineCount)
+		lineCount := len(strings.Split(content, "\n"))
 		height := 10
 		if lineCount > 10 {
 			height = lineCount + 5
@@ -414,35 +415,71 @@ var mcpSetCmd = &cobra.Command{
 		if height > 40 {
 			height = 40
 		}
-		fmt.Println("Height:", height)
 
-		// Interactive edit
-		err = huh.NewText().
-			Title("Edit MCP Configuration (JSON)").
-			Description("Press enter to save, or Ctrl+C to cancel.").
-			Validate(func(v string) error {
-				if v == "" {
-					return errors.New("content cannot be empty")
-				}
-				// Validate JSON
-				var js map[string]interface{}
-				if err := json.Unmarshal([]byte(content), &js); err != nil {
-					return fmt.Errorf("invalid JSON content - %v", err)
-				}
-				return nil
-			}).
-			Value(&content).
-			WithHeight(height).
-			Run()
+		// Bugfix:
+		// huh.NewText() only support 90 newlines, above that, it cannot add newlines
+		// so we must switch to editor to edit that file
+		if lineCount >= 80 {
+			editor := getPreferredEditor()
+			// Open in detected editor
+			cmdE := exec.Command(editor, configPath)
+			cmdE.Stdin = os.Stdin
+			cmdE.Stdout = os.Stdout
+			cmdE.Stderr = os.Stderr
 
-		if err != nil {
-			fmt.Println("Edit cancelled.")
+			fmt.Printf("Opening in %s...\n", editor)
+			if err := cmdE.Run(); err != nil {
+				service.Errorf("Editor failed: %v", err)
+				return
+			}
+			// Reload content
+			contentBytes, _ := os.ReadFile(configPath)
+			content = string(contentBytes)
+		} else {
+			// Interactive edit
+			form := huh.NewForm(
+				huh.NewGroup(
+					huh.NewText().
+						Title("Edit MCP Configuration (JSON)").
+						Description("The MCP (Model Context Protocol) enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.").
+						Validate(func(v string) error {
+							if v == "" {
+								return errors.New("content cannot be empty")
+							}
+							// Validate JSON
+							var js map[string]interface{}
+							if err := json.Unmarshal([]byte(v), &js); err != nil {
+								return fmt.Errorf("invalid JSON content - %v", err)
+							}
+							return nil
+						}).
+						Placeholder("{\"mcpServers\": {}}").
+						Value(&content).
+						WithHeight(height),
+				),
+			).WithKeyMap(GetHuhKeyMap())
+			err = form.Run()
+			if err != nil {
+				fmt.Println("Edit cancelled.")
+				return
+			}
+		}
+
+		// Validate JSON
+		var js map[string]interface{}
+		if err := json.Unmarshal([]byte(content), &js); err != nil {
+			service.Errorf("Invalid JSON content - %v", err)
 			return
 		}
 
+		// Make it pretty
+		var prettyJSON bytes.Buffer
+		content = strings.TrimSpace(content)
+		json.Indent(&prettyJSON, []byte(content), "", "  ")
+
 		// Save content
-		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
-			fmt.Printf("Error saving config file: %v\n", err)
+		if err := os.WriteFile(configPath, prettyJSON.Bytes(), 0644); err != nil {
+			service.Errorf("Error saving config file: %v", err)
 			return
 		}
 
