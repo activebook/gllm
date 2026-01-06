@@ -259,6 +259,9 @@ var agentAddCmd = &cobra.Command{
 					Description("The tools to use for agent responses").
 					Options(toolsOptions...).
 					Value(&tools),
+				huh.NewNote().
+					Title("Tips").
+					Description("Embedding tools are used to perform operations on the file system, execute commands.\nIf you want the agent to switch to different agent for different tasks automatically, toggle switch\\_agent tool."),
 			),
 		).Run()
 		if err != nil {
@@ -568,6 +571,9 @@ var agentSetCmd = &cobra.Command{
 					Description("The tools to use for agent responses").
 					Options(toolsOptions...).
 					Value(&tools),
+				huh.NewNote().
+					Title("Tips").
+					Description("Embedding tools are used to perform operations on the file system, execute commands.\nIf you want the agent to switch to different agent for different tasks automatically, toggle switch\\_agent tool."),
 			),
 		).Run()
 		if err != nil {

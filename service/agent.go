@@ -286,7 +286,6 @@ func CallAgent(op *AgentOptions) error {
 		case ModelProviderOpenAI:
 			// Used for OpenAI compatible models
 			if err := ag.GenerateOpenAIStream(); err != nil {
-				// TODO: use error to signal?? weird
 				// Send error through channel instead of returning
 				if IsSwitchAgentError(err) {
 					notifyCh <- StreamNotify{Status: StatusSwitchAgent, Data: err.(*SwitchAgentError).TargetAgent}
@@ -305,7 +304,6 @@ func CallAgent(op *AgentOptions) error {
 			}
 		case ModelProviderAnthropic:
 			if err := ag.GenerateAnthropicStream(); err != nil {
-				// TODO: use error to signal?? weird
 				// Send error through channel instead of returning
 				if IsSwitchAgentError(err) {
 					notifyCh <- StreamNotify{Status: StatusSwitchAgent, Data: err.(*SwitchAgentError).TargetAgent}

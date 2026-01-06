@@ -1366,7 +1366,6 @@ func (op *OpenProcessor) OpenAISaveMemoryToolCall(toolCall openai.ToolCall, args
 	}, nil
 }
 
-// TODO: where is the OpenChatSwitchAgentToolCall? and why here don't use error to check?
 func (op *OpenProcessor) OpenAISwitchAgentToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := switchAgentToolCallImpl(argsMap)
 	if err != nil {

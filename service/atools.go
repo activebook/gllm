@@ -232,7 +232,6 @@ func (op *OpenProcessor) AnthropicMCPToolCall(toolCall anthropic.ToolUseBlockPar
 	return anthropic.NewUserMessage(toolResult), nil
 }
 
-// TODO: use error to do it? weird!
 func (op *OpenProcessor) AnthropicSwitchAgentToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
 	response, err := switchAgentToolCallImpl(argsMap)
 	isError := err != nil
