@@ -278,7 +278,7 @@ func CallAgent(op *AgentOptions) error {
 			if err := ag.GenerateOpenChatStream(); err != nil {
 				// Send error through channel instead of returning
 				if IsSwitchAgentError(err) {
-					notifyCh <- StreamNotify{Status: StatusSwitchAgent, Data: err.(*SwitchAgentError).TargetAgent}
+					notifyCh <- StreamNotify{Status: StatusSwitchAgent, Extra: err}
 				} else {
 					notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 				}
@@ -288,7 +288,7 @@ func CallAgent(op *AgentOptions) error {
 			if err := ag.GenerateOpenAIStream(); err != nil {
 				// Send error through channel instead of returning
 				if IsSwitchAgentError(err) {
-					notifyCh <- StreamNotify{Status: StatusSwitchAgent, Data: err.(*SwitchAgentError).TargetAgent}
+					notifyCh <- StreamNotify{Status: StatusSwitchAgent, Extra: err}
 				} else {
 					notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 				}
@@ -297,7 +297,7 @@ func CallAgent(op *AgentOptions) error {
 			if err := ag.GenerateGemini2Stream(); err != nil {
 				// Send error through channel instead of returning
 				if IsSwitchAgentError(err) {
-					notifyCh <- StreamNotify{Status: StatusSwitchAgent, Data: err.(*SwitchAgentError).TargetAgent}
+					notifyCh <- StreamNotify{Status: StatusSwitchAgent, Extra: err}
 				} else {
 					notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 				}
@@ -306,7 +306,7 @@ func CallAgent(op *AgentOptions) error {
 			if err := ag.GenerateAnthropicStream(); err != nil {
 				// Send error through channel instead of returning
 				if IsSwitchAgentError(err) {
-					notifyCh <- StreamNotify{Status: StatusSwitchAgent, Data: err.(*SwitchAgentError).TargetAgent}
+					notifyCh <- StreamNotify{Status: StatusSwitchAgent, Extra: err}
 				} else {
 					notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 				}
@@ -391,7 +391,9 @@ func CallAgent(op *AgentOptions) error {
 				// Switch agent signal, pop up
 				ag.StopIndicator()
 				ag.WriteEnd()
-				return &SwitchAgentError{TargetAgent: notify.Data}
+				// Convert notify.Extra to SwitchAgentError
+				switchErr := notify.Extra.(*SwitchAgentError)
+				return switchErr
 			case StatusFinished:
 				ag.StopIndicator()
 				// Render the markdown

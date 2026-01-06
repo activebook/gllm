@@ -22,7 +22,8 @@ const (
 
 type StreamNotify struct {
 	Status StreamStatus
-	Data   string // For text content or error messages
+	Data   string      // For text content or error messages
+	Extra  interface{} // For additional metadata (e.g., switch instruction)
 }
 
 // StateStack is a stack data structure for managing states.
