@@ -8,7 +8,7 @@ const (
 	// Model types
 	ModelProviderGemini           string = "gemini" // for google gemini models
 	ModelProviderOpenAI           string = "openai"
-	ModelProviderOpenAICompatible string = "openchat"
+	ModelProviderOpenAICompatible string = "openai-compatible"
 	ModelProviderAnthropic        string = "anthropic" // for anthropic models (official sdk)
 	ModelProviderUnknown          string = "unknown"
 )

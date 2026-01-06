@@ -21,8 +21,8 @@
 - **Model Context Protocol (MCP) Support**: Connect to external MCP servers to access additional tools and data sources.
 - **Token Usage Tracking**: Monitor your token consumption.
 - **Configuration Management**: Easily manage models, templates, system prompts, and search engines.
-- **Agent Management**: Create, configure, and switch between different AI assistant profiles with custom models, tools, and settings.
 - **Memory Management**: Remember important facts about you across sessions for personalized responses.
+- **Context-Aware Agent Switching**: Agents can hand off tasks to other specialized agents with full context and instructions across different LLM providers.
 - **@ Reference Support**: Reference files and directories directly in prompts using @ syntax for seamless context inclusion.
 - **Version Control**: Easily track and update your `gllm` setup.
 
@@ -351,7 +351,8 @@ gllm agent set coder --model gpt-4
 
 - `gllm agent add <name>` - Create a new agent
 - `gllm agent list` - List all agents
-- `gllm agent switch <name>` - Switch to an agent
+- `gllm agent switch <name>` - Manual switch to an agent
+- `switch_agent` tool - Autonomous handover between agents with context-aware "briefing" instructions.
 - `gllm agent info <name>` - Show agent details
 - `gllm agent set <name>` - Update an agent
 - `gllm agent remove <name>` - Delete an agent

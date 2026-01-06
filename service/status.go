@@ -17,11 +17,13 @@ const (
 	StatusFunctionCallingOver              // 9
 	StatusDiffConfirm                      // 10
 	StatusDiffConfirmOver                  // 11
+	StatusSwitchAgent                      // 12
 )
 
 type StreamNotify struct {
 	Status StreamStatus
-	Data   string // For text content or error messages
+	Data   string      // For text content or error messages
+	Extra  interface{} // For additional metadata (e.g., switch instruction)
 }
 
 // StateStack is a stack data structure for managing states.

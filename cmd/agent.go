@@ -259,6 +259,9 @@ var agentAddCmd = &cobra.Command{
 					Description("The tools to use for agent responses").
 					Options(toolsOptions...).
 					Value(&tools),
+				huh.NewNote().
+					Title("Tips").
+					Description("Embedding tools are used to perform operations on the file system, execute commands.\nIf you want the agent to switch to different agent for different tasks automatically, toggle switch\\_agent tool."),
 			),
 		).Run()
 		if err != nil {
@@ -568,6 +571,9 @@ var agentSetCmd = &cobra.Command{
 					Description("The tools to use for agent responses").
 					Options(toolsOptions...).
 					Value(&tools),
+				huh.NewNote().
+					Title("Tips").
+					Description("Embedding tools are used to perform operations on the file system, execute commands.\nIf you want the agent to switch to different agent for different tasks automatically, toggle switch\\_agent tool."),
 			),
 		).Run()
 		if err != nil {
@@ -648,6 +654,13 @@ var agentSetCmd = &cobra.Command{
 				markdownEnabled = true
 			}
 		}
+
+		// Bugfix:
+		// We set None options as " " in the form, so we need to trim them
+		// Why set " " in the form: huh has a bug, without space, the sort doesn't work
+		template = strings.TrimSpace(template)
+		sysPrompt = strings.TrimSpace(sysPrompt)
+		search = strings.TrimSpace(search)
 
 		agentConfig := &data.AgentConfig{
 			Name:          name,
@@ -872,22 +885,24 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 	store := data.NewConfigStore()
 	if agent.SystemPrompt != "" {
 		resolvedSysPrompt := store.GetSystemPrompt(agent.SystemPrompt)
-		if len(resolvedSysPrompt) > 50 {
-			fmt.Printf("%sSystem Prompt: %s...\n", spaceholder, resolvedSysPrompt[:47])
-		} else {
-			fmt.Printf("%sSystem Prompt: %s\n", spaceholder, resolvedSysPrompt)
-		}
+		// if len(resolvedSysPrompt) > 50 {
+		// 	fmt.Printf("%sSystem Prompt: %s...\n", spaceholder, resolvedSysPrompt[:47])
+		// } else {
+		// 	fmt.Printf("%sSystem Prompt: %s\n", spaceholder, resolvedSysPrompt)
+		// }
+		fmt.Printf("%sSystem Prompt: %s\n", spaceholder, resolvedSysPrompt)
 	} else {
 		fmt.Printf("%sSystem Prompt: \n", spaceholder)
 	}
 
 	if agent.Template != "" {
 		resolvedTemplate := store.GetTemplate(agent.Template)
-		if len(resolvedTemplate) > 50 {
-			fmt.Printf("%sTemplate: %s...\n", spaceholder, resolvedTemplate[:47])
-		} else {
-			fmt.Printf("%sTemplate: %s\n", spaceholder, resolvedTemplate)
-		}
+		// if len(resolvedTemplate) > 50 {
+		// 	fmt.Printf("%sTemplate: %s...\n", spaceholder, resolvedTemplate[:47])
+		// } else {
+		// 	fmt.Printf("%sTemplate: %s\n", spaceholder, resolvedTemplate)
+		// }
+		fmt.Printf("%sTemplate: %s\n", spaceholder, resolvedTemplate)
 	} else {
 		fmt.Printf("%sTemplate: \n", spaceholder)
 	}

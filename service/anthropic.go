@@ -98,6 +98,10 @@ func (ag *Agent) GenerateAnthropicStream() error {
 	// Process
 	err = chat.process(ag)
 	if err != nil {
+		// Switch agent signal, pop up
+		if IsSwitchAgentError(err) {
+			return err
+		}
 		return fmt.Errorf("error processing chat: %v", err)
 	}
 
@@ -193,6 +197,13 @@ func (a *Anthropic) process(ag *Agent) error {
 				// Execute tool
 				toolMsg, err := a.processToolCall(tc)
 				if err != nil {
+					// Switch agent signal, pop up
+					if IsSwitchAgentError(err) {
+						// Bugfix: left an "orphan" tool_call that had no matching tool result.
+						// Add tool message to conversation to fix this.
+						ag.Convo.Push(toolMsg)
+						return err
+					}
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Tool call failed: %v", err)}, nil)
 				}
 				ag.Convo.Push(toolMsg)
@@ -420,6 +431,7 @@ func (a *Anthropic) processToolCall(toolCall anthropic.ToolUseBlockParam) (anthr
 		"read_multiple_files": a.op.AnthropicReadMultipleFilesToolCall,
 		"list_memory":         a.op.AnthropicListMemoryToolCall,
 		"save_memory":         a.op.AnthropicSaveMemoryToolCall,
+		"switch_agent":        a.op.AnthropicSwitchAgentToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Name]; ok {

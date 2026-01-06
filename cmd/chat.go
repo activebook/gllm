@@ -9,6 +9,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -21,7 +22,7 @@ var chatCmd = &cobra.Command{
 	Long: `Start an interactive chat session with the configured LLM.
 This provides a Read-Eval-Print-Loop (REPL) interface where you can
 have a continuous conversation with the model.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// Create an indeterminate progress bar
 		indicator := service.NewIndicator("Processing...")
 
@@ -31,53 +32,41 @@ have a continuous conversation with the model.`,
 		// If conversation flag is not provided, generate a new conversation name
 		if !cmd.Flags().Changed("conversation") {
 			convoName = GenerateChatFileName()
+		} else {
+			// Bugfix: When convoName is an index number, and use it to find convo file
+			// it will return the convo file(sorted by modified time)
+			// but if user mannually update other convo file, the modified time will change
+			// so the next time using index to load convo file, would load the wrong one
+			// How to fix:
+			// First, we need convert convoName
+			// And, keep that name, the next time, it willn't use the index to load convo file
+			name, err := service.FindConvosByIndex(convoName)
+			if err != nil {
+				return fmt.Errorf("error finding conversation: %v\n", err)
+			}
+			if name != "" {
+				convoName = name
+			}
 		}
 
 		// If agent flag is provided, update the default agent
 		if cmd.Flags().Changed("agent") {
 			if store.GetAgent(agentName) == nil {
-				service.Warnf("Agent %s does not exist", agentName)
-				return
+				return fmt.Errorf("agent %s does not exist", agentName)
 			}
 			store.SetActiveAgent(agentName)
 		}
 
-		// Get active agent
-		activeAgent := store.GetActiveAgent()
-		if activeAgent == nil {
-			service.Warnf("No active agent found")
-			return
-		}
-
-		files := []*service.FileData{}
-		// Start a goroutine for your actual LLM work
-		done := make(chan bool)
-		go func() {
-
-			// Process all prompt building
-			if cmd.Flags().Changed("attachment") {
-				// Process attachments
-				for _, attachment := range attachments {
-					fileData := processAttachment(attachment)
-					if fileData != nil {
-						files = append(files, fileData)
-					}
-				}
-			}
-			done <- true
-		}()
-		// Update the spinner until work is done
-		<-done
-		indicator.Stop()
-
 		// Build the ChatInfo object
-		chatInfo = buildChatInfo(activeAgent, files)
-		if chatInfo == nil {
-			return
+		chatInfo = &ChatInfo{
+			QuitFlag: false,
 		}
+
+		indicator.Stop()
 
 		// Start the REPL
 		chatInfo.startREPL()
+		return nil
 	},
 }
 
@@ -101,52 +90,10 @@ func init() {
 }
 
 type ChatInfo struct {
-	ModelProvider string
-	Files         []*service.FileData
-	ConvoMgr      service.ConversationManager
-	QuitFlag      bool   // for cmd /quit or /exit
-	EditorInput   string // for /e editor edit
-	outputFile    string
-}
-
-func buildChatInfo(agent *data.AgentConfig, files []*service.FileData) *ChatInfo {
-
-	// Bugfix:
-	// When convoName is an index number, and use it to find convo file
-	// it will return the convo file(sorted by modified time)
-	// but if user mannually update other convo file, the modified time will change
-	// so the next time using index to load convo file, would load the wrong one
-	// How to fix:
-	// First, we need convert convoName
-	// And, keep that name, the next time, it willn't use the index to load convo file
-	name, _ := service.FindConvosByIndex(convoName)
-	if name != "" {
-		convoName = name
-	}
-
-	// Bugfix: Auto-detect provider if not set
-	// Legacy models don't have provider set
-	if agent.Model.Provider == "" {
-		service.Debugf("Auto-detecting provider for %s", agent.Model.Model)
-		agent.Model.Provider = service.DetectModelProvider(agent.Model.Endpoint, agent.Model.Model)
-	} else {
-		service.Debugf("Provider: [%s]", agent.Model.Provider)
-	}
-
-	// Construct conversation manager
-	cm, err := service.ConstructConversationManager(convoName, agent.Model.Provider)
-	if err != nil {
-		service.Errorf("Error constructing conversation manager: %v\n", err)
-		return nil
-	}
-
-	ci := ChatInfo{
-		ModelProvider: agent.Model.Provider,
-		Files:         files,
-		ConvoMgr:      cm,
-		QuitFlag:      false,
-	}
-	return &ci
+	Files       []*service.FileData
+	QuitFlag    bool   // for cmd /quit or /exit
+	EditorInput string // for /e editor edit
+	outputFile  string
 }
 
 func (ci *ChatInfo) printWelcome() {
@@ -286,94 +233,84 @@ func (ci *ChatInfo) startWithLocalCommand(line string) bool {
 	return strings.HasPrefix(line, "!")
 }
 
-func (ci *ChatInfo) callAgent(input string) {
-	yolo := false
-	if yoloFlag {
-		yolo = true
-	}
-
-	// Get ActiveAgent
-	store := data.NewConfigStore()
-	agent := store.GetActiveAgent()
-	if agent == nil {
-		service.Warnf("No active agent found")
-		return
-	}
-
-	tb := TextBuilder{}
-
-	// Get template content
-	templateContent := store.GetTemplate(agent.Template)
-	tb.appendText(templateContent)
-	tb.appendText(input)
-
-	//Process @ references in prompt
-	prompt := tb.String()
-	atRefProcessor := service.NewAtRefProcessor()
-	processedPrompt, err := atRefProcessor.ProcessText(prompt)
+// clearContext clears the conversation context
+func (ci *ChatInfo) clearContext() {
+	agent, err := EnsureActiveAgent()
 	if err != nil {
-		service.Warnf("Error processing @ references in prompt: %v", err)
-		// Continue with original prompt if processing fails
-		processedPrompt = prompt
-	}
-
-	// Get system prompt
-	sys_prompt := store.GetSystemPrompt(agent.SystemPrompt)
-
-	// Get memory content
-	memStore := data.NewMemoryStore()
-	memoryContent := memStore.GetFormatted()
-	if memoryContent != "" {
-		sys_prompt += "\n\n" + memoryContent
-	}
-
-	// Load MCP config
-	mcpStore := data.NewMCPStore()
-	mcpConfig, _, _ := mcpStore.Load()
-
-	// Check whether model is valid
-	if agent.Model.Name == "" {
-		service.Errorf("No model specified")
+		service.Errorf("%v", err)
 		return
-	} else {
-		model := store.GetModel(agent.Model.Name)
-		if model == nil {
-			service.Errorf("Model %s not found", agent.Model.Name)
-			return
-		}
 	}
-
-	// Call agent
-	op := service.AgentOptions{
-		Prompt:         processedPrompt,
-		SysPrompt:      sys_prompt,
-		Files:          ci.Files,
-		ModelInfo:      &agent.Model,
-		SearchEngine:   &agent.Search,
-		MaxRecursions:  agent.MaxRecursions,
-		ThinkingLevel:  agent.Think,
-		EnabledTools:   agent.Tools,
-		UseMCP:         agent.MCP,
-		YoloMode:       yolo,
-		AppendUsage:    agent.Usage,
-		AppendMarkdown: agent.Markdown,
-		OutputFile:     ci.outputFile,
-		QuietMode:      false,
-		ConvoName:      convoName,
-		MCPConfig:      mcpConfig,
+	// Construct conversation manager
+	cm, err := service.ConstructConversationManager(convoName, agent.Model.Provider)
+	if err != nil {
+		service.Errorf("Error constructing conversation manager: %v\n", err)
+		return
 	}
+	// Clear conversation history
+	err = cm.Clear()
+	if err != nil {
+		service.Errorf("Error clearing context: %v\n", err)
+		return
+	}
+	// Empty attachments
+	ci.Files = []*service.FileData{}
+	fmt.Printf("Context cleared.\n")
+}
 
-	err = service.CallAgent(&op)
+// showHistory displays conversation history using TUI viewport
+func (ci *ChatInfo) showHistory() {
+	// Get active agent
+	agent, err := EnsureActiveAgent()
 	if err != nil {
 		service.Errorf("%v", err)
 		return
 	}
 
-	// We must reset the files after processing
-	// We shouldn't pass the files to the next call each time
-	// Because the files are already in the context of this conversation
-	// The same to system prompt and template
-	// We shouldn't pass the system prompt and template to the next call each time
+	// Get conversation data
+	convoData, convoName, err := GetConvoData(convoName, agent.Model.Provider)
+	if err != nil {
+		service.Errorf("%v", err)
+		return
+	}
+
+	// Detect provider based on message format
+	isCompatible, provider, modelProvider := CheckConvoFormat(agent, convoData)
+	if !isCompatible {
+		// Warn about potential incompatibility if providers differ
+		service.Warnf("Conversation '%s' [%s] is not compatible with the current model provider [%s].\n", convoName, provider, modelProvider)
+	}
+
+	// Render conversation log
+	var content string
+	switch provider {
+	case service.ModelProviderGemini:
+		content = service.RenderGeminiConversationLog(convoData)
+	case service.ModelProviderOpenAI, service.ModelProviderOpenAICompatible:
+		content = service.RenderOpenAIConversationLog(convoData)
+	case service.ModelProviderAnthropic:
+		content = service.RenderAnthropicConversationLog(convoData)
+	default:
+		fmt.Println("No available conversation yet.")
+		return
+	}
+
+	// Show viewport in full screen
+	m := NewViewportModel(provider, content, func() string {
+		return fmt.Sprintf("Conversation: %s", convoName)
+	})
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		service.Errorf("Error running viewport: %v", err)
+	}
+}
+
+func (ci *ChatInfo) callAgent(input string) {
+	// Call agent using the shared runner
+	err := RunAgent(input, ci.Files, convoName, yoloFlag, ci.outputFile)
+	if err != nil {
+		service.Errorf("%v", err)
+		return
+	}
 
 	// Reset the files after processing
 	ci.Files = []*service.FileData{}

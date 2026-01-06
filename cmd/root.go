@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os" // Import filepath
 	"strings"
-	"sync"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
@@ -107,6 +106,22 @@ Configure your API keys and preferred models, then start chatting or executing c
 				prompt = readStdin()
 			}
 
+			// Create an indeterminate progress bar
+			indicator := service.NewIndicator("Processing...")
+
+			// If conversation flag is provided, find the conversation file
+			if cmd.Flags().Changed("conversation") {
+				// Bugfix: When convoName is an index number, and use it to find convo file
+				name, err := service.FindConvosByIndex(convoName)
+				if err != nil {
+					service.Errorf("error finding conversation: %v\n", err)
+					return
+				}
+				if name != "" {
+					convoName = name
+				}
+			}
+
 			store := data.NewConfigStore()
 			// If agent flag is provided, update the default agent
 			if cmd.Flags().Changed("agent") {
@@ -124,178 +139,23 @@ Configure your API keys and preferred models, then start chatting or executing c
 				return
 			}
 
-			// Create an indeterminate progress bar
-			indicator := service.NewIndicator("Processing...")
-
+			// Process all prompt building
 			var files []*service.FileData
-			// Start a goroutine for your actual LLM work
-			done := make(chan bool)
-			go func() {
-				// Process all prompt building
-				isThereAttachment := cmd.Flags().Changed("attachment")
-				prompt, files = buildPrompt(activeAgent, prompt, isThereAttachment)
-				done <- true
-			}()
-			// Update the spinner until work is done
-			<-done
+			if cmd.Flags().Changed("attachment") {
+				files = BatchAttachments(attachments)
+			}
+
 			indicator.Stop()
 
 			// Call your LLM service here
-			processQuery(prompt, files)
+			err := RunAgent(prompt, files, convoName, yoloFlag, "")
+			if err != nil {
+				service.Errorf("%v", err)
+				return
+			}
 		},
 	}
 )
-
-// Processes a single attachment (file or stdin marker)
-func processAttachment(path string) *service.FileData {
-	// Handle stdin or regular file
-	data, err := readContentFromPath(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading file[%s]: %v\n", path, err)
-		return nil
-	}
-
-	// Check if content is an image
-	isImage, format, err := service.CheckIfImageFromBytes(data)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error checking content type: %v\n", err)
-		return nil
-	}
-
-	// If not an image, try to get MIME type from file extension
-	if !isImage {
-		format = service.GetMIMEType(path)
-		if service.IsUnknownMIMEType(format) {
-			// try to guess MIME type by content
-			format = service.GetMIMETypeByContent(data)
-		}
-	}
-	return service.NewFileData(format, data, path)
-}
-
-// batchAttachments processes multiple attachments concurrently and adds the resulting
-// FileData objects to the provided files slice. It uses a WaitGroup to manage goroutines
-// and a channel to collect results safely.
-func batchAttachments(files *[]*service.FileData) {
-	var wg sync.WaitGroup
-	filesCh := make(chan *service.FileData, len(attachments))
-	for _, attachment := range attachments {
-		wg.Add(1)
-		go func(att string) {
-			defer wg.Done()
-			fileData := processAttachment(att)
-			if fileData != nil {
-				filesCh <- fileData
-			}
-		}(attachment)
-	}
-	wg.Wait()
-	close(filesCh)
-	for fileData := range filesCh {
-		*files = append(*files, fileData)
-	}
-}
-
-func buildPrompt(agent *data.AgentConfig, prompt string, isThereAttachment bool) (string, []*service.FileData) {
-	tb := TextBuilder{}
-	files := []*service.FileData{}
-
-	// Get template content
-	store := data.NewConfigStore()
-	templateContent := store.GetTemplate(agent.Template)
-	tb.appendText(templateContent)
-	tb.appendText(prompt)
-
-	if isThereAttachment {
-		// Process attachments
-		batchAttachments(&files)
-	} else {
-		// No attachments specified, try stdin
-		stdinContent := readStdin()
-		if len(stdinContent) > 0 {
-			tb.appendText(stdinContent)
-		}
-	}
-
-	// Process @ references in prompt
-	finalPrompt := tb.String()
-	atRefProcessor := service.NewAtRefProcessor()
-	processedPrompt, err := atRefProcessor.ProcessText(finalPrompt)
-	if err != nil {
-		service.Warnf("Error processing @ references in prompt: %v", err)
-		// Continue with original prompt if processing fails
-		processedPrompt = finalPrompt
-	}
-
-	return processedPrompt, files
-}
-
-func processQuery(prompt string, files []*service.FileData) {
-	// Get Active Agent
-	store := data.NewConfigStore()
-	activeAgent := store.GetActiveAgent()
-	if activeAgent == nil {
-		service.Errorf("No active agent found")
-		return
-	}
-
-	// Yolo mode(non-interactive mode)
-	yolo := false
-	if yoloFlag {
-		yolo = true
-	}
-
-	// Get system prompt
-	sys_prompt := store.GetSystemPrompt(activeAgent.SystemPrompt)
-
-	// Get memory content
-	memStore := data.NewMemoryStore()
-	memoryContent := memStore.GetFormatted()
-	if memoryContent != "" {
-		sys_prompt += "\n\n" + memoryContent
-	}
-
-	// Load MCP config
-	mcpStore := data.NewMCPStore()
-	mcpConfig, _, _ := mcpStore.Load()
-
-	// Check whether model is valid
-	if activeAgent.Model.Name == "" {
-		service.Errorf("No model specified")
-		return
-	} else {
-		model := store.GetModel(activeAgent.Model.Name)
-		if model == nil {
-			service.Errorf("Model %s not found", activeAgent.Model.Name)
-			return
-		}
-	}
-
-	// Call your LLM service here
-	op := service.AgentOptions{
-		Prompt:         prompt,
-		SysPrompt:      sys_prompt,
-		Files:          files,
-		ModelInfo:      &activeAgent.Model,
-		SearchEngine:   &activeAgent.Search,
-		MaxRecursions:  activeAgent.MaxRecursions,
-		ThinkingLevel:  activeAgent.Think,
-		EnabledTools:   activeAgent.Tools,
-		UseMCP:         activeAgent.MCP,
-		YoloMode:       yolo,
-		AppendUsage:    activeAgent.Usage,
-		AppendMarkdown: activeAgent.Markdown,
-		OutputFile:     "",
-		QuietMode:      false,
-		ConvoName:      convoName,
-		MCPConfig:      mcpConfig,
-	}
-	err := service.CallAgent(&op)
-	if err != nil {
-		service.Errorf("%v", err)
-		return
-	}
-}
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.

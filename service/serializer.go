@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/anthropics/anthropic-sdk-go"
+	anthropic "github.com/anthropics/anthropic-sdk-go"
+	openai "github.com/sashabaranov/go-openai"
+	gemini "google.golang.org/genai"
 )
 
 var (
@@ -38,85 +40,88 @@ func init() {
 	}
 }
 
-// Gemini message format
-type GeminiMessage struct {
-	Role  string       `json:"role"` // user, model
-	Parts []GeminiPart `json:"parts"`
+// Detects if a message is definitely an OpenAI message
+func DetectOpenAIKeyMessage(msg *openai.ChatCompletionMessage) bool {
+	if msg.Role == "" {
+		return false
+	}
+	// SystemRole is unique to OpenAI
+	if msg.Role == openai.ChatMessageRoleSystem {
+		return true
+	}
+	// ReasoningContent is unique to OpenAI
+	if msg.ReasoningContent != "" {
+		return true
+	}
+	// ToolCallID is unique to OpenAI
+	if msg.ToolCallID != "" {
+		return true
+	}
+	// ToolCalls is unique to OpenAI
+	if len(msg.ToolCalls) > 0 {
+		return true
+	}
+	// ImageURL is unique to OpenAI
+	if len(msg.MultiContent) > 0 {
+		for _, content := range msg.MultiContent {
+			if content.ImageURL != nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
-type GeminiPart struct {
-	Type             string                  `json:"type"` // text, function_call, function_response, image, file_data, etc.
-	Text             string                  `json:"text,omitempty"`
-	Thought          bool                    `json:"thought,omitempty"`          // for reasoning
-	Name             string                  `json:"name,omitempty"`             // for function calls
-	Args             map[string]interface{}  `json:"args,omitempty"`             // for function calls
-	InlineData       *GeminiInlineData       `json:"inlineData,omitempty"`       // for inline images
-	FunctionCall     *GeminiFunctionCall     `json:"functionCall,omitempty"`     // for function responses
-	FunctionResponse *GeminiFunctionResponse `json:"functionResponse,omitempty"` // for function responses
+// Detects if a message is definitely a Gemini message
+func DetectGeminiKeyMessage(msg *gemini.Content) bool {
+	if msg.Role == "" {
+		return false
+	}
+	// RoleModel is unique to Gemini
+	if msg.Role == gemini.RoleModel {
+		return true
+	}
+	// Parts is unique to Gemini
+	if len(msg.Parts) > 0 {
+		return true
+	}
+	return false
 }
 
-type GeminiFunctionCall struct {
-	Name      string                 `json:"name,omitempty"`
-	Arguments map[string]interface{} `json:"args,omitempty"` // JSON string
+// Detects if a message is definitely an Anthropic message
+func DetectAnthropicKeyMessage(msg *anthropic.MessageParam) bool {
+	if msg.Role == "" {
+		return false
+	}
+	for _, block := range msg.Content {
+		if v := block.OfText; v != nil {
+			// For pure text content, Anthropic and OpenAI multimodal messages have identical JSON structure
+			// So we need to check for other fields to determine if it's Anthropic
+			continue
+		} else if v := block.OfImage; v != nil {
+			return true
+		} else if v := block.OfDocument; v != nil {
+			return true
+		} else if v := block.OfToolResult; v != nil {
+			return true
+		} else if v := block.OfToolUse; v != nil {
+			return true
+		} else if v := block.OfThinking; v != nil {
+			return true
+		} else if v := block.OfRedactedThinking; v != nil {
+			return true
+		}
+	}
+	return false
 }
 
-type GeminiFunctionResponse struct {
-	Name     string                 `json:"name,omitempty"`
-	Response map[string]interface{} `json:"response,omitempty"` // JSON string
-}
-
-type GeminiInlineData struct {
-	MimeType string `json:"mimeType,omitempty"`
-	Data     string `json:"data,omitempty"`
-}
-
-// OpenAI message format with enhanced support for function calls and files
-type OpenAIMessage struct {
-	Role          string `json:"role"`    // system, user, assistant
-	Content       string `json:"content"` // can be string or array for multimodal content
-	MultiContent  []OpenAIContentItem
-	ReasonContent string              `json:"reasoning_content,omitempty"`
-	Name          string              `json:"name,omitempty"`
-	FunctionCall  *OpenAIFunctionCall `json:"function_call,omitempty"`
-	ToolCalls     []OpenAIToolCall    `json:"tool_calls,omitempty"`
-	ToolCallId    string              `json:"tool_call_id,omitempty"` // For function response
-}
-
-type OpenAIFunctionCall struct {
-	Name      string `json:"name"`
-	Arguments string `json:"arguments"` // JSON string
-}
-
-type OpenAIToolCall struct {
-	Id       string             `json:"id"`
-	Type     string             `json:"type"` // typically "function"
-	Function OpenAIFunctionCall `json:"function"`
-}
-
-// OpenAI content item for multimodal messages
-type OpenAIContentItem struct {
-	Type     string          `json:"type"` // text, image_url, etc.
-	Text     string          `json:"text,omitempty"`
-	ImageUrl *OpenAIImageURL `json:"image_url,omitempty"`
-}
-
-type OpenAIImageURL struct {
-	Url string `json:"url"` // Can be data URL or HTTP URL
-}
-
-// Anthropic message format
-type AnthropicMessage struct {
-	Role    string                  `json:"role"`
-	Content []AnthropicContentBlock `json:"content"`
-}
-
-type AnthropicContentBlock struct {
-	Type   string      `json:"type"` // text, tool_use, tool_result, thinking
-	Text   string      `json:"text,omitempty"`
-	Source interface{} `json:"source,omitempty"` // for image
-}
-
-// Detects the conversation provider based on message format
+/*
+ * Detects the conversation provider based on message format
+ * OpenAICompatible: OpenAI messages that are pure text content
+ * OpenAI: OpenAI messages that are unique to OpenAI
+ * Anthropic: Anthropic messages that are unique to Anthropic
+ * Gemini: Gemini messages that are unique to Gemini
+ */
 func DetectMessageProvider(data []byte) string {
 	// Try to unmarshal as array of messages
 	var messages []json.RawMessage
@@ -124,38 +129,75 @@ func DetectMessageProvider(data []byte) string {
 		return ModelProviderUnknown
 	}
 
+	provider := ModelProviderUnknown
 	if len(messages) == 0 {
-		return ModelProviderUnknown
-	}
-
-	// Try to detect OpenAI format (fallback)
-	var openaiMsg OpenAIMessage
-	if err := json.Unmarshal(messages[0], &openaiMsg); err == nil {
-		// OpenAI messages must have a role and content or multi-content
-		if openaiMsg.Role != "" && (openaiMsg.Content != "" || openaiMsg.MultiContent != nil) {
-			return ModelProviderOpenAI
-		}
+		return provider
 	}
 
 	// Try to detect Gemini format
-	var geminiMsg GeminiMessage
-	if err := json.Unmarshal(messages[0], &geminiMsg); err == nil {
-		// Gemini messages must have a role and parts array
-		if geminiMsg.Role != "" && len(geminiMsg.Parts) > 0 {
-			return ModelProviderGemini
+	var geminiMsg gemini.Content
+	for _, msg := range messages {
+		if err := json.Unmarshal(msg, &geminiMsg); err == nil {
+			// Gemini messages must have a role and parts array
+			// If parts length aren't 0, then it must be gemini
+			if DetectGeminiKeyMessage(&geminiMsg) {
+				provider = ModelProviderGemini
+				break
+			} else {
+				// The first message can detect gemini or not, if not, break
+				break
+			}
 		}
+	}
+	if provider != ModelProviderUnknown {
+		return provider
 	}
 
 	// Try to detect Anthropic format
-	var anthropicMsg AnthropicMessage
-	if err := json.Unmarshal(messages[0], &anthropicMsg); err == nil {
-		// Anthropic messages must have a role and content must be an array of blocks
-		if anthropicMsg.Role != "" && len(anthropicMsg.Content) > 0 {
-			return ModelProviderAnthropic
+	// Bugfix:
+	// The Anthropic SDK has a custom decoder that automatically handles string content by converting it to an array of content blocks.
+	// So we cannot rely on Content[] along to detect whether it's anthropic or not
+	// Because "content": "hi" would be converted Content[{"text":"hi"}] automatically
+	var anthropicMsg anthropic.MessageParam
+	for _, msg := range messages {
+		if err := json.Unmarshal(msg, &anthropicMsg); err == nil {
+			// For Anthropic messages, we must find the first key message
+			if DetectAnthropicKeyMessage(&anthropicMsg) {
+				provider = ModelProviderAnthropic
+				break
+			} else if anthropicMsg.Role != anthropic.MessageParamRoleUser && anthropicMsg.Role != anthropic.MessageParamRoleAssistant {
+				// If role is not user or assistant, it's not anthropic
+				// Remember: anthropic only has two roles, no system and tools
+				provider = ModelProviderUnknown
+				break
+			}
 		}
 	}
+	if provider != ModelProviderUnknown {
+		return provider
+	}
 
-	return ModelProviderUnknown
+	// Try to detect OpenAI format (fallback)
+	var openaiMsg openai.ChatCompletionMessage
+	for _, msg := range messages {
+		if err := json.Unmarshal(msg, &openaiMsg); err == nil {
+			// OpenAI messages must have a role
+			if DetectOpenAIKeyMessage(&openaiMsg) {
+				provider = ModelProviderOpenAI
+				break
+			} else if openaiMsg.Role != "" && (openaiMsg.Content != "" || len(openaiMsg.MultiContent) > 0) {
+				// If role exists, check whether it's pure text content
+				// If so, we can consider it OpenAICompatible (Pure text content)
+				provider = ModelProviderOpenAICompatible
+				// don't break, continue to check the next message
+			}
+		}
+	}
+	if provider != ModelProviderUnknown {
+		return provider
+	}
+
+	return provider
 }
 
 // styleEachRune applies color to each rune individually except newlines.
@@ -196,7 +238,7 @@ func indentText(text string, indent string) string {
 // RenderGeminiConversationLog returns a string summary of Gemini conversation
 func RenderGeminiConversationLog(data []byte) string {
 	var sb strings.Builder
-	var messages []GeminiMessage
+	var messages []gemini.Content
 	if err := json.Unmarshal(data, &messages); err != nil {
 		return fmt.Sprintf("Error parsing Gemini messages: %v\n", err)
 	}
@@ -220,7 +262,7 @@ func RenderGeminiConversationLog(data []byte) string {
 			case part.FunctionResponse != nil:
 				functionResponseCount++
 			case part.InlineData != nil:
-				mimeType := part.InlineData.MimeType
+				mimeType := part.InlineData.MIMEType
 				if strings.HasPrefix(mimeType, "image/") {
 					imageCount++
 				} else {
@@ -264,8 +306,8 @@ func RenderGeminiConversationLog(data []byte) string {
 					switch {
 					case part.FunctionCall != nil:
 						sb.WriteString(fmt.Sprintf("\n    %s[Function call: %s]%s", ContentTypeColors["function_call"], part.FunctionCall.Name, resetColor))
-						if len(part.FunctionCall.Arguments) > 0 {
-							argStr, _ := json.MarshalIndent(part.FunctionCall.Arguments, "    ", "  ")
+						if len(part.FunctionCall.Args) > 0 {
+							argStr, _ := json.MarshalIndent(part.FunctionCall.Args, "    ", "  ")
 							sb.WriteString(fmt.Sprintf("\n    args: %s", string(argStr)))
 						}
 					case part.FunctionResponse != nil:
@@ -273,7 +315,7 @@ func RenderGeminiConversationLog(data []byte) string {
 						respPreview, _ := json.MarshalIndent(part.FunctionResponse.Response, "    ", "  ")
 						sb.WriteString(fmt.Sprintf("\n    data: %s", string(respPreview)))
 					case part.InlineData != nil:
-						mimeType := part.InlineData.MimeType
+						mimeType := part.InlineData.MIMEType
 						if strings.HasPrefix(mimeType, "image/") {
 							sb.WriteString(fmt.Sprintf("\n    %s[Image content]%s", ContentTypeColors["image"], resetColor))
 						} else {
@@ -287,8 +329,6 @@ func RenderGeminiConversationLog(data []byte) string {
 						if part.Text != "" {
 							sb.WriteString("\n    ")
 							sb.WriteString(indentText(part.Text, "    "))
-						} else {
-							sb.WriteString(fmt.Sprintf("[%s content]", part.Type))
 						}
 					}
 				}
@@ -304,7 +344,7 @@ func RenderGeminiConversationLog(data []byte) string {
 // RenderOpenAIConversationLog returns a string summary of OpenAI conversation
 func RenderOpenAIConversationLog(data []byte) string {
 	var sb strings.Builder
-	var messages []OpenAIMessage
+	var messages []openai.ChatCompletionMessage
 	if err := json.Unmarshal(data, &messages); err != nil {
 		return fmt.Sprintf("Error parsing OpenAI messages: %v\n", err)
 	}
@@ -370,9 +410,9 @@ func RenderOpenAIConversationLog(data []byte) string {
 			sb.WriteString(": ")
 
 			// Output the reasoning content if it exists
-			if msg.ReasonContent != "" {
+			if msg.ReasoningContent != "" {
 				sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
-				sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(msg.ReasonContent, ContentTypeColors["reasoning_content"], "    ")))
+				sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(msg.ReasoningContent, ContentTypeColors["reasoning_content"], "    ")))
 				sb.WriteString(fmt.Sprintf("\n    %s✓%s\n", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 			}
 
@@ -382,19 +422,19 @@ func RenderOpenAIConversationLog(data []byte) string {
 			}
 
 			if len(msg.MultiContent) > 0 {
-				sb.WriteString("\n    [Multimodal content: ")
+				// sb.WriteString("\n    Multimodal content: ")
 				for j, item := range msg.MultiContent {
 					if j > 0 {
 						sb.WriteString(", ")
 					}
 					if item.Type == "text" {
-						sb.WriteString(fmt.Sprintf("\n    text (%s)", indentText(item.Text, "    ")))
+						sb.WriteString(fmt.Sprintf("\n    %s", indentText(item.Text, "    ")))
 					}
 					if item.Type == "image_url" {
 						sb.WriteString(fmt.Sprintf("\n    %simage%s", ContentTypeColors["image"], resetColor))
 					}
 				}
-				sb.WriteString("]")
+				// sb.WriteString("\n    ")
 			}
 
 			// Function call details
@@ -412,14 +452,14 @@ func RenderOpenAIConversationLog(data []byte) string {
 					if j > 0 {
 						sb.WriteString(", ")
 					}
-					sb.WriteString(fmt.Sprintf("%s (id: %s)", tool.Function.Name, tool.Id))
+					sb.WriteString(fmt.Sprintf("%s (id: %s)", tool.Function.Name, tool.ID))
 				}
 				sb.WriteString(fmt.Sprintf("]%s", resetColor))
 			}
 
 			// Tool response details
-			if msg.ToolCallId != "" {
-				sb.WriteString(fmt.Sprintf("\n    %s[Response to tool call: %s]%s", ContentTypeColors["function_response"], msg.ToolCallId, resetColor))
+			if msg.ToolCallID != "" {
+				sb.WriteString(fmt.Sprintf("\n    %s[Response to tool call: %s]%s", ContentTypeColors["function_response"], msg.ToolCallID, resetColor))
 			}
 
 			sb.WriteString("\n\n")

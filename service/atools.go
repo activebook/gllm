@@ -231,3 +231,23 @@ func (op *OpenProcessor) AnthropicMCPToolCall(toolCall anthropic.ToolUseBlockPar
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, output, isError)
 	return anthropic.NewUserMessage(toolResult), nil
 }
+
+func (op *OpenProcessor) AnthropicSwitchAgentToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
+	response, err := switchAgentToolCallImpl(argsMap)
+	isError := err != nil && !IsSwitchAgentError(err)
+	if err != nil && !IsSwitchAgentError(err) {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
+	toolMessage := anthropic.NewUserMessage(toolResult)
+
+	if err != nil {
+		if IsSwitchAgentError(err) {
+			return toolMessage, err
+		}
+		return toolMessage, err
+	}
+
+	return toolMessage, nil
+}

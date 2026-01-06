@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -1118,4 +1119,66 @@ func saveMemoryToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	// Count how many memories were saved
 	savedMemories, _ := store.Load()
 	return fmt.Sprintf("Successfully updated memories (%d items saved)", len(savedMemories)), nil
+}
+
+// switchAgentToolCallImpl handles the switch_agent tool call
+func switchAgentToolCallImpl(argsMap *map[string]interface{}) (string, error) {
+	name, ok := (*argsMap)["name"].(string)
+	if !ok {
+		return "", fmt.Errorf("agent name is required")
+	}
+
+	store := data.NewConfigStore()
+
+	// If name is "list", return available agents
+	if name == "list" {
+		agents := store.GetAllAgents()
+		var sb strings.Builder
+		sb.WriteString("Available Agents:\n")
+
+		var names []string
+		for n := range agents {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+
+		// List all agents with details
+		for _, n := range names {
+			ag := agents[n]
+			sb.WriteString(fmt.Sprintf("- %s: Model=%s, ThinkingLevel=%s, Template=%s, Tools=%v\n",
+				n, ag.Model.Model, ag.Think, ag.Template, ag.Tools))
+			if ag.SystemPrompt != "" {
+				// Show more of the system prompt to help the model decide
+				sysPrompt := strings.ReplaceAll(ag.SystemPrompt, "\n", " ")
+				sb.WriteString(fmt.Sprintf("  System Prompt: %s\n", sysPrompt))
+			}
+		}
+		sb.WriteString("\nTo switch to an agent, use this tool with the agent's name.")
+		return sb.String(), nil
+	}
+
+	// Check if agent exists
+	if store.GetAgent(name) == nil {
+		return fmt.Sprintf("Agent '%s' not found. Use 'list' to see available agents.", name), nil
+	}
+
+	// If already in this agent, just return message
+	if store.GetActiveAgentName() == name {
+		return fmt.Sprintf("You are already using agent '%s'. No need to switch.", name), nil
+	}
+
+	// Set active agent
+	err := store.SetActiveAgent(name)
+	if err != nil {
+		return fmt.Sprintf("Failed to set active agent: %v", err), nil
+	}
+
+	// Set instruction for new agent
+	var instruction string
+	if v, ok := (*argsMap)["instruction"].(string); ok {
+		instruction = v
+	}
+
+	// Signal to switch
+	return fmt.Sprintf("Switching to agent '%s'...", name), &SwitchAgentError{TargetAgent: name, Instruction: instruction}
 }

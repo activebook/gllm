@@ -136,7 +136,10 @@ func (ag *Agent) SortOpenChatMessagesByOrder() error {
 			}
 		}
 	}
-	history = append(history, userMessage)
+	// Add to history only if it's not empty
+	if ag.UserPrompt != "" || len(ag.Files) > 0 {
+		history = append(history, userMessage)
+	}
 
 	// Update the conversation with new messages
 	ag.Convo.SetMessages(history)
@@ -207,6 +210,10 @@ func (ag *Agent) GenerateOpenChatStream() error {
 	// Process the chat with recursive tool call handling
 	err = chat.process(ag)
 	if err != nil {
+		// Switch agent signal, pop up
+		if IsSwitchAgentError(err) {
+			return err
+		}
 		return fmt.Errorf("error processing chat: %v", err)
 	}
 	return nil
@@ -317,6 +324,13 @@ func (c *OpenChat) process(ag *Agent) error {
 			for _, toolCall := range *toolCalls {
 				toolMessage, err := c.processToolCall(toolCall)
 				if err != nil {
+					// Switch agent signal, pop up
+					if IsSwitchAgentError(err) {
+						// Bugfix: left an "orphan" tool_call that had no matching tool result.
+						// Add tool message to conversation to fix this.
+						ag.Convo.Push(toolMessage)
+						return err
+					}
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
 					// IMPORTANT: Still add an error response message to maintain conversation integrity
 					// The API requires every tool_call to have a corresponding tool response
@@ -571,6 +585,7 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		"read_multiple_files": c.op.OpenChatReadMultipleFilesToolCall,
 		"list_memory":         c.op.OpenChatListMemoryToolCall,
 		"save_memory":         c.op.OpenChatSaveMemoryToolCall,
+		"switch_agent":        c.op.OpenChatSwitchAgentToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {

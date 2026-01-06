@@ -71,6 +71,9 @@ var toolsSwCmd = &cobra.Command{
 					Description("Choose which tools to enable for this agent. Press space to toggle, enter to confirm.").
 					Options(options...).
 					Value(&selectedTools),
+				huh.NewNote().
+					Title("Tips").
+					Description("Embedding tools are used to perform operations on the file system, execute commands.\nIf you want the agent to switch to different agent for different tasks automatically, toggle switch\\_agent tool."),
 			),
 		).Run()
 

@@ -626,25 +626,6 @@ func getBool(m map[string]interface{}, key string) bool {
 	return false
 }
 
-// getThinkingLevel extracts the thinking level from a config map.
-// Supports backward compatibility with old boolean format (true -> "high", false -> "off").
-func getThinkingLevel(m map[string]interface{}, key string) string {
-	val := m[key]
-	switch v := val.(type) {
-	case string:
-		// New string format: off, low, medium, high
-		return v
-	case bool:
-		// Old boolean format for backward compatibility
-		if v {
-			return "high"
-		}
-		return "off"
-	default:
-		return "off"
-	}
-}
-
 func getInt(m map[string]interface{}, key string, defaultVal int) int {
 	switch v := m[key].(type) {
 	case int:
