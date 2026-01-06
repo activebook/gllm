@@ -822,13 +822,20 @@ Use this tool when:
 4. Check agents' system prompt, tools, capabilities and thinking level for better usage if possible.
 (e.g., switching to a 'Coder' agent for programming tasks, to a 'Researcher' agent for research tasks, to a 'Writer' agent for writing tasks, etc.)
 
-IMPORTANT: This function is highly powerful. Pass 'list' as the name to see all available agents and their capabilities before switching.`,
+IMPORTANT: This function is highly powerful.
+Pass 'list' as the name to see all available agents and their capabilities before switching.
+When a switch occurs, if an instruction is provided, it replaces the original prompt for the next agent's execution. This essentially "briefs" the new agent on what to do next, preserving context.
+`,
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"name": map[string]interface{}{
 					"type":        "string",
 					"description": "The name of the agent to switch to, or 'list' to see available agents.",
+				},
+				"instruction": map[string]interface{}{
+					"type":        "string",
+					"description": "Optional context or instruction to pass to the new agent. This helps the new agent understand the task and current state.",
 				},
 			},
 			"required": []string{"name"},

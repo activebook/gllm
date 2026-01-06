@@ -9,9 +9,13 @@ import (
 
 type SwitchAgentError struct {
 	TargetAgent string
+	Instruction string
 }
 
 func (e *SwitchAgentError) Error() string {
+	if e.Instruction != "" {
+		return fmt.Sprintf("switching to agent: %s with instruction: %s", e.TargetAgent, e.Instruction)
+	}
 	return fmt.Sprintf("switching to agent: %s", e.TargetAgent)
 }
 

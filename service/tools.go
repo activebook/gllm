@@ -1168,6 +1168,12 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 		return fmt.Sprintf("Failed to set active agent: %v", err), nil
 	}
 
+	// Set instruction for new agent
+	var instruction string
+	if v, ok := (*argsMap)["instruction"].(string); ok {
+		instruction = v
+	}
+
 	// Signal to switch
-	return fmt.Sprintf("Switching to agent '%s'...", name), &SwitchAgentError{TargetAgent: name}
+	return fmt.Sprintf("Switching to agent '%s'...", name), &SwitchAgentError{TargetAgent: name, Instruction: instruction}
 }

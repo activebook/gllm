@@ -104,6 +104,11 @@ func RunAgent(prompt string, files []*service.FileData, convoName string, yolo b
 			if service.IsSwitchAgentError(err) {
 				switchErr := err.(*service.SwitchAgentError)
 				service.Infof("Switching agent to %s...", switchErr.TargetAgent)
+				// Set instruction, shouldn't use the old prompt
+				prompt = switchErr.Instruction
+				service.Debugf("Switch agent instruction: %s", prompt)
+				// Clearup files
+				files = nil
 				continue
 			}
 			return err
