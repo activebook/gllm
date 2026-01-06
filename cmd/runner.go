@@ -41,63 +41,75 @@ func EnsureActiveAgent() (*data.AgentConfig, error) {
 
 // RunAgent executes the agent with the given parameters, handling all setup and compatibility checks.
 func RunAgent(prompt string, files []*service.FileData, convoName string, yolo bool, outputFile string) error {
-	// Create an indeterminate progress bar
-	indicator := service.NewIndicator("Processing...")
+	for {
+		// Create an indeterminate progress bar
+		indicator := service.NewIndicator("Processing...")
 
-	// Ensure Active Agent
-	agent, err := EnsureActiveAgent()
-	if err != nil {
-		return err
-	}
-
-	// Ensure conversation compatibility
-	if convoName != "" {
-		if err := EnsureConversationCompatibility(agent, convoName); err != nil {
+		// Ensure Active Agent
+		agent, err := EnsureActiveAgent()
+		if err != nil {
 			return err
 		}
+
+		// Ensure conversation compatibility
+		if convoName != "" {
+			if err := EnsureConversationCompatibility(agent, convoName); err != nil {
+				return err
+			}
+		}
+
+		// Build Final Prompt (Template + Input + @ Processing)
+		finalPrompt := buildFinalPrompt(agent, prompt)
+
+		// Get system prompt & Memory
+		store := data.NewConfigStore()
+		sysPrompt := store.GetSystemPrompt(agent.SystemPrompt)
+		memStore := data.NewMemoryStore()
+		memoryContent := memStore.GetFormatted()
+		if memoryContent != "" {
+			sysPrompt += "\n\n" + memoryContent
+		}
+
+		// Load MCP config
+		mcpStore := data.NewMCPStore()
+		mcpConfig, _, _ := mcpStore.Load()
+
+		// Stop indicator
+		indicator.Stop()
+
+		// Prepare Agent Options
+		op := service.AgentOptions{
+			Prompt:         finalPrompt,
+			SysPrompt:      sysPrompt,
+			Files:          files,
+			ModelInfo:      &agent.Model,
+			SearchEngine:   &agent.Search,
+			MaxRecursions:  agent.MaxRecursions,
+			ThinkingLevel:  agent.Think,
+			EnabledTools:   agent.Tools,
+			UseMCP:         agent.MCP,
+			YoloMode:       yolo,
+			AppendUsage:    agent.Usage,
+			AppendMarkdown: agent.Markdown,
+			OutputFile:     outputFile,
+			QuietMode:      false,
+			ConvoName:      convoName,
+			MCPConfig:      mcpConfig,
+		}
+
+		// Execute
+		err = service.CallAgent(&op)
+		if err != nil {
+			// Switch agent signal
+			if service.IsSwitchAgentError(err) {
+				switchErr := err.(*service.SwitchAgentError)
+				service.Infof("Switching agent to %s...", switchErr.TargetAgent)
+				continue
+			}
+			return err
+		}
+		return nil
 	}
-
-	// Build Final Prompt (Template + Input + @ Processing)
-	finalPrompt := buildFinalPrompt(agent, prompt)
-
-	// Get system prompt & Memory
-	store := data.NewConfigStore()
-	sysPrompt := store.GetSystemPrompt(agent.SystemPrompt)
-	memStore := data.NewMemoryStore()
-	memoryContent := memStore.GetFormatted()
-	if memoryContent != "" {
-		sysPrompt += "\n\n" + memoryContent
-	}
-
-	// Load MCP config
-	mcpStore := data.NewMCPStore()
-	mcpConfig, _, _ := mcpStore.Load()
-
-	// Stop indicator
-	indicator.Stop()
-
-	// Prepare Agent Options
-	op := service.AgentOptions{
-		Prompt:         finalPrompt,
-		SysPrompt:      sysPrompt,
-		Files:          files,
-		ModelInfo:      &agent.Model,
-		SearchEngine:   &agent.Search,
-		MaxRecursions:  agent.MaxRecursions,
-		ThinkingLevel:  agent.Think,
-		EnabledTools:   agent.Tools,
-		UseMCP:         agent.MCP,
-		YoloMode:       yolo,
-		AppendUsage:    agent.Usage,
-		AppendMarkdown: agent.Markdown,
-		OutputFile:     outputFile,
-		QuietMode:      false,
-		ConvoName:      convoName,
-		MCPConfig:      mcpConfig,
-	}
-
-	// Execute
-	return service.CallAgent(&op)
 }
 
 // buildFinalPrompt combines template and user input, and processes @ references

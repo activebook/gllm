@@ -249,6 +249,10 @@ func (ag *Agent) GenerateGemini2Stream() error {
 			// Handle tool call
 			funcResp, err := ag.processGemini2ToolCall(funcCall)
 			if err != nil {
+				// Switch agent signal, pop up
+				if IsSwitchAgentError(err) {
+					return err
+				}
 				ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
 				// Send error info to user but continue processing other tool calls
 				continue
@@ -403,6 +407,7 @@ func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Functi
 		"edit_file":           ag.Gemini2EditFileToolCall,
 		"list_memory":         ag.Gemini2ListMemoryToolCall,
 		"save_memory":         ag.Gemini2SaveMemoryToolCall,
+		"switch_agent":        ag.Gemini2SwitchAgentToolCall,
 	}
 
 	if handler, ok := toolHandlers[call.Name]; ok {

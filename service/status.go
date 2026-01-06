@@ -17,6 +17,7 @@ const (
 	StatusFunctionCallingOver              // 9
 	StatusDiffConfirm                      // 10
 	StatusDiffConfirmOver                  // 11
+	StatusSwitchAgent                      // 12
 )
 
 type StreamNotify struct {

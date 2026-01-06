@@ -277,23 +277,41 @@ func CallAgent(op *AgentOptions) error {
 			// Used for Chinese Models, they use "thinking[enable/disable]" as extra_body
 			if err := ag.GenerateOpenChatStream(); err != nil {
 				// Send error through channel instead of returning
-				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
+				if IsSwitchAgentError(err) {
+					notifyCh <- StreamNotify{Status: StatusSwitchAgent, Data: err.(*SwitchAgentError).TargetAgent}
+				} else {
+					notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
+				}
 			}
 		case ModelProviderOpenAI:
 			// Used for OpenAI compatible models
 			if err := ag.GenerateOpenAIStream(); err != nil {
+				// TODO: use error to signal?? weird
 				// Send error through channel instead of returning
-				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
+				if IsSwitchAgentError(err) {
+					notifyCh <- StreamNotify{Status: StatusSwitchAgent, Data: err.(*SwitchAgentError).TargetAgent}
+				} else {
+					notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
+				}
 			}
 		case ModelProviderGemini:
 			if err := ag.GenerateGemini2Stream(); err != nil {
 				// Send error through channel instead of returning
-				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
+				if IsSwitchAgentError(err) {
+					notifyCh <- StreamNotify{Status: StatusSwitchAgent, Data: err.(*SwitchAgentError).TargetAgent}
+				} else {
+					notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
+				}
 			}
 		case ModelProviderAnthropic:
 			if err := ag.GenerateAnthropicStream(); err != nil {
+				// TODO: use error to signal?? weird
 				// Send error through channel instead of returning
-				notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
+				if IsSwitchAgentError(err) {
+					notifyCh <- StreamNotify{Status: StatusSwitchAgent, Data: err.(*SwitchAgentError).TargetAgent}
+				} else {
+					notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
+				}
 			}
 		default:
 			notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("Unsupported model provider: %s", ag.Model.Provider)}
@@ -371,6 +389,11 @@ func CallAgent(op *AgentOptions) error {
 				ag.Error(notify.Data)
 				processingErr = fmt.Errorf("%s", notify.Data)
 				return processingErr
+			case StatusSwitchAgent:
+				// Switch agent signal, pop up
+				ag.StopIndicator()
+				ag.WriteEnd()
+				return &SwitchAgentError{TargetAgent: notify.Data}
 			case StatusFinished:
 				ag.StopIndicator()
 				// Render the markdown
@@ -612,7 +635,7 @@ func (ag *Agent) WriteEnd() {
 	//if ag.Std != nil && ag.Markdown == nil && ag.TokenUsage == nil {
 	if ag.Std != nil {
 		if !EndWithNewline(ag.LastWrittenData) {
-			ag.Std.Writeln()
+			ag.Std.Writeln(resetColor)
 		}
 	}
 }

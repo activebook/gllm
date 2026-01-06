@@ -231,3 +231,19 @@ func (op *OpenProcessor) AnthropicMCPToolCall(toolCall anthropic.ToolUseBlockPar
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, output, isError)
 	return anthropic.NewUserMessage(toolResult), nil
 }
+
+// TODO: use error to do it? weird!
+func (op *OpenProcessor) AnthropicSwitchAgentToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
+	response, err := switchAgentToolCallImpl(argsMap)
+	isError := err != nil
+	if err != nil {
+		// If it's a SwitchAgentError, propagate it immediately
+		if IsSwitchAgentError(err) {
+			return anthropic.MessageParam{}, err
+		}
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
+	return anthropic.NewUserMessage(toolResult), nil
+}

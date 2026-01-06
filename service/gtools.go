@@ -564,3 +564,31 @@ func (ag *Agent) Gemini2SaveMemoryToolCall(call *genai.FunctionCall) (*genai.Fun
 	}
 	return &resp, nil
 }
+
+func (ag *Agent) Gemini2SwitchAgentToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+	resp := genai.FunctionResponse{
+		ID:   call.ID,
+		Name: call.Name,
+	}
+
+	// Convert genai.FunctionCall.Args to map[string]interface{}
+	argsMap := make(map[string]interface{})
+	for k, v := range call.Args {
+		argsMap[k] = v
+	}
+
+	// Call shared implementation
+	response, err := switchAgentToolCallImpl(&argsMap)
+	if err != nil {
+		if IsSwitchAgentError(err) {
+			return nil, err
+		}
+		return nil, err
+	}
+
+	resp.Response = map[string]any{
+		"output": response,
+		"error":  "",
+	}
+	return &resp, nil
+}

@@ -184,6 +184,10 @@ func (ag *Agent) GenerateOpenAIStream() error {
 	// Process the chat with recursive tool call handling
 	err = chat.process(ag)
 	if err != nil {
+		// Switch agent signal
+		if IsSwitchAgentError(err) {
+			return err
+		}
 		return fmt.Errorf("error processing chat: %v", err)
 	}
 	return nil
@@ -276,6 +280,10 @@ func (oa *OpenAI) process(ag *Agent) error {
 			for _, toolCall := range toolCalls {
 				toolMessage, err := oa.processToolCall(toolCall)
 				if err != nil {
+					// Switch agent signal, pop up
+					if IsSwitchAgentError(err) {
+						return err
+					}
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
 					// Send error info to user but continue processing other tool calls
 					continue
@@ -500,6 +508,7 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 		"read_multiple_files": oa.op.OpenAIReadMultipleFilesToolCall,
 		"list_memory":         oa.op.OpenAIListMemoryToolCall,
 		"save_memory":         oa.op.OpenAISaveMemoryToolCall,
+		"switch_agent":        oa.op.OpenAISwitchAgentToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {

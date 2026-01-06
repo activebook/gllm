@@ -69,6 +69,7 @@ var (
 		"web_fetch",
 		"list_memory",
 		"save_memory",
+		"switch_agent",
 	}
 	searchTools = []string{
 		"web_search",
@@ -810,6 +811,36 @@ To clear all memories, pass an empty string.`,
 
 	tools = append(tools, &saveMemoryTool)
 
+	// Switch Agent tool
+	switchAgentFunc := OpenFunctionDefinition{
+		Name: "switch_agent",
+		Description: `Switch the active agent to another agent profile. 
+Use this tool when:
+1. The current agent's system prompt or capabilities are not suitable for the user's request.
+2. The user explicitly asks to switch to a specific agent.
+3. You need to access tools that are only available to another agent.
+4. Check agents' system prompt, tools, capabilities and thinking level for better usage if possible.
+(e.g., switching to a 'Coder' agent for programming tasks, to a 'Researcher' agent for research tasks, to a 'Writer' agent for writing tasks, etc.)
+
+IMPORTANT: This function is highly powerful. Pass 'list' as the name to see all available agents and their capabilities before switching.`,
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"name": map[string]interface{}{
+					"type":        "string",
+					"description": "The name of the agent to switch to, or 'list' to see available agents.",
+				},
+			},
+			"required": []string{"name"},
+		},
+	}
+	switchAgentTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &switchAgentFunc,
+	}
+
+	tools = append(tools, &switchAgentTool)
+
 	return tools
 }
 
@@ -1333,6 +1364,44 @@ func (op *OpenProcessor) OpenAISaveMemoryToolCall(toolCall openai.ToolCall, args
 		ToolCallID: toolCall.ID,
 		Content:    response,
 	}, nil
+}
+
+// TODO: where is the OpenChatSwitchAgentToolCall? and why here don't use error to check?
+func (op *OpenProcessor) OpenAISwitchAgentToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+	response, err := switchAgentToolCallImpl(argsMap)
+	if err != nil {
+		if IsSwitchAgentError(err) {
+			return openai.ChatCompletionMessage{}, err
+		}
+		return openai.ChatCompletionMessage{}, err
+	}
+
+	return openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Content:    response,
+	}, nil
+}
+
+func (op *OpenProcessor) OpenChatSwitchAgentToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	toolMessage := model.ChatCompletionMessage{
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Name:       Ptr(""),
+	}
+
+	response, err := switchAgentToolCallImpl(argsMap)
+	if err != nil {
+		if IsSwitchAgentError(err) {
+			return nil, err
+		}
+		return nil, err
+	}
+
+	toolMessage.Content = &model.ChatCompletionMessageContent{
+		StringValue: volcengine.String(response),
+	}
+	return &toolMessage, nil
 }
 
 func (op *OpenProcessor) OpenChatMCPToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
