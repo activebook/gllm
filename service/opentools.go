@@ -1375,38 +1375,43 @@ func (op *OpenProcessor) OpenAISaveMemoryToolCall(toolCall openai.ToolCall, args
 
 func (op *OpenProcessor) OpenAISwitchAgentToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := switchAgentToolCallImpl(argsMap)
-	if err != nil {
-		if IsSwitchAgentError(err) {
-			return openai.ChatCompletionMessage{}, err
-		}
-		return openai.ChatCompletionMessage{}, err
-	}
 
-	return openai.ChatCompletionMessage{
+	// Create the tool message anyway
+	toolMessage := openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}
+
+	if err != nil {
+		if IsSwitchAgentError(err) {
+			return toolMessage, err
+		}
+		return toolMessage, err
+	}
+
+	return toolMessage, nil
 }
 
 func (op *OpenProcessor) OpenChatSwitchAgentToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	response, err := switchAgentToolCallImpl(argsMap)
+
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Name:       Ptr(""),
+		Content: &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(response),
+		},
 	}
 
-	response, err := switchAgentToolCallImpl(argsMap)
 	if err != nil {
 		if IsSwitchAgentError(err) {
-			return nil, err
+			return &toolMessage, err
 		}
-		return nil, err
+		return &toolMessage, err
 	}
 
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
 	return &toolMessage, nil
 }
 

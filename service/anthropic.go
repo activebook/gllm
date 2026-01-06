@@ -199,6 +199,9 @@ func (a *Anthropic) process(ag *Agent) error {
 				if err != nil {
 					// Switch agent signal, pop up
 					if IsSwitchAgentError(err) {
+						// Bugfix: left an "orphan" tool_call that had no matching tool result.
+						// Add tool message to conversation to fix this.
+						ag.Convo.Push(toolMsg)
 						return err
 					}
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Tool call failed: %v", err)}, nil)

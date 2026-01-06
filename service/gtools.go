@@ -579,11 +579,15 @@ func (ag *Agent) Gemini2SwitchAgentToolCall(call *genai.FunctionCall) (*genai.Fu
 
 	// Call shared implementation
 	response, err := switchAgentToolCallImpl(&argsMap)
+	resp.Response = map[string]any{
+		"output": response,
+		"error":  "",
+	}
 	if err != nil {
 		if IsSwitchAgentError(err) {
-			return nil, err
+			return &resp, err
 		}
-		return nil, err
+		return &resp, err
 	}
 
 	resp.Response = map[string]any{

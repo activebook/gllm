@@ -76,7 +76,10 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		return err
 	}
 
-	parts := []genai.Part{{Text: ag.UserPrompt}}
+	var parts []genai.Part
+	if ag.UserPrompt != "" {
+		parts = append(parts, genai.Part{Text: ag.UserPrompt})
+	}
 	for _, file := range ag.Files {
 		// Check if the file data is empty
 		if file != nil {
@@ -171,6 +174,10 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	// Use maxRecursions from LangLogic
 	maxRecursions := ag.MaxRecursions
 	for i := 0; i < maxRecursions; i++ {
+		// Skip turn if no parts to send
+		if len(*streamParts) == 0 {
+			break
+		}
 		// Construct Input Content from streamParts
 		inputParts := make([]*genai.Part, len(*streamParts))
 		hasFuncResponse := false
@@ -251,6 +258,15 @@ func (ag *Agent) GenerateGemini2Stream() error {
 			if err != nil {
 				// Switch agent signal, pop up
 				if IsSwitchAgentError(err) {
+					// Add the response part to satisfy history integrity
+					respPart := genai.Part{FunctionResponse: funcResp}
+					inputContent := &genai.Content{
+						Role:  genai.RoleUser, // In Gemini, tool responses are sent as 'user' role
+						Parts: []*genai.Part{&respPart},
+					}
+					messages = append(messages, inputContent)
+					ag.Convo.SetMessages(messages)
+					ag.Convo.Save()
 					return err
 				}
 				ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)

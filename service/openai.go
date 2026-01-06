@@ -114,7 +114,10 @@ func (ag *Agent) SortOpenAIMessagesByOrder() error {
 			Content: ag.UserPrompt, // only for text models
 		}
 	}
-	history = append(history, userMessage)
+	// Add to history only if it's not empty
+	if ag.UserPrompt != "" || len(ag.Files) > 0 {
+		history = append(history, userMessage)
+	}
 
 	// Update the conversation with new messages
 	ag.Convo.SetMessages(history)
@@ -282,6 +285,9 @@ func (oa *OpenAI) process(ag *Agent) error {
 				if err != nil {
 					// Switch agent signal, pop up
 					if IsSwitchAgentError(err) {
+						// Bugfix: left an "orphan" tool_call that had no matching tool result.
+						// Add tool message to conversation to fix this.
+						ag.Convo.Push(toolMessage)
 						return err
 					}
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
