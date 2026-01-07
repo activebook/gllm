@@ -159,7 +159,7 @@ var agentAddCmd = &cobra.Command{
 		toolsList := service.GetAllEmbeddingTools()
 		var toolsOptions []huh.Option[string]
 		for _, s := range toolsList {
-			toolsOptions = append(toolsOptions, huh.NewOption(s, s))
+			toolsOptions = append(toolsOptions, huh.NewOption(s, s).Selected(true))
 		}
 		SortOptions(toolsOptions, "")
 
@@ -169,7 +169,7 @@ var agentAddCmd = &cobra.Command{
 		// I will re-structure to use MultiSelect for the boolean flags.
 		var capabilities []string
 
-		// 1. Agent Name
+		// Agent Name
 		err := huh.NewForm(
 			huh.NewGroup(
 				huh.NewInput().
@@ -196,7 +196,7 @@ var agentAddCmd = &cobra.Command{
 			return
 		}
 
-		// 2. Model
+		// Model
 		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewSelect[string]().
@@ -209,7 +209,7 @@ var agentAddCmd = &cobra.Command{
 			return
 		}
 
-		// 3. System Prompt
+		// System Prompt
 		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewSelect[string]().
@@ -223,7 +223,7 @@ var agentAddCmd = &cobra.Command{
 			return
 		}
 
-		// 4. Template
+		// Template
 		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewSelect[string]().
@@ -237,7 +237,7 @@ var agentAddCmd = &cobra.Command{
 			return
 		}
 
-		// 5. Search Engine
+		// Search Engine
 		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewSelect[string]().
@@ -251,7 +251,7 @@ var agentAddCmd = &cobra.Command{
 			return
 		}
 
-		// 6. Tools
+		// Tools
 		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewMultiSelect[string]().
@@ -268,7 +268,27 @@ var agentAddCmd = &cobra.Command{
 			return
 		}
 
-		// 7. Thinking Level
+		// Max Recursions
+		err = huh.NewForm(
+			huh.NewGroup(
+				huh.NewInput().
+					Title("Max Recursions").
+					Description("The maximum number of Model calling recursions allowed").
+					Value(&maxRecursions).
+					Validate(ValidateMaxRecursions),
+				huh.NewNote().
+					Title("Tips").
+					Description(`It controls the maximum number of recursive model calls allowed when tools are being used.
+- Increase for complex multi-step tasks (20-50)
+- Decrease for simple tasks (3-5) to save tokens
+`),
+			),
+		).Run()
+		if err != nil {
+			return
+		}
+
+		// Thinking Level
 		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewSelect[string]().
@@ -287,21 +307,7 @@ var agentAddCmd = &cobra.Command{
 			return
 		}
 
-		// 8. Max Recursions
-		err = huh.NewForm(
-			huh.NewGroup(
-				huh.NewInput().
-					Title("Max Recursions").
-					Description("The maximum number of Model calling recursions allowed").
-					Value(&maxRecursions).
-					Validate(ValidateMaxRecursions),
-			),
-		).Run()
-		if err != nil {
-			return
-		}
-
-		// 8. Capabilities
+		// Capabilities
 		// We can group these or keep them separate? Input is small. MultiSelect is potentially large-ish.
 		// Let's keep them somewhat together or just split to be safe?
 		// Split is safer.
@@ -310,11 +316,14 @@ var agentAddCmd = &cobra.Command{
 				huh.NewMultiSelect[string]().
 					Title("Capabilities").
 					Options(
-						huh.NewOption("Enable MCP", "mcp"),
-						huh.NewOption("Show Usage Stats", "usage"),
-						huh.NewOption("Markdown Output", "markdown"),
+						huh.NewOption("Show Usage Stats", "usage").Selected(true),
+						huh.NewOption("Markdown Output", "markdown").Selected(true),
+						huh.NewOption("Enable MCP", "mcp").Selected(false),
 					).
 					Value(&capabilities),
+				huh.NewNote().
+					Title("Tips").
+					Description("The MCP (Model Context Protocol) enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."),
 			),
 		).Run()
 		if err != nil {
@@ -580,20 +589,6 @@ var agentSetCmd = &cobra.Command{
 			return
 		}
 
-		// Thinking Level
-		err = huh.NewForm(
-			huh.NewGroup(
-				huh.NewSelect[string]().
-					Title("Thinking Level").
-					Description("Select the thinking level for this agent").
-					Options(thinkOptions...).
-					Value(&think),
-			),
-		).Run()
-		if err != nil {
-			return
-		}
-
 		// Max Recursions
 		err = huh.NewForm(
 			huh.NewGroup(
@@ -602,6 +597,26 @@ var agentSetCmd = &cobra.Command{
 					Description("The maximum number of Model calling recursions allowed").
 					Value(&maxRecursions).
 					Validate(ValidateMaxRecursions),
+				huh.NewNote().
+					Title("Tips").
+					Description(`It controls the maximum number of recursive model calls allowed when tools are being used.
+- Increase for complex multi-step tasks (20-50)
+- Decrease for simple tasks (3-5) to save tokens
+`),
+			),
+		).Run()
+		if err != nil {
+			return
+		}
+
+		// Thinking Level
+		err = huh.NewForm(
+			huh.NewGroup(
+				huh.NewSelect[string]().
+					Title("Thinking Level").
+					Description("Select the thinking level for this agent").
+					Options(thinkOptions...).
+					Value(&think),
 			),
 		).Run()
 		if err != nil {
@@ -625,6 +640,9 @@ var agentSetCmd = &cobra.Command{
 					Title("Capabilities").
 					Options(capsOpts...).
 					Value(&capabilities),
+				huh.NewNote().
+					Title("Tips").
+					Description("The MCP (Model Context Protocol) enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."),
 			),
 		).Run()
 
