@@ -261,6 +261,9 @@ func RunInitWizard() error {
 					huh.NewOption("Markdown Output", "markdown").Selected(true),
 				).
 				Value(&selectedFeatures),
+			huh.NewNote().
+				Title("Tips").
+				Description("The MCP (Model Context Protocol) enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."),
 		),
 		huh.NewGroup(
 			huh.NewConfirm().
