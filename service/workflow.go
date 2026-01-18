@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/activebook/gllm/data"
-	"github.com/ergochat/readline"
 )
 
 type WorkflowAgentType string
@@ -167,21 +166,12 @@ func promptUserForConfirmation(agent *WorkflowAgent) bool {
 	fmt.Printf("   %sPass through:%s %s%s%s\n", passThroughColor, workflowResetColor, passThroughColor, passThroughStatus, workflowResetColor)
 
 	// Set the prompt question
-	rl, err := readline.New(WokflowConfirmPrompt)
+	confirm, err := NeedUserConfirm("", WokflowConfirmPrompt)
 	if err != nil {
 		fmt.Printf("Error initializing readline: %v. Skipping agent.\n", err)
 		return false
 	}
-	defer rl.Close()
-
-	input, err := rl.Readline()
-	if err != nil {
-		fmt.Printf("Error reading input: %v. Skipping agent.\n", err)
-		return false
-	}
-
-	response := strings.ToLower(strings.TrimSpace(input))
-	return response == "y" || response == "yes"
+	return confirm
 }
 
 /*
@@ -192,41 +182,25 @@ by printing a message and returning an empty string.
 */
 func waitForNewPrompt() string {
 	// Wait for user to proceed or modify the prompt
-	rl, err := readline.New(WokflowProceedPrompt)
+	confirm, err := NeedUserConfirm("", WokflowProceedPrompt)
 	if err != nil {
 		fmt.Printf("Error initializing readline: %v. Skipping agent.\n", err)
 		return ""
 	}
-	defer rl.Close()
-
-	prompt, err := rl.Readline()
-	if err != nil {
-		fmt.Printf("Error reading input: %v. Skipping agent.\n", err)
-		return ""
-	}
-
-	response := strings.ToLower(strings.TrimSpace(prompt))
-	cont := response == "y" || response == "yes"
-	if cont {
+	if confirm {
 		return ""
 	}
 
 	// Create a new readline instance for modification prompt
-	rl2, err := readline.New(WokflowModifyPrompt)
+	confirm, err = NeedUserConfirm("", WokflowModifyPrompt)
 	if err != nil {
 		fmt.Printf("Error initializing readline: %v. Skipping agent.\n", err)
 		return ""
 	}
-	defer rl2.Close()
-
-	prompt, err = rl2.Readline()
-	if err != nil {
-		fmt.Printf("Error reading input: %v. Skipping agent.\n", err)
+	if confirm {
 		return ""
 	}
-
-	response = strings.ToLower(strings.TrimSpace(prompt))
-	return response
+	return ""
 }
 
 /*
