@@ -1309,10 +1309,21 @@ func callAgentToolCallImpl(
 			return "", fmt.Errorf("task at index %d missing required 'task_key' field", i)
 		}
 
+		// Parse optional input_keys
+		var inputKeys []string
+		if keysInterface, ok := taskMap["input_keys"].([]interface{}); ok {
+			for _, k := range keysInterface {
+				if keyStr, ok := k.(string); ok {
+					inputKeys = append(inputKeys, keyStr)
+				}
+			}
+		}
+
 		tasks = append(tasks, &SubAgentTask{
 			AgentName:   agentName,
 			Instruction: instruction,
 			TaskKey:     taskKey,
+			InputKeys:   inputKeys,
 		})
 	}
 

@@ -40,10 +40,11 @@ func (s SubAgentStatus) String() string {
 
 // SubAgentTask represents a single sub-agent invocation request
 type SubAgentTask struct {
-	ID          string // Unique task ID
-	AgentName   string // Agent profile to use
-	Instruction string // Task instruction/prompt
-	TaskKey     string // Key to store result in SharedState
+	ID          string   // Unique task ID
+	AgentName   string   // Agent profile to use
+	Instruction string   // Task instruction/prompt
+	TaskKey     string   // Key to store result in SharedState
+	InputKeys   []string // Keys to read as input context (virtual files)
 }
 
 // SubAgentResult represents the outcome of a sub-agent execution
@@ -239,9 +240,26 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 	}
 	result.OutputFile = outputFile
 
+	// Prepare input context from SharedState dependencies
+	// Instead of virtual files, we embed the context directly into the prompt
+	finalInstruction := task.Instruction
+	if len(task.InputKeys) > 0 && e.state != nil {
+		finalInstruction += "\n\n# Context from previous tasks:\n"
+		for _, key := range task.InputKeys {
+			if val, ok := e.state.Get(key); ok {
+				// Convert value to string representation
+				contentStr := fmt.Sprintf("%v", val)
+				// Append to instruction with clear separation
+				finalInstruction += fmt.Sprintf("\n## Output from '%s':\n%s\n", GetSanitizeTitle(key), contentStr)
+			} else {
+				Warnf("Sub-agent input key '%s' not found in SharedState, skipping.", key)
+			}
+		}
+	}
+
 	// Prepare agent options
 	op := AgentOptions{
-		Prompt:         task.Instruction,
+		Prompt:         finalInstruction,
 		SysPrompt:      sysPrompt,
 		Files:          nil,
 		ModelInfo:      &agentConfig.Model,

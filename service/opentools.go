@@ -927,6 +927,13 @@ Differs from switch_agent:
 								"type":        "string",
 								"description": "A unique, semantic string identifier for this specific task execution. This key acts as the 'Primary Key' for the task's output. It serves three critical roles: 1. ADDRESS: It is the specific key used to write the full result into SharedState memory. 2. STORAGE: It forms the unique suffix of the persistent output filename (e.g., ..._analysis_codereview.md), enabling debuggability. 3. RETRIEVAL: You MUST use this exact key with get_state to read the sub-agent's work. Example: 'code_review_auth_module', 'market_analysis_competitor_A'.",
 							},
+							"input_keys": map[string]interface{}{
+								"type": "array",
+								"items": map[string]interface{}{
+									"type": "string",
+								},
+								"description": "Optional list of task_keys from PREVIOUS tasks. The output content of these keys will be automatically retrieved from SharedState and injected into this sub-agent's context. Use this to pass the results of 'agent A' as input to 'agent B'.",
+							},
 						},
 						"required": []string{"agent", "instruction", "task_key"},
 					},
