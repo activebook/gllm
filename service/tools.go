@@ -1347,11 +1347,9 @@ func getStateToolCallImpl(
 
 	var result strings.Builder
 	result.WriteString(fmt.Sprintf("Key: %s\n", key))
-	if meta != nil {
-		result.WriteString(fmt.Sprintf("Created by: %s\n", meta.CreatedBy))
-		result.WriteString(fmt.Sprintf("Type: %s\n", meta.ContentType))
-		result.WriteString(fmt.Sprintf("Size: %d bytes\n", meta.Size))
-	}
+	result.WriteString(fmt.Sprintf("Created by: %s\n", meta.CreatedBy))
+	result.WriteString(fmt.Sprintf("Type: %s\n", meta.ContentType))
+	result.WriteString(fmt.Sprintf("Size: %d bytes\n", meta.Size))
 
 	value := state.GetString(key)
 	result.WriteString("\nValue:\n")
