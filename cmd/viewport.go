@@ -63,20 +63,21 @@ func (m ViewportModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		footerHeight := lipgloss.Height(m.footerView())
 		verticalMarginHeight := headerHeight + footerHeight
 
-		// Fix Details: I switched from wordwrap to github.com/muesli/reflow/wrap.
-		// The wrap package uses a hard-wrapping strategy that correctly calculates character widths (handling East Asian Widths),
-		// so lines will now break correctly for Chinese, Japanese, and other multi-byte characters.
 		if !m.ready {
 			m.viewport = viewport.New(msg.Width, msg.Height-verticalMarginHeight)
 			m.viewport.YPosition = headerHeight
 			wrappedContent := wrapWithIndentation(m.content, msg.Width)
 			m.viewport.SetContent(wrappedContent)
+			// Scroll to the bottom - use GotoBottom() method
+			m.viewport.GotoBottom()
 			m.ready = true
 		} else {
 			m.viewport.Width = msg.Width
 			m.viewport.Height = msg.Height - verticalMarginHeight
 			wrappedContent := wrapWithIndentation(m.content, msg.Width)
 			m.viewport.SetContent(wrappedContent)
+			// Scroll to the bottom - use GotoBottom() method
+			m.viewport.GotoBottom()
 		}
 	}
 
