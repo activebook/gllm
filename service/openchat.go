@@ -540,7 +540,12 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompletionMessage, error) {
 	// Parse the query from the arguments
 	var argsMap map[string]interface{}
-	if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &argsMap); err != nil {
+	argsStr := toolCall.Function.Arguments
+	if strings.TrimSpace(argsStr) == "" {
+		argsStr = "{}"
+	}
+
+	if err := json.Unmarshal([]byte(argsStr), &argsMap); err != nil {
 		// Log the malformed JSON for debugging
 		Debugf("Failed to parse tool call arguments. Function: %s, Raw arguments: %s", toolCall.Function.Name, toolCall.Function.Arguments)
 		return nil, fmt.Errorf("error parsing arguments: %v (raw: %s)", err, toolCall.Function.Arguments)

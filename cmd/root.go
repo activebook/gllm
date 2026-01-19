@@ -148,7 +148,8 @@ Configure your API keys and preferred models, then start chatting or executing c
 			indicator.Stop()
 
 			// Call your LLM service here
-			err := RunAgent(prompt, files, convoName, yoloFlag, "")
+			// Call agent using the shared runner, passing nil for SharedState (single turn)
+			err := RunAgent(prompt, files, convoName, yoloFlag, "", nil)
 			if err != nil {
 				service.Errorf("%v", err)
 				return

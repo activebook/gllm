@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/activebook/gllm/data"
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/packages/param"
 	"github.com/anthropics/anthropic-sdk-go/shared/constant"
@@ -53,7 +54,9 @@ Status:
 
 var (
 	embeddingTools = []string{
+		// shell tool
 		"shell",
+		// file tools
 		"read_file",
 		"write_file",
 		"edit_file",
@@ -66,12 +69,23 @@ var (
 		"search_files",
 		"search_text_in_file",
 		"read_multiple_files",
+		// web tools
 		"web_fetch",
+		// memory tools
 		"list_memory",
 		"save_memory",
+		// agent tools
 		"switch_agent",
+		"list_agent",
+		// Sub-agent orchestration tools
+		"call_agent",
+		// shared state tools
+		"get_state",
+		"set_state",
+		"list_state",
 	}
 	searchTools = []string{
+		// web tools
 		"web_search",
 	}
 )
@@ -837,6 +851,11 @@ When a switch occurs, if an instruction is provided, it replaces the original pr
 					"type":        "string",
 					"description": "Optional context or instruction to pass to the new agent. This helps the new agent understand the task and current state.",
 				},
+				"need_confirm": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Whether to prompt the user for confirmation before switching agents. Defaults to true.",
+					"default":     true,
+				},
 			},
 			"required": []string{"name"},
 		},
@@ -847,6 +866,158 @@ When a switch occurs, if an instruction is provided, it replaces the original pr
 	}
 
 	tools = append(tools, &switchAgentTool)
+
+	// list_agent tool - List all available agents
+	listAgentFunc := OpenFunctionDefinition{
+		Name: "list_agent",
+		Description: `List all available agents with their capabilities, models, and configurations.
+Use this tool to discover which agents are available before using call_agent or switch_agent.`,
+		Parameters: map[string]interface{}{
+			"type":       "object",
+			"properties": map[string]interface{}{},
+			"required":   []string{},
+		},
+	}
+	listAgentTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &listAgentFunc,
+	}
+	tools = append(tools, &listAgentTool)
+
+	// call_agent tool - The core orchestration tool
+	callAgentFunc := OpenFunctionDefinition{
+		Name: "call_agent",
+		Description: `Orchestrate concurrent sub-agents to execute specialized tasks in parallel.
+
+This tool enables sophisticated Map/Reduce workflows by dispatching tasks to isolated agent instances.
+Each sub-agent runs independently with auto-approved tools and returns results via SharedState.
+
+Use this for:
+- Delegating specialized tasks to agents with appropriate capabilities
+- Parallel processing of independent tasks across multiple agent instances
+- Complex multi-stage workflows requiring orchestration
+
+Key operational details:
+- Sub-agents run in isolated contexts (no shared conversation history)
+- Provide complete context in each instruction
+- CRITICAL: Assign a unique, semantic task_key to each task—this is your ONLY mechanism
+  to retrieve results and correlate outputs across the workflow
+- Returns progress summary; use get_state(task_key) for full detailed results
+
+Differs from switch_agent:
+- call_agent: Sub-agents return results to you; you maintain control
+- switch_agent: Permanently hands off control; you won't see results`,
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"tasks": map[string]interface{}{
+					"type": "array",
+					"items": map[string]interface{}{
+						"type": "object",
+						"properties": map[string]interface{}{
+							"agent": map[string]interface{}{
+								"type":        "string",
+								"description": "Name of the agent to invoke. Use list_agent to see available agents.",
+							},
+							"instruction": map[string]interface{}{
+								"type":        "string",
+								"description": "The task instruction/prompt for the sub-agent. Be specific and provide all necessary context.",
+							},
+							"task_key": map[string]interface{}{
+								"type":        "string",
+								"description": "A unique, semantic string identifier for this specific task execution. This key acts as the 'Primary Key' for the task's output. It serves three critical roles: 1. ADDRESS: It is the specific key used to write the full result into SharedState memory. 2. STORAGE: It forms the unique suffix of the persistent output filename (e.g., ..._analysis_codereview.md), enabling debuggability. 3. RETRIEVAL: You MUST use this exact key with get_state to read the sub-agent's work. Example: 'code_review_auth_module', 'market_analysis_competitor_A'.",
+							},
+						},
+						"required": []string{"agent", "instruction", "task_key"},
+					},
+					"description": "Array of tasks to execute. Each task invokes a sub-agent with the given instruction.",
+				},
+				"timeout": map[string]interface{}{
+					"type":        "integer",
+					"description": "Timeout in seconds for all tasks. Default is 300 (5 minutes).",
+					"default":     300,
+				},
+			},
+			"required": []string{"tasks"},
+		},
+	}
+	callAgentTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &callAgentFunc,
+	}
+	tools = append(tools, &callAgentTool)
+
+	// get_state tool - Read from SharedState
+	getStateFunc := OpenFunctionDefinition{
+		Name: "get_state",
+		Description: `Retrieve a value from the SharedState memory.
+
+SharedState is a key-value store for communication between the orchestrator and sub-agents.
+Sub-agents store their results in SharedState when you specify an output_key in call_agent.
+Use list_state to see available keys.`,
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"key": map[string]interface{}{
+					"type":        "string",
+					"description": "The key to retrieve from SharedState.",
+				},
+			},
+			"required": []string{"key"},
+		},
+	}
+	getStateTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &getStateFunc,
+	}
+	tools = append(tools, &getStateTool)
+
+	// set_state tool - Write to SharedState
+	setStateFunc := OpenFunctionDefinition{
+		Name: "set_state",
+		Description: `Store a value in the SharedState memory.
+
+Use this to save information that other agents or future tool calls can access.
+SharedState persists for the duration of the current session.`,
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"key": map[string]interface{}{
+					"type":        "string",
+					"description": "The key to store the value under.",
+				},
+				"value": map[string]interface{}{
+					"type":        "string",
+					"description": "The value to store. Can be text, JSON, or any serializable content.",
+				},
+			},
+			"required": []string{"key", "value"},
+		},
+	}
+	setStateTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &setStateFunc,
+	}
+	tools = append(tools, &setStateTool)
+
+	// list_state tool - List all SharedState keys
+	listStateFunc := OpenFunctionDefinition{
+		Name: "list_state",
+		Description: `List all keys and their metadata in SharedState.
+
+Shows what data is available in the shared memory, including who created each entry,
+when it was created/updated, content type, and size.`,
+		Parameters: map[string]interface{}{
+			"type":       "object",
+			"properties": map[string]interface{}{},
+			"required":   []string{},
+		},
+	}
+	listStateTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &listStateFunc,
+	}
+	tools = append(tools, &listStateTool)
 
 	return tools
 }
@@ -1033,6 +1204,11 @@ type OpenProcessor struct {
 	references []map[string]interface{} // keep track of the references
 	status     *StatusStack             // Stack to manage streaming status
 	mcpClient  *MCPClient               // MCP client for MCP tool calls
+
+	// Sub-agent orchestration
+	sharedState *data.SharedState // Shared state for inter-agent communication
+	executor    *SubAgentExecutor // Sub-agent executor for call_agent tool
+	agentName   string            // Current agent name (for set_state metadata)
 }
 
 // Diff confirm func
@@ -1374,7 +1550,7 @@ func (op *OpenProcessor) OpenAISaveMemoryToolCall(toolCall openai.ToolCall, args
 }
 
 func (op *OpenProcessor) OpenAISwitchAgentToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := switchAgentToolCallImpl(argsMap)
+	response, err := switchAgentToolCallImpl(argsMap, op.toolsUse)
 
 	// Create the tool message anyway
 	toolMessage := openai.ChatCompletionMessage{
@@ -1393,8 +1569,75 @@ func (op *OpenProcessor) OpenAISwitchAgentToolCall(toolCall openai.ToolCall, arg
 	return toolMessage, nil
 }
 
+// OpenAI wrappers for new orchestration tools
+
+func (op *OpenProcessor) OpenAIListAgentToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+	response, err := listAgentToolCallImpl()
+	if err != nil {
+		return openai.ChatCompletionMessage{}, err
+	}
+
+	return openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Content:    response,
+	}, nil
+}
+
+func (op *OpenProcessor) OpenAICallAgentToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+	response, err := callAgentToolCallImpl(argsMap, op.executor)
+	if err != nil {
+		return openai.ChatCompletionMessage{}, err
+	}
+
+	return openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Content:    response,
+	}, nil
+}
+
+func (op *OpenProcessor) OpenAIGetStateToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+	response, err := getStateToolCallImpl(argsMap, op.sharedState)
+	if err != nil {
+		return openai.ChatCompletionMessage{}, err
+	}
+
+	return openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Content:    response,
+	}, nil
+}
+
+func (op *OpenProcessor) OpenAISetStateToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+	response, err := setStateToolCallImpl(argsMap, op.agentName, op.sharedState)
+	if err != nil {
+		return openai.ChatCompletionMessage{}, err
+	}
+
+	return openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Content:    response,
+	}, nil
+}
+
+func (op *OpenProcessor) OpenAIListStateToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+	response, err := listStateToolCallImpl(op.sharedState)
+	if err != nil {
+		return openai.ChatCompletionMessage{}, err
+	}
+
+	return openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Content:    response,
+	}, nil
+}
+
 func (op *OpenProcessor) OpenChatSwitchAgentToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := switchAgentToolCallImpl(argsMap)
+	response, err := switchAgentToolCallImpl(argsMap, op.toolsUse)
 
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,

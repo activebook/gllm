@@ -156,6 +156,12 @@ func (ag *Agent) GenerateOpenAIStream() error {
 		tools = append(tools, mcpTools...)
 	}
 
+	// Initialize sub-agent executor if SharedState is available
+	var executor *SubAgentExecutor
+	if ag.SharedState != nil {
+		executor = NewSubAgentExecutor(ag.SharedState, 5)
+	}
+
 	op := OpenProcessor{
 		ctx:        ctx,
 		notify:     ag.NotifyChan,
@@ -167,6 +173,10 @@ func (ag *Agent) GenerateOpenAIStream() error {
 		references: make([]map[string]interface{}, 0), // Updated to match new field type
 		status:     &ag.Status,
 		mcpClient:  ag.MCPClient,
+		// Sub-agent orchestration
+		sharedState: ag.SharedState,
+		executor:    executor,
+		agentName:   ag.AgentName,
 	}
 	chat := &OpenAI{
 		client: client,
@@ -471,7 +481,12 @@ func (oa *OpenAI) processStream(stream *openai.ChatCompletionStream) (openai.Cha
 func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompletionMessage, error) {
 	// Parse the query from the arguments
 	var argsMap map[string]interface{}
-	if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &argsMap); err != nil {
+	argsStr := toolCall.Function.Arguments
+	if strings.TrimSpace(argsStr) == "" {
+		argsStr = "{}"
+	}
+
+	if err := json.Unmarshal([]byte(argsStr), &argsMap); err != nil {
 		return openai.ChatCompletionMessage{}, fmt.Errorf("error parsing arguments: %v", err)
 	}
 
@@ -515,6 +530,11 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 		"list_memory":         oa.op.OpenAIListMemoryToolCall,
 		"save_memory":         oa.op.OpenAISaveMemoryToolCall,
 		"switch_agent":        oa.op.OpenAISwitchAgentToolCall,
+		"list_agent":          oa.op.OpenAIListAgentToolCall,
+		"call_agent":          oa.op.OpenAICallAgentToolCall,
+		"get_state":           oa.op.OpenAIGetStateToolCall,
+		"set_state":           oa.op.OpenAISetStateToolCall,
+		"list_state":          oa.op.OpenAIListStateToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {

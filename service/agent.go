@@ -56,6 +56,10 @@ type Agent struct {
 	Convo           ConversationManager // Conversation manager
 	Indicator       *Indicator          // Indicator Spinner
 	LastWrittenData string              // Last written data
+
+	// Sub-agent orchestration
+	SharedState *data.SharedState // Shared state for inter-agent communication
+	AgentName   string            // Current agent name for metadata tracking
 }
 
 func constructModelInfo(model *data.Model) *ModelInfo {
@@ -155,6 +159,10 @@ type AgentOptions struct {
 	QuietMode      bool
 	ConvoName      string
 	MCPConfig      map[string]*data.MCPServer
+
+	// Sub-agent orchestration fields
+	SharedState *data.SharedState // Shared state for inter-agent communication
+	AgentName   string            // Name of the agent running this task
 }
 
 func CallAgent(op *AgentOptions) error {
@@ -253,6 +261,9 @@ func CallAgent(op *AgentOptions) error {
 		OutputFile:    fileRenderer,
 		Status:        StatusStack{},
 		Indicator:     indicator,
+		// Sub-agent orchestration
+		SharedState: op.SharedState,
+		AgentName:   op.AgentName,
 	}
 
 	// Construct conversation manager
@@ -575,7 +586,16 @@ func (ag *Agent) WriteFunctionCall(text string) {
 					} else if k == "need_confirm" {
 						continue
 					}
-					val := fmt.Sprintf("%s = %v", k, v)
+					var val string
+					switch v.(type) {
+					case map[string]interface{}, []interface{}, []map[string]interface{}:
+						// Pretty print complex types
+						bytes, _ := json.MarshalIndent(v, "      ", "  ")
+						val = fmt.Sprintf("%s = %s", k, string(bytes))
+					default:
+						// Simple types
+						val = fmt.Sprintf("%s = %v", k, v)
+					}
 					commandParts = append(commandParts, val)
 				}
 

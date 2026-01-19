@@ -578,7 +578,7 @@ func (ag *Agent) Gemini2SwitchAgentToolCall(call *genai.FunctionCall) (*genai.Fu
 	}
 
 	// Call shared implementation
-	response, err := switchAgentToolCallImpl(&argsMap)
+	response, err := switchAgentToolCallImpl(&argsMap, &ag.ToolsUse)
 	resp.Response = map[string]any{
 		"output": response,
 		"error":  "",

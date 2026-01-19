@@ -36,6 +36,8 @@ func runTests(testName string) {
 		// test.TestAtRefProcessor()
 	case "anthropic":
 		// test.TestAnthropic()
+	case "home":
+		// test.TestHomeDirs()
 	case "all":
 		fmt.Println("Running all tests...")
 	default:

@@ -1122,7 +1122,7 @@ func saveMemoryToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 }
 
 // switchAgentToolCallImpl handles the switch_agent tool call
-func switchAgentToolCallImpl(argsMap *map[string]interface{}) (string, error) {
+func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
 	name, ok := (*argsMap)["name"].(string)
 	if !ok {
 		return "", fmt.Errorf("agent name is required")
@@ -1145,12 +1145,17 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 		// List all agents with details
 		for _, n := range names {
 			ag := agents[n]
-			sb.WriteString(fmt.Sprintf("- %s: Model=%s, ThinkingLevel=%s, Template=%s, Tools=%v\n",
-				n, ag.Model.Model, ag.Think, ag.Template, ag.Tools))
+			sb.WriteString(fmt.Sprintf("- %s: Model=%s, ThinkingLevel=%s, Tools=%v\n",
+				n, ag.Model.Model, ag.Think, ag.Tools))
 			if ag.SystemPrompt != "" {
 				// Show more of the system prompt to help the model decide
 				sysPrompt := strings.ReplaceAll(ag.SystemPrompt, "\n", " ")
 				sb.WriteString(fmt.Sprintf("  System Prompt: %s\n", sysPrompt))
+			}
+			if ag.Template != "" {
+				// Show more of the template to help the model decide
+				template := strings.ReplaceAll(ag.Template, "\n", " ")
+				sb.WriteString(fmt.Sprintf("  Template: %s\n", template))
 			}
 		}
 		sb.WriteString("\nTo switch to an agent, use this tool with the agent's name.")
@@ -1167,6 +1172,22 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 		return fmt.Sprintf("You are already using agent '%s'. No need to switch.", name), nil
 	}
 
+	// Check for confirmation
+	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
+	if !ok {
+		needConfirm = true // Default to true
+	}
+
+	if needConfirm && !toolsUse.AutoApprove {
+		confirm, err := NeedUserConfirm(fmt.Sprintf("switch to agent '%s'", name), ToolUserConfirmPrompt)
+		if err != nil {
+			return "", err
+		}
+		if !confirm {
+			return fmt.Sprintf("Operation cancelled by user: switch to agent %s", name), nil
+		}
+	}
+
 	// Set active agent
 	err := store.SetActiveAgent(name)
 	if err != nil {
@@ -1181,4 +1202,205 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 
 	// Signal to switch
 	return fmt.Sprintf("Switching to agent '%s'...", name), &SwitchAgentError{TargetAgent: name, Instruction: instruction}
+}
+
+// listAgentToolCallImpl handles the list_agent tool call
+// Returns a formatted list of all available agents with their capabilities
+func listAgentToolCallImpl() (string, error) {
+	store := data.NewConfigStore()
+	agents := store.GetAllAgents()
+
+	if len(agents) == 0 {
+		return "No agents configured. Use 'gllm agent add' to create agents.", nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Available Agents (%d total):\n\n", len(agents)))
+
+	// Sort agent names for consistent output
+	var names []string
+	for n := range agents {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		ag := agents[name]
+		sb.WriteString(fmt.Sprintf("## %s\n", name))
+		sb.WriteString(fmt.Sprintf("  Model: %s\n", ag.Model.Model))
+		sb.WriteString(fmt.Sprintf("  Provider: %s\n", ag.Model.Provider))
+		sb.WriteString(fmt.Sprintf("  Thinking Level: %s\n", ag.Think))
+
+		if len(ag.Tools) > 0 {
+			sb.WriteString(fmt.Sprintf("  Tools: %v\n", ag.Tools))
+		} else {
+			sb.WriteString("  Tools: none\n")
+		}
+
+		if ag.MCP {
+			sb.WriteString("  MCP: enabled\n")
+		}
+
+		if ag.SystemPrompt != "" {
+			// Show more system prompt to help model understand the agent
+			sysPrompt := strings.ReplaceAll(ag.SystemPrompt, "\n", " ")
+			sb.WriteString(fmt.Sprintf("  System Prompt: %s\n", sysPrompt))
+		}
+		if ag.Template != "" {
+			// Show more template to help model understand the agent
+			template := strings.ReplaceAll(ag.Template, "\n", " ")
+			sb.WriteString(fmt.Sprintf("  Template: %s\n", template))
+		}
+
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("Use call_agent to invoke a sub-agent, or switch_agent to hand off to another agent.")
+	return sb.String(), nil
+}
+
+// callAgentToolCallImpl handles the call_agent tool call
+// Invokes one or more sub-agents and returns progress summary
+func callAgentToolCallImpl(
+	argsMap *map[string]interface{},
+	executor *SubAgentExecutor,
+) (string, error) {
+	if executor == nil {
+		return "", fmt.Errorf("sub-agent executor not initialized")
+	}
+
+	// Parse tasks array
+	tasksInterface, ok := (*argsMap)["tasks"].([]interface{})
+	if !ok {
+		return "", fmt.Errorf("tasks parameter is required and must be an array")
+	}
+
+	if len(tasksInterface) == 0 {
+		return "No tasks provided. Please specify at least one task.", nil
+	}
+
+	timeout := 300 * time.Second // Default 5 minutes
+	if timeoutVal, exists := (*argsMap)["timeout"]; exists {
+		if timeoutFloat, ok := timeoutVal.(float64); ok && timeoutFloat > 0 {
+			timeout = time.Duration(timeoutFloat) * time.Second
+		}
+	}
+
+	// Convert tasks to SubAgentTask structs
+	var tasks []*SubAgentTask
+	for i, taskInterface := range tasksInterface {
+		taskMap, ok := taskInterface.(map[string]interface{})
+		if !ok {
+			return "", fmt.Errorf("task at index %d is not a valid object", i)
+		}
+
+		agentName, ok := taskMap["agent"].(string)
+		if !ok || agentName == "" {
+			return "", fmt.Errorf("task at index %d missing required 'agent' field", i)
+		}
+
+		instruction, ok := taskMap["instruction"].(string)
+		if !ok || instruction == "" {
+			return "", fmt.Errorf("task at index %d missing required 'instruction' field", i)
+		}
+
+		taskKey, ok := taskMap["task_key"].(string)
+		if !ok || taskKey == "" {
+			return "", fmt.Errorf("task at index %d missing required 'task_key' field", i)
+		}
+
+		tasks = append(tasks, &SubAgentTask{
+			AgentName:   agentName,
+			Instruction: instruction,
+			TaskKey:     taskKey,
+		})
+	}
+
+	// Submit and execute all tasks (always wait)
+	executor.SubmitBatch(tasks)
+	results := executor.Execute(timeout)
+
+	// Return formatted summary
+	return executor.FormatSummary(results), nil
+}
+
+// getStateToolCallImpl handles the get_state tool call
+// Retrieves a value from SharedState
+func getStateToolCallImpl(
+	argsMap *map[string]interface{},
+	state *data.SharedState,
+) (string, error) {
+	if state == nil {
+		return "", fmt.Errorf("shared state not initialized")
+	}
+
+	key, ok := (*argsMap)["key"].(string)
+	if !ok || key == "" {
+		return "", fmt.Errorf("key parameter is required")
+	}
+
+	// Get metadata for context
+	meta := state.GetMetadata(key)
+	if meta == nil {
+		return fmt.Sprintf("Key '%s' not found in SharedState. Use list_state to see available keys.", key), nil
+	}
+
+	var result strings.Builder
+	result.WriteString(fmt.Sprintf("Key: %s\n", key))
+	if meta != nil {
+		result.WriteString(fmt.Sprintf("Created by: %s\n", meta.CreatedBy))
+		result.WriteString(fmt.Sprintf("Type: %s\n", meta.ContentType))
+		result.WriteString(fmt.Sprintf("Size: %d bytes\n", meta.Size))
+	}
+
+	value := state.GetString(key)
+	result.WriteString("\nValue:\n")
+	result.WriteString(value)
+
+	return result.String(), nil
+}
+
+// setStateToolCallImpl handles the set_state tool call
+// Stores a value in SharedState
+func setStateToolCallImpl(
+	argsMap *map[string]interface{},
+	agentName string,
+	state *data.SharedState,
+) (string, error) {
+	if state == nil {
+		return "", fmt.Errorf("shared state not initialized")
+	}
+
+	key, ok := (*argsMap)["key"].(string)
+	if !ok || key == "" {
+		return "", fmt.Errorf("key parameter is required")
+	}
+
+	value, ok := (*argsMap)["value"]
+	if !ok {
+		return "", fmt.Errorf("value parameter is required")
+	}
+
+	// Check if key already exists
+	existed := state.Has(key)
+
+	err := state.Set(key, value, agentName)
+	if err != nil {
+		return "", fmt.Errorf("failed to set state: %v", err)
+	}
+
+	if existed {
+		return fmt.Sprintf("Successfully updated key '%s' in SharedState.", key), nil
+	}
+	return fmt.Sprintf("Successfully created key '%s' in SharedState.", key), nil
+}
+
+// listStateToolCallImpl handles the list_state tool call
+// Lists all keys and metadata in SharedState
+func listStateToolCallImpl(state *data.SharedState) (string, error) {
+	if state == nil {
+		return "", fmt.Errorf("shared state not initialized")
+	}
+
+	return state.FormatList(), nil
 }

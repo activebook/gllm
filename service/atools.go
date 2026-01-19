@@ -233,7 +233,7 @@ func (op *OpenProcessor) AnthropicMCPToolCall(toolCall anthropic.ToolUseBlockPar
 }
 
 func (op *OpenProcessor) AnthropicSwitchAgentToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
-	response, err := switchAgentToolCallImpl(argsMap)
+	response, err := switchAgentToolCallImpl(argsMap, op.toolsUse)
 	isError := err != nil && !IsSwitchAgentError(err)
 	if err != nil && !IsSwitchAgentError(err) {
 		response = fmt.Sprintf("Error: %v", err)
