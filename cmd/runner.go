@@ -117,7 +117,7 @@ func RunAgent(prompt string, files []*service.FileData, convoName string, yolo b
 			// Switch agent signal
 			if service.IsSwitchAgentError(err) {
 				switchErr := err.(*service.SwitchAgentError)
-				service.Infof("Already switched to agent [%s]...", switchErr.TargetAgent)
+				service.Infof("Already switched to agent [%s].", switchErr.TargetAgent)
 				// Set instruction, shouldn't use the old prompt
 				prompt = switchErr.Instruction
 				service.Debugf("Switch agent instruction: %s", prompt)

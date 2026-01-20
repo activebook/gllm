@@ -119,6 +119,9 @@ func (ga *Gemini2Agent) Gemini2ReadFileToolCall(call *genai.FunctionCall) (*gena
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -145,6 +148,9 @@ func (ga *Gemini2Agent) Gemini2WriteFileToolCall(call *genai.FunctionCall) (*gen
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -171,6 +177,9 @@ func (ga *Gemini2Agent) Gemini2CreateDirectoryToolCall(call *genai.FunctionCall)
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -197,6 +206,9 @@ func (ga *Gemini2Agent) Gemini2ListDirectoryToolCall(call *genai.FunctionCall) (
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -223,6 +235,9 @@ func (ga *Gemini2Agent) Gemini2DeleteFileToolCall(call *genai.FunctionCall) (*ge
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -249,6 +264,9 @@ func (ga *Gemini2Agent) Gemini2DeleteDirectoryToolCall(call *genai.FunctionCall)
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -267,7 +285,7 @@ func (ga *Gemini2Agent) Gemini2MCPToolCall(call *genai.FunctionCall) (*genai.Fun
 		err := fmt.Errorf("MCP client not initialized")
 		error := fmt.Sprintf("Error: MCP tool call failed: %v", err)
 		resp.Response = map[string]any{
-			"output": "",
+			"output": error,
 			"error":  error,
 		}
 		return &resp, err
@@ -285,7 +303,7 @@ func (ga *Gemini2Agent) Gemini2MCPToolCall(call *genai.FunctionCall) (*genai.Fun
 		// Wrap error in response
 		error := fmt.Sprintf("Error: MCP tool call failed: %v", err)
 		resp.Response = map[string]any{
-			"output": "",
+			"output": error,
 			"error":  error,
 		}
 		return &resp, err
@@ -330,6 +348,9 @@ func (ga *Gemini2Agent) Gemini2MoveToolCall(call *genai.FunctionCall) (*genai.Fu
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -356,6 +377,9 @@ func (ga *Gemini2Agent) Gemini2SearchFilesToolCall(call *genai.FunctionCall) (*g
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -382,6 +406,9 @@ func (ga *Gemini2Agent) Gemini2SearchTextInFileToolCall(call *genai.FunctionCall
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -408,6 +435,9 @@ func (ga *Gemini2Agent) Gemini2ReadMultipleFilesToolCall(call *genai.FunctionCal
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -434,6 +464,9 @@ func (ga *Gemini2Agent) Gemini2ShellToolCall(call *genai.FunctionCall) (*genai.F
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -460,6 +493,9 @@ func (ga *Gemini2Agent) Gemini2WebFetchToolCall(call *genai.FunctionCall) (*gena
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -486,6 +522,9 @@ func (ga *Gemini2Agent) Gemini2EditFileToolCall(call *genai.FunctionCall) (*gena
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -512,6 +551,9 @@ func (ga *Gemini2Agent) Gemini2CopyToolCall(call *genai.FunctionCall) (*genai.Fu
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -532,6 +574,9 @@ func (ga *Gemini2Agent) Gemini2ListMemoryToolCall(call *genai.FunctionCall) (*ge
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -558,6 +603,9 @@ func (ga *Gemini2Agent) Gemini2SaveMemoryToolCall(call *genai.FunctionCall) (*ge
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -584,10 +632,13 @@ func (ga *Gemini2Agent) Gemini2SwitchAgentToolCall(call *genai.FunctionCall) (*g
 	error := ""
 	if err != nil {
 		if IsSwitchAgentError(err) {
-			resp.Response = map[string]any{"error": err.Error()}
+			resp.Response = map[string]any{"output": err.Error(), "error": err.Error()}
 			return &resp, err
 		}
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -607,6 +658,9 @@ func (ga *Gemini2Agent) Gemini2ListAgentToolCall(call *genai.FunctionCall) (*gen
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -632,6 +686,9 @@ func (ga *Gemini2Agent) Gemini2CallAgentToolCall(call *genai.FunctionCall) (*gen
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -656,6 +713,9 @@ func (ga *Gemini2Agent) Gemini2GetStateToolCall(call *genai.FunctionCall) (*gena
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -680,6 +740,9 @@ func (ga *Gemini2Agent) Gemini2SetStateToolCall(call *genai.FunctionCall) (*gena
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
@@ -699,6 +762,9 @@ func (ga *Gemini2Agent) Gemini2ListStateToolCall(call *genai.FunctionCall) (*gen
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
 	}
 
 	resp.Response = map[string]any{
