@@ -1241,269 +1241,217 @@ func (op *OpenProcessor) closeDiffConfirm() {
 func (op *OpenProcessor) OpenAIShellToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := shellToolCallImpl(argsMap, op.toolsUse)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
 
 func (op *OpenProcessor) OpenAIWebFetchToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := webFetchToolCallImpl(argsMap)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
 
 func (op *OpenProcessor) OpenAIWebSearchToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := webSearchToolCallImpl(argsMap, &op.queries, &op.references, op.search)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+		ToolCallID: toolCall.ID,
+	}, err
 }
 
 func (op *OpenProcessor) OpenAIReadFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := readFileToolCallImpl(argsMap)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
 
 func (op *OpenProcessor) OpenAIWriteFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := writeFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
-
-// func (op *OpenProcessor) OpenAIEditFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-// 	response, err := editFileToolCallImpl(argsMap, op.toolsUse)
-// 	if err != nil {
-// 		return openai.ChatCompletionMessage{}, err
-// 	}
-
-// 	return openai.ChatCompletionMessage{
-// 		Role:       openai.ChatMessageRoleTool,
-// 		ToolCallID: toolCall.ID,
-// 		Content:    response,
-// 	}, nil
-// }
 
 func (op *OpenProcessor) OpenAIEditFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := editFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
 
 func (op *OpenProcessor) OpenAICreateDirectoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := createDirectoryToolCallImpl(argsMap)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
 
 func (op *OpenProcessor) OpenAIListDirectoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := listDirectoryToolCallImpl(argsMap)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
 
 func (op *OpenProcessor) OpenAIDeleteFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := deleteFileToolCallImpl(argsMap, op.toolsUse)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
 
 func (op *OpenProcessor) OpenAIDeleteDirectoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := deleteDirectoryToolCallImpl(argsMap, op.toolsUse)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
 
 func (op *OpenProcessor) OpenAIMoveToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := moveToolCallImpl(argsMap, op.toolsUse)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
 
 func (op *OpenProcessor) OpenAICopyToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := copyToolCallImpl(argsMap, op.toolsUse)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
 
 func (op *OpenProcessor) OpenAISearchFilesToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := searchFilesToolCallImpl(argsMap)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
 
 func (op *OpenProcessor) OpenAISearchTextInFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := searchTextInFileToolCallImpl(argsMap)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
 
 func (op *OpenProcessor) OpenAIReadMultipleFilesToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := readMultipleFilesToolCallImpl(argsMap)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
-
-// MCP tool call implementations
-/*
-Here is a bug:
-status: 422 Unprocessable Entity, message: %!s(<nil>),
-body: {"detail":[{"type":"string_type","loc":["body","messages",2,"ChatCompletionToolMessage","content"],"msg":"Input should be a valid string"
-it is caused by the tool call response can be only a simple string
-*/
-// func (op *OpenProcessor) OpenAIMCPToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-// 	if op.mcpClient == nil {
-// 		return openai.ChatCompletionMessage{}, fmt.Errorf("MCP client not initialized")
-// 	}
-
-// 	// Call the MCP tool
-// 	result, err := op.mcpClient.CallTool(toolCall.Function.Name, *argsMap)
-// 	if err != nil {
-// 		return openai.ChatCompletionMessage{}, fmt.Errorf("MCP tool call failed: %v", err)
-// 	}
-
-// 	parts := []openai.ChatMessagePart{}
-// 	for i, content := range result.Contents {
-// 		switch result.Types[i] {
-// 		case MCPResponseText:
-// 			part := openai.ChatMessagePart{
-// 				Type: openai.ChatMessagePartTypeText,
-// 				Text: content,
-// 			}
-// 			parts = append(parts, part)
-// 		case MCPResponseImage:
-// 			part := openai.ChatMessagePart{
-// 				Type: openai.ChatMessagePartTypeImageURL,
-// 				ImageURL: &openai.ChatMessageImageURL{
-// 					URL: content,
-// 				},
-// 			}
-// 			parts = append(parts, part)
-// 		default:
-// 			// Unknown file type, skip
-// 			// Don't deal with pdf, xls
-// 			// It needs upload to OpenAI's servers first, so we can't include them directly in a message.
-// 		}
-// 	}
-
-// 	return openai.ChatCompletionMessage{
-// 		Role:         openai.ChatMessageRoleTool,
-// 		ToolCallID:   toolCall.ID,
-// 		MultiContent: parts,
-// 	}, nil
-// }
 
 func (op *OpenProcessor) OpenAIMCPToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	if op.mcpClient == nil {
-		return openai.ChatCompletionMessage{}, fmt.Errorf("MCP client not initialized")
+		err := fmt.Errorf("MCP client not initialized")
+		return openai.ChatCompletionMessage{
+			Role:       openai.ChatMessageRoleTool,
+			ToolCallID: toolCall.ID,
+			Content:    fmt.Sprintf("Error: MCP tool call failed: %v", err),
+		}, err
 	}
 
 	// Call the MCP tool
 	result, err := op.mcpClient.CallTool(toolCall.Function.Name, *argsMap)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, fmt.Errorf("MCP tool call failed: %v", err)
+		// Wrap error in response
+		return openai.ChatCompletionMessage{
+			Role:       openai.ChatMessageRoleTool,
+			ToolCallID: toolCall.ID,
+			Content:    fmt.Sprintf("Error: MCP tool call failed: %v", err),
+		}, err
 	}
 
 	// Concatenate all text and image URLs into a single string output
@@ -1537,28 +1485,28 @@ func (op *OpenProcessor) OpenAIListMemoryToolCall(toolCall openai.ToolCall, args
 	// Call shared implementation (no args needed)
 	response, err := listMemoryToolCallImpl()
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+		ToolCallID: toolCall.ID,
+	}, err
 }
 
 func (op *OpenProcessor) OpenAISaveMemoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	// Call shared implementation
 	response, err := saveMemoryToolCallImpl(argsMap)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+		ToolCallID: toolCall.ID,
+	}, err
 }
 
 func (op *OpenProcessor) OpenAISwitchAgentToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
@@ -1575,10 +1523,11 @@ func (op *OpenProcessor) OpenAISwitchAgentToolCall(toolCall openai.ToolCall, arg
 		if IsSwitchAgentError(err) {
 			return toolMessage, err
 		}
-		return toolMessage, err
+		// Wrap other errors in response
+		toolMessage.Content = fmt.Sprintf("Error: %v", err)
 	}
 
-	return toolMessage, nil
+	return toolMessage, err
 }
 
 // OpenAI wrappers for new orchestration tools
@@ -1586,66 +1535,66 @@ func (op *OpenProcessor) OpenAISwitchAgentToolCall(toolCall openai.ToolCall, arg
 func (op *OpenProcessor) OpenAIListAgentToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := listAgentToolCallImpl()
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
 
 func (op *OpenProcessor) OpenAICallAgentToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := callAgentToolCallImpl(argsMap, op.executor)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
 
 func (op *OpenProcessor) OpenAIGetStateToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := getStateToolCallImpl(argsMap, op.sharedState)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
 
 func (op *OpenProcessor) OpenAISetStateToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := setStateToolCallImpl(argsMap, op.agentName, op.sharedState)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
 
 func (op *OpenProcessor) OpenAIListStateToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := listStateToolCallImpl(op.sharedState)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		ToolCallID: toolCall.ID,
 		Content:    response,
-	}, nil
+	}, err
 }
 
 func (op *OpenProcessor) OpenChatSwitchAgentToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
@@ -1667,18 +1616,35 @@ func (op *OpenProcessor) OpenChatSwitchAgentToolCall(toolCall *model.ToolCall, a
 		return &toolMessage, err
 	}
 
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatMCPToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	if op.mcpClient == nil {
-		return nil, fmt.Errorf("MCP client not initialized")
+		err := fmt.Errorf("MCP client not initialized")
+		toolMessage := model.ChatCompletionMessage{
+			Role:       model.ChatMessageRoleTool,
+			ToolCallID: toolCall.ID,
+			Name:       Ptr(""),
+			Content: &model.ChatCompletionMessageContent{
+				StringValue: volcengine.String(fmt.Sprintf("Error: MCP tool call failed: %v", err)),
+			},
+		}
+		return &toolMessage, err
 	}
 
 	// Call the MCP tool
 	result, err := op.mcpClient.CallTool(toolCall.Function.Name, *argsMap)
 	if err != nil {
-		return nil, fmt.Errorf("MCP tool call failed: %v", err)
+		toolMessage := model.ChatCompletionMessage{
+			Role:       model.ChatMessageRoleTool,
+			ToolCallID: toolCall.ID,
+			Name:       Ptr(""),
+			Content: &model.ChatCompletionMessageContent{
+				StringValue: volcengine.String(fmt.Sprintf("Error: MCP tool call failed: %v", err)),
+			},
+		}
+		return &toolMessage, err
 	}
 
 	// OpenChat supports text, image, audio toolcall responses
@@ -1725,13 +1691,13 @@ func (op *OpenProcessor) OpenChatReadFileToolCall(toolCall *model.ToolCall, args
 
 	response, err := readFileToolCallImpl(argsMap)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(response),
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatWriteFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
@@ -1743,13 +1709,13 @@ func (op *OpenProcessor) OpenChatWriteFileToolCall(toolCall *model.ToolCall, arg
 
 	response, err := writeFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(response),
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatCreateDirectoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
@@ -1761,13 +1727,13 @@ func (op *OpenProcessor) OpenChatCreateDirectoryToolCall(toolCall *model.ToolCal
 
 	response, err := createDirectoryToolCallImpl(argsMap)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(response),
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatListDirectoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
@@ -1779,13 +1745,13 @@ func (op *OpenProcessor) OpenChatListDirectoryToolCall(toolCall *model.ToolCall,
 
 	response, err := listDirectoryToolCallImpl(argsMap)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(response),
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatDeleteFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
@@ -1797,13 +1763,13 @@ func (op *OpenProcessor) OpenChatDeleteFileToolCall(toolCall *model.ToolCall, ar
 
 	response, err := deleteFileToolCallImpl(argsMap, op.toolsUse)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(response),
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatDeleteDirectoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
@@ -1815,13 +1781,13 @@ func (op *OpenProcessor) OpenChatDeleteDirectoryToolCall(toolCall *model.ToolCal
 
 	response, err := deleteDirectoryToolCallImpl(argsMap, op.toolsUse)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(response),
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatMoveToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
@@ -1833,13 +1799,13 @@ func (op *OpenProcessor) OpenChatMoveToolCall(toolCall *model.ToolCall, argsMap 
 
 	response, err := moveToolCallImpl(argsMap, op.toolsUse)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(response),
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatSearchFilesToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
@@ -1851,13 +1817,13 @@ func (op *OpenProcessor) OpenChatSearchFilesToolCall(toolCall *model.ToolCall, a
 
 	response, err := searchFilesToolCallImpl(argsMap)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(response),
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatSearchTextInFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
@@ -1869,13 +1835,13 @@ func (op *OpenProcessor) OpenChatSearchTextInFileToolCall(toolCall *model.ToolCa
 
 	response, err := searchTextInFileToolCallImpl(argsMap)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(response),
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatReadMultipleFilesToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
@@ -1887,13 +1853,13 @@ func (op *OpenProcessor) OpenChatReadMultipleFilesToolCall(toolCall *model.ToolC
 
 	response, err := readMultipleFilesToolCallImpl(argsMap)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(response),
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatShellToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
@@ -1905,13 +1871,13 @@ func (op *OpenProcessor) OpenChatShellToolCall(toolCall *model.ToolCall, argsMap
 
 	response, err := shellToolCallImpl(argsMap, op.toolsUse)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(response),
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatWebFetchToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
@@ -1923,19 +1889,19 @@ func (op *OpenProcessor) OpenChatWebFetchToolCall(toolCall *model.ToolCall, args
 
 	response, err := webFetchToolCallImpl(argsMap)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(response),
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatWebSearchToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	response, err := webSearchToolCallImpl(argsMap, &op.queries, &op.references, op.search)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	// Create and return the tool response message
@@ -1945,26 +1911,8 @@ func (op *OpenProcessor) OpenChatWebSearchToolCall(toolCall *model.ToolCall, arg
 			StringValue: volcengine.String(response),
 		}, Name: Ptr(""),
 		ToolCallID: toolCall.ID,
-	}, nil
+	}, err
 }
-
-// func (op *OpenProcessor) OpenChatEditFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-// 	toolMessage := model.ChatCompletionMessage{
-// 		Role:       model.ChatMessageRoleTool,
-// 		ToolCallID: toolCall.ID,
-// 		Name:       Ptr(""),
-// 	}
-
-// 	response, err := editFileToolCallImpl(argsMap, op.toolsUse)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	toolMessage.Content = &model.ChatCompletionMessageContent{
-// 		StringValue: volcengine.String(response),
-// 	}
-// 	return &toolMessage, nil
-// }
 
 func (op *OpenProcessor) OpenChatEditFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	toolMessage := model.ChatCompletionMessage{
@@ -1975,13 +1923,13 @@ func (op *OpenProcessor) OpenChatEditFileToolCall(toolCall *model.ToolCall, args
 
 	response, err := editFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(response),
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatCopyToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
@@ -1993,20 +1941,20 @@ func (op *OpenProcessor) OpenChatCopyToolCall(toolCall *model.ToolCall, argsMap 
 
 	response, err := copyToolCallImpl(argsMap, op.toolsUse)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(response),
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatListMemoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	// Call shared implementation (no args needed)
 	response, err := listMemoryToolCallImpl()
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage := model.ChatCompletionMessage{
@@ -2017,14 +1965,14 @@ func (op *OpenProcessor) OpenChatListMemoryToolCall(toolCall *model.ToolCall, ar
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(response),
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatSaveMemoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	// Call shared implementation
 	response, err := saveMemoryToolCallImpl(argsMap)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage := model.ChatCompletionMessage{
@@ -2035,13 +1983,13 @@ func (op *OpenProcessor) OpenChatSaveMemoryToolCall(toolCall *model.ToolCall, ar
 	toolMessage.Content = &model.ChatCompletionMessageContent{
 		StringValue: volcengine.String(response),
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatListAgentToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	response, err := listAgentToolCallImpl()
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage := model.ChatCompletionMessage{
@@ -2052,13 +2000,13 @@ func (op *OpenProcessor) OpenChatListAgentToolCall(toolCall *model.ToolCall, arg
 			StringValue: volcengine.String(response),
 		},
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatCallAgentToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	response, err := callAgentToolCallImpl(argsMap, op.executor)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage := model.ChatCompletionMessage{
@@ -2069,13 +2017,13 @@ func (op *OpenProcessor) OpenChatCallAgentToolCall(toolCall *model.ToolCall, arg
 			StringValue: volcengine.String(response),
 		},
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatGetStateToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	response, err := getStateToolCallImpl(argsMap, op.sharedState)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage := model.ChatCompletionMessage{
@@ -2086,13 +2034,13 @@ func (op *OpenProcessor) OpenChatGetStateToolCall(toolCall *model.ToolCall, args
 			StringValue: volcengine.String(response),
 		},
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatSetStateToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	response, err := setStateToolCallImpl(argsMap, op.agentName, op.sharedState)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage := model.ChatCompletionMessage{
@@ -2103,13 +2051,13 @@ func (op *OpenProcessor) OpenChatSetStateToolCall(toolCall *model.ToolCall, args
 			StringValue: volcengine.String(response),
 		},
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }
 
 func (op *OpenProcessor) OpenChatListStateToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	response, err := listStateToolCallImpl(op.sharedState)
 	if err != nil {
-		return nil, err
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
 	toolMessage := model.ChatCompletionMessage{
@@ -2120,5 +2068,5 @@ func (op *OpenProcessor) OpenChatListStateToolCall(toolCall *model.ToolCall, arg
 			StringValue: volcengine.String(response),
 		},
 	}
-	return &toolMessage, nil
+	return &toolMessage, err
 }

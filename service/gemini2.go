@@ -279,9 +279,8 @@ func (ag *Agent) GenerateGemini2Stream() error {
 					return err
 				}
 				ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
-				// Send error info to user but continue processing other tool calls
-				continue
 			}
+			// Bugfix: Even error happened, we still need to send the function response back through the chat session
 			// Send function response back through the chat session
 			respPart := genai.Part{FunctionResponse: funcResp}
 			*streamParts = append(*streamParts, respPart)

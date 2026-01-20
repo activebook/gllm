@@ -85,6 +85,21 @@ func (ga *Gemini2Agent) getGemini2CodeExecTool() *genai.Tool {
 	return tool
 }
 
+// Diff confirm func
+func (ga *Gemini2Agent) gemini2ShowDiffConfirm(diff string) {
+	// Function call is over
+	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusFunctionCallingOver}, ga.ProceedChan)
+
+	// Show the diff confirm
+	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Data: diff, Status: StatusDiffConfirm}, ga.ProceedChan)
+}
+
+// Diff close func
+func (ga *Gemini2Agent) gemini2CloseDiffConfirm() {
+	// Confirm diff is over
+	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusDiffConfirmOver}, ga.ProceedChan)
+}
+
 // Tool implementation functions for Gemini 2
 
 func (ga *Gemini2Agent) Gemini2ReadFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -101,15 +116,16 @@ func (ga *Gemini2Agent) Gemini2ReadFileToolCall(call *genai.FunctionCall) (*gena
 
 	// Call shared implementation
 	response, err := readFileToolCallImpl(&argsMap)
+	error := ""
 	if err != nil {
-		return nil, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp.Response = map[string]any{
 		"output": response,
-		"error":  "",
+		"error":  error,
 	}
-	return &resp, nil
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2WriteFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -126,15 +142,16 @@ func (ga *Gemini2Agent) Gemini2WriteFileToolCall(call *genai.FunctionCall) (*gen
 
 	// Call shared implementation
 	response, err := writeFileToolCallImpl(&argsMap, &ga.ToolsUse, ga.gemini2ShowDiffConfirm, ga.gemini2CloseDiffConfirm)
+	error := ""
 	if err != nil {
-		return nil, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp.Response = map[string]any{
 		"output": response,
-		"error":  "",
+		"error":  error,
 	}
-	return &resp, nil
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2CreateDirectoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -151,15 +168,16 @@ func (ga *Gemini2Agent) Gemini2CreateDirectoryToolCall(call *genai.FunctionCall)
 
 	// Call shared implementation
 	response, err := createDirectoryToolCallImpl(&argsMap)
+	error := ""
 	if err != nil {
-		return nil, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp.Response = map[string]any{
 		"output": response,
-		"error":  "",
+		"error":  error,
 	}
-	return &resp, nil
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2ListDirectoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -176,15 +194,16 @@ func (ga *Gemini2Agent) Gemini2ListDirectoryToolCall(call *genai.FunctionCall) (
 
 	// Call shared implementation
 	response, err := listDirectoryToolCallImpl(&argsMap)
+	error := ""
 	if err != nil {
-		return nil, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp.Response = map[string]any{
 		"output": response,
-		"error":  "",
+		"error":  error,
 	}
-	return &resp, nil
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2DeleteFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -201,15 +220,16 @@ func (ga *Gemini2Agent) Gemini2DeleteFileToolCall(call *genai.FunctionCall) (*ge
 
 	// Call shared implementation
 	response, err := deleteFileToolCallImpl(&argsMap, &ga.ToolsUse)
+	error := ""
 	if err != nil {
-		return nil, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp.Response = map[string]any{
 		"output": response,
-		"error":  "",
+		"error":  error,
 	}
-	return &resp, nil
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2DeleteDirectoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -226,25 +246,31 @@ func (ga *Gemini2Agent) Gemini2DeleteDirectoryToolCall(call *genai.FunctionCall)
 
 	// Call shared implementation
 	response, err := deleteDirectoryToolCallImpl(&argsMap, &ga.ToolsUse)
+	error := ""
 	if err != nil {
-		return nil, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp.Response = map[string]any{
 		"output": response,
-		"error":  "",
+		"error":  error,
 	}
-	return &resp, nil
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2MCPToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	if ga.MCPClient == nil {
-		return nil, fmt.Errorf("MCP client not initialized")
-	}
-
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
+	}
+	if ga.MCPClient == nil {
+		err := fmt.Errorf("MCP client not initialized")
+		error := fmt.Sprintf("Error: MCP tool call failed: %v", err)
+		resp.Response = map[string]any{
+			"output": "",
+			"error":  error,
+		}
+		return &resp, err
 	}
 
 	// Convert genai.FunctionCall.Args to map[string]interface{}
@@ -256,7 +282,13 @@ func (ga *Gemini2Agent) Gemini2MCPToolCall(call *genai.FunctionCall) (*genai.Fun
 	// Call the MCP tool
 	result, err := ga.MCPClient.CallTool(call.Name, argsMap)
 	if err != nil {
-		return nil, fmt.Errorf("MCP tool call failed: %v", err)
+		// Wrap error in response
+		error := fmt.Sprintf("Error: MCP tool call failed: %v", err)
+		resp.Response = map[string]any{
+			"output": "",
+			"error":  error,
+		}
+		return &resp, err
 	}
 
 	// Convert to markdown string output for Gemini
@@ -295,15 +327,16 @@ func (ga *Gemini2Agent) Gemini2MoveToolCall(call *genai.FunctionCall) (*genai.Fu
 
 	// Call shared implementation
 	response, err := moveToolCallImpl(&argsMap, &ga.ToolsUse)
+	error := ""
 	if err != nil {
-		return nil, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp.Response = map[string]any{
 		"output": response,
-		"error":  "",
+		"error":  error,
 	}
-	return &resp, nil
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2SearchFilesToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -320,15 +353,16 @@ func (ga *Gemini2Agent) Gemini2SearchFilesToolCall(call *genai.FunctionCall) (*g
 
 	// Call shared implementation
 	response, err := searchFilesToolCallImpl(&argsMap)
+	error := ""
 	if err != nil {
-		return nil, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp.Response = map[string]any{
 		"output": response,
-		"error":  "",
+		"error":  error,
 	}
-	return &resp, nil
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2SearchTextInFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -345,15 +379,16 @@ func (ga *Gemini2Agent) Gemini2SearchTextInFileToolCall(call *genai.FunctionCall
 
 	// Call shared implementation
 	response, err := searchTextInFileToolCallImpl(&argsMap)
+	error := ""
 	if err != nil {
-		return nil, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp.Response = map[string]any{
 		"output": response,
-		"error":  "",
+		"error":  error,
 	}
-	return &resp, nil
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2ReadMultipleFilesToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -370,15 +405,16 @@ func (ga *Gemini2Agent) Gemini2ReadMultipleFilesToolCall(call *genai.FunctionCal
 
 	// Call shared implementation
 	response, err := readMultipleFilesToolCallImpl(&argsMap)
+	error := ""
 	if err != nil {
-		return nil, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp.Response = map[string]any{
 		"output": response,
-		"error":  "",
+		"error":  error,
 	}
-	return &resp, nil
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2ShellToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -395,15 +431,16 @@ func (ga *Gemini2Agent) Gemini2ShellToolCall(call *genai.FunctionCall) (*genai.F
 
 	// Call shared implementation
 	response, err := shellToolCallImpl(&argsMap, &ga.ToolsUse)
+	error := ""
 	if err != nil {
-		return nil, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp.Response = map[string]any{
 		"output": response,
-		"error":  "",
+		"error":  error,
 	}
-	return &resp, nil
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2WebFetchToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -420,41 +457,17 @@ func (ga *Gemini2Agent) Gemini2WebFetchToolCall(call *genai.FunctionCall) (*gena
 
 	// Call shared implementation
 	response, err := webFetchToolCallImpl(&argsMap)
+	error := ""
 	if err != nil {
-		return nil, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp.Response = map[string]any{
 		"output": response,
-		"error":  "",
+		"error":  error,
 	}
-	return &resp, nil
+	return &resp, err
 }
-
-// func (ga *Gemini2Agent) Gemini2EditFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-// 	resp := genai.FunctionResponse{
-// 		ID:   call.ID,
-// 		Name: call.Name,
-// 	}
-
-// 	// Convert genai.FunctionCall.Args to map[string]interface{}
-// 	argsMap := make(map[string]interface{})
-// 	for k, v := range call.Args {
-// 		argsMap[k] = v
-// 	}
-
-// 	// Call shared implementation
-// 	response, err := editFileToolCallImpl(&argsMap, &ga.ToolsUse)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	resp.Response = map[string]any{
-// 		"output": response,
-// 		"error":  "",
-// 	}
-// 	return &resp, nil
-// }
 
 func (ga *Gemini2Agent) Gemini2EditFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
@@ -470,15 +483,16 @@ func (ga *Gemini2Agent) Gemini2EditFileToolCall(call *genai.FunctionCall) (*gena
 
 	// Call shared implementation
 	response, err := editFileToolCallImpl(&argsMap, &ga.ToolsUse, ga.gemini2ShowDiffConfirm, ga.gemini2CloseDiffConfirm)
+	error := ""
 	if err != nil {
-		return nil, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp.Response = map[string]any{
 		"output": response,
-		"error":  "",
+		"error":  error,
 	}
-	return &resp, nil
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2CopyToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -495,30 +509,16 @@ func (ga *Gemini2Agent) Gemini2CopyToolCall(call *genai.FunctionCall) (*genai.Fu
 
 	// Call shared implementation
 	response, err := copyToolCallImpl(&argsMap, &ga.ToolsUse)
+	error := ""
 	if err != nil {
-		return nil, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp.Response = map[string]any{
 		"output": response,
-		"error":  "",
+		"error":  error,
 	}
-	return &resp, nil
-}
-
-// Diff confirm func
-func (ga *Gemini2Agent) gemini2ShowDiffConfirm(diff string) {
-	// Function call is over
-	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusFunctionCallingOver}, ga.ProceedChan)
-
-	// Show the diff confirm
-	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Data: diff, Status: StatusDiffConfirm}, ga.ProceedChan)
-}
-
-// Diff close func
-func (ga *Gemini2Agent) gemini2CloseDiffConfirm() {
-	// Confirm diff is over
-	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusDiffConfirmOver}, ga.ProceedChan)
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2ListMemoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -529,15 +529,16 @@ func (ga *Gemini2Agent) Gemini2ListMemoryToolCall(call *genai.FunctionCall) (*ge
 
 	// Call shared implementation (no args needed)
 	response, err := listMemoryToolCallImpl()
+	error := ""
 	if err != nil {
-		return nil, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp.Response = map[string]any{
 		"output": response,
-		"error":  "",
+		"error":  error,
 	}
-	return &resp, nil
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2SaveMemoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -554,15 +555,16 @@ func (ga *Gemini2Agent) Gemini2SaveMemoryToolCall(call *genai.FunctionCall) (*ge
 
 	// Call shared implementation
 	response, err := saveMemoryToolCallImpl(&argsMap)
+	error := ""
 	if err != nil {
-		return nil, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp.Response = map[string]any{
 		"output": response,
-		"error":  "",
+		"error":  error,
 	}
-	return &resp, nil
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2SwitchAgentToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -579,22 +581,20 @@ func (ga *Gemini2Agent) Gemini2SwitchAgentToolCall(call *genai.FunctionCall) (*g
 
 	// Call shared implementation
 	response, err := switchAgentToolCallImpl(&argsMap, &ga.ToolsUse)
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  "",
-	}
+	error := ""
 	if err != nil {
 		if IsSwitchAgentError(err) {
+			resp.Response = map[string]any{"error": err.Error()}
 			return &resp, err
 		}
-		return &resp, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp.Response = map[string]any{
 		"output": response,
-		"error":  "",
+		"error":  error,
 	}
-	return &resp, nil
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2ListAgentToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -604,13 +604,16 @@ func (ga *Gemini2Agent) Gemini2ListAgentToolCall(call *genai.FunctionCall) (*gen
 	}
 
 	response, err := listAgentToolCallImpl()
+	error := ""
 	if err != nil {
-		resp.Response = map[string]any{"error": err.Error()}
-		return &resp, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
-	resp.Response = map[string]any{"output": response}
-	return &resp, nil
+	resp.Response = map[string]any{
+		"output": response,
+		"error":  error,
+	}
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2CallAgentToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -626,13 +629,16 @@ func (ga *Gemini2Agent) Gemini2CallAgentToolCall(call *genai.FunctionCall) (*gen
 	}
 
 	response, err := callAgentToolCallImpl(&argsMap, ga.executor)
+	error := ""
 	if err != nil {
-		resp.Response = map[string]any{"error": err.Error()}
-		return &resp, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
-	resp.Response = map[string]any{"output": response}
-	return &resp, nil
+	resp.Response = map[string]any{
+		"output": response,
+		"error":  error,
+	}
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2GetStateToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -647,13 +653,16 @@ func (ga *Gemini2Agent) Gemini2GetStateToolCall(call *genai.FunctionCall) (*gena
 	}
 
 	response, err := getStateToolCallImpl(&argsMap, ga.SharedState)
+	error := ""
 	if err != nil {
-		resp.Response = map[string]any{"error": err.Error()}
-		return &resp, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
-	resp.Response = map[string]any{"output": response}
-	return &resp, nil
+	resp.Response = map[string]any{
+		"output": response,
+		"error":  error,
+	}
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2SetStateToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -668,13 +677,16 @@ func (ga *Gemini2Agent) Gemini2SetStateToolCall(call *genai.FunctionCall) (*gena
 	}
 
 	response, err := setStateToolCallImpl(&argsMap, ga.AgentName, ga.SharedState)
+	error := ""
 	if err != nil {
-		resp.Response = map[string]any{"error": err.Error()}
-		return &resp, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
-	resp.Response = map[string]any{"output": response}
-	return &resp, nil
+	resp.Response = map[string]any{
+		"output": response,
+		"error":  error,
+	}
+	return &resp, err
 }
 
 func (ga *Gemini2Agent) Gemini2ListStateToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
@@ -684,11 +696,14 @@ func (ga *Gemini2Agent) Gemini2ListStateToolCall(call *genai.FunctionCall) (*gen
 	}
 
 	response, err := listStateToolCallImpl(ga.SharedState)
+	error := ""
 	if err != nil {
-		resp.Response = map[string]any{"error": err.Error()}
-		return &resp, err
+		error = fmt.Sprintf("Error: %v", err)
 	}
 
-	resp.Response = map[string]any{"output": response}
-	return &resp, nil
+	resp.Response = map[string]any{
+		"output": response,
+		"error":  error,
+	}
+	return &resp, err
 }

@@ -342,19 +342,9 @@ func (c *OpenChat) process(ag *Agent) error {
 						return err
 					}
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
-					// IMPORTANT: Still add an error response message to maintain conversation integrity
-					// The API requires every tool_call to have a corresponding tool response
-					errorMessage := &model.ChatCompletionMessage{
-						Role:       model.ChatMessageRoleTool,
-						ToolCallID: toolCall.ID,
-						Name:       Ptr(""),
-						Content: &model.ChatCompletionMessageContent{
-							StringValue: volcengine.String(fmt.Sprintf("Tool call failed: %v. Please try a different approach or different tool instead of retrying with the same arguments.", err)),
-						},
-					}
-					ag.Convo.Push(errorMessage)
-					continue
 				}
+				// IMPORTANT: Even error happened still add an error response message to maintain conversation integrity
+				// The API requires every tool_call to have a corresponding tool response
 				// Add the tool response to the conversation
 				ag.Convo.Push(toolMessage)
 			}

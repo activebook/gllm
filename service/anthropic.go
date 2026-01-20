@@ -216,6 +216,8 @@ func (a *Anthropic) process(ag *Agent) error {
 					}
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Tool call failed: %v", err)}, nil)
 				}
+				// IMPORTANT: Even error happened still add an error response message to maintain conversation integrity
+				// The API requires every tool_call to have a corresponding tool response
 				ag.Convo.Push(toolMsg)
 			}
 		} else {
