@@ -179,6 +179,12 @@ func (ag *Agent) GenerateOpenChatStream() error {
 		tools = append(tools, mcpTools...)
 	}
 
+	// Initialize sub-agent executor if SharedState is available
+	var executor *SubAgentExecutor
+	if ag.SharedState != nil {
+		executor = NewSubAgentExecutor(ag.SharedState, MaxWorkersParalleled)
+	}
+
 	op := OpenProcessor{
 		ctx:        ctx,
 		notify:     ag.NotifyChan,
@@ -190,6 +196,10 @@ func (ag *Agent) GenerateOpenChatStream() error {
 		references: make([]map[string]interface{}, 0), // Updated to match new field type
 		status:     &ag.Status,
 		mcpClient:  ag.MCPClient,
+		// Sub-agent orchestration
+		sharedState: ag.SharedState,
+		executor:    executor,
+		agentName:   ag.AgentName,
 	}
 	chat := &OpenChat{
 		client: client,
@@ -591,6 +601,11 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		"list_memory":         c.op.OpenChatListMemoryToolCall,
 		"save_memory":         c.op.OpenChatSaveMemoryToolCall,
 		"switch_agent":        c.op.OpenChatSwitchAgentToolCall,
+		"list_agent":          c.op.OpenChatListAgentToolCall,
+		"call_agent":          c.op.OpenChatCallAgentToolCall,
+		"get_state":           c.op.OpenChatGetStateToolCall,
+		"set_state":           c.op.OpenChatSetStateToolCall,
+		"list_state":          c.op.OpenChatListStateToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {

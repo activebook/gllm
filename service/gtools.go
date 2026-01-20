@@ -22,9 +22,9 @@ This means that you can't use a built-in tool and function calling at the same t
 */
 
 // Tool definitions for Gemini 2
-func (ag *Agent) getGemini2EmbeddingTools(includeMCP bool) *genai.Tool {
+func (ga *Gemini2Agent) getGemini2EmbeddingTools(includeMCP bool) *genai.Tool {
 	// Get filtered tools based on agent's enabled tools list
-	openTools := GetOpenEmbeddingToolsFiltered(ag.EnabledTools)
+	openTools := GetOpenEmbeddingToolsFiltered(ga.EnabledTools)
 	var funcs []*genai.FunctionDeclaration
 
 	// Track registered tool names to prevent duplicates
@@ -37,8 +37,8 @@ func (ag *Agent) getGemini2EmbeddingTools(includeMCP bool) *genai.Tool {
 	}
 
 	// Add MCP tools if requested and client is available
-	if includeMCP && ag.MCPClient != nil {
-		mcpTools := getMCPTools(ag.MCPClient)
+	if includeMCP && ga.MCPClient != nil {
+		mcpTools := getMCPTools(ga.MCPClient)
 		for _, mcpTool := range mcpTools {
 			geminiTool := mcpTool.ToGeminiFunctions()
 			// Skip MCP tools that have the same name as built-in tools to avoid Gemini duplicate function declaration error
@@ -56,11 +56,11 @@ func (ag *Agent) getGemini2EmbeddingTools(includeMCP bool) *genai.Tool {
 	}
 }
 
-func (ag *Agent) getGemini2MCPTools() *genai.Tool {
-	if ag.MCPClient == nil {
+func (ga *Gemini2Agent) getGemini2MCPTools() *genai.Tool {
+	if ga.MCPClient == nil {
 		return nil
 	}
-	mcpTools := getMCPTools(ag.MCPClient)
+	mcpTools := getMCPTools(ga.MCPClient)
 	var funcs []*genai.FunctionDeclaration
 
 	for _, mcpTool := range mcpTools {
@@ -73,13 +73,13 @@ func (ag *Agent) getGemini2MCPTools() *genai.Tool {
 	}
 }
 
-func (ag *Agent) getGemini2WebSearchTool() *genai.Tool {
+func (ga *Gemini2Agent) getGemini2WebSearchTool() *genai.Tool {
 	// return google embedding search tool
 	tool := &genai.Tool{GoogleSearch: &genai.GoogleSearch{}}
 	return tool
 }
 
-func (ag *Agent) getGemini2CodeExecTool() *genai.Tool {
+func (ga *Gemini2Agent) getGemini2CodeExecTool() *genai.Tool {
 	// return google embedding search tool
 	tool := &genai.Tool{CodeExecution: &genai.ToolCodeExecution{}}
 	return tool
@@ -87,7 +87,7 @@ func (ag *Agent) getGemini2CodeExecTool() *genai.Tool {
 
 // Tool implementation functions for Gemini 2
 
-func (ag *Agent) Gemini2ReadFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *Gemini2Agent) Gemini2ReadFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -112,7 +112,7 @@ func (ag *Agent) Gemini2ReadFileToolCall(call *genai.FunctionCall) (*genai.Funct
 	return &resp, nil
 }
 
-func (ag *Agent) Gemini2WriteFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *Gemini2Agent) Gemini2WriteFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -125,7 +125,7 @@ func (ag *Agent) Gemini2WriteFileToolCall(call *genai.FunctionCall) (*genai.Func
 	}
 
 	// Call shared implementation
-	response, err := writeFileToolCallImpl(&argsMap, &ag.ToolsUse, ag.gemini2ShowDiffConfirm, ag.gemini2CloseDiffConfirm)
+	response, err := writeFileToolCallImpl(&argsMap, &ga.ToolsUse, ga.gemini2ShowDiffConfirm, ga.gemini2CloseDiffConfirm)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func (ag *Agent) Gemini2WriteFileToolCall(call *genai.FunctionCall) (*genai.Func
 	return &resp, nil
 }
 
-func (ag *Agent) Gemini2CreateDirectoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *Gemini2Agent) Gemini2CreateDirectoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -162,7 +162,7 @@ func (ag *Agent) Gemini2CreateDirectoryToolCall(call *genai.FunctionCall) (*gena
 	return &resp, nil
 }
 
-func (ag *Agent) Gemini2ListDirectoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *Gemini2Agent) Gemini2ListDirectoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -187,7 +187,7 @@ func (ag *Agent) Gemini2ListDirectoryToolCall(call *genai.FunctionCall) (*genai.
 	return &resp, nil
 }
 
-func (ag *Agent) Gemini2DeleteFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *Gemini2Agent) Gemini2DeleteFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -200,7 +200,7 @@ func (ag *Agent) Gemini2DeleteFileToolCall(call *genai.FunctionCall) (*genai.Fun
 	}
 
 	// Call shared implementation
-	response, err := deleteFileToolCallImpl(&argsMap, &ag.ToolsUse)
+	response, err := deleteFileToolCallImpl(&argsMap, &ga.ToolsUse)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +212,7 @@ func (ag *Agent) Gemini2DeleteFileToolCall(call *genai.FunctionCall) (*genai.Fun
 	return &resp, nil
 }
 
-func (ag *Agent) Gemini2DeleteDirectoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *Gemini2Agent) Gemini2DeleteDirectoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -225,7 +225,7 @@ func (ag *Agent) Gemini2DeleteDirectoryToolCall(call *genai.FunctionCall) (*gena
 	}
 
 	// Call shared implementation
-	response, err := deleteDirectoryToolCallImpl(&argsMap, &ag.ToolsUse)
+	response, err := deleteDirectoryToolCallImpl(&argsMap, &ga.ToolsUse)
 	if err != nil {
 		return nil, err
 	}
@@ -237,8 +237,8 @@ func (ag *Agent) Gemini2DeleteDirectoryToolCall(call *genai.FunctionCall) (*gena
 	return &resp, nil
 }
 
-func (ag *Agent) Gemini2MCPToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	if ag.MCPClient == nil {
+func (ga *Gemini2Agent) Gemini2MCPToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+	if ga.MCPClient == nil {
 		return nil, fmt.Errorf("MCP client not initialized")
 	}
 
@@ -254,7 +254,7 @@ func (ag *Agent) Gemini2MCPToolCall(call *genai.FunctionCall) (*genai.FunctionRe
 	}
 
 	// Call the MCP tool
-	result, err := ag.MCPClient.CallTool(call.Name, argsMap)
+	result, err := ga.MCPClient.CallTool(call.Name, argsMap)
 	if err != nil {
 		return nil, fmt.Errorf("MCP tool call failed: %v", err)
 	}
@@ -281,7 +281,7 @@ func (ag *Agent) Gemini2MCPToolCall(call *genai.FunctionCall) (*genai.FunctionRe
 	return &resp, nil
 }
 
-func (ag *Agent) Gemini2MoveToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *Gemini2Agent) Gemini2MoveToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -294,7 +294,7 @@ func (ag *Agent) Gemini2MoveToolCall(call *genai.FunctionCall) (*genai.FunctionR
 	}
 
 	// Call shared implementation
-	response, err := moveToolCallImpl(&argsMap, &ag.ToolsUse)
+	response, err := moveToolCallImpl(&argsMap, &ga.ToolsUse)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +306,7 @@ func (ag *Agent) Gemini2MoveToolCall(call *genai.FunctionCall) (*genai.FunctionR
 	return &resp, nil
 }
 
-func (ag *Agent) Gemini2SearchFilesToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *Gemini2Agent) Gemini2SearchFilesToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -331,7 +331,7 @@ func (ag *Agent) Gemini2SearchFilesToolCall(call *genai.FunctionCall) (*genai.Fu
 	return &resp, nil
 }
 
-func (ag *Agent) Gemini2SearchTextInFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *Gemini2Agent) Gemini2SearchTextInFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -356,7 +356,7 @@ func (ag *Agent) Gemini2SearchTextInFileToolCall(call *genai.FunctionCall) (*gen
 	return &resp, nil
 }
 
-func (ag *Agent) Gemini2ReadMultipleFilesToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *Gemini2Agent) Gemini2ReadMultipleFilesToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -381,7 +381,7 @@ func (ag *Agent) Gemini2ReadMultipleFilesToolCall(call *genai.FunctionCall) (*ge
 	return &resp, nil
 }
 
-func (ag *Agent) Gemini2ShellToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *Gemini2Agent) Gemini2ShellToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -394,7 +394,7 @@ func (ag *Agent) Gemini2ShellToolCall(call *genai.FunctionCall) (*genai.Function
 	}
 
 	// Call shared implementation
-	response, err := shellToolCallImpl(&argsMap, &ag.ToolsUse)
+	response, err := shellToolCallImpl(&argsMap, &ga.ToolsUse)
 	if err != nil {
 		return nil, err
 	}
@@ -406,7 +406,7 @@ func (ag *Agent) Gemini2ShellToolCall(call *genai.FunctionCall) (*genai.Function
 	return &resp, nil
 }
 
-func (ag *Agent) Gemini2WebFetchToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *Gemini2Agent) Gemini2WebFetchToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -431,7 +431,7 @@ func (ag *Agent) Gemini2WebFetchToolCall(call *genai.FunctionCall) (*genai.Funct
 	return &resp, nil
 }
 
-// func (ag *Agent) Gemini2EditFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+// func (ga *Gemini2Agent) Gemini2EditFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 // 	resp := genai.FunctionResponse{
 // 		ID:   call.ID,
 // 		Name: call.Name,
@@ -444,7 +444,7 @@ func (ag *Agent) Gemini2WebFetchToolCall(call *genai.FunctionCall) (*genai.Funct
 // 	}
 
 // 	// Call shared implementation
-// 	response, err := editFileToolCallImpl(&argsMap, &ag.ToolsUse)
+// 	response, err := editFileToolCallImpl(&argsMap, &ga.ToolsUse)
 // 	if err != nil {
 // 		return nil, err
 // 	}
@@ -456,7 +456,7 @@ func (ag *Agent) Gemini2WebFetchToolCall(call *genai.FunctionCall) (*genai.Funct
 // 	return &resp, nil
 // }
 
-func (ag *Agent) Gemini2EditFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *Gemini2Agent) Gemini2EditFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -469,7 +469,7 @@ func (ag *Agent) Gemini2EditFileToolCall(call *genai.FunctionCall) (*genai.Funct
 	}
 
 	// Call shared implementation
-	response, err := editFileToolCallImpl(&argsMap, &ag.ToolsUse, ag.gemini2ShowDiffConfirm, ag.gemini2CloseDiffConfirm)
+	response, err := editFileToolCallImpl(&argsMap, &ga.ToolsUse, ga.gemini2ShowDiffConfirm, ga.gemini2CloseDiffConfirm)
 	if err != nil {
 		return nil, err
 	}
@@ -481,7 +481,7 @@ func (ag *Agent) Gemini2EditFileToolCall(call *genai.FunctionCall) (*genai.Funct
 	return &resp, nil
 }
 
-func (ag *Agent) Gemini2CopyToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *Gemini2Agent) Gemini2CopyToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -494,7 +494,7 @@ func (ag *Agent) Gemini2CopyToolCall(call *genai.FunctionCall) (*genai.FunctionR
 	}
 
 	// Call shared implementation
-	response, err := copyToolCallImpl(&argsMap, &ag.ToolsUse)
+	response, err := copyToolCallImpl(&argsMap, &ga.ToolsUse)
 	if err != nil {
 		return nil, err
 	}
@@ -507,21 +507,21 @@ func (ag *Agent) Gemini2CopyToolCall(call *genai.FunctionCall) (*genai.FunctionR
 }
 
 // Diff confirm func
-func (ag *Agent) gemini2ShowDiffConfirm(diff string) {
+func (ga *Gemini2Agent) gemini2ShowDiffConfirm(diff string) {
 	// Function call is over
-	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusFunctionCallingOver}, ag.ProceedChan)
+	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusFunctionCallingOver}, ga.ProceedChan)
 
 	// Show the diff confirm
-	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Data: diff, Status: StatusDiffConfirm}, ag.ProceedChan)
+	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Data: diff, Status: StatusDiffConfirm}, ga.ProceedChan)
 }
 
 // Diff close func
-func (ag *Agent) gemini2CloseDiffConfirm() {
+func (ga *Gemini2Agent) gemini2CloseDiffConfirm() {
 	// Confirm diff is over
-	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusDiffConfirmOver}, ag.ProceedChan)
+	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusDiffConfirmOver}, ga.ProceedChan)
 }
 
-func (ag *Agent) Gemini2ListMemoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *Gemini2Agent) Gemini2ListMemoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -540,7 +540,7 @@ func (ag *Agent) Gemini2ListMemoryToolCall(call *genai.FunctionCall) (*genai.Fun
 	return &resp, nil
 }
 
-func (ag *Agent) Gemini2SaveMemoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *Gemini2Agent) Gemini2SaveMemoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -565,7 +565,7 @@ func (ag *Agent) Gemini2SaveMemoryToolCall(call *genai.FunctionCall) (*genai.Fun
 	return &resp, nil
 }
 
-func (ag *Agent) Gemini2SwitchAgentToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *Gemini2Agent) Gemini2SwitchAgentToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -578,7 +578,7 @@ func (ag *Agent) Gemini2SwitchAgentToolCall(call *genai.FunctionCall) (*genai.Fu
 	}
 
 	// Call shared implementation
-	response, err := switchAgentToolCallImpl(&argsMap, &ag.ToolsUse)
+	response, err := switchAgentToolCallImpl(&argsMap, &ga.ToolsUse)
 	resp.Response = map[string]any{
 		"output": response,
 		"error":  "",
@@ -594,5 +594,101 @@ func (ag *Agent) Gemini2SwitchAgentToolCall(call *genai.FunctionCall) (*genai.Fu
 		"output": response,
 		"error":  "",
 	}
+	return &resp, nil
+}
+
+func (ga *Gemini2Agent) Gemini2ListAgentToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+	resp := genai.FunctionResponse{
+		ID:   call.ID,
+		Name: call.Name,
+	}
+
+	response, err := listAgentToolCallImpl()
+	if err != nil {
+		resp.Response = map[string]any{"error": err.Error()}
+		return &resp, err
+	}
+
+	resp.Response = map[string]any{"output": response}
+	return &resp, nil
+}
+
+func (ga *Gemini2Agent) Gemini2CallAgentToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+	resp := genai.FunctionResponse{
+		ID:   call.ID,
+		Name: call.Name,
+	}
+
+	// Convert args
+	argsMap := make(map[string]interface{})
+	for k, v := range call.Args {
+		argsMap[k] = v
+	}
+
+	response, err := callAgentToolCallImpl(&argsMap, ga.executor)
+	if err != nil {
+		resp.Response = map[string]any{"error": err.Error()}
+		return &resp, err
+	}
+
+	resp.Response = map[string]any{"output": response}
+	return &resp, nil
+}
+
+func (ga *Gemini2Agent) Gemini2GetStateToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+	resp := genai.FunctionResponse{
+		ID:   call.ID,
+		Name: call.Name,
+	}
+
+	argsMap := make(map[string]interface{})
+	for k, v := range call.Args {
+		argsMap[k] = v
+	}
+
+	response, err := getStateToolCallImpl(&argsMap, ga.SharedState)
+	if err != nil {
+		resp.Response = map[string]any{"error": err.Error()}
+		return &resp, err
+	}
+
+	resp.Response = map[string]any{"output": response}
+	return &resp, nil
+}
+
+func (ga *Gemini2Agent) Gemini2SetStateToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+	resp := genai.FunctionResponse{
+		ID:   call.ID,
+		Name: call.Name,
+	}
+
+	argsMap := make(map[string]interface{})
+	for k, v := range call.Args {
+		argsMap[k] = v
+	}
+
+	response, err := setStateToolCallImpl(&argsMap, ga.AgentName, ga.SharedState)
+	if err != nil {
+		resp.Response = map[string]any{"error": err.Error()}
+		return &resp, err
+	}
+
+	resp.Response = map[string]any{"output": response}
+	return &resp, nil
+}
+
+func (ga *Gemini2Agent) Gemini2ListStateToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+	resp := genai.FunctionResponse{
+		ID:   call.ID,
+		Name: call.Name,
+	}
+
+	response, err := listStateToolCallImpl(ga.SharedState)
+	if err != nil {
+		resp.Response = map[string]any{"error": err.Error()}
+		return &resp, err
+	}
+
+	resp.Response = map[string]any{"output": response}
 	return &resp, nil
 }

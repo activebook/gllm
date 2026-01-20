@@ -251,3 +251,58 @@ func (op *OpenProcessor) AnthropicSwitchAgentToolCall(toolCall anthropic.ToolUse
 
 	return toolMessage, nil
 }
+
+func (op *OpenProcessor) AnthropicListAgentToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
+	response, err := listAgentToolCallImpl()
+	isError := err != nil
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
+	return anthropic.NewUserMessage(toolResult), nil
+}
+
+func (op *OpenProcessor) AnthropicCallAgentToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
+	response, err := callAgentToolCallImpl(argsMap, op.executor)
+	isError := err != nil
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
+	return anthropic.NewUserMessage(toolResult), nil
+}
+
+func (op *OpenProcessor) AnthropicGetStateToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
+	response, err := getStateToolCallImpl(argsMap, op.sharedState)
+	isError := err != nil
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
+	return anthropic.NewUserMessage(toolResult), nil
+}
+
+func (op *OpenProcessor) AnthropicSetStateToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
+	response, err := setStateToolCallImpl(argsMap, op.agentName, op.sharedState)
+	isError := err != nil
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
+	return anthropic.NewUserMessage(toolResult), nil
+}
+
+func (op *OpenProcessor) AnthropicListStateToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
+	response, err := listStateToolCallImpl(op.sharedState)
+	isError := err != nil
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
+	return anthropic.NewUserMessage(toolResult), nil
+}

@@ -2037,3 +2037,88 @@ func (op *OpenProcessor) OpenChatSaveMemoryToolCall(toolCall *model.ToolCall, ar
 	}
 	return &toolMessage, nil
 }
+
+func (op *OpenProcessor) OpenChatListAgentToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	response, err := listAgentToolCallImpl()
+	if err != nil {
+		return nil, err
+	}
+
+	toolMessage := model.ChatCompletionMessage{
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Name:       Ptr(""),
+		Content: &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(response),
+		},
+	}
+	return &toolMessage, nil
+}
+
+func (op *OpenProcessor) OpenChatCallAgentToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	response, err := callAgentToolCallImpl(argsMap, op.executor)
+	if err != nil {
+		return nil, err
+	}
+
+	toolMessage := model.ChatCompletionMessage{
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Name:       Ptr(""),
+		Content: &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(response),
+		},
+	}
+	return &toolMessage, nil
+}
+
+func (op *OpenProcessor) OpenChatGetStateToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	response, err := getStateToolCallImpl(argsMap, op.sharedState)
+	if err != nil {
+		return nil, err
+	}
+
+	toolMessage := model.ChatCompletionMessage{
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Name:       Ptr(""),
+		Content: &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(response),
+		},
+	}
+	return &toolMessage, nil
+}
+
+func (op *OpenProcessor) OpenChatSetStateToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	response, err := setStateToolCallImpl(argsMap, op.agentName, op.sharedState)
+	if err != nil {
+		return nil, err
+	}
+
+	toolMessage := model.ChatCompletionMessage{
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Name:       Ptr(""),
+		Content: &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(response),
+		},
+	}
+	return &toolMessage, nil
+}
+
+func (op *OpenProcessor) OpenChatListStateToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	response, err := listStateToolCallImpl(op.sharedState)
+	if err != nil {
+		return nil, err
+	}
+
+	toolMessage := model.ChatCompletionMessage{
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Name:       Ptr(""),
+		Content: &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(response),
+		},
+	}
+	return &toolMessage, nil
+}

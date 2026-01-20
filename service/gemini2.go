@@ -44,8 +44,11 @@ func (ag *Agent) getGemini2FilePart(file *FileData) genai.Part {
 }
 
 type Gemini2Agent struct {
-	ctx    context.Context
-	client *genai.Client
+	// With *Agent embedded, Gemini2Agent automatically has access to all of Agent's fields and methods.
+	*Agent   // Embedded pointer to Agent
+	ctx      context.Context
+	client   *genai.Client
+	executor *SubAgentExecutor
 }
 
 func (ag *Agent) initGemini2Agent() (*Gemini2Agent, error) {
@@ -63,6 +66,7 @@ func (ag *Agent) initGemini2Agent() (*Gemini2Agent, error) {
 		return nil, err
 	}
 	return &Gemini2Agent{
+		Agent:  ag,
 		ctx:    ctx,
 		client: client,
 	}, nil
@@ -77,6 +81,11 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	}
 
 	var parts []genai.Part
+	// Initialize sub-agent executor if SharedState is available
+	if ag.SharedState != nil {
+		ga.executor = NewSubAgentExecutor(ag.SharedState, MaxWorkersParalleled)
+	}
+
 	if ag.UserPrompt != "" {
 		parts = append(parts, genai.Part{Text: ag.UserPrompt})
 	}
@@ -130,7 +139,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	if len(ag.EnabledTools) > 0 {
 		// load embedding tools (include MCP if available)
 		includeMCP := ag.MCPClient != nil
-		config.Tools = append(config.Tools, ag.getGemini2EmbeddingTools(includeMCP))
+		config.Tools = append(config.Tools, ga.getGemini2EmbeddingTools(includeMCP))
 		if ag.SearchEngine.UseSearch {
 			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
 			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn,
@@ -143,13 +152,13 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		// only load search tool
 		// **Remember: google doesn't support web_search tool plus function call
 		// Function call is not compatible with Google Search tool
-		config.Tools = append(config.Tools, ag.getGemini2WebSearchTool())
+		config.Tools = append(config.Tools, ga.getGemini2WebSearchTool())
 	} else if ag.UseCodeTool {
 		// Remember: CodeExecution and GoogleSearch cannot be enabled at the same time
-		config.Tools = append(config.Tools, ag.getGemini2CodeExecTool())
+		config.Tools = append(config.Tools, ga.getGemini2CodeExecTool())
 	} else if ag.MCPClient != nil {
 		// Load MCP-only tools when embedding tools are disabled but MCP client exists
-		if mcpTool := ag.getGemini2MCPTools(); mcpTool != nil {
+		if mcpTool := ga.getGemini2MCPTools(); mcpTool != nil {
 			config.Tools = append(config.Tools, mcpTool)
 		}
 	}
@@ -221,12 +230,12 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		}
 
 		// Call API
-		modelContent, resp, err := ag.processGemini2Stream(ga.ctx, ga.client, &config, messages, &references, &queries)
+		modelContent, resp, err := ga.processGemini2Stream(ga.ctx, ga.client, &config, messages, &references, &queries)
 		if err != nil {
 			return err
 		}
 		// Record token usage
-		ag.addUpGemini2TokenUsage(resp)
+		ga.addUpGemini2TokenUsage(resp)
 
 		// Update History
 		// messages already has inputContent from pre-API append
@@ -254,7 +263,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 				continue
 			}
 			// Handle tool call
-			funcResp, err := ag.processGemini2ToolCall(funcCall)
+			funcResp, err := ga.processGemini2ToolCall(funcCall)
 			if err != nil {
 				// Switch agent signal, pop up
 				if IsSwitchAgentError(err) {
@@ -306,17 +315,17 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	return err
 }
 
-func (ag *Agent) processGemini2Stream(ctx context.Context,
+func (ga *Gemini2Agent) processGemini2Stream(ctx context.Context,
 	client *genai.Client, config *genai.GenerateContentConfig,
 	messages []*genai.Content,
 	refs *[]map[string]interface{},
 	queries *[]string) (*genai.Content, *genai.GenerateContentResponse, error) {
 
 	// Stream the response
-	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusProcessing}, ag.ProceedChan)
-	iter := client.Models.GenerateContentStream(ctx, ag.Model.ModelName, messages, config)
+	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusProcessing}, ga.ProceedChan)
+	iter := client.Models.GenerateContentStream(ctx, ga.Model.ModelName, messages, config)
 	// Wait for the main goroutine to tell sub-goroutine to proceed
-	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
+	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusStarted}, ga.ProceedChan)
 
 	modelContent := &genai.Content{
 		Role:  genai.RoleModel,
@@ -326,7 +335,7 @@ func (ag *Agent) processGemini2Stream(ctx context.Context,
 
 	for resp, err := range iter {
 		if err != nil {
-			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}, nil)
+			ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}, nil)
 			return nil, nil, err
 		}
 
@@ -348,24 +357,24 @@ func (ag *Agent) processGemini2Stream(ctx context.Context,
 				}
 
 				// State transitions
-				switch ag.Status.Peek() {
+				switch ga.Status.Peek() {
 				case StatusReasoning:
 					if !part.Thought {
-						ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusReasoningOver}, ag.ProceedChan)
+						ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusReasoningOver}, ga.ProceedChan)
 					}
 				default:
 					if part.Thought {
-						ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusReasoning}, ag.ProceedChan)
+						ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusReasoning}, ga.ProceedChan)
 					}
 				}
 
 				// Actual text data (don't trim text, because we need to keep the spaces between them)
 				if part.Thought && part.Text != "" {
 					// Reasoning data
-					ag.DataChan <- StreamData{Text: (part.Text), Type: DataTypeReasoning}
+					ga.DataChan <- StreamData{Text: (part.Text), Type: DataTypeReasoning}
 				} else if part.Text != "" {
 					// Normal text data
-					ag.DataChan <- StreamData{Text: (part.Text), Type: DataTypeNormal}
+					ga.DataChan <- StreamData{Text: (part.Text), Type: DataTypeNormal}
 				}
 			}
 
@@ -383,7 +392,7 @@ func (ag *Agent) processGemini2Stream(ctx context.Context,
 	return modelContent, finalResp, nil
 }
 
-func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *Gemini2Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 
 	var filteredArgs map[string]interface{}
 	if call.Name == "edit_file" || call.Name == "write_file" {
@@ -400,37 +409,42 @@ func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Functi
 		"args":     filteredArgs,
 	}
 	jsonData, _ := json.Marshal(toolCallData)
-	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusFunctionCalling, Data: string(jsonData)}, ag.ProceedChan)
+	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusFunctionCalling, Data: string(jsonData)}, ga.ProceedChan)
 
 	var resp *genai.FunctionResponse
 	var err error
 
 	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
 	toolHandlers := map[string]func(*genai.FunctionCall) (*genai.FunctionResponse, error){
-		"shell":               ag.Gemini2ShellToolCall,
-		"read_file":           ag.Gemini2ReadFileToolCall,
-		"write_file":          ag.Gemini2WriteFileToolCall,
-		"create_directory":    ag.Gemini2CreateDirectoryToolCall,
-		"list_directory":      ag.Gemini2ListDirectoryToolCall,
-		"delete_file":         ag.Gemini2DeleteFileToolCall,
-		"delete_directory":    ag.Gemini2DeleteDirectoryToolCall,
-		"move":                ag.Gemini2MoveToolCall,
-		"copy":                ag.Gemini2CopyToolCall,
-		"search_files":        ag.Gemini2SearchFilesToolCall,
-		"search_text_in_file": ag.Gemini2SearchTextInFileToolCall,
-		"read_multiple_files": ag.Gemini2ReadMultipleFilesToolCall,
-		"web_fetch":           ag.Gemini2WebFetchToolCall,
-		"edit_file":           ag.Gemini2EditFileToolCall,
-		"list_memory":         ag.Gemini2ListMemoryToolCall,
-		"save_memory":         ag.Gemini2SaveMemoryToolCall,
-		"switch_agent":        ag.Gemini2SwitchAgentToolCall,
+		"shell":               ga.Gemini2ShellToolCall,
+		"read_file":           ga.Gemini2ReadFileToolCall,
+		"write_file":          ga.Gemini2WriteFileToolCall,
+		"create_directory":    ga.Gemini2CreateDirectoryToolCall,
+		"list_directory":      ga.Gemini2ListDirectoryToolCall,
+		"delete_file":         ga.Gemini2DeleteFileToolCall,
+		"delete_directory":    ga.Gemini2DeleteDirectoryToolCall,
+		"move":                ga.Gemini2MoveToolCall,
+		"copy":                ga.Gemini2CopyToolCall,
+		"search_files":        ga.Gemini2SearchFilesToolCall,
+		"search_text_in_file": ga.Gemini2SearchTextInFileToolCall,
+		"read_multiple_files": ga.Gemini2ReadMultipleFilesToolCall,
+		"web_fetch":           ga.Gemini2WebFetchToolCall,
+		"edit_file":           ga.Gemini2EditFileToolCall,
+		"list_memory":         ga.Gemini2ListMemoryToolCall,
+		"save_memory":         ga.Gemini2SaveMemoryToolCall,
+		"switch_agent":        ga.Gemini2SwitchAgentToolCall,
+		"list_agent":          ga.Gemini2ListAgentToolCall,
+		"call_agent":          ga.Gemini2CallAgentToolCall,
+		"get_state":           ga.Gemini2GetStateToolCall,
+		"set_state":           ga.Gemini2SetStateToolCall,
+		"list_state":          ga.Gemini2ListStateToolCall,
 	}
 
 	if handler, ok := toolHandlers[call.Name]; ok {
 		resp, err = handler(call)
-	} else if ag.MCPClient != nil && ag.MCPClient.FindTool(call.Name) != nil {
+	} else if ga.MCPClient != nil && ga.MCPClient.FindTool(call.Name) != nil {
 		// Handle MCP tool calls
-		resp, err = ag.Gemini2MCPToolCall(call)
+		resp, err = ga.Gemini2MCPToolCall(call)
 	} else {
 		// For web_search and other Google Search/CodeExecution tools that don't need special processing
 		resp, err = &genai.FunctionResponse{
@@ -442,11 +456,11 @@ func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Functi
 			},
 		}, nil
 		// Warn the user
-		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", call.Name)}, nil)
+		ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", call.Name)}, nil)
 	}
 
 	// Function call is done
-	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusFunctionCallingOver}, ag.ProceedChan)
+	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusFunctionCallingOver}, ga.ProceedChan)
 	return resp, err
 }
 
@@ -455,13 +469,13 @@ func (ag *Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.Functi
 // Each response may contain tool calls that trigger additional processing
 // New responses are generated based on tool call results
 // Each of these interactions consumes tokens that should be tracked
-func (ag *Agent) addUpGemini2TokenUsage(resp *genai.GenerateContentResponse) {
-	if resp != nil && resp.UsageMetadata != nil && ag.TokenUsage != nil {
+func (ga *Gemini2Agent) addUpGemini2TokenUsage(resp *genai.GenerateContentResponse) {
+	if resp != nil && resp.UsageMetadata != nil && ga.TokenUsage != nil {
 		// For gemini model, cache read tokens are not included in the usage metadata
 		// The total number of tokens for the entire request. This is the sum of `prompt_token_count`,
 		// `candidates_token_count`, `tool_use_prompt_token_count`, and `thoughts_token_count`.
-		ag.TokenUsage.CachedTokensInPrompt = true
-		ag.TokenUsage.RecordTokenUsage(int(resp.UsageMetadata.PromptTokenCount),
+		ga.TokenUsage.CachedTokensInPrompt = true
+		ga.TokenUsage.RecordTokenUsage(int(resp.UsageMetadata.PromptTokenCount),
 			int(resp.UsageMetadata.CandidatesTokenCount),
 			int(resp.UsageMetadata.CachedContentTokenCount),
 			int(resp.UsageMetadata.ThoughtsTokenCount),
