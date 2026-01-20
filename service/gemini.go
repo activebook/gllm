@@ -8,7 +8,7 @@ import (
 	"google.golang.org/genai"
 )
 
-func (ag *Agent) getGemini2FilePart(file *FileData) genai.Part {
+func (ag *Agent) getGeminiFilePart(file *FileData) genai.Part {
 
 	mimeType := file.Format()
 	data := file.Data()
@@ -43,15 +43,15 @@ func (ag *Agent) getGemini2FilePart(file *FileData) genai.Part {
 	}
 }
 
-type Gemini2Agent struct {
-	// With *Agent embedded, Gemini2Agent automatically has access to all of Agent's fields and methods.
+type GeminiAgent struct {
+	// With *Agent embedded, GeminiAgent automatically has access to all of Agent's fields and methods.
 	*Agent   // Embedded pointer to Agent
 	ctx      context.Context
 	client   *genai.Client
 	executor *SubAgentExecutor
 }
 
-func (ag *Agent) initGemini2Agent() (*Gemini2Agent, error) {
+func (ag *Agent) initGeminiAgent() (*GeminiAgent, error) {
 	// Setup the Gemini client
 	// In multi-turn conversation, even though we create it each time
 	// it can still be cached for advanced gemini models such as 2.5 flash/pro
@@ -65,17 +65,17 @@ func (ag *Agent) initGemini2Agent() (*Gemini2Agent, error) {
 		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create client: %v", err)}, nil)
 		return nil, err
 	}
-	return &Gemini2Agent{
+	return &GeminiAgent{
 		Agent:  ag,
 		ctx:    ctx,
 		client: client,
 	}, nil
 }
 
-func (ag *Agent) GenerateGemini2Stream() error {
+func (ag *Agent) GenerateGeminiStream() error {
 	var err error
 	// Check the setup of Gemini client
-	ga, err := ag.initGemini2Agent()
+	ga, err := ag.initGeminiAgent()
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		// Check if the file data is empty
 		if file != nil {
 			// Convert the file data to a blob
-			part := ag.getGemini2FilePart(file)
+			part := ag.getGeminiFilePart(file)
 			if part.Text != "" || part.InlineData != nil {
 				parts = append(parts, part)
 			}
@@ -139,7 +139,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	if len(ag.EnabledTools) > 0 {
 		// load embedding tools (include MCP if available)
 		includeMCP := ag.MCPClient != nil
-		config.Tools = append(config.Tools, ga.getGemini2EmbeddingTools(includeMCP))
+		config.Tools = append(config.Tools, ga.getGeminiEmbeddingTools(includeMCP))
 		if ag.SearchEngine.UseSearch {
 			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
 			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn,
@@ -152,13 +152,13 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		// only load search tool
 		// **Remember: google doesn't support web_search tool plus function call
 		// Function call is not compatible with Google Search tool
-		config.Tools = append(config.Tools, ga.getGemini2WebSearchTool())
+		config.Tools = append(config.Tools, ga.getGeminiWebSearchTool())
 	} else if ag.UseCodeTool {
 		// Remember: CodeExecution and GoogleSearch cannot be enabled at the same time
-		config.Tools = append(config.Tools, ga.getGemini2CodeExecTool())
+		config.Tools = append(config.Tools, ga.getGeminiCodeExecTool())
 	} else if ag.MCPClient != nil {
 		// Load MCP-only tools when embedding tools are disabled but MCP client exists
-		if mcpTool := ga.getGemini2MCPTools(); mcpTool != nil {
+		if mcpTool := ga.getGeminiMCPTools(); mcpTool != nil {
 			config.Tools = append(config.Tools, mcpTool)
 		}
 	}
@@ -230,12 +230,12 @@ func (ag *Agent) GenerateGemini2Stream() error {
 		}
 
 		// Call API
-		modelContent, resp, err := ga.processGemini2Stream(ga.ctx, ga.client, &config, messages, &references, &queries)
+		modelContent, resp, err := ga.processGeminiStream(ga.ctx, ga.client, &config, messages, &references, &queries)
 		if err != nil {
 			return err
 		}
 		// Record token usage
-		ga.addUpGemini2TokenUsage(resp)
+		ga.addUpGeminiTokenUsage(resp)
 
 		// Update History
 		// messages already has inputContent from pre-API append
@@ -263,7 +263,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 				continue
 			}
 			// Handle tool call
-			funcResp, err := ga.processGemini2ToolCall(funcCall)
+			funcResp, err := ga.processGeminiToolCall(funcCall)
 			if err != nil {
 				// Switch agent signal, pop up
 				if IsSwitchAgentError(err) {
@@ -314,7 +314,7 @@ func (ag *Agent) GenerateGemini2Stream() error {
 	return err
 }
 
-func (ga *Gemini2Agent) processGemini2Stream(ctx context.Context,
+func (ga *GeminiAgent) processGeminiStream(ctx context.Context,
 	client *genai.Client, config *genai.GenerateContentConfig,
 	messages []*genai.Content,
 	refs *[]map[string]interface{},
@@ -391,7 +391,7 @@ func (ga *Gemini2Agent) processGemini2Stream(ctx context.Context,
 	return modelContent, finalResp, nil
 }
 
-func (ga *Gemini2Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *GeminiAgent) processGeminiToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 
 	var filteredArgs map[string]interface{}
 	if call.Name == "edit_file" || call.Name == "write_file" {
@@ -415,35 +415,35 @@ func (ga *Gemini2Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai
 
 	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
 	toolHandlers := map[string]func(*genai.FunctionCall) (*genai.FunctionResponse, error){
-		"shell":               ga.Gemini2ShellToolCall,
-		"read_file":           ga.Gemini2ReadFileToolCall,
-		"write_file":          ga.Gemini2WriteFileToolCall,
-		"create_directory":    ga.Gemini2CreateDirectoryToolCall,
-		"list_directory":      ga.Gemini2ListDirectoryToolCall,
-		"delete_file":         ga.Gemini2DeleteFileToolCall,
-		"delete_directory":    ga.Gemini2DeleteDirectoryToolCall,
-		"move":                ga.Gemini2MoveToolCall,
-		"copy":                ga.Gemini2CopyToolCall,
-		"search_files":        ga.Gemini2SearchFilesToolCall,
-		"search_text_in_file": ga.Gemini2SearchTextInFileToolCall,
-		"read_multiple_files": ga.Gemini2ReadMultipleFilesToolCall,
-		"web_fetch":           ga.Gemini2WebFetchToolCall,
-		"edit_file":           ga.Gemini2EditFileToolCall,
-		"list_memory":         ga.Gemini2ListMemoryToolCall,
-		"save_memory":         ga.Gemini2SaveMemoryToolCall,
-		"switch_agent":        ga.Gemini2SwitchAgentToolCall,
-		"list_agent":          ga.Gemini2ListAgentToolCall,
-		"call_agent":          ga.Gemini2CallAgentToolCall,
-		"get_state":           ga.Gemini2GetStateToolCall,
-		"set_state":           ga.Gemini2SetStateToolCall,
-		"list_state":          ga.Gemini2ListStateToolCall,
+		"shell":               ga.GeminiShellToolCall,
+		"read_file":           ga.GeminiReadFileToolCall,
+		"write_file":          ga.GeminiWriteFileToolCall,
+		"create_directory":    ga.GeminiCreateDirectoryToolCall,
+		"list_directory":      ga.GeminiListDirectoryToolCall,
+		"delete_file":         ga.GeminiDeleteFileToolCall,
+		"delete_directory":    ga.GeminiDeleteDirectoryToolCall,
+		"move":                ga.GeminiMoveToolCall,
+		"copy":                ga.GeminiCopyToolCall,
+		"search_files":        ga.GeminiSearchFilesToolCall,
+		"search_text_in_file": ga.GeminiSearchTextInFileToolCall,
+		"read_multiple_files": ga.GeminiReadMultipleFilesToolCall,
+		"web_fetch":           ga.GeminiWebFetchToolCall,
+		"edit_file":           ga.GeminiEditFileToolCall,
+		"list_memory":         ga.GeminiListMemoryToolCall,
+		"save_memory":         ga.GeminiSaveMemoryToolCall,
+		"switch_agent":        ga.GeminiSwitchAgentToolCall,
+		"list_agent":          ga.GeminiListAgentToolCall,
+		"call_agent":          ga.GeminiCallAgentToolCall,
+		"get_state":           ga.GeminiGetStateToolCall,
+		"set_state":           ga.GeminiSetStateToolCall,
+		"list_state":          ga.GeminiListStateToolCall,
 	}
 
 	if handler, ok := toolHandlers[call.Name]; ok {
 		resp, err = handler(call)
 	} else if ga.MCPClient != nil && ga.MCPClient.FindTool(call.Name) != nil {
 		// Handle MCP tool calls
-		resp, err = ga.Gemini2MCPToolCall(call)
+		resp, err = ga.GeminiMCPToolCall(call)
 	} else {
 		// For web_search and other Google Search/CodeExecution tools that don't need special processing
 		resp, err = &genai.FunctionResponse{
@@ -468,7 +468,7 @@ func (ga *Gemini2Agent) processGemini2ToolCall(call *genai.FunctionCall) (*genai
 // Each response may contain tool calls that trigger additional processing
 // New responses are generated based on tool call results
 // Each of these interactions consumes tokens that should be tracked
-func (ga *Gemini2Agent) addUpGemini2TokenUsage(resp *genai.GenerateContentResponse) {
+func (ga *GeminiAgent) addUpGeminiTokenUsage(resp *genai.GenerateContentResponse) {
 	if resp != nil && resp.UsageMetadata != nil && ga.TokenUsage != nil {
 		// For gemini model, cache read tokens are not included in the usage metadata
 		// The total number of tokens for the entire request. This is the sum of `prompt_token_count`,
