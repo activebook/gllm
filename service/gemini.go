@@ -340,6 +340,9 @@ func (ga *GeminiAgent) processGeminiStream(ctx context.Context,
 
 		// Process and send content
 		for _, candidate := range resp.Candidates {
+			if candidate.Content == nil {
+				continue // Skip candidates with nil content, bugfix: panic on nil content
+			}
 			// Process content
 			for _, part := range candidate.Content.Parts {
 				// Accumulate parts for history ONLY if they have content
