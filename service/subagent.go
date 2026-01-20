@@ -219,7 +219,7 @@ func (e *SubAgentExecutor) Execute(timeout time.Duration) []SubAgentResult {
 			te.cancel = taskCancel
 			e.mu.Unlock()
 
-			fmt.Printf("%s> Executing task: %s ...%s\n", boldColor, te.task.TaskKey, resetColor)
+			fmt.Printf("> Executing task: %s ...\n", te.task.TaskKey)
 			// Execute the task
 			e.executeTask(taskCtx, te)
 			// Show progress executing task/total tasks

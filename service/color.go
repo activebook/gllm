@@ -43,7 +43,7 @@ var (
 	taskCompleteColor string
 
 	// Workflow colors
-	agentNameColor     string
+	workflowColor      string
 	agentRoleColor     string
 	modelColor         string
 	directoryColor     string
@@ -90,9 +90,9 @@ func setupColors() {
 
 	if p == termenv.TrueColor {
 		errorColor = fgSeq("#FF4500")   // Orangered
-		successColor = fgSeq("#32CD32") // Limegreen
+		successColor = fgSeq("#3CB371") // MediumSeaGreen (Less vibrant)
 		warnColor = fgSeq("#FF8C00")    // DarkOrange
-		infoColor = fgSeq("#00CED1")    // DarkCyan
+		infoColor = fgSeq("#5F9EA0")    // CadetBlue (Less vibrant)
 		debugColor = fgSeq("#1E90FF")   // DodgerBlue
 
 		cyanColor = fgSeq("#00FFFF")
@@ -103,6 +103,8 @@ func setupColors() {
 		purpleColor = fgSeq("#9370DB") // MediumPurple
 		yellowColor = fgSeq("#FFD700") // Gold
 
+		// Task completion color (Medium Sea Green, matching successColor)
+		// taskCompleteColor = fgSeq("#3CB371")
 		// Task completion color (Spring Green, matching switchOnColor)
 		taskCompleteColor = fgSeq("#89D184")
 
@@ -178,7 +180,7 @@ func setupColors() {
 	reasoningColorHigh = "\033[92m" // Bright Green
 
 	// Workflow colors (fixed ANSI)
-	agentNameColor = "\033[95m"    // Bright Magenta
+	workflowColor = "\033[35m"     // Magenta
 	agentRoleColor = "\033[36m"    // Cyan
 	modelColor = "\033[92m"        // Bright Green
 	directoryColor = "\033[93m"    // Yellow
