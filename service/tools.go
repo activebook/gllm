@@ -1319,11 +1319,18 @@ func callAgentToolCallImpl(
 			}
 		}
 
+		// Parse optional wait flag (explicit barrier)
+		wait := false
+		if waitVal, ok := taskMap["wait"].(bool); ok {
+			wait = waitVal
+		}
+
 		tasks = append(tasks, &SubAgentTask{
 			AgentName:   agentName,
 			Instruction: instruction,
 			TaskKey:     taskKey,
 			InputKeys:   inputKeys,
+			Wait:        wait,
 		})
 	}
 

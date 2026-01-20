@@ -21,6 +21,10 @@ const (
 	StatusCancelled
 )
 
+const (
+	MaxWorkersParalleled = 5
+)
+
 func (s SubAgentStatus) String() string {
 	switch s {
 	case StatusPending:
@@ -45,6 +49,7 @@ type SubAgentTask struct {
 	Instruction string   // Task instruction/prompt
 	TaskKey     string   // Key to store result in SharedState
 	InputKeys   []string // Keys to read as input context (virtual files)
+	Wait        bool     // If true, wait for ALL prior tasks before starting
 }
 
 // SubAgentResult represents the outcome of a sub-agent execution
@@ -86,7 +91,9 @@ type taskEntry struct {
 // NewSubAgentExecutor creates a new SubAgentExecutor
 func NewSubAgentExecutor(state *data.SharedState, maxWorkers int) *SubAgentExecutor {
 	if maxWorkers <= 0 {
-		maxWorkers = 5
+		maxWorkers = MaxWorkersParalleled
+	} else if maxWorkers > MaxWorkersParalleled {
+		maxWorkers = MaxWorkersParalleled
 	}
 	return &SubAgentExecutor{
 		state:      state,
@@ -134,16 +141,19 @@ func (e *SubAgentExecutor) SubmitBatch(tasks []*SubAgentTask) []string {
 }
 
 // Execute runs all pending tasks and waits for completion
+// Uses DAG-based dependency resolution: tasks with input_keys wait for those dependencies
 func (e *SubAgentExecutor) Execute(timeout time.Duration) []SubAgentResult {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	// Collect pending tasks
+	// Collect pending tasks in submission order
 	e.mu.RLock()
 	var pendingTasks []*taskEntry
+	var taskOrder []string // Track submission order for Wait flag
 	for _, entry := range e.tasks {
 		if entry.result.Status == StatusPending {
 			pendingTasks = append(pendingTasks, entry)
+			taskOrder = append(taskOrder, entry.task.TaskKey)
 		}
 	}
 	e.mu.RUnlock()
@@ -151,6 +161,22 @@ func (e *SubAgentExecutor) Execute(timeout time.Duration) []SubAgentResult {
 	if len(pendingTasks) == 0 {
 		return nil
 	}
+
+	// Build dependency graph and check for cycles
+	deps := e.buildDependencyGraph(pendingTasks, taskOrder)
+	if cycle := e.detectCycle(deps); cycle != "" {
+		// Mark all tasks as failed due to cycle
+		for _, entry := range pendingTasks {
+			entry.result.Status = StatusFailed
+			entry.result.Error = fmt.Errorf("circular dependency detected: %s", cycle)
+		}
+		return e.collectResults(pendingTasks)
+	}
+
+	// Synchronization primitives for dependency tracking
+	completed := make(map[string]bool)
+	var completedMu sync.RWMutex
+	completedCond := sync.NewCond(&completedMu)
 
 	// Use semaphore to limit concurrent workers
 	sem := make(chan struct{}, e.maxWorkers)
@@ -161,7 +187,23 @@ func (e *SubAgentExecutor) Execute(timeout time.Duration) []SubAgentResult {
 		go func(te *taskEntry) {
 			defer wg.Done()
 
-			// Acquire semaphore
+			// Wait for dependencies before acquiring worker slot
+			completedMu.Lock()
+			for !e.allDepsReady(te.task, deps, completed, ctx) {
+				// Check for context cancellation while waiting
+				select {
+				case <-ctx.Done():
+					completedMu.Unlock()
+					te.result.Status = StatusCancelled
+					te.result.Error = ctx.Err()
+					return
+				default:
+				}
+				completedCond.Wait()
+			}
+			completedMu.Unlock()
+
+			// Acquire semaphore (worker slot)
 			select {
 			case sem <- struct{}{}:
 				defer func() { <-sem }()
@@ -177,21 +219,159 @@ func (e *SubAgentExecutor) Execute(timeout time.Duration) []SubAgentResult {
 			te.cancel = taskCancel
 			e.mu.Unlock()
 
+			fmt.Printf("> Executing task: %s ...\n", te.task.TaskKey)
 			// Execute the task
 			e.executeTask(taskCtx, te)
+			// Show progress executing task/total tasks
+			dones, total := e.GetProgressStatistics()
+			fmt.Printf("✓ Task completed (%d/%d): %s\n", dones, total, te.task.TaskKey)
+
+			// Mark task as completed and broadcast to waiting tasks
+			completedMu.Lock()
+			completed[te.task.TaskKey] = true
+			completedCond.Broadcast()
+			completedMu.Unlock()
 		}(entry)
 	}
 
 	wg.Wait()
 
-	// Collect results
+	return e.collectResults(pendingTasks)
+}
+
+// buildDependencyGraph constructs a dependency map from input_keys and Wait flags
+// Returns: task_key -> list of task_keys it must wait for
+func (e *SubAgentExecutor) buildDependencyGraph(tasks []*taskEntry, taskOrder []string) map[string][]string {
+	deps := make(map[string][]string)
+	taskKeySet := make(map[string]bool)
+
+	// Build set of valid task_keys in this batch
+	for _, te := range tasks {
+		taskKeySet[te.task.TaskKey] = true
+	}
+
+	// Map task_key to position for Wait flag processing
+	orderIndex := make(map[string]int)
+	for i, key := range taskOrder {
+		orderIndex[key] = i
+	}
+
+	for _, te := range tasks {
+		var taskDeps []string
+
+		// If Wait=true, depend on ALL prior tasks
+		if te.task.Wait {
+			myIndex := orderIndex[te.task.TaskKey]
+			for _, priorKey := range taskOrder[:myIndex] {
+				if taskKeySet[priorKey] {
+					taskDeps = append(taskDeps, priorKey)
+				}
+			}
+		} else {
+			// Otherwise, depend only on input_keys that exist in this batch
+			for _, inputKey := range te.task.InputKeys {
+				if taskKeySet[inputKey] {
+					taskDeps = append(taskDeps, inputKey)
+				}
+			}
+		}
+
+		deps[te.task.TaskKey] = taskDeps
+	}
+
+	return deps
+}
+
+// detectCycle checks for circular dependencies using DFS
+// Returns the cycle path as a string if found, empty string otherwise
+func (e *SubAgentExecutor) detectCycle(deps map[string][]string) string {
+	visited := make(map[string]int) // 0=unvisited, 1=in-progress, 2=done
+	var path []string
+
+	var dfs func(key string) bool
+	dfs = func(key string) bool {
+		if visited[key] == 1 {
+			// Found cycle - build path string
+			cycleStart := -1
+			for i, k := range path {
+				if k == key {
+					cycleStart = i
+					break
+				}
+			}
+			if cycleStart >= 0 {
+				_ = append(path[cycleStart:], key) // Cycle detected; path used for reconstruction in outer loop
+				return true
+			}
+			return true
+		}
+		if visited[key] == 2 {
+			return false
+		}
+
+		visited[key] = 1
+		path = append(path, key)
+
+		for _, dep := range deps[key] {
+			if dfs(dep) {
+				return true
+			}
+		}
+
+		path = path[:len(path)-1]
+		visited[key] = 2
+		return false
+	}
+
+	for key := range deps {
+		if visited[key] == 0 {
+			if dfs(key) {
+				// Reconstruct cycle for error message
+				var cycleParts []string
+				inCycle := false
+				for _, k := range path {
+					if k == path[len(path)-1] || inCycle {
+						inCycle = true
+						cycleParts = append(cycleParts, k)
+					}
+				}
+				if len(cycleParts) > 0 {
+					return fmt.Sprintf("%v", cycleParts)
+				}
+				return "cycle detected"
+			}
+		}
+	}
+
+	return ""
+}
+
+// allDepsReady checks if all dependencies for a task are satisfied
+func (e *SubAgentExecutor) allDepsReady(task *SubAgentTask, deps map[string][]string, completed map[string]bool, ctx context.Context) bool {
+	// Check context first
+	select {
+	case <-ctx.Done():
+		return true // Return true to exit wait loop, caller handles cancellation
+	default:
+	}
+
+	for _, depKey := range deps[task.TaskKey] {
+		if !completed[depKey] {
+			return false
+		}
+	}
+	return true
+}
+
+// collectResults gathers results from all task entries
+func (e *SubAgentExecutor) collectResults(tasks []*taskEntry) []SubAgentResult {
 	e.mu.RLock()
-	results := make([]SubAgentResult, 0, len(pendingTasks))
-	for _, entry := range pendingTasks {
+	defer e.mu.RUnlock()
+
+	results := make([]SubAgentResult, 0, len(tasks))
+	for _, entry := range tasks {
 		results = append(results, *entry.result)
 	}
-	e.mu.RUnlock()
-
 	return results
 }
 
@@ -313,6 +493,19 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 			}
 		}
 	}
+}
+
+// GetProgressStatistics returns the number of done and total tasks
+func (e *SubAgentExecutor) GetProgressStatistics() (int, int) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	dones := 0
+	for _, entry := range e.tasks {
+		if entry.result.Status == StatusCompleted {
+			dones++
+		}
+	}
+	return dones, len(e.tasks)
 }
 
 // GetProgress returns the current result for a task

@@ -934,6 +934,11 @@ Differs from switch_agent:
 								},
 								"description": "Optional list of task_keys from PREVIOUS tasks. The output content of these keys will be automatically retrieved from SharedState and injected into this sub-agent's context. Use this to pass the results of 'agent A' as input to 'agent B'.",
 							},
+							"wait": map[string]interface{}{
+								"type":        "boolean",
+								"description": "If true, wait for ALL preceding tasks to complete before starting. Use for explicit barriers. Default is false (auto-waits based on input_keys dependencies).",
+								"default":     false,
+							},
 						},
 						"required": []string{"agent", "instruction", "task_key"},
 					},
