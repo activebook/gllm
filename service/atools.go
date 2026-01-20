@@ -16,7 +16,7 @@ func (op *OpenProcessor) AnthropicShellToolCall(toolCall anthropic.ToolUseBlockP
 	}
 
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
-	return anthropic.NewUserMessage(toolResult), nil
+	return anthropic.NewUserMessage(toolResult), err
 }
 
 func (op *OpenProcessor) AnthropicReadFileToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
@@ -27,7 +27,7 @@ func (op *OpenProcessor) AnthropicReadFileToolCall(toolCall anthropic.ToolUseBlo
 	}
 
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
-	return anthropic.NewUserMessage(toolResult), nil
+	return anthropic.NewUserMessage(toolResult), err
 }
 
 func (op *OpenProcessor) AnthropicWriteFileToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
@@ -38,7 +38,7 @@ func (op *OpenProcessor) AnthropicWriteFileToolCall(toolCall anthropic.ToolUseBl
 	}
 
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
-	return anthropic.NewUserMessage(toolResult), nil
+	return anthropic.NewUserMessage(toolResult), err
 }
 
 func (op *OpenProcessor) AnthropicEditFileToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
@@ -49,7 +49,7 @@ func (op *OpenProcessor) AnthropicEditFileToolCall(toolCall anthropic.ToolUseBlo
 	}
 
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
-	return anthropic.NewUserMessage(toolResult), nil
+	return anthropic.NewUserMessage(toolResult), err
 }
 
 func (op *OpenProcessor) AnthropicCreateDirectoryToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
@@ -60,7 +60,7 @@ func (op *OpenProcessor) AnthropicCreateDirectoryToolCall(toolCall anthropic.Too
 	}
 
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
-	return anthropic.NewUserMessage(toolResult), nil
+	return anthropic.NewUserMessage(toolResult), err
 }
 
 func (op *OpenProcessor) AnthropicListDirectoryToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
@@ -71,7 +71,7 @@ func (op *OpenProcessor) AnthropicListDirectoryToolCall(toolCall anthropic.ToolU
 	}
 
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
-	return anthropic.NewUserMessage(toolResult), nil
+	return anthropic.NewUserMessage(toolResult), err
 }
 
 func (op *OpenProcessor) AnthropicDeleteFileToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
@@ -82,7 +82,7 @@ func (op *OpenProcessor) AnthropicDeleteFileToolCall(toolCall anthropic.ToolUseB
 	}
 
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
-	return anthropic.NewUserMessage(toolResult), nil
+	return anthropic.NewUserMessage(toolResult), err
 }
 
 func (op *OpenProcessor) AnthropicDeleteDirectoryToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
@@ -93,7 +93,7 @@ func (op *OpenProcessor) AnthropicDeleteDirectoryToolCall(toolCall anthropic.Too
 	}
 
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
-	return anthropic.NewUserMessage(toolResult), nil
+	return anthropic.NewUserMessage(toolResult), err
 }
 
 func (op *OpenProcessor) AnthropicMoveToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
@@ -104,7 +104,7 @@ func (op *OpenProcessor) AnthropicMoveToolCall(toolCall anthropic.ToolUseBlockPa
 	}
 
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
-	return anthropic.NewUserMessage(toolResult), nil
+	return anthropic.NewUserMessage(toolResult), err
 }
 
 func (op *OpenProcessor) AnthropicCopyToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
@@ -115,7 +115,7 @@ func (op *OpenProcessor) AnthropicCopyToolCall(toolCall anthropic.ToolUseBlockPa
 	}
 
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
-	return anthropic.NewUserMessage(toolResult), nil
+	return anthropic.NewUserMessage(toolResult), err
 }
 
 func (op *OpenProcessor) AnthropicSearchFilesToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
@@ -126,7 +126,7 @@ func (op *OpenProcessor) AnthropicSearchFilesToolCall(toolCall anthropic.ToolUse
 	}
 
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
-	return anthropic.NewUserMessage(toolResult), nil
+	return anthropic.NewUserMessage(toolResult), err
 }
 
 func (op *OpenProcessor) AnthropicSearchTextInFileToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
@@ -137,7 +137,7 @@ func (op *OpenProcessor) AnthropicSearchTextInFileToolCall(toolCall anthropic.To
 	}
 
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
-	return anthropic.NewUserMessage(toolResult), nil
+	return anthropic.NewUserMessage(toolResult), err
 }
 
 func (op *OpenProcessor) AnthropicReadMultipleFilesToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
@@ -148,7 +148,7 @@ func (op *OpenProcessor) AnthropicReadMultipleFilesToolCall(toolCall anthropic.T
 	}
 
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
-	return anthropic.NewUserMessage(toolResult), nil
+	return anthropic.NewUserMessage(toolResult), err
 }
 
 func (op *OpenProcessor) AnthropicWebFetchToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
@@ -159,7 +159,7 @@ func (op *OpenProcessor) AnthropicWebFetchToolCall(toolCall anthropic.ToolUseBlo
 	}
 
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
-	return anthropic.NewUserMessage(toolResult), nil
+	return anthropic.NewUserMessage(toolResult), err
 }
 
 func (op *OpenProcessor) AnthropicWebSearchToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
@@ -170,7 +170,7 @@ func (op *OpenProcessor) AnthropicWebSearchToolCall(toolCall anthropic.ToolUseBl
 	}
 
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
-	return anthropic.NewUserMessage(toolResult), nil
+	return anthropic.NewUserMessage(toolResult), err
 }
 
 func (op *OpenProcessor) AnthropicListMemoryToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
@@ -181,7 +181,7 @@ func (op *OpenProcessor) AnthropicListMemoryToolCall(toolCall anthropic.ToolUseB
 	}
 
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
-	return anthropic.NewUserMessage(toolResult), nil
+	return anthropic.NewUserMessage(toolResult), err
 }
 
 func (op *OpenProcessor) AnthropicSaveMemoryToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
@@ -192,12 +192,16 @@ func (op *OpenProcessor) AnthropicSaveMemoryToolCall(toolCall anthropic.ToolUseB
 	}
 
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
-	return anthropic.NewUserMessage(toolResult), nil
+	return anthropic.NewUserMessage(toolResult), err
 }
 
 func (op *OpenProcessor) AnthropicMCPToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
 	if op.mcpClient == nil {
-		return anthropic.MessageParam{}, fmt.Errorf("MCP client not initialized")
+		err := fmt.Errorf("MCP client not initialized")
+		response := fmt.Sprintf("Error: %v", err)
+		isError := err != nil
+		toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
+		return anthropic.NewUserMessage(toolResult), err
 	}
 
 	// Call the MCP tool
@@ -233,7 +237,7 @@ func (op *OpenProcessor) AnthropicMCPToolCall(toolCall anthropic.ToolUseBlockPar
 }
 
 func (op *OpenProcessor) AnthropicSwitchAgentToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
-	response, err := switchAgentToolCallImpl(argsMap)
+	response, err := switchAgentToolCallImpl(argsMap, op.toolsUse)
 	isError := err != nil && !IsSwitchAgentError(err)
 	if err != nil && !IsSwitchAgentError(err) {
 		response = fmt.Sprintf("Error: %v", err)
@@ -246,8 +250,62 @@ func (op *OpenProcessor) AnthropicSwitchAgentToolCall(toolCall anthropic.ToolUse
 		if IsSwitchAgentError(err) {
 			return toolMessage, err
 		}
-		return toolMessage, err
 	}
 
-	return toolMessage, nil
+	return toolMessage, err
+}
+
+func (op *OpenProcessor) AnthropicListAgentToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
+	response, err := listAgentToolCallImpl()
+	isError := err != nil
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
+	return anthropic.NewUserMessage(toolResult), err
+}
+
+func (op *OpenProcessor) AnthropicCallAgentToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
+	response, err := callAgentToolCallImpl(argsMap, op.executor)
+	isError := err != nil
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
+	return anthropic.NewUserMessage(toolResult), err
+}
+
+func (op *OpenProcessor) AnthropicGetStateToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
+	response, err := getStateToolCallImpl(argsMap, op.sharedState)
+	isError := err != nil
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
+	return anthropic.NewUserMessage(toolResult), err
+}
+
+func (op *OpenProcessor) AnthropicSetStateToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
+	response, err := setStateToolCallImpl(argsMap, op.agentName, op.sharedState)
+	isError := err != nil
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
+	return anthropic.NewUserMessage(toolResult), err
+}
+
+func (op *OpenProcessor) AnthropicListStateToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
+	response, err := listStateToolCallImpl(op.sharedState)
+	isError := err != nil
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
+	return anthropic.NewUserMessage(toolResult), err
 }

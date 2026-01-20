@@ -235,7 +235,7 @@ func RunInitWizard() error {
 				Value(&selectedTools),
 			huh.NewNote().
 				Title("Tips").
-				Description("Embedding tools are used to perform operations on the file system, execute commands.\nIf you want the agent to switch to different agent for different tasks automatically, toggle switch\\_agent tool."),
+				Description(EmbeddingToolsDescription),
 		),
 		// Group 4: Thinking Level
 		huh.NewGroup(

@@ -156,6 +156,12 @@ func (ag *Agent) GenerateOpenAIStream() error {
 		tools = append(tools, mcpTools...)
 	}
 
+	// Initialize sub-agent executor if SharedState is available
+	var executor *SubAgentExecutor
+	if ag.SharedState != nil {
+		executor = NewSubAgentExecutor(ag.SharedState, MaxWorkersParalleled)
+	}
+
 	op := OpenProcessor{
 		ctx:        ctx,
 		notify:     ag.NotifyChan,
@@ -167,6 +173,10 @@ func (ag *Agent) GenerateOpenAIStream() error {
 		references: make([]map[string]interface{}, 0), // Updated to match new field type
 		status:     &ag.Status,
 		mcpClient:  ag.MCPClient,
+		// Sub-agent orchestration
+		sharedState: ag.SharedState,
+		executor:    executor,
+		agentName:   ag.AgentName,
 	}
 	chat := &OpenAI{
 		client: client,
@@ -291,9 +301,9 @@ func (oa *OpenAI) process(ag *Agent) error {
 						return err
 					}
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
-					// Send error info to user but continue processing other tool calls
-					continue
 				}
+				// IMPORTANT: Even error happened still add an error response message to maintain conversation integrity
+				// The API requires every tool_call to have a corresponding tool response
 				// Add the tool response to the conversation
 				ag.Convo.Push(toolMessage)
 			}
@@ -471,7 +481,12 @@ func (oa *OpenAI) processStream(stream *openai.ChatCompletionStream) (openai.Cha
 func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompletionMessage, error) {
 	// Parse the query from the arguments
 	var argsMap map[string]interface{}
-	if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &argsMap); err != nil {
+	argsStr := toolCall.Function.Arguments
+	if strings.TrimSpace(argsStr) == "" {
+		argsStr = "{}"
+	}
+
+	if err := json.Unmarshal([]byte(argsStr), &argsMap); err != nil {
 		return openai.ChatCompletionMessage{}, fmt.Errorf("error parsing arguments: %v", err)
 	}
 
@@ -515,6 +530,11 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 		"list_memory":         oa.op.OpenAIListMemoryToolCall,
 		"save_memory":         oa.op.OpenAISaveMemoryToolCall,
 		"switch_agent":        oa.op.OpenAISwitchAgentToolCall,
+		"list_agent":          oa.op.OpenAIListAgentToolCall,
+		"call_agent":          oa.op.OpenAICallAgentToolCall,
+		"get_state":           oa.op.OpenAIGetStateToolCall,
+		"set_state":           oa.op.OpenAISetStateToolCall,
+		"list_state":          oa.op.OpenAIListStateToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {

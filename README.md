@@ -357,6 +357,26 @@ gllm agent set coder --model gpt-4
 - `gllm agent set <name>` - Update an agent
 - `gllm agent remove <name>` - Delete an agent
 
+### Dynamic Agent Orchestration
+
+`gllm` supports dynamic, autonomous orchestration where an agent can invoke other specialized agents to perform tasks concurrently.
+
+**Key Features:**
+
+- **`call_agent` Tool**: Allows an orchestrator agent to spawn sub-agents with specific instructions. Orchestrators always wait for all sub-agents to complete before receiving a progress summary. Sub-agents run in isolated contexts to prevent state pollution.
+- **Parallel Execution**: Multiple sub-agents can run concurrently (e.g., a "Coder" and a "Reviewer" working in parallel).
+- **Shared State**: Agents communicate via a high-speed in-memory `SharedState` key-value store using `set_state` and `get_state` tools.
+- **Progress Tracking**: The orchestrator receives progress summaries instead of full chat logs, preventing context window explosion.
+
+**Example Flow:**
+
+1. **Orchestrator** receives a complex task: "Implement feature X and write docs."
+2. **Orchestrator** calls:
+   - `call_agent(agent="coder", instruction="Implement feature X", output_key="code_result")`
+   - `call_agent(agent="writer", instruction="Write docs for X", output_key="doc_result")`
+3. **Sub-agents** execute concurrently. They write their detailed outputs to `SharedState`.
+4. **Orchestrator** waits for completion, reads the results via `get_state`, and synthesizes the final response.
+
 ---
 
 ## 🛠 Model Context Protocol (MCP)

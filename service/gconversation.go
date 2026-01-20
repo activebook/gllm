@@ -8,17 +8,17 @@ import (
 )
 
 /*
- * Google Gemini2.0 Conversation
+ * Google Gemini Conversation
  */
 // GeminiConversation manages conversations for Google's Gemini model
-type Gemini2Conversation struct {
+type GeminiConversation struct {
 	BaseConversation
 	Messages []*genai.Content
 }
 
-// Open initializes a Gemini2Conversation with the provided title
+// Open initializes a GeminiConversation with the provided title
 // PushContents adds multiple content items to the history
-func (g *Gemini2Conversation) Push(messages ...interface{}) {
+func (g *GeminiConversation) Push(messages ...interface{}) {
 	for _, msg := range messages {
 		switch v := msg.(type) {
 		case *genai.Content:
@@ -29,18 +29,18 @@ func (g *Gemini2Conversation) Push(messages ...interface{}) {
 	}
 }
 
-func (g *Gemini2Conversation) GetMessages() interface{} {
+func (g *GeminiConversation) GetMessages() interface{} {
 	return g.Messages
 }
 
-func (g *Gemini2Conversation) SetMessages(messages interface{}) {
+func (g *GeminiConversation) SetMessages(messages interface{}) {
 	if msgs, ok := messages.([]*genai.Content); ok {
 		g.Messages = msgs
 	}
 }
 
 // Save persists the Gemini conversation to disk
-func (g *Gemini2Conversation) Save() error {
+func (g *GeminiConversation) Save() error {
 	if g.Name == "" || len(g.Messages) == 0 {
 		return nil
 	}
@@ -63,7 +63,7 @@ func (g *Gemini2Conversation) Save() error {
 }
 
 // Load retrieves the Gemini conversation from disk
-func (g *Gemini2Conversation) Load() error {
+func (g *GeminiConversation) Load() error {
 	if g.Name == "" {
 		return nil
 	}
@@ -90,7 +90,7 @@ func (g *Gemini2Conversation) Load() error {
 }
 
 // Clear removes all messages from the conversation
-func (g *Gemini2Conversation) Clear() error {
+func (g *GeminiConversation) Clear() error {
 	g.Messages = []*genai.Content{}
 	return g.BaseConversation.Clear()
 }

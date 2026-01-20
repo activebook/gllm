@@ -40,7 +40,18 @@ func EnsureActiveAgent() (*data.AgentConfig, error) {
 }
 
 // RunAgent executes the agent with the given parameters, handling all setup and compatibility checks.
-func RunAgent(prompt string, files []*service.FileData, convoName string, yolo bool, outputFile string) error {
+func RunAgent(prompt string, files []*service.FileData, convoName string, yolo bool, outputFile string, inputState *data.SharedState) error {
+	// Initialize SharedState for this session (for sub-agent orchestration)
+	// If inputState is provided, use it (lifecycle managed by caller)
+	// If not, create a new one and manage lifecycle here
+	var sharedState *data.SharedState
+	if inputState != nil {
+		sharedState = inputState
+	} else {
+		sharedState = data.NewSharedState()
+		defer sharedState.Clear() // Clean up on session end
+	}
+
 	for {
 		// Create an indeterminate progress bar
 		indicator := service.NewIndicator("Processing...")
@@ -95,6 +106,9 @@ func RunAgent(prompt string, files []*service.FileData, convoName string, yolo b
 			QuietMode:      false,
 			ConvoName:      convoName,
 			MCPConfig:      mcpConfig,
+			// Sub-agent orchestration
+			SharedState: sharedState,
+			AgentName:   agent.Name,
 		}
 
 		// Execute
@@ -103,18 +117,29 @@ func RunAgent(prompt string, files []*service.FileData, convoName string, yolo b
 			// Switch agent signal
 			if service.IsSwitchAgentError(err) {
 				switchErr := err.(*service.SwitchAgentError)
-				service.Infof("Switching agent to %s...", switchErr.TargetAgent)
+				service.Infof("Already switched to agent [%s].", switchErr.TargetAgent)
 				// Set instruction, shouldn't use the old prompt
 				prompt = switchErr.Instruction
 				service.Debugf("Switch agent instruction: %s", prompt)
 				// Clearup files
 				files = nil
-				continue
+				if prompt == "" {
+					// If no instruction, then no more task, exit
+					break
+				} else {
+					// Switch agent, continue to next loop
+					continue
+				}
+			} else {
+				// Other error, return
+				return err
 			}
-			return err
+		} else {
+			// No error, this turn is done, break
+			break
 		}
-		return nil
 	}
+	return nil
 }
 
 // buildFinalPrompt combines template and user input, and processes @ references

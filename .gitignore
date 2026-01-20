@@ -3,6 +3,7 @@
 gllm.yaml
 mcp.json
 design.md
+workflow.json
 **test*/*
 **test*/*.*
 **workflow/*

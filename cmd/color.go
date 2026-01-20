@@ -258,7 +258,8 @@ var colorCmd = &cobra.Command{
 				{"ToolCall", "\033[38;2;38;198;218m"},      // #26C6DA
 				{"ToolResponse", "\033[38;2;149;117;205m"}, // #9575CD
 				{"Media", "\033[38;2;38;166;154m"},         // #26A69A
-				{"Success", "\033[38;2;50;205;50m"},        // Limegreen
+				{"Success", "\033[38;2;60;179;113m"},       // MediumSeaGreen
+				{"Info", "\033[38;2;95;158;160m"},          // CadetBlue
 				{"Error", "\033[38;2;255;69;0m"},           // Orangered
 				{"Gray", "\033[38;2;128;128;128m"},         // Gray
 				{"Purple", "\033[38;2;147;112;219m"},       // MediumPurple

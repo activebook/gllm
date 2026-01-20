@@ -94,6 +94,7 @@ type ChatInfo struct {
 	QuitFlag    bool   // for cmd /quit or /exit
 	EditorInput string // for /e editor edit
 	outputFile  string
+	sharedState *data.SharedState // Persistent SharedState for the session
 }
 
 func (ci *ChatInfo) printWelcome() {
@@ -159,6 +160,10 @@ func (ci *ChatInfo) awaitChat() (string, error) {
 }
 
 func (ci *ChatInfo) startREPL() {
+	// Initialize SharedState for the session
+	ci.sharedState = data.NewSharedState()
+	defer ci.sharedState.Clear()
+
 	// Start the REPL
 	ci.printWelcome()
 
@@ -305,8 +310,8 @@ func (ci *ChatInfo) showHistory() {
 }
 
 func (ci *ChatInfo) callAgent(input string) {
-	// Call agent using the shared runner
-	err := RunAgent(input, ci.Files, convoName, yoloFlag, ci.outputFile)
+	// Call agent using the shared runner, passing persisted SharedState
+	err := RunAgent(input, ci.Files, convoName, yoloFlag, ci.outputFile, ci.sharedState)
 	if err != nil {
 		service.Errorf("%v", err)
 		return

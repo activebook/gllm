@@ -179,6 +179,12 @@ func (ag *Agent) GenerateOpenChatStream() error {
 		tools = append(tools, mcpTools...)
 	}
 
+	// Initialize sub-agent executor if SharedState is available
+	var executor *SubAgentExecutor
+	if ag.SharedState != nil {
+		executor = NewSubAgentExecutor(ag.SharedState, MaxWorkersParalleled)
+	}
+
 	op := OpenProcessor{
 		ctx:        ctx,
 		notify:     ag.NotifyChan,
@@ -190,6 +196,10 @@ func (ag *Agent) GenerateOpenChatStream() error {
 		references: make([]map[string]interface{}, 0), // Updated to match new field type
 		status:     &ag.Status,
 		mcpClient:  ag.MCPClient,
+		// Sub-agent orchestration
+		sharedState: ag.SharedState,
+		executor:    executor,
+		agentName:   ag.AgentName,
 	}
 	chat := &OpenChat{
 		client: client,
@@ -332,19 +342,9 @@ func (c *OpenChat) process(ag *Agent) error {
 						return err
 					}
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
-					// IMPORTANT: Still add an error response message to maintain conversation integrity
-					// The API requires every tool_call to have a corresponding tool response
-					errorMessage := &model.ChatCompletionMessage{
-						Role:       model.ChatMessageRoleTool,
-						ToolCallID: toolCall.ID,
-						Name:       Ptr(""),
-						Content: &model.ChatCompletionMessageContent{
-							StringValue: volcengine.String(fmt.Sprintf("Tool call failed: %v. Please try a different approach or different tool instead of retrying with the same arguments.", err)),
-						},
-					}
-					ag.Convo.Push(errorMessage)
-					continue
 				}
+				// IMPORTANT: Even error happened still add an error response message to maintain conversation integrity
+				// The API requires every tool_call to have a corresponding tool response
 				// Add the tool response to the conversation
 				ag.Convo.Push(toolMessage)
 			}
@@ -540,7 +540,12 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompletionMessage, error) {
 	// Parse the query from the arguments
 	var argsMap map[string]interface{}
-	if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &argsMap); err != nil {
+	argsStr := toolCall.Function.Arguments
+	if strings.TrimSpace(argsStr) == "" {
+		argsStr = "{}"
+	}
+
+	if err := json.Unmarshal([]byte(argsStr), &argsMap); err != nil {
 		// Log the malformed JSON for debugging
 		Debugf("Failed to parse tool call arguments. Function: %s, Raw arguments: %s", toolCall.Function.Name, toolCall.Function.Arguments)
 		return nil, fmt.Errorf("error parsing arguments: %v (raw: %s)", err, toolCall.Function.Arguments)
@@ -586,6 +591,11 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		"list_memory":         c.op.OpenChatListMemoryToolCall,
 		"save_memory":         c.op.OpenChatSaveMemoryToolCall,
 		"switch_agent":        c.op.OpenChatSwitchAgentToolCall,
+		"list_agent":          c.op.OpenChatListAgentToolCall,
+		"call_agent":          c.op.OpenChatCallAgentToolCall,
+		"get_state":           c.op.OpenChatGetStateToolCall,
+		"set_state":           c.op.OpenChatSetStateToolCall,
+		"list_state":          c.op.OpenChatListStateToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {

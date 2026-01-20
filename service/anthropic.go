@@ -67,6 +67,12 @@ func (ag *Agent) GenerateAnthropicStream() error {
 		tools = append(tools, mcpTools...)
 	}
 
+	// Initialize sub-agent executor if SharedState is available
+	var executor *SubAgentExecutor
+	if ag.SharedState != nil {
+		executor = NewSubAgentExecutor(ag.SharedState, MaxWorkersParalleled)
+	}
+
 	op := OpenProcessor{
 		ctx:        ctx,
 		notify:     ag.NotifyChan,
@@ -78,6 +84,10 @@ func (ag *Agent) GenerateAnthropicStream() error {
 		references: make([]map[string]interface{}, 0),
 		status:     &ag.Status,
 		mcpClient:  ag.MCPClient,
+		// Sub-agent orchestration
+		sharedState: ag.SharedState,
+		executor:    executor,
+		agentName:   ag.AgentName,
 	}
 
 	chat := &Anthropic{
@@ -206,6 +216,8 @@ func (a *Anthropic) process(ag *Agent) error {
 					}
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Tool call failed: %v", err)}, nil)
 				}
+				// IMPORTANT: Even error happened still add an error response message to maintain conversation integrity
+				// The API requires every tool_call to have a corresponding tool response
 				ag.Convo.Push(toolMsg)
 			}
 		} else {
@@ -432,6 +444,11 @@ func (a *Anthropic) processToolCall(toolCall anthropic.ToolUseBlockParam) (anthr
 		"list_memory":         a.op.AnthropicListMemoryToolCall,
 		"save_memory":         a.op.AnthropicSaveMemoryToolCall,
 		"switch_agent":        a.op.AnthropicSwitchAgentToolCall,
+		"list_agent":          a.op.AnthropicListAgentToolCall,
+		"call_agent":          a.op.AnthropicCallAgentToolCall,
+		"get_state":           a.op.AnthropicGetStateToolCall,
+		"set_state":           a.op.AnthropicSetStateToolCall,
+		"list_state":          a.op.AnthropicListStateToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Name]; ok {
