@@ -295,7 +295,7 @@ gllm "Read this file @build.sh and change function name"
     - The next agent reads that key (e.g., `get_state(key="research_report")`) to continue the work.
     - This keeps the communication channel lightweight while preserving the full depth of data in memory.
 
-#### Example: Deep Research & Code Generation
+#### Deep Research Workflows
 
 Build complex workflows where agents collaborate autonomously.
 
@@ -306,6 +306,18 @@ Build complex workflows where agents collaborate autonomously.
 | **Gemini 3.0 Workflow** | **LongCat Workflow** |
 |:---:|:---:|
 | ![Gemini 1](screenshots/workflow_gemini_1.png)<br>![Gemini 2](screenshots/workflow_gemini_2.png)<br>![Gemini 3](screenshots/workflow_gemini_3.png) | ![LongCat 1](screenshots/workflow_longcat_1.png)<br>![LongCat 2](screenshots/workflow_longcat_2.png)<br>![LongCat 3](screenshots/workflow_longcat_3.png) |
+
+#### Recursive LM Workflows
+
+Recursive LM (RLM) instructs the LLM to act as a programmer managing large datasets, using code to extract info from files snippet-by-snippet (not loading entire files), verify with code, and filter through chunks or regex while considering context window. It treats the LLM as an OS dispatching tasks to subagents (processes) with coding abilities. Subagents critique their work, save to shared memory state. Root LLM uses a judge agent to evaluate combined results from shared memory. If good, job done; else, try again with new approaches.
+
+| RLM DeepSeek Task | RLM Subagent Task 1-2 |
+|----------------|----------------|
+| ![RLM1](screenshots/rlm_deepseek_1.png) | ![RLM2](screenshots/rlm_deepseek_2.png) |
+
+| RLM Subagent Task 3-4 | RLM Judge & Summary |
+|----------------|----------------|
+| ![RLM3](screenshots/rlm_deepseek_3.png) | ![RLM4](screenshots/rlm_deepseek_4.png) |
 
 ---
 
