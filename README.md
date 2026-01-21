@@ -17,14 +17,14 @@
 - **Markdown Support**: Renders Markdown for easy-to-read formatted output.
 - **Multi-turn Conversations**: Engage in multiple rounds of conversation and manage chat history.
 - **Command Agent Mode**: Let LLMs plan and execute commands with your confirmation.
-- **Multi-Agent Workflows**: Build and run complex workflows with multiple agents for tasks like deep research.
 - **Model Context Protocol (MCP) Support**: Connect to external MCP servers to access additional tools and data sources.
 - **Token Usage Tracking**: Monitor your token consumption.
 - **Configuration Management**: Easily manage models, templates, system prompts, and search engines.
 - **Memory Management**: Remember important facts about you across sessions for personalized responses.
 - **Context-Aware Agent Switching**: Agents can hand off tasks to other specialized agents with full context and instructions across different LLM providers.
+- **Agentic Workflow**: Orchestrate sophisticated multi-agent behaviors using state-of-the-art models for parallel task execution and save context window.
 - **@ Reference Support**: Reference files and directories directly in prompts using @ syntax for seamless context inclusion.
-- **Version Control**: Easily track and update your `gllm` setup.
+- **Cross-platform Support**: gllm is available for macOS, Windows, and Linux, and easy to install and update.
 
 ---
 
@@ -205,6 +205,14 @@ For a more interactive experience, you can use the `chat` command to enter a rea
 
   Within the chat, the conversation history is automatically maintained.
 
+- **Check chat history:**
+
+  ```sh
+  in chat mode, type: /history or /h
+  ```
+
+  ![Chat History Screenshot](screenshots/chathistory.png)
+
 ---
 
 ## Memory Management
@@ -270,61 +278,34 @@ gllm "Read this file @build.sh and change function name"
 |:-------------------:|:--------------:|
 | ![Edit Code Screenshot](screenshots/editcode.png) | ![Cancel Edit Screenshot](screenshots/editcode_cancel.png) |
 
-### Workflows
+### Agentic Workflows
 
-`gllm` allows you to define and run complex workflows with multiple agents. A workflow consists of a sequence of agents, where the output of one agent serves as the input for the next. This is useful for tasks like deep research, automated code generation, and more.
+`gllm` introduces a powerful **Agentic Workflow** system that leverages **Agent Tools** and **State Tools** to orchestrate complex, multi-agent tasks. This approach solves the traditional context window limitations by decoupling agent execution and using a shared state memory. SOTA LLMs like Gemini 3.0 and GPT-5.2 can handle complex workflows with ease.
 
 #### How it Works
 
-A workflow is defined by a series of agents, each with a specific role and configuration. There are two types of agents:
+1.  **Agent Tools (`call_agent`)**:
+    - An Orchestrator agent can spawn independent sub-agents using the `call_agent` tool.
+    - Each sub-agent runs in its own isolated context, preventing the "context window explosion" typical of long chains.
+    - Sub-agents can run in parallel, maximizing efficiency.
 
-- **`master`**: A master agent orchestrates the workflow. It takes an initial prompt and its output is passed to the next agent in the sequence. A workflow must have at least one master agent.
-- **`worker`**: A worker agent performs a specific task. It receives input from the previous agent, processes it, and its output is passed to the next agent.
+2.  **State Tools (`set_state`, `get_state`)**:
+    - Instead of passing massive context strings, agents communicate via a high-speed, in-memory **Shared State**.
+    - An agent writes its output to a specific key in the shared state (e.g., `set_state(key="research_report", value="...")`).
+    - The next agent reads that key (e.g., `get_state(key="research_report")`) to continue the work.
+    - This keeps the communication channel lightweight while preserving the full depth of data in memory.
 
-When a workflow is executed, `gllm` processes each agent in the defined order. The output from one agent is written to a directory that becomes the input for the next agent.
+#### Example: Deep Research & Code Generation
 
-#### Workflow Commands
+Build complex workflows where agents collaborate autonomously.
 
-You can manage your workflows using the `gllm workflow` command:
+| **GPT-5.2 Workflow** | **DeepSeek V3.2 Workflow** |
+|:---:|:---:|
+| ![GPT5](screenshots/workflow_gpt5.png) | ![DeepSeek 1](screenshots/workflow_deepseek_1.png)<br>![DeepSeek 2](screenshots/workflow_deepseek_2.png)<br>![DeepSeek 3](screenshots/workflow_deepseek_3.png) |
 
-- **`gllm workflow list`**: List all agents in the current workflow.
-- **`gllm workflow add`**: Add a new agent to the workflow.
-- **`gllm workflow remove`**: Remove an agent from the workflow.
-- **`gllm workflow set`**: Modify the properties of an existing agent.
-- **`gllm workflow move`**: Change the order of agents in the workflow.
-- **`gllm workflow info`**: Display detailed information about a specific agent.
-- **`gllm workflow start`**: Execute the workflow.
-
-#### Example: A Simple Research Workflow
-
-Here's an example of a simple research workflow with two agents: a `planner` and a `researcher`.
-
-**Planner (master)**: This agent takes a research topic and creates a research plan.
-**Researcher (worker)**: This agent takes the research plan and executes it, gathering information and generating a report.
-
-To create this workflow, you would use the `gllm workflow add` command:
-
-```sh
-# Add the planner agent
-gllm workflow add --name planner --model groq-oss --role master --output "workflow/planner" --template "Create a research plan for the following topic: {{.prompt}}"
-
-# Add the researcher agent
-gllm workflow add --name researcher --model gemini-pro --role worker --input "workflow/planner" --output "workflow/researcher" --template "Execute the following research plan: {{.prompt}}"
-```
-
-To execute the workflow, you would use the `gllm workflow start` command:
-
-```sh
-gllm workflow start "The future of artificial intelligence"
-```
-
-This will start the workflow. The `planner` agent will create a research plan and save it to the `workflow/planner` directory. The `researcher` agent will then read the plan from that directory, execute the research, and save the final report to the `workflow/researcher` directory.
-
-Here's an example of a deep research workflow in action:
-
-| Planner | Dispatcher | Workers | Summarizer |
-|---------|------------|---------|------------|
-| Designs a plan for the research.  ![Planner Screenshot](screenshots/deepresearch_planner.png) | Dispatches sub-tasks to worker agents.  ![Dispatcher Screenshot](screenshots/deepresearch_dispatcher.png) | Execute the sub-tasks in parallel.  ![Workers Screenshot](screenshots/deepresearch_workers.png) | Summarizes the results from the workers to provide a final report.  ![Summarizer Screenshot](screenshots/deepresearch_summarizer.png) |
+| **Gemini 3.0 Workflow** | **LongCat Workflow** |
+|:---:|:---:|
+| ![Gemini 1](screenshots/workflow_gemini_1.png)<br>![Gemini 2](screenshots/workflow_gemini_2.png)<br>![Gemini 3](screenshots/workflow_gemini_3.png) | ![LongCat 1](screenshots/workflow_longcat_1.png)<br>![LongCat 2](screenshots/workflow_longcat_2.png)<br>![LongCat 3](screenshots/workflow_longcat_3.png) |
 
 ---
 
@@ -356,26 +337,6 @@ gllm agent set coder --model gpt-4
 - `gllm agent info <name>` - Show agent details
 - `gllm agent set <name>` - Update an agent
 - `gllm agent remove <name>` - Delete an agent
-
-### Dynamic Agent Orchestration
-
-`gllm` supports dynamic, autonomous orchestration where an agent can invoke other specialized agents to perform tasks concurrently.
-
-**Key Features:**
-
-- **`call_agent` Tool**: Allows an orchestrator agent to spawn sub-agents with specific instructions. Orchestrators always wait for all sub-agents to complete before receiving a progress summary. Sub-agents run in isolated contexts to prevent state pollution.
-- **Parallel Execution**: Multiple sub-agents can run concurrently (e.g., a "Coder" and a "Reviewer" working in parallel).
-- **Shared State**: Agents communicate via a high-speed in-memory `SharedState` key-value store using `set_state` and `get_state` tools.
-- **Progress Tracking**: The orchestrator receives progress summaries instead of full chat logs, preventing context window explosion.
-
-**Example Flow:**
-
-1. **Orchestrator** receives a complex task: "Implement feature X and write docs."
-2. **Orchestrator** calls:
-   - `call_agent(agent="coder", instruction="Implement feature X", output_key="code_result")`
-   - `call_agent(agent="writer", instruction="Write docs for X", output_key="doc_result")`
-3. **Sub-agents** execute concurrently. They write their detailed outputs to `SharedState`.
-4. **Orchestrator** waits for completion, reads the results via `get_state`, and synthesizes the final response.
 
 ---
 
@@ -501,4 +462,9 @@ Contributions are welcome! Please feel free to submit a pull request or open an 
 
 ---
 
-*Created by Charles Liu ([@activebook](https://github.com/activebook))*
+{
+  "author": {
+    "name": "Charles Liu",    
+    "url": "https://github.com/activebook"
+  }
+}
