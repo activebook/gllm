@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -55,6 +56,13 @@ type ConfigStore struct {
 // NewConfigStore creates a new ConfigStore using the existing viper configuration.
 // This reuses whatever config file viper has already loaded.
 func NewConfigStore() *ConfigStore {
+	/*
+	 * Viper merges configuration from various sources,
+	 * many of which are either case insensitive or use different casing than other sources.
+	 * In order to provide the best experience when using multiple sources,
+	 * all keys are made case insensitive GitHub -
+	 * which means they're internally lowercased.
+	 */
 	return &ConfigStore{v: viper.GetViper()}
 }
 
@@ -140,6 +148,7 @@ func (c *ConfigStore) ConfigFileUsed() string {
 // GetAgent returns a specific agent configuration by name.
 // Returns nil if agent doesn't exist.
 func (c *ConfigStore) GetAgent(name string) *AgentConfig {
+	name = strings.ToLower(name)
 	agentsMap := c.v.GetStringMap("agents")
 	if agentsMap == nil {
 		return nil
@@ -188,6 +197,7 @@ func (c *ConfigStore) GetAgentNames() []string {
 
 // SetAgent saves or updates an agent configuration.
 func (c *ConfigStore) SetAgent(name string, agent *AgentConfig) error {
+	name = strings.ToLower(name)
 	agentsMap := c.v.GetStringMap("agents")
 	if agentsMap == nil {
 		agentsMap = make(map[string]interface{})
@@ -202,6 +212,7 @@ func (c *ConfigStore) SetAgent(name string, agent *AgentConfig) error {
 
 // DeleteAgent removes an agent configuration.
 func (c *ConfigStore) DeleteAgent(name string) error {
+	name = strings.ToLower(name)
 	agentsMap := c.v.GetStringMap("agents")
 	if agentsMap == nil {
 		return fmt.Errorf("no agents configured")
@@ -249,6 +260,7 @@ func (c *ConfigStore) GetModels() map[string]*Model {
 
 // SetModel adds or updates a model.
 func (c *ConfigStore) SetModel(name string, model *Model) error {
+	name = strings.ToLower(name)
 	modelsMap := c.v.GetStringMap("models")
 	if modelsMap == nil {
 		modelsMap = make(map[string]interface{})
@@ -260,6 +272,7 @@ func (c *ConfigStore) SetModel(name string, model *Model) error {
 }
 
 func (c *ConfigStore) GetModel(name string) *Model {
+	name = strings.ToLower(name)
 	modelsMap := c.v.GetStringMap("models")
 	if modelConfig, ok := modelsMap[name]; ok {
 		if configMap := toStringMap(modelConfig); configMap != nil {
@@ -280,6 +293,7 @@ func (c *ConfigStore) getModelFromAgentMap(m map[string]interface{}, key string)
 
 	// Model is a string reference (alias)
 	if name, ok := val.(string); ok {
+		name = strings.ToLower(name)
 		modelsMap := c.v.GetStringMap("models")
 		if modelConfig, ok := modelsMap[name]; ok {
 			if configMap := toStringMap(modelConfig); configMap != nil {
@@ -296,6 +310,7 @@ func (c *ConfigStore) getModelFromAgentMap(m map[string]interface{}, key string)
 
 // DeleteModel removes a model.
 func (c *ConfigStore) DeleteModel(name string) error {
+	name = strings.ToLower(name)
 	modelsMap := c.v.GetStringMap("models")
 	if modelsMap == nil {
 		return fmt.Errorf("no models configured")
@@ -328,6 +343,7 @@ func (c *ConfigStore) getSearchEngineFromAgentMap(m map[string]interface{}, name
 	}
 
 	if name, ok := val.(string); ok {
+		name = strings.ToLower(name)
 		searchMap := c.v.GetStringMap("search_engines")
 		if searchConfig, ok := searchMap[name]; ok {
 			if configMap := toStringMap(searchConfig); configMap != nil {
@@ -342,6 +358,7 @@ func (c *ConfigStore) getSearchEngineFromAgentMap(m map[string]interface{}, name
 
 // GetSearchEngine returns a specific search engine by name.
 func (c *ConfigStore) GetSearchEngine(name string) *SearchEngine {
+	name = strings.ToLower(name)
 	searchMap := c.v.GetStringMap("search_engines")
 	if searchConfig, ok := searchMap[name]; ok {
 		if configMap := toStringMap(searchConfig); configMap != nil {
@@ -354,6 +371,7 @@ func (c *ConfigStore) GetSearchEngine(name string) *SearchEngine {
 
 // SetSearchEngine adds or updates a search engine.
 func (c *ConfigStore) SetSearchEngine(name string, se *SearchEngine) error {
+	name = strings.ToLower(name)
 	searchMap := c.v.GetStringMap("search_engines")
 	if searchMap == nil {
 		searchMap = make(map[string]interface{})
@@ -365,6 +383,7 @@ func (c *ConfigStore) SetSearchEngine(name string, se *SearchEngine) error {
 
 // DeleteSearchEngine removes a search engine.
 func (c *ConfigStore) DeleteSearchEngine(name string) error {
+	name = strings.ToLower(name)
 	searchMap := c.v.GetStringMap("search_engines")
 	if searchMap == nil {
 		return fmt.Errorf("no search engines configured")
@@ -381,11 +400,13 @@ func (c *ConfigStore) GetTemplates() map[string]string {
 
 // GetTemplate returns a specific template by name.
 func (c *ConfigStore) GetTemplate(name string) string {
+	name = strings.ToLower(name)
 	return c.v.GetStringMapString("templates")[name]
 }
 
 // SetTemplate adds or updates a template.
 func (c *ConfigStore) SetTemplate(name, content string) error {
+	name = strings.ToLower(name)
 	templates := c.v.GetStringMapString("templates")
 	if templates == nil {
 		templates = make(map[string]string)
@@ -397,6 +418,7 @@ func (c *ConfigStore) SetTemplate(name, content string) error {
 
 // DeleteTemplate removes a template.
 func (c *ConfigStore) DeleteTemplate(name string) error {
+	name = strings.ToLower(name)
 	templates := c.v.GetStringMapString("templates")
 	if templates == nil {
 		return fmt.Errorf("no templates configured")
@@ -413,11 +435,13 @@ func (c *ConfigStore) GetSystemPrompts() map[string]string {
 
 // GetSystemPrompt returns a specific system prompt by name.
 func (c *ConfigStore) GetSystemPrompt(name string) string {
+	name = strings.ToLower(name)
 	return c.v.GetStringMapString("system_prompts")[name]
 }
 
 // SetSystemPrompt adds or updates a system prompt.
 func (c *ConfigStore) SetSystemPrompt(name, content string) error {
+	name = strings.ToLower(name)
 	prompts := c.v.GetStringMapString("system_prompts")
 	if prompts == nil {
 		prompts = make(map[string]string)
@@ -429,6 +453,7 @@ func (c *ConfigStore) SetSystemPrompt(name, content string) error {
 
 // DeleteSystemPrompt removes a system prompt.
 func (c *ConfigStore) DeleteSystemPrompt(name string) error {
+	name = strings.ToLower(name)
 	prompts := c.v.GetStringMapString("system_prompts")
 	if prompts == nil {
 		return fmt.Errorf("no system prompts configured")
