@@ -90,7 +90,7 @@ func setupColors() {
 
 	if p == termenv.TrueColor {
 		errorColor = fgSeq("#FF4500")   // Orangered
-		successColor = fgSeq("#31e180") // MediumSeaGreen (Less vibrant)
+		successColor = fgSeq("#89D184") // MediumSeaGreen (Less vibrant)
 		warnColor = fgSeq("#FF8C00")    // DarkOrange
 		infoColor = fgSeq("#5F9EA0")    // CadetBlue (Less vibrant)
 		debugColor = fgSeq("#1E90FF")   // DodgerBlue
