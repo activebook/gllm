@@ -63,6 +63,19 @@ func NewConfigStore() *ConfigStore {
 	 * all keys are made case insensitive GitHub -
 	 * which means they're internally lowercased.
 	 */
+	/*
+	 * Solution:
+	 * For keys that are case sensitive, we use ToLower to normalize them.
+	 * Set and Get Keys.
+	 * Or: the ideal pattern is to store the "canonical ID" (lowercased) as the key,
+	 * and store a separate DisplayName field inside the configuration value.
+	 *
+	 * The ToLower call acts as a normalization gate.
+	 * Without it, the Go map's inherent case-sensitivity would "leak" into the configuration persistence layer,
+	 * breaking the abstraction of case-insensitivity that the rest of the system relies on.
+	 * It is not just about the final YAML file; it is about ensuring that the Go runtime’s
+	 * map lookup remains synchronized with Viper's configuration logic.
+	 */
 	return &ConfigStore{v: viper.GetViper()}
 }
 
@@ -522,29 +535,6 @@ func (c *ConfigStore) parseAgentConfig(name string, config interface{}) *AgentCo
 	}
 
 	return agent
-}
-
-// GetWorkflowAgents returns the list of agents in the workflow.
-func (c *ConfigStore) GetWorkflowAgents() []interface{} {
-	return c.v.Get("workflow.agents").([]interface{})
-}
-
-// GetWorkflowAgentsRaw returns the raw value of workflow agents, handling potential nil or type mismatch safely
-func (c *ConfigStore) GetWorkflowAgentsRaw() []interface{} {
-	val := c.v.Get("workflow.agents")
-	if val == nil {
-		return nil
-	}
-	if slice, ok := val.([]interface{}); ok {
-		return slice
-	}
-	return nil
-}
-
-// SetWorkflowAgents updates the workflow agents list.
-func (c *ConfigStore) SetWorkflowAgents(agents []interface{}) error {
-	c.v.Set("workflow.agents", agents)
-	return c.Save()
 }
 
 // agentToMap converts an Agent struct to a map for viper storage.
