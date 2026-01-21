@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -55,6 +56,26 @@ type ConfigStore struct {
 // NewConfigStore creates a new ConfigStore using the existing viper configuration.
 // This reuses whatever config file viper has already loaded.
 func NewConfigStore() *ConfigStore {
+	/*
+	 * Viper merges configuration from various sources,
+	 * many of which are either case insensitive or use different casing than other sources.
+	 * In order to provide the best experience when using multiple sources,
+	 * all keys are made case insensitive GitHub -
+	 * which means they're internally lowercased.
+	 */
+	/*
+	 * Solution:
+	 * For keys that are case sensitive, we use ToLower to normalize them.
+	 * Set and Get Keys.
+	 * Or: the ideal pattern is to store the "canonical ID" (lowercased) as the key,
+	 * and store a separate DisplayName field inside the configuration value.
+	 *
+	 * The ToLower call acts as a normalization gate.
+	 * Without it, the Go map's inherent case-sensitivity would "leak" into the configuration persistence layer,
+	 * breaking the abstraction of case-insensitivity that the rest of the system relies on.
+	 * It is not just about the final YAML file; it is about ensuring that the Go runtime’s
+	 * map lookup remains synchronized with Viper's configuration logic.
+	 */
 	return &ConfigStore{v: viper.GetViper()}
 }
 
@@ -140,6 +161,7 @@ func (c *ConfigStore) ConfigFileUsed() string {
 // GetAgent returns a specific agent configuration by name.
 // Returns nil if agent doesn't exist.
 func (c *ConfigStore) GetAgent(name string) *AgentConfig {
+	name = strings.ToLower(name)
 	agentsMap := c.v.GetStringMap("agents")
 	if agentsMap == nil {
 		return nil
@@ -188,6 +210,7 @@ func (c *ConfigStore) GetAgentNames() []string {
 
 // SetAgent saves or updates an agent configuration.
 func (c *ConfigStore) SetAgent(name string, agent *AgentConfig) error {
+	name = strings.ToLower(name)
 	agentsMap := c.v.GetStringMap("agents")
 	if agentsMap == nil {
 		agentsMap = make(map[string]interface{})
@@ -202,6 +225,7 @@ func (c *ConfigStore) SetAgent(name string, agent *AgentConfig) error {
 
 // DeleteAgent removes an agent configuration.
 func (c *ConfigStore) DeleteAgent(name string) error {
+	name = strings.ToLower(name)
 	agentsMap := c.v.GetStringMap("agents")
 	if agentsMap == nil {
 		return fmt.Errorf("no agents configured")
@@ -249,6 +273,7 @@ func (c *ConfigStore) GetModels() map[string]*Model {
 
 // SetModel adds or updates a model.
 func (c *ConfigStore) SetModel(name string, model *Model) error {
+	name = strings.ToLower(name)
 	modelsMap := c.v.GetStringMap("models")
 	if modelsMap == nil {
 		modelsMap = make(map[string]interface{})
@@ -260,6 +285,7 @@ func (c *ConfigStore) SetModel(name string, model *Model) error {
 }
 
 func (c *ConfigStore) GetModel(name string) *Model {
+	name = strings.ToLower(name)
 	modelsMap := c.v.GetStringMap("models")
 	if modelConfig, ok := modelsMap[name]; ok {
 		if configMap := toStringMap(modelConfig); configMap != nil {
@@ -280,6 +306,7 @@ func (c *ConfigStore) getModelFromAgentMap(m map[string]interface{}, key string)
 
 	// Model is a string reference (alias)
 	if name, ok := val.(string); ok {
+		name = strings.ToLower(name)
 		modelsMap := c.v.GetStringMap("models")
 		if modelConfig, ok := modelsMap[name]; ok {
 			if configMap := toStringMap(modelConfig); configMap != nil {
@@ -296,6 +323,7 @@ func (c *ConfigStore) getModelFromAgentMap(m map[string]interface{}, key string)
 
 // DeleteModel removes a model.
 func (c *ConfigStore) DeleteModel(name string) error {
+	name = strings.ToLower(name)
 	modelsMap := c.v.GetStringMap("models")
 	if modelsMap == nil {
 		return fmt.Errorf("no models configured")
@@ -328,6 +356,7 @@ func (c *ConfigStore) getSearchEngineFromAgentMap(m map[string]interface{}, name
 	}
 
 	if name, ok := val.(string); ok {
+		name = strings.ToLower(name)
 		searchMap := c.v.GetStringMap("search_engines")
 		if searchConfig, ok := searchMap[name]; ok {
 			if configMap := toStringMap(searchConfig); configMap != nil {
@@ -342,6 +371,7 @@ func (c *ConfigStore) getSearchEngineFromAgentMap(m map[string]interface{}, name
 
 // GetSearchEngine returns a specific search engine by name.
 func (c *ConfigStore) GetSearchEngine(name string) *SearchEngine {
+	name = strings.ToLower(name)
 	searchMap := c.v.GetStringMap("search_engines")
 	if searchConfig, ok := searchMap[name]; ok {
 		if configMap := toStringMap(searchConfig); configMap != nil {
@@ -354,6 +384,7 @@ func (c *ConfigStore) GetSearchEngine(name string) *SearchEngine {
 
 // SetSearchEngine adds or updates a search engine.
 func (c *ConfigStore) SetSearchEngine(name string, se *SearchEngine) error {
+	name = strings.ToLower(name)
 	searchMap := c.v.GetStringMap("search_engines")
 	if searchMap == nil {
 		searchMap = make(map[string]interface{})
@@ -365,6 +396,7 @@ func (c *ConfigStore) SetSearchEngine(name string, se *SearchEngine) error {
 
 // DeleteSearchEngine removes a search engine.
 func (c *ConfigStore) DeleteSearchEngine(name string) error {
+	name = strings.ToLower(name)
 	searchMap := c.v.GetStringMap("search_engines")
 	if searchMap == nil {
 		return fmt.Errorf("no search engines configured")
@@ -381,11 +413,13 @@ func (c *ConfigStore) GetTemplates() map[string]string {
 
 // GetTemplate returns a specific template by name.
 func (c *ConfigStore) GetTemplate(name string) string {
+	name = strings.ToLower(name)
 	return c.v.GetStringMapString("templates")[name]
 }
 
 // SetTemplate adds or updates a template.
 func (c *ConfigStore) SetTemplate(name, content string) error {
+	name = strings.ToLower(name)
 	templates := c.v.GetStringMapString("templates")
 	if templates == nil {
 		templates = make(map[string]string)
@@ -397,6 +431,7 @@ func (c *ConfigStore) SetTemplate(name, content string) error {
 
 // DeleteTemplate removes a template.
 func (c *ConfigStore) DeleteTemplate(name string) error {
+	name = strings.ToLower(name)
 	templates := c.v.GetStringMapString("templates")
 	if templates == nil {
 		return fmt.Errorf("no templates configured")
@@ -413,11 +448,13 @@ func (c *ConfigStore) GetSystemPrompts() map[string]string {
 
 // GetSystemPrompt returns a specific system prompt by name.
 func (c *ConfigStore) GetSystemPrompt(name string) string {
+	name = strings.ToLower(name)
 	return c.v.GetStringMapString("system_prompts")[name]
 }
 
 // SetSystemPrompt adds or updates a system prompt.
 func (c *ConfigStore) SetSystemPrompt(name, content string) error {
+	name = strings.ToLower(name)
 	prompts := c.v.GetStringMapString("system_prompts")
 	if prompts == nil {
 		prompts = make(map[string]string)
@@ -429,6 +466,7 @@ func (c *ConfigStore) SetSystemPrompt(name, content string) error {
 
 // DeleteSystemPrompt removes a system prompt.
 func (c *ConfigStore) DeleteSystemPrompt(name string) error {
+	name = strings.ToLower(name)
 	prompts := c.v.GetStringMapString("system_prompts")
 	if prompts == nil {
 		return fmt.Errorf("no system prompts configured")
@@ -497,29 +535,6 @@ func (c *ConfigStore) parseAgentConfig(name string, config interface{}) *AgentCo
 	}
 
 	return agent
-}
-
-// GetWorkflowAgents returns the list of agents in the workflow.
-func (c *ConfigStore) GetWorkflowAgents() []interface{} {
-	return c.v.Get("workflow.agents").([]interface{})
-}
-
-// GetWorkflowAgentsRaw returns the raw value of workflow agents, handling potential nil or type mismatch safely
-func (c *ConfigStore) GetWorkflowAgentsRaw() []interface{} {
-	val := c.v.Get("workflow.agents")
-	if val == nil {
-		return nil
-	}
-	if slice, ok := val.([]interface{}); ok {
-		return slice
-	}
-	return nil
-}
-
-// SetWorkflowAgents updates the workflow agents list.
-func (c *ConfigStore) SetWorkflowAgents(agents []interface{}) error {
-	c.v.Set("workflow.agents", agents)
-	return c.Save()
 }
 
 // agentToMap converts an Agent struct to a map for viper storage.
