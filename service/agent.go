@@ -607,7 +607,7 @@ func (ag *Agent) WriteFunctionCall(text string) {
 				// Purpose -> Gray, Dim, Wrapped
 
 				cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("7")).Width(tcol)       // White
-				purposeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Width(tcol) // Grey, wrapped
+				purposeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Width(tcol) // Grey, wrapped
 
 				var parts []string
 				parts = append(parts, titleStyle.Render(data.Function))
