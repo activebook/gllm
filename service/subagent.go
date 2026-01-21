@@ -219,7 +219,7 @@ func (e *SubAgentExecutor) Execute(timeout time.Duration) []SubAgentResult {
 			te.cancel = taskCancel
 			e.mu.Unlock()
 
-			fmt.Printf("> Executing task: %s ...\n", te.task.TaskKey)
+			fmt.Printf("==> Executing task: %s ...\n", te.task.TaskKey)
 			// Execute the task
 			e.executeTask(taskCtx, te)
 			// Show progress executing task/total tasks
@@ -227,11 +227,11 @@ func (e *SubAgentExecutor) Execute(timeout time.Duration) []SubAgentResult {
 
 			switch te.result.Status {
 			case StatusCompleted:
-				fmt.Printf("%s✓ Task completed (%d/%d): %s%s\n", successColor, dones, total, te.task.TaskKey, resetColor)
+				fmt.Printf("%s✓ > Task completed (%d/%d): %s%s\n", successColor, dones, total, te.task.TaskKey, resetColor)
 			case StatusFailed:
-				fmt.Printf("%s✗ Task failed (%d/%d): %s - %v%s\n", errorColor, dones, total, te.task.TaskKey, te.result.Error, resetColor)
+				fmt.Printf("%s✗ > Task failed (%d/%d): %s - %v%s\n", errorColor, dones, total, te.task.TaskKey, te.result.Error, resetColor)
 			case StatusCancelled:
-				fmt.Printf("%s! Task cancelled (%d/%d): %s%s\n", warnColor, dones, total, te.task.TaskKey, resetColor)
+				fmt.Printf("%s! > Task cancelled (%d/%d): %s%s\n", warnColor, dones, total, te.task.TaskKey, resetColor)
 			}
 
 			// Mark task as completed and broadcast to waiting tasks
