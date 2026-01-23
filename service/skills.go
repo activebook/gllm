@@ -51,6 +51,7 @@ func (sm *SkillManager) LoadMetadata() error {
 }
 
 // GetAvailableSkills returns the XML string for system prompt injection
+// Skills that are disabled in settings.json are excluded from the output.
 func (sm *SkillManager) GetAvailableSkills() string {
 	if err := sm.LoadMetadata(); err != nil {
 		// Log warning but don't fail - skills are optional
@@ -65,9 +66,16 @@ func (sm *SkillManager) GetAvailableSkills() string {
 		return ""
 	}
 
+	// Get disabled skills from settings
+	settingsStore := data.GetSettingsStore()
+
 	var sb strings.Builder
 	sb.WriteString("<available_skills>\n")
 	for _, skill := range sm.skills {
+		// Skip disabled skills
+		if settingsStore.IsSkillDisabled(skill.Name) {
+			continue
+		}
 		fmt.Fprintf(&sb, "  <skill>\n")
 		sb.WriteString(fmt.Sprintf("    <name>%s</name>\n", skill.Name))
 		sb.WriteString(fmt.Sprintf("    <description>%s</description>\n", skill.Description))

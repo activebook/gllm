@@ -724,7 +724,7 @@ gllm model clear --force`,
 
 var modelSwitchCmd = &cobra.Command{
 	Use:     "switch NAME",
-	Aliases: []string{"sw", "select"},
+	Aliases: []string{"sw", "select", "sel"},
 	Short:   "Switch to a different model",
 	Long: `Switch to a different model configuration. This will change your current model
 to the specified one for all subsequent operations.`,

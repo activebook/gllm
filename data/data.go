@@ -55,6 +55,11 @@ func GetSkillsDirPath() string {
 	return filepath.Join(GetConfigDir(), "skills")
 }
 
+// GetSettingsFilePath returns the path to the settings file.
+func GetSettingsFilePath() string {
+	return filepath.Join(GetConfigDir(), "settings.json")
+}
+
 // EnsureConfigDir creates the config directory if it doesn't exist.
 func EnsureConfigDir() error {
 	return os.MkdirAll(GetConfigDir(), 0750)

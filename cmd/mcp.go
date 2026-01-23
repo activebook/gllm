@@ -314,7 +314,7 @@ var mcpPathCmd = &cobra.Command{
 
 var mcpSwitchCmd = &cobra.Command{
 	Use:     "switch",
-	Aliases: []string{"sw"},
+	Aliases: []string{"select", "sw", "sel"},
 	Short:   "Toggle which MCP servers are allowed",
 	Long:    `Interactively select which MCP servers should be allowed. Use space to toggle, enter to confirm.`,
 	Run: func(cmd *cobra.Command, args []string) {

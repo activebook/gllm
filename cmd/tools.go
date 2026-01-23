@@ -46,9 +46,10 @@ Use 'gllm tools sw' to select which tools to enable for the current agent.`,
 }
 
 var toolsSwCmd = &cobra.Command{
-	Use:   "sw",
-	Short: "Switch tools on/off",
-	Long:  "Choose which embedding tools to enable for the current agent.",
+	Use:     "switch",
+	Aliases: []string{"sw", "select", "sel"},
+	Short:   "Switch tools on/off",
+	Long:    "Choose which embedding tools to enable for the current agent.",
 	Run: func(cmd *cobra.Command, args []string) {
 		store := data.NewConfigStore()
 		agent := store.GetActiveAgent()

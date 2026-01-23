@@ -29,7 +29,7 @@ with the /editor command in chat sessions.`,
 		switch arg {
 		case "list", "ls", "pr":
 			editorListCmd.Run(cmd, args)
-		case "switch", "sw", "select":
+		case "switch", "sw", "select", "sel":
 			// Handle error if switch fails
 			if err := editorSwitchCmd.RunE(cmd, args[1:]); err != nil {
 				fmt.Printf("Error switching editor: %v\n", err)
@@ -45,7 +45,7 @@ with the /editor command in chat sessions.`,
 // editorSwitchCmd represents the editor switch command
 var editorSwitchCmd = &cobra.Command{
 	Use:     "switch [NAME]",
-	Aliases: []string{"sw", "select"},
+	Aliases: []string{"sw", "select", "sel"},
 	Short:   "Switch to a different text editor",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name string

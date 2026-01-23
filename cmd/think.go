@@ -52,7 +52,7 @@ The actual behavior depends on the model provider:
 
 var thinkSwitchCmd = &cobra.Command{
 	Use:     "switch",
-	Aliases: []string{"sw"},
+	Aliases: []string{"sw", "select", "sel"},
 	Short:   "Interactively select thinking level",
 	Long:    `Opens an interactive selector to choose the thinking level.`,
 	Run: func(cmd *cobra.Command, args []string) {

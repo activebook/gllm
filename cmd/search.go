@@ -40,7 +40,7 @@ You can switch to use which search engine.`,
 // searchSwitchCmd represents the command to switch search engine
 var searchSwitchCmd = &cobra.Command{
 	Use:     "switch [ENGINE]",
-	Aliases: []string{"sw"},
+	Aliases: []string{"sw", "select", "sel"},
 	Short:   "Switch the active search engine",
 	Long:    `Switch the search engine used by the current agent. Options: google, bing, tavily, none.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
