@@ -535,6 +535,7 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 		"get_state":           oa.op.OpenAIGetStateToolCall,
 		"set_state":           oa.op.OpenAISetStateToolCall,
 		"list_state":          oa.op.OpenAIListStateToolCall,
+		"activate_skill":      oa.op.OpenAIActivateSkillToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {

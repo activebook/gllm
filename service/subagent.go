@@ -403,13 +403,8 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 		return
 	}
 
-	// Build system prompt with memory
+	// Build system prompt
 	sysPrompt := store.GetSystemPrompt(agentConfig.SystemPrompt)
-	memStore := data.NewMemoryStore()
-	memoryContent := memStore.GetFormatted()
-	if memoryContent != "" {
-		sysPrompt += "\n\n" + memoryContent
-	}
 
 	// Load MCP config
 	mcpConfig, _, _ := e.mcpStore.Load()
@@ -420,12 +415,7 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 	if task.TaskKey != "" {
 		keyPart = "_" + GetSanitizeTitle(task.TaskKey)
 	}
-	outputFile, err := GenerateTaskFilePath(fmt.Sprintf("subagent_%s%s", task.AgentName, keyPart), ".md")
-	if err != nil {
-		// Fallback to simpler path or handle error
-		outputFile = GenerateTempFilePath(fmt.Sprintf("subagent_%s%s", task.AgentName, keyPart), ".md")
-		Warnf("Failed to create persistent output file, using temp: %v\n", err)
-	}
+	outputFile := data.GenerateTaskFilePath(fmt.Sprintf("subagent_%s%s", task.AgentName, keyPart), ".md")
 	result.OutputFile = outputFile
 
 	// Prepare input context from SharedState dependencies
@@ -480,7 +470,7 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 	}
 
 	// Execute the agent
-	err = e.runner(&op)
+	err := e.runner(&op)
 
 	result.EndTime = time.Now()
 	result.Duration = result.EndTime.Sub(result.StartTime)

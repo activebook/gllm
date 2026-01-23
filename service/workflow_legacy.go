@@ -169,7 +169,7 @@ package service
 // 	fmt.Printf("   %sPass through:%s %s%s%s\n", passThroughColor, workflowResetColor, passThroughColor, passThroughStatus, workflowResetColor)
 
 // 	// Set the prompt question
-// 	confirm, err := NeedUserConfirm("", WokflowConfirmPrompt)
+// 	confirm, err := NeedUserConfirm("", WokflowConfirmPrompt, "")
 // 	if err != nil {
 // 		fmt.Printf("Error initializing readline: %v. Skipping agent.\n", err)
 // 		return false
@@ -185,7 +185,7 @@ package service
 // */
 // func waitForNewPrompt() string {
 // 	// Wait for user to proceed or modify the prompt
-// 	confirm, err := NeedUserConfirm("", WokflowProceedPrompt)
+// 	confirm, err := NeedUserConfirm("", WokflowProceedPrompt, "")
 // 	if err != nil {
 // 		fmt.Printf("Error initializing readline: %v. Skipping agent.\n", err)
 // 		return ""
@@ -195,7 +195,7 @@ package service
 // 	}
 
 // 	// Create a new readline instance for modification prompt
-// 	confirm, err = NeedUserConfirm("", WokflowModifyPrompt)
+// 	confirm, err = NeedUserConfirm("", WokflowModifyPrompt, "")
 // 	if err != nil {
 // 		fmt.Printf("Error initializing readline: %v. Skipping agent.\n", err)
 // 		return ""

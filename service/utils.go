@@ -70,30 +70,6 @@ func GenerateTempFileName() string {
 	return filename
 }
 
-// GenerateTempFilePath generates a temporary file path with the given prefix and extension.
-// The file is stored in the system's temp directory.
-func GenerateTempFilePath(prefix string, ext string) string {
-	currentTime := time.Now()
-	filename := fmt.Sprintf("%s_%s%s", prefix, currentTime.Format("20060102_150405.000"), ext)
-	return filepath.Join(os.TempDir(), filename)
-}
-
-// GenerateTaskFilePath generates a persistent file path for sub-agent tasks.
-// Files are stored in ~/.gllm/tasks/YYYY-MM-DD/
-func GenerateTaskFilePath(prefix string, ext string) (string, error) {
-	currentTime := time.Now()
-	dateDir := currentTime.Format("2006-01-02")
-
-	// Ensure directory exists: ~/.gllm/tasks/YYYY-MM-DD
-	outputDir := MakeUserSubDir("gllm", "tasks", dateDir)
-	if outputDir == "" {
-		return "", fmt.Errorf("failed to create output directory")
-	}
-
-	filename := fmt.Sprintf("%s_%s%s", prefix, currentTime.Format("20060102_150405"), ext)
-	return filepath.Join(outputDir, filename), nil
-}
-
 // Helper function to truncate strings with ellipsis
 func TruncateString(s string, maxLen int) string {
 	s = strings.TrimSpace(s)

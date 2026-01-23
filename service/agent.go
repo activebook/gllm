@@ -273,6 +273,19 @@ func CallAgent(op *AgentOptions) error {
 	}
 	ag.Convo = cm
 
+	// Inject memory into system prompt
+	memStore := data.NewMemoryStore()
+	if memoryContent := memStore.GetAll(); memoryContent != "" {
+		ag.SystemPrompt += "\n\n" + memoryContent
+	}
+
+	// Load available skills metadata
+	sm := GetSkillManager() // Use singleton
+	// Inject skills into system prompt if any are available
+	if skillsXML := sm.GetAvailableSkills(); skillsXML != "" {
+		ag.SystemPrompt += "\n\n" + skillsXML
+	}
+
 	// Start the generation in a goroutine
 	go func() {
 		defer func() {

@@ -596,6 +596,7 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		"get_state":           c.op.OpenChatGetStateToolCall,
 		"set_state":           c.op.OpenChatSetStateToolCall,
 		"list_state":          c.op.OpenChatListStateToolCall,
+		"activate_skill":      c.op.OpenChatActivateSkillToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {

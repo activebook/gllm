@@ -786,3 +786,30 @@ func (ga *GeminiAgent) GeminiListStateToolCall(call *genai.FunctionCall) (*genai
 	}
 	return &resp, err
 }
+
+func (ga *GeminiAgent) GeminiActivateSkillToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+	resp := genai.FunctionResponse{
+		ID:   call.ID,
+		Name: call.Name,
+	}
+
+	argsMap := make(map[string]interface{})
+	for k, v := range call.Args {
+		argsMap[k] = v
+	}
+
+	response, err := activateSkillToolCallImpl(&argsMap, &ga.ToolsUse)
+	error := ""
+	if err != nil {
+		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
+	}
+
+	resp.Response = map[string]any{
+		"output": response,
+		"error":  error,
+	}
+	return &resp, err
+}

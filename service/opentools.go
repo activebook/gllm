@@ -83,6 +83,8 @@ var (
 		"get_state",
 		"set_state",
 		"list_state",
+		// skill tools
+		"activate_skill",
 	}
 	searchTools = []string{
 		// web tools
@@ -1031,6 +1033,30 @@ when it was created/updated, content type, and size.`,
 	}
 	tools = append(tools, &listStateTool)
 
+	// activate_skill tool
+	activateSkillFunc := OpenFunctionDefinition{
+		Name: "activate_skill",
+		Description: `Activates a specialized agent skill by name and returns the skill's instructions.
+The returned instructions provide specialized guidance for the current task.
+Use this when you identify a task that matches a skill's description.
+ONLY use names exactly as they appear in the <available_skills> section.`,
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"name": map[string]interface{}{
+					"type":        "string",
+					"description": "The exact name of the skill to activate (case-insensitive).",
+				},
+			},
+			"required": []string{"name"},
+		},
+	}
+	activateSkillTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &activateSkillFunc,
+	}
+	tools = append(tools, &activateSkillTool)
+
 	return tools
 }
 
@@ -1236,6 +1262,11 @@ func (op *OpenProcessor) closeDiffConfirm() {
 	// Confirm diff is over
 	op.status.ChangeTo(op.notify, StreamNotify{Status: StatusDiffConfirmOver}, op.proceed)
 }
+
+/*
+ * OpenAI tool call implements
+ *
+ */
 
 // OpenAI tool implementations (wrapper functions)
 func (op *OpenProcessor) OpenAIShellToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
@@ -1596,6 +1627,24 @@ func (op *OpenProcessor) OpenAIListStateToolCall(toolCall openai.ToolCall, argsM
 		Content:    response,
 	}, err
 }
+
+func (op *OpenProcessor) OpenAIActivateSkillToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+	response, err := activateSkillToolCallImpl(argsMap, op.toolsUse)
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	return openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Content:    response,
+	}, err
+}
+
+/*
+ * OpenChat tool call implements
+ *
+ */
 
 func (op *OpenProcessor) OpenChatSwitchAgentToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	response, err := switchAgentToolCallImpl(argsMap, op.toolsUse)
@@ -2056,6 +2105,23 @@ func (op *OpenProcessor) OpenChatSetStateToolCall(toolCall *model.ToolCall, args
 
 func (op *OpenProcessor) OpenChatListStateToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	response, err := listStateToolCallImpl(op.sharedState)
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolMessage := model.ChatCompletionMessage{
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Name:       Ptr(""),
+		Content: &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(response),
+		},
+	}
+	return &toolMessage, err
+}
+
+func (op *OpenProcessor) OpenChatActivateSkillToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	response, err := activateSkillToolCallImpl(argsMap, op.toolsUse)
 	if err != nil {
 		response = fmt.Sprintf("Error: %v", err)
 	}

@@ -155,12 +155,12 @@ func (m *MemoryStore) Clear() error {
 	return os.WriteFile(m.path, []byte(content), 0644)
 }
 
-// GetFormattedXML returns memory content formatted for system prompt injection in XML format.
+// GetAll returns memory content formatted for system prompt injection in XML format.
 // This is useful for injecting memory into a system prompt.
 // Bugfix: Using xml to replace markdown
 // XML supports nested structures naturally, making it more suitable for system prompts and memory injection.
 // Markdown: General content, documentation, when token efficiency matters more than parsing precision
-func (m *MemoryStore) GetFormatted() string {
+func (m *MemoryStore) GetAll() string {
 	memories, err := m.Load()
 	if err != nil || len(memories) == 0 {
 		return ""

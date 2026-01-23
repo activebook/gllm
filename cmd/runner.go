@@ -72,14 +72,9 @@ func RunAgent(prompt string, files []*service.FileData, convoName string, yolo b
 		// Build Final Prompt (Template + Input + @ Processing)
 		finalPrompt := buildFinalPrompt(agent, prompt)
 
-		// Get system prompt & Memory
+		// Get system prompt
 		store := data.NewConfigStore()
 		sysPrompt := store.GetSystemPrompt(agent.SystemPrompt)
-		memStore := data.NewMemoryStore()
-		memoryContent := memStore.GetFormatted()
-		if memoryContent != "" {
-			sysPrompt += "\n\n" + memoryContent
-		}
 
 		// Load MCP config
 		mcpStore := data.NewMCPStore()
