@@ -260,7 +260,6 @@ var agentAddCmd = &cobra.Command{
 					Options(toolsOptions...).
 					Value(&tools),
 				huh.NewNote().
-					Title("Tips").
 					Description(EmbeddingToolsDescription),
 			),
 		).Run()
@@ -581,7 +580,6 @@ var agentSetCmd = &cobra.Command{
 					Options(toolsOptions...).
 					Value(&tools),
 				huh.NewNote().
-					Title("Tips").
 					Description(EmbeddingToolsDescription),
 			),
 		).Run()

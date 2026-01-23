@@ -234,7 +234,6 @@ func RunInitWizard() error {
 				}()...).
 				Value(&selectedTools),
 			huh.NewNote().
-				Title("Tips").
 				Description(EmbeddingToolsDescription),
 		),
 		// Group 4: Thinking Level
