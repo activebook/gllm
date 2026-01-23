@@ -4,6 +4,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -79,21 +80,59 @@ var skillsListCmd = &cobra.Command{
 	},
 }
 
+// skillsInstallPath holds the path flag value
+var skillsInstallPath string
+
 // skillsInstallCmd installs a skill from a path
 var skillsInstallCmd = &cobra.Command{
-	Use:   "install <path>",
-	Short: "Install a skill from a path",
+	Use:   "install <path|url>",
+	Short: "Install a skill from a path or git URL",
 	Long: `Install a skill by copying its directory to the skills storage.
-The source path must contain a valid SKILL.md file with frontmatter.`,
+The source can be a local directory path or a git repository URL.
+If a git URL is provided, the repository will be cloned temporarily.
+You can use the --path flag to specify a subdirectory within the git repository.
+The source (local or resolved git path) must contain a valid SKILL.md file with frontmatter.`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		sourcePath := args[0]
+		source := args[0]
+		var absPath string
+		var cleanup func()
 
-		// Resolve to absolute path
-		absPath, err := filepath.Abs(sourcePath)
-		if err != nil {
-			service.Errorf("Invalid path: %v", err)
-			return
+		// Check if source is a URL (starts with http/https or ends with .git)
+		if strings.HasPrefix(source, "http") || strings.HasSuffix(source, ".git") {
+			// Create temp dir
+			tempDir, err := os.MkdirTemp("", "gllm-skill-clone-*")
+			if err != nil {
+				service.Errorf("Failed to create temp directory: %v", err)
+				return
+			}
+			cleanup = func() { os.RemoveAll(tempDir) }
+			defer cleanup()
+
+			fmt.Printf("Cloning %s...\n", source)
+			// Clone git repo
+			gitCmd := exec.Command("git", "clone", source, tempDir)
+			gitCmd.Stdout = os.Stdout
+			gitCmd.Stderr = os.Stderr
+			if err := gitCmd.Run(); err != nil {
+				service.Errorf("Failed to clone repository: %v", err)
+				return
+			}
+
+			// Determine path within repo
+			if skillsInstallPath != "" {
+				absPath = filepath.Join(tempDir, skillsInstallPath)
+			} else {
+				absPath = tempDir
+			}
+		} else {
+			// Local path
+			var err error
+			absPath, err = filepath.Abs(source)
+			if err != nil {
+				service.Errorf("Invalid path: %v", err)
+				return
+			}
 		}
 
 		// Check if source exists and is a directory
@@ -317,6 +356,7 @@ func init() {
 	rootCmd.AddCommand(skillsCmd)
 	skillsCmd.AddCommand(skillsListCmd)
 	skillsCmd.AddCommand(skillsInstallCmd)
+	skillsInstallCmd.Flags().StringVar(&skillsInstallPath, "path", "", "Path to the skill directory within the git repository")
 	skillsCmd.AddCommand(skillsUninstallCmd)
 	skillsCmd.AddCommand(skillsSwCmd)
 }
