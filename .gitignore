@@ -30,6 +30,8 @@ gllm.7z
 # IDE settings, configuration, and caches
 .idea/
 .vscode/
+.roo/
+.kilocode/
 .codebuddy/
 *.swp
 *~
