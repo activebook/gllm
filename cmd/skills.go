@@ -19,8 +19,16 @@ var skillsCmd = &cobra.Command{
 	Use:   "skills",
 	Short: "Manage agent skills",
 	Long: `Manage skills that extend agent capabilities.
-Agent Skills are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.`,
+Agent Skills are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.
+
+Use 'gllm skills switch' to switch skills on/off.
+Use 'gllm skills list' to list all installed skills.
+Use 'gllm skills install <path>' to install a skill.
+Use 'gllm skills uninstall <name>' to uninstall a skill.
+`,
 	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(cmd.Long)
+		fmt.Println()
 		// Default action: list skills
 		skillsListCmd.Run(skillsListCmd, args)
 	},
