@@ -13,6 +13,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	AgentMCPDescription = `The MCP (Model Context Protocol) enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.
+You need to set up MCP servers specifically to use this feature.`
+	AgentSkillsDescription = `Agent Skills are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.
+After integrating skills, agent will use skills automatically`
+	MaxRecursionsDescription = `It controls the maximum number of recursive model calls allowed when tools are being used.
+-- Increase for complex multi-step tasks (20-50)
+-- Decrease for simple tasks (3-5) to save tokens`
+)
+
 // agentCmd represents the agent subcommand for agents
 var agentCmd = &cobra.Command{
 	Use:     "agent",
@@ -107,6 +117,7 @@ var agentAddCmd = &cobra.Command{
 			search        string
 			template      string
 			sysPrompt     string
+			skills        bool
 			usage         bool
 			markdown      bool
 			maxRecursions string
@@ -260,6 +271,7 @@ var agentAddCmd = &cobra.Command{
 					Options(toolsOptions...).
 					Value(&tools),
 				huh.NewNote().
+					Title("---").
 					Description(EmbeddingToolsDescription),
 			),
 		).Run()
@@ -276,11 +288,8 @@ var agentAddCmd = &cobra.Command{
 					Value(&maxRecursions).
 					Validate(ValidateMaxRecursions),
 				huh.NewNote().
-					Title("Tips").
-					Description(`It controls the maximum number of recursive model calls allowed when tools are being used.
-- Increase for complex multi-step tasks (20-50)
-- Decrease for simple tasks (3-5) to save tokens
-`),
+					Title("---").
+					Description(MaxRecursionsDescription),
 			),
 		).Run()
 		if err != nil {
@@ -318,11 +327,12 @@ var agentAddCmd = &cobra.Command{
 						huh.NewOption("Show Usage Stats", "usage").Selected(true),
 						huh.NewOption("Markdown Output", "markdown").Selected(true),
 						huh.NewOption("Enable MCP", "mcp").Selected(false),
+						huh.NewOption("Enable Skills", "skills").Selected(false),
 					).
 					Value(&capabilities),
 				huh.NewNote().
-					Title("Tips").
-					Description("The MCP (Model Context Protocol) enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."),
+					Title("---").
+					Description(AgentMCPDescription+"\n\n"+AgentSkillsDescription),
 			),
 		).Run()
 		if err != nil {
@@ -335,6 +345,8 @@ var agentAddCmd = &cobra.Command{
 			switch cap {
 			case "mcp":
 				mcp = true
+			case "skills":
+				skills = true
 			case "usage":
 				usage = true
 			case "markdown":
@@ -353,6 +365,7 @@ var agentAddCmd = &cobra.Command{
 			Model:         data.Model{Name: model},
 			Tools:         tools,
 			MCP:           mcp,
+			Skills:        skills,
 			Usage:         usage,
 			Markdown:      markdown,
 			Think:         think,
@@ -446,6 +459,9 @@ var agentSetCmd = &cobra.Command{
 		// Populate capabilities from struct fields
 		if agent.MCP {
 			capabilities = append(capabilities, "mcp")
+		}
+		if agent.Skills {
+			capabilities = append(capabilities, "skills")
 		}
 		if agent.Usage {
 			capabilities = append(capabilities, "usage")
@@ -580,6 +596,7 @@ var agentSetCmd = &cobra.Command{
 					Options(toolsOptions...).
 					Value(&tools),
 				huh.NewNote().
+					Title("---").
 					Description(EmbeddingToolsDescription),
 			),
 		).Run()
@@ -596,11 +613,8 @@ var agentSetCmd = &cobra.Command{
 					Value(&maxRecursions).
 					Validate(ValidateMaxRecursions),
 				huh.NewNote().
-					Title("Tips").
-					Description(`It controls the maximum number of recursive model calls allowed when tools are being used.
-- Increase for complex multi-step tasks (20-50)
-- Decrease for simple tasks (3-5) to save tokens
-`),
+					Title("---").
+					Description(MaxRecursionsDescription),
 			),
 		).Run()
 		if err != nil {
@@ -628,6 +642,7 @@ var agentSetCmd = &cobra.Command{
 		}
 		capsOpts := []huh.Option[string]{
 			huh.NewOption("Enable MCP", "mcp").Selected(capsSet["mcp"]),
+			huh.NewOption("Enable Skills", "skills").Selected(capsSet["skills"]),
 			huh.NewOption("Show Usage Stats", "usage").Selected(capsSet["usage"]),
 			huh.NewOption("Markdown Output", "markdown").Selected(capsSet["markdown"]),
 		}
@@ -639,8 +654,8 @@ var agentSetCmd = &cobra.Command{
 					Options(capsOpts...).
 					Value(&capabilities),
 				huh.NewNote().
-					Title("Tips").
-					Description("The MCP (Model Context Protocol) enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."),
+					Title("---").
+					Description(AgentMCPDescription+"\n\n"+AgentSkillsDescription),
 			),
 		).Run()
 
@@ -658,12 +673,15 @@ var agentSetCmd = &cobra.Command{
 
 		// Process capabilities - think uses string level
 		mcpEnabled := false
+		skillsEnabled := false
 		usageEnabled := false
 		markdownEnabled := false
 		for _, cap := range capabilities {
 			switch cap {
 			case "mcp":
 				mcpEnabled = true
+			case "skills":
+				skillsEnabled = true
 			case "usage":
 				usageEnabled = true
 			case "markdown":
@@ -683,6 +701,7 @@ var agentSetCmd = &cobra.Command{
 			Model:         data.Model{Name: model},
 			Tools:         tools,
 			MCP:           mcpEnabled,
+			Skills:        skillsEnabled,
 			Usage:         usageEnabled,
 			Markdown:      markdownEnabled,
 			Think:         think,
@@ -933,6 +952,7 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 	fmt.Printf("%sThink: %v\n", spaceholder, agent.Think)
 
 	fmt.Printf("%sMCP: %v\n", spaceholder, agent.MCP)
+	fmt.Printf("%sSkills: %v\n", spaceholder, agent.Skills)
 	fmt.Printf("%sUsage: %v\n", spaceholder, agent.Usage)
 	fmt.Printf("%sMarkdown: %v\n", spaceholder, agent.Markdown)
 	fmt.Printf("%sMax Recursions: %d\n", spaceholder, agent.MaxRecursions)

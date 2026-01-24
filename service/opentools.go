@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/activebook/gllm/data"
@@ -83,12 +84,14 @@ var (
 		"get_state",
 		"set_state",
 		"list_state",
-		// skill tools
-		"activate_skill",
 	}
 	searchTools = []string{
 		// web tools
 		"web_search",
+	}
+	skillTools = []string{
+		// skill tools
+		"activate_skill",
 	}
 )
 
@@ -102,6 +105,10 @@ func GetAllEmbeddingTools() []string {
 
 func GetAllSearchTools() []string {
 	return searchTools
+}
+
+func GetAllSkillTools() []string {
+	return skillTools
 }
 
 func AvailableEmbeddingTool(toolName string) bool {
@@ -120,6 +127,35 @@ func AvailableSearchTool(toolName string) bool {
 		}
 	}
 	return false
+}
+
+func AvailableSkillTool(toolName string) bool {
+	for _, tool := range skillTools {
+		if tool == toolName {
+			return true
+		}
+	}
+	return false
+}
+
+// AppendSkillTools appends skill tools to the given tools slice if they are not already present.
+func AppendSkillTools(tools []string) []string {
+	for _, tool := range skillTools {
+		if !slices.Contains(tools, tool) {
+			tools = append(tools, tool)
+		}
+	}
+	return tools
+}
+
+// RemoveSkillTools removes skill tools from the given tools slice.
+func RemoveSkillTools(tools []string) []string {
+	for _, tool := range skillTools {
+		tools = slices.DeleteFunc(tools, func(t string) bool {
+			return t == tool
+		})
+	}
+	return tools
 }
 
 // GetOpenEmbeddingToolsFiltered returns embedding tools filtered by the allowed list.

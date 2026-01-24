@@ -87,7 +87,7 @@ Do testing stuff.`
 		t.Errorf("Instructions missing content. Got: %s", instructions)
 	}
 
-	if !strings.Contains(instructions, "<available_resources>") {
+	if !strings.Contains(instructions, "<available_resources") {
 		t.Errorf("Instructions missing resources. Got: %s", instructions)
 	}
 

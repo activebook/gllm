@@ -446,6 +446,7 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 		ThinkingLevel:  agentConfig.Think,
 		EnabledTools:   agentConfig.Tools,
 		UseMCP:         agentConfig.MCP,
+		UseSkills:      agentConfig.Skills,
 		YoloMode:       true, // Sub-agents always auto-approve
 		AppendUsage:    agentConfig.Usage,
 		AppendMarkdown: agentConfig.Markdown,

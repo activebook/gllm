@@ -203,7 +203,6 @@ Example:
 						).
 						Value(&provider),
 					huh.NewNote().
-						Title("Tips").
 						Description("If you are using Chinese open-source models, then better choose 'Other (OpenAI Compatible)'"),
 				),
 			).Run()
@@ -429,7 +428,6 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 						).
 						Value(&provider),
 					huh.NewNote().
-						Title("Tips").
 						Description("If you are using Chinese open-source models, then better choose 'Other (OpenAI Compatible)'"),
 				),
 				huh.NewGroup(

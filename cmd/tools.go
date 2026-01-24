@@ -21,11 +21,7 @@ const (
    - _Use when you need to orchestrate multiple agents working in parallel_
    - _Sub-agents execute tasks and return outputs_
    - _Best for: "Execute these parallel tasks, report back to me"_
-   - _Companion tools: list\_agents (discover), get\_state/set\_state (coordinate)_
-   
-3. Agent Skill activation (activate\_skill):
-   - _Use when you want to use Agent Skills_
-   - _After integrating skills into the current agent, agent will use skills automatically_`
+   - _Companion tools: list\_agents (discover), get\_state/set\_state (coordinate)_`
 )
 
 func init() {
@@ -91,6 +87,7 @@ var toolsSwCmd = &cobra.Command{
 					Options(options...).
 					Value(&selectedTools),
 				huh.NewNote().
+					Title("---").
 					Description(EmbeddingToolsDescription),
 			),
 		).Run()

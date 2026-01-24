@@ -151,8 +151,9 @@ type AgentOptions struct {
 	MaxRecursions  int
 	ThinkingLevel  string
 	EnabledTools   []string // List of enabled embedding tools
-	UseMCP         bool
-	YoloMode       bool // Whether to automatically approve tools
+	UseMCP         bool     // Whether to use MCP
+	UseSkills      bool     // Whether to use skills
+	YoloMode       bool     // Whether to automatically approve tools
 	AppendMarkdown bool
 	AppendUsage    bool
 	OutputFile     string
@@ -240,6 +241,31 @@ func CallAgent(op *AgentOptions) error {
 		defer fileRenderer.Close()
 	}
 
+	// Inject memory into system prompt
+	memStore := data.NewMemoryStore()
+	if memoryContent := memStore.GetAll(); memoryContent != "" {
+		op.SysPrompt += "\n\n" + memoryContent
+	}
+
+	// Inject skills into system prompt if any are available and enabled
+	if op.UseSkills {
+		// Load available skills metadata
+		sm := GetSkillManager() // Use singleton
+		if skillsXML := sm.GetAvailableSkills(); skillsXML != "" {
+			op.SysPrompt += "\n\n" + skillsXML
+		}
+	}
+
+	// Set up enabled tools list with skill automation
+	enabledTools := op.EnabledTools
+	if op.UseSkills {
+		// Automatically add activate_skill if not already there
+		enabledTools = AppendSkillTools(enabledTools)
+	} else {
+		// Automatically remove activate_skill if skills are disabled
+		enabledTools = RemoveSkillTools(enabledTools)
+	}
+
 	ag := Agent{
 		Model:         mi,
 		SystemPrompt:  op.SysPrompt,
@@ -250,7 +276,7 @@ func CallAgent(op *AgentOptions) error {
 		ProceedChan:   proceedCh,
 		SearchEngine:  se,
 		ToolsUse:      toolsUse,
-		EnabledTools:  op.EnabledTools,
+		EnabledTools:  enabledTools,
 		UseCodeTool:   exeCode,
 		MCPClient:     mc,
 		ThinkingLevel: thinkingLevel,
@@ -272,19 +298,6 @@ func CallAgent(op *AgentOptions) error {
 		return err
 	}
 	ag.Convo = cm
-
-	// Inject memory into system prompt
-	memStore := data.NewMemoryStore()
-	if memoryContent := memStore.GetAll(); memoryContent != "" {
-		ag.SystemPrompt += "\n\n" + memoryContent
-	}
-
-	// Load available skills metadata
-	sm := GetSkillManager() // Use singleton
-	// Inject skills into system prompt if any are available
-	if skillsXML := sm.GetAvailableSkills(); skillsXML != "" {
-		ag.SystemPrompt += "\n\n" + skillsXML
-	}
 
 	// Start the generation in a goroutine
 	go func() {

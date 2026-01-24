@@ -18,6 +18,7 @@ type AgentConfig struct {
 	Model         Model        // Model name reference
 	Tools         []string     // List of enabled tools
 	MCP           bool         // Whether MCP is enabled
+	Skills        bool         // Whether skills are enabled
 	Usage         bool         // Whether to show usage statistics
 	Markdown      bool         // Whether to render markdown
 	Think         string       // Thinking level: off, low, medium, high
@@ -524,6 +525,7 @@ func (c *ConfigStore) parseAgentConfig(name string, config interface{}) *AgentCo
 		Name:          name,
 		Model:         c.getModelFromAgentMap(configMap, "model"),
 		MCP:           getBool(configMap, "mcp"),
+		Skills:        getBool(configMap, "skills"),
 		Usage:         getBool(configMap, "usage"),
 		Markdown:      getBool(configMap, "markdown"),
 		Think:         getString(configMap, "think"),
@@ -543,6 +545,7 @@ func (c *ConfigStore) agentToMap(agent *AgentConfig) map[string]interface{} {
 		"model":          agent.Model.Name,
 		"tools":          agent.Tools,
 		"mcp":            agent.MCP,
+		"skills":         agent.Skills,
 		"usage":          agent.Usage,
 		"markdown":       agent.Markdown,
 		"think":          agent.Think,

@@ -234,6 +234,7 @@ func RunInitWizard() error {
 				}()...).
 				Value(&selectedTools),
 			huh.NewNote().
+				Title("---").
 				Description(EmbeddingToolsDescription),
 		),
 		// Group 4: Thinking Level
@@ -256,13 +257,14 @@ func RunInitWizard() error {
 				Description("Select additional features to enable").
 				Options(
 					huh.NewOption("MCP Enabled", "mcp").Selected(true),
+					huh.NewOption("Agent Skills", "skills").Selected(true),
 					huh.NewOption("Token Usage Stats", "usage").Selected(true),
 					huh.NewOption("Markdown Output", "markdown").Selected(true),
 				).
 				Value(&selectedFeatures),
 			huh.NewNote().
-				Title("Tips").
-				Description("The MCP (Model Context Protocol) enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."),
+				Title("---").
+				Description(AgentMCPDescription+"\n\n"+AgentSkillsDescription),
 		),
 		huh.NewGroup(
 			huh.NewConfirm().
@@ -303,6 +305,7 @@ func RunInitWizard() error {
 		Tools:    selectedTools,
 		Think:    selectedThinkingLevel,
 		MCP:      contains(selectedFeatures, "mcp"),
+		Skills:   contains(selectedFeatures, "skills"),
 		Usage:    contains(selectedFeatures, "usage"),
 		Markdown: contains(selectedFeatures, "markdown"),
 	}

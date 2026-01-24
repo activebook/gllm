@@ -94,6 +94,7 @@ func RunAgent(prompt string, files []*service.FileData, convoName string, yolo b
 			ThinkingLevel:  agent.Think,
 			EnabledTools:   agent.Tools,
 			UseMCP:         agent.MCP,
+			UseSkills:      agent.Skills,
 			YoloMode:       yolo,
 			AppendUsage:    agent.Usage,
 			AppendMarkdown: agent.Markdown,
