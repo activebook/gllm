@@ -77,13 +77,6 @@ var (
 		"save_memory",
 		// agent tools
 		"switch_agent",
-		"list_agent",
-		// Sub-agent orchestration tools
-		"call_agent",
-		// shared state tools
-		"get_state",
-		"set_state",
-		"list_state",
 	}
 	searchTools = []string{
 		// web tools
@@ -92,6 +85,15 @@ var (
 	skillTools = []string{
 		// skill tools
 		"activate_skill",
+	}
+	subagentTools = []string{
+		// Sub-agent orchestration tools
+		"list_agent",
+		"call_agent",
+		// shared state tools
+		"get_state",
+		"set_state",
+		"list_state",
 	}
 )
 
@@ -109,6 +111,10 @@ func GetAllSearchTools() []string {
 
 func GetAllSkillTools() []string {
 	return skillTools
+}
+
+func GetAllSubagentTools() []string {
+	return subagentTools
 }
 
 func AvailableEmbeddingTool(toolName string) bool {
@@ -136,6 +142,35 @@ func AvailableSkillTool(toolName string) bool {
 		}
 	}
 	return false
+}
+
+func AvailableSubagentTool(toolName string) bool {
+	for _, tool := range subagentTools {
+		if tool == toolName {
+			return true
+		}
+	}
+	return false
+}
+
+// AppendSubagentTools appends subagent tools to the given tools slice if they are not already present.
+func AppendSubagentTools(tools []string) []string {
+	for _, tool := range subagentTools {
+		if !slices.Contains(tools, tool) {
+			tools = append(tools, tool)
+		}
+	}
+	return tools
+}
+
+// RemoveSubagentTools removes subagent tools from the given tools slice.
+func RemoveSubagentTools(tools []string) []string {
+	for _, tool := range subagentTools {
+		tools = slices.DeleteFunc(tools, func(t string) bool {
+			return t == tool
+		})
+	}
+	return tools
 }
 
 // AppendSkillTools appends skill tools to the given tools slice if they are not already present.

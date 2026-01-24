@@ -437,25 +437,22 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 
 	// Prepare agent options
 	op := AgentOptions{
-		Prompt:         finalInstruction,
-		SysPrompt:      sysPrompt,
-		Files:          nil,
-		ModelInfo:      &agentConfig.Model,
-		SearchEngine:   &agentConfig.Search,
-		MaxRecursions:  agentConfig.MaxRecursions,
-		ThinkingLevel:  agentConfig.Think,
-		EnabledTools:   agentConfig.Tools,
-		UseMCP:         agentConfig.MCP,
-		UseSkills:      agentConfig.Skills,
-		YoloMode:       true, // Sub-agents always auto-approve
-		AppendUsage:    agentConfig.Usage,
-		AppendMarkdown: agentConfig.Markdown,
-		OutputFile:     outputFile,
-		QuietMode:      true, // Sub-agents run quietly
-		ConvoName:      "",   // No conversation persistence for sub-agents
-		MCPConfig:      mcpConfig,
-		SharedState:    e.state,
-		AgentName:      task.AgentName,
+		Prompt:        finalInstruction,
+		SysPrompt:     sysPrompt,
+		Files:         nil,
+		ModelInfo:     &agentConfig.Model,
+		SearchEngine:  &agentConfig.Search,
+		MaxRecursions: agentConfig.MaxRecursions,
+		ThinkingLevel: agentConfig.Think,
+		EnabledTools:  agentConfig.Tools,
+		Capabilities:  agentConfig.Capabilities,
+		YoloMode:      true, // Sub-agents always auto-approve
+		OutputFile:    outputFile,
+		QuietMode:     true, // Sub-agents run quietly
+		ConvoName:     "",   // No conversation persistence for sub-agents
+		MCPConfig:     mcpConfig,
+		SharedState:   e.state,
+		AgentName:     task.AgentName,
 	}
 
 	// Check for context cancellation

@@ -1145,8 +1145,8 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse
 		// List all agents with details
 		for _, n := range names {
 			ag := agents[n]
-			sb.WriteString(fmt.Sprintf("- %s: Model=%s, ThinkingLevel=%s, Tools=%v\n",
-				n, ag.Model.Model, ag.Think, ag.Tools))
+			sb.WriteString(fmt.Sprintf("- %s: Model=%s, ThinkingLevel=%s, Tools=%v, Capabilities=%v\n",
+				n, ag.Model.Model, ag.Think, ag.Tools, ag.Capabilities))
 			if ag.SystemPrompt != "" {
 				// Show more of the system prompt to help the model decide
 				sysPrompt := strings.ReplaceAll(ag.SystemPrompt, "\n", " ")
@@ -1237,8 +1237,8 @@ func listAgentToolCallImpl() (string, error) {
 			sb.WriteString("  Tools: none\n")
 		}
 
-		if ag.MCP {
-			sb.WriteString("  MCP: enabled\n")
+		if len(ag.Capabilities) > 0 {
+			sb.WriteString(fmt.Sprintf("  Capabilities: %v\n", ag.Capabilities))
 		}
 
 		if ag.SystemPrompt != "" {

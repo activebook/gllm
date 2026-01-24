@@ -256,15 +256,16 @@ func RunInitWizard() error {
 				Title("Agent Capabilities").
 				Description("Select additional features to enable").
 				Options(
-					huh.NewOption("MCP Enabled", "mcp").Selected(true),
-					huh.NewOption("Agent Skills", "skills").Selected(true),
-					huh.NewOption("Token Usage Stats", "usage").Selected(true),
-					huh.NewOption("Markdown Output", "markdown").Selected(true),
+					huh.NewOption("Show Token Usage Stats", service.CapabilityTokenUsage).Selected(true),
+					huh.NewOption("Show Markdown Output", service.CapabilityMarkdown).Selected(true),
+					huh.NewOption("Enable MCP Servers", service.CapabilityMCPServers).Selected(true),
+					huh.NewOption("Enable Agent Skills", service.CapabilityAgentSkills).Selected(true),
+					huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(true),
 				).
 				Value(&selectedFeatures),
 			huh.NewNote().
 				Title("---").
-				Description(AgentMCPDescription+"\n\n"+AgentSkillsDescription),
+				Description(AgentMCPDescription+"\n\n"+AgentSkillsDescription+"\n\n"+AgentSubAgentsDescription),
 		),
 		huh.NewGroup(
 			huh.NewConfirm().
@@ -301,13 +302,10 @@ func RunInitWizard() error {
 
 	// Setup agent config
 	agentConfig := &data.AgentConfig{
-		Model:    newModel,
-		Tools:    selectedTools,
-		Think:    selectedThinkingLevel,
-		MCP:      contains(selectedFeatures, "mcp"),
-		Skills:   contains(selectedFeatures, "skills"),
-		Usage:    contains(selectedFeatures, "usage"),
-		Markdown: contains(selectedFeatures, "markdown"),
+		Model:        newModel,
+		Tools:        selectedTools,
+		Think:        selectedThinkingLevel,
+		Capabilities: selectedFeatures,
 	}
 
 	// Save Agent via data layer

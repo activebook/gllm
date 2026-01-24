@@ -143,23 +143,20 @@ func ConstructConversationManager(convoName string, provider string) (Conversati
 }
 
 type AgentOptions struct {
-	Prompt         string
-	SysPrompt      string
-	Files          []*FileData
-	ModelInfo      *data.Model
-	SearchEngine   *data.SearchEngine
-	MaxRecursions  int
-	ThinkingLevel  string
-	EnabledTools   []string // List of enabled embedding tools
-	UseMCP         bool     // Whether to use MCP
-	UseSkills      bool     // Whether to use skills
-	YoloMode       bool     // Whether to automatically approve tools
-	AppendMarkdown bool
-	AppendUsage    bool
-	OutputFile     string
-	QuietMode      bool
-	ConvoName      string
-	MCPConfig      map[string]*data.MCPServer
+	Prompt        string
+	SysPrompt     string
+	Files         []*FileData
+	ModelInfo     *data.Model
+	SearchEngine  *data.SearchEngine
+	MaxRecursions int
+	ThinkingLevel string
+	EnabledTools  []string // List of enabled embedding tools
+	Capabilities  []string // List of enabled capabilities
+	YoloMode      bool     // Whether to automatically approve tools
+	OutputFile    string
+	QuietMode     bool
+	ConvoName     string
+	MCPConfig     map[string]*data.MCPServer
 
 	// Sub-agent orchestration fields
 	SharedState *data.SharedState // Shared state for inter-agent communication
@@ -198,9 +195,21 @@ func CallAgent(op *AgentOptions) error {
 		indicator = NewIndicator("Processing...")
 	}
 
+	// Need to output a file
+	var fileRenderer *FileRenderer
+	if op.OutputFile != "" {
+		var err error
+		fileRenderer, err = NewFileRenderer(op.OutputFile)
+		if err != nil {
+			err := fmt.Errorf("failed to create output file %s: %v", op.OutputFile, err)
+			return err
+		}
+		defer fileRenderer.Close()
+	}
+
 	// Set up MCP client
 	var mc *MCPClient
-	if op.UseMCP {
+	if IsMCPServersEnabled(op.Capabilities) {
 		mc = GetMCPClient() // use the shared instance
 		if !op.QuietMode {
 			indicator.Start("Loading MCP servers...")
@@ -219,26 +228,14 @@ func CallAgent(op *AgentOptions) error {
 
 	// Need to append markdown
 	var markdown *Markdown
-	if op.AppendMarkdown {
+	if IsMarkdownEnabled(op.Capabilities) {
 		markdown = NewMarkdown()
 	}
 
 	// Need to append token usage
 	var tu *TokenUsage
-	if op.AppendUsage {
+	if IsTokenUsageEnabled(op.Capabilities) {
 		tu = NewTokenUsage()
-	}
-
-	// Need to output a file
-	var fileRenderer *FileRenderer
-	if op.OutputFile != "" {
-		var err error
-		fileRenderer, err = NewFileRenderer(op.OutputFile)
-		if err != nil {
-			err := fmt.Errorf("failed to create output file %s: %v", op.OutputFile, err)
-			return err
-		}
-		defer fileRenderer.Close()
 	}
 
 	// Inject memory into system prompt
@@ -248,7 +245,7 @@ func CallAgent(op *AgentOptions) error {
 	}
 
 	// Inject skills into system prompt if any are available and enabled
-	if op.UseSkills {
+	if IsAgentSkillsEnabled(op.Capabilities) {
 		// Load available skills metadata
 		sm := GetSkillManager() // Use singleton
 		if skillsXML := sm.GetAvailableSkills(); skillsXML != "" {
@@ -258,12 +255,19 @@ func CallAgent(op *AgentOptions) error {
 
 	// Set up enabled tools list with skill automation
 	enabledTools := op.EnabledTools
-	if op.UseSkills {
+	if IsAgentSkillsEnabled(op.Capabilities) {
 		// Automatically add activate_skill if not already there
 		enabledTools = AppendSkillTools(enabledTools)
 	} else {
 		// Automatically remove activate_skill if skills are disabled
 		enabledTools = RemoveSkillTools(enabledTools)
+	}
+
+	// Subagents tool injection
+	if IsSubAgentsEnabled(op.Capabilities) {
+		enabledTools = AppendSubagentTools(enabledTools)
+	} else {
+		enabledTools = RemoveSubagentTools(enabledTools)
 	}
 
 	ag := Agent{
@@ -287,9 +291,8 @@ func CallAgent(op *AgentOptions) error {
 		OutputFile:    fileRenderer,
 		Status:        StatusStack{},
 		Indicator:     indicator,
-		// Sub-agent orchestration
-		SharedState: op.SharedState,
-		AgentName:   op.AgentName,
+		SharedState:   op.SharedState,
+		AgentName:     op.AgentName,
 	}
 
 	// Construct conversation manager

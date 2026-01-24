@@ -18,6 +18,8 @@ const (
 You need to set up MCP servers specifically to use this feature.`
 	AgentSkillsDescription = `Agent Skills are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.
 After integrating skills, agent will use skills automatically`
+	AgentSubAgentsDescription = `Subagents allow an agent to manage and call other agents to perform tasks or workflows.
+Use when you need to orchestrate multiple agents working in parallel`
 	MaxRecursionsDescription = `It controls the maximum number of recursive model calls allowed when tools are being used.
 -- Increase for complex multi-step tasks (20-50)
 -- Decrease for simple tasks (3-5) to save tokens`
@@ -113,18 +115,13 @@ var agentAddCmd = &cobra.Command{
 			model         string
 			tools         []string
 			think         string
-			mcp           bool
 			search        string
 			template      string
 			sysPrompt     string
-			skills        bool
-			usage         bool
-			markdown      bool
 			maxRecursions string
 		)
 
 		// Initial defaults
-		markdown = true // Default to true typically
 		maxRecursions = "10"
 
 		// Get available options from data layer
@@ -324,15 +321,16 @@ var agentAddCmd = &cobra.Command{
 				huh.NewMultiSelect[string]().
 					Title("Capabilities").
 					Options(
-						huh.NewOption("Show Usage Stats", "usage").Selected(true),
-						huh.NewOption("Markdown Output", "markdown").Selected(true),
-						huh.NewOption("Enable MCP", "mcp").Selected(false),
-						huh.NewOption("Enable Skills", "skills").Selected(false),
+						huh.NewOption("Show Usage Stats", service.CapabilityTokenUsage).Selected(true),
+						huh.NewOption("Show Markdown Output", service.CapabilityMarkdown).Selected(true),
+						huh.NewOption("Enable MCP Servers", service.CapabilityMCPServers).Selected(false),
+						huh.NewOption("Enable Agent Skills", service.CapabilityAgentSkills).Selected(false),
+						huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(false),
 					).
 					Value(&capabilities),
 				huh.NewNote().
 					Title("---").
-					Description(AgentMCPDescription+"\n\n"+AgentSkillsDescription),
+					Description(AgentMCPDescription+"\n\n"+AgentSkillsDescription+"\n\n"+AgentSubAgentsDescription),
 			),
 		).Run()
 		if err != nil {
@@ -341,18 +339,7 @@ var agentAddCmd = &cobra.Command{
 		}
 
 		// Process capabilities
-		for _, cap := range capabilities {
-			switch cap {
-			case "mcp":
-				mcp = true
-			case "skills":
-				skills = true
-			case "usage":
-				usage = true
-			case "markdown":
-				markdown = true
-			}
-		}
+		// Capabilities are already a string slice from the form, compatible with AgentConfig
 
 		// Construct typed config
 		var recursionVal int
@@ -364,10 +351,7 @@ var agentAddCmd = &cobra.Command{
 			Name:          name,
 			Model:         data.Model{Name: model},
 			Tools:         tools,
-			MCP:           mcp,
-			Skills:        skills,
-			Usage:         usage,
-			Markdown:      markdown,
+			Capabilities:  capabilities,
 			Think:         think,
 			Search:        data.SearchEngine{Name: search},
 			Template:      template,
@@ -457,18 +441,7 @@ var agentSetCmd = &cobra.Command{
 		}
 
 		// Populate capabilities from struct fields
-		if agent.MCP {
-			capabilities = append(capabilities, "mcp")
-		}
-		if agent.Skills {
-			capabilities = append(capabilities, "skills")
-		}
-		if agent.Usage {
-			capabilities = append(capabilities, "usage")
-		}
-		if agent.Markdown {
-			capabilities = append(capabilities, "markdown")
-		}
+		capabilities = agent.Capabilities
 
 		// Reuse options logic - access data layer directly
 		modelsMap := store.GetModels()
@@ -641,10 +614,11 @@ var agentSetCmd = &cobra.Command{
 			capsSet[c] = true
 		}
 		capsOpts := []huh.Option[string]{
-			huh.NewOption("Enable MCP", "mcp").Selected(capsSet["mcp"]),
-			huh.NewOption("Enable Skills", "skills").Selected(capsSet["skills"]),
-			huh.NewOption("Show Usage Stats", "usage").Selected(capsSet["usage"]),
-			huh.NewOption("Markdown Output", "markdown").Selected(capsSet["markdown"]),
+			huh.NewOption("Show Usage Stats", service.CapabilityTokenUsage).Selected(capsSet[service.CapabilityTokenUsage]),
+			huh.NewOption("Show Markdown Output", service.CapabilityMarkdown).Selected(capsSet[service.CapabilityMarkdown]),
+			huh.NewOption("Enable MCP Servers", service.CapabilityMCPServers).Selected(capsSet[service.CapabilityMCPServers]),
+			huh.NewOption("Enable Agent Skills", service.CapabilityAgentSkills).Selected(capsSet[service.CapabilityAgentSkills]),
+			huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(capsSet[service.CapabilitySubAgents]),
 		}
 		SortMultiOptions(capsOpts, capabilities)
 		err = huh.NewForm(
@@ -655,7 +629,7 @@ var agentSetCmd = &cobra.Command{
 					Value(&capabilities),
 				huh.NewNote().
 					Title("---").
-					Description(AgentMCPDescription+"\n\n"+AgentSkillsDescription),
+					Description(AgentMCPDescription+"\n\n"+AgentSkillsDescription+"\n\n"+AgentSubAgentsDescription),
 			),
 		).Run()
 
@@ -671,23 +645,7 @@ var agentSetCmd = &cobra.Command{
 			recursionVal = 10
 		}
 
-		// Process capabilities - think uses string level
-		mcpEnabled := false
-		skillsEnabled := false
-		usageEnabled := false
-		markdownEnabled := false
-		for _, cap := range capabilities {
-			switch cap {
-			case "mcp":
-				mcpEnabled = true
-			case "skills":
-				skillsEnabled = true
-			case "usage":
-				usageEnabled = true
-			case "markdown":
-				markdownEnabled = true
-			}
-		}
+		// Process capabilities - no conversion needed
 
 		// Bugfix:
 		// We set None options as " " in the form, so we need to trim them
@@ -700,10 +658,7 @@ var agentSetCmd = &cobra.Command{
 			Name:          name,
 			Model:         data.Model{Name: model},
 			Tools:         tools,
-			MCP:           mcpEnabled,
-			Skills:        skillsEnabled,
-			Usage:         usageEnabled,
-			Markdown:      markdownEnabled,
+			Capabilities:  capabilities,
 			Think:         think,
 			Search:        data.SearchEngine{Name: search},
 			Template:      template,
@@ -951,10 +906,7 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 	fmt.Printf("%sTools:%s\n", spaceholder, toolsSlice)
 	fmt.Printf("%sThink: %v\n", spaceholder, agent.Think)
 
-	fmt.Printf("%sMCP: %v\n", spaceholder, agent.MCP)
-	fmt.Printf("%sSkills: %v\n", spaceholder, agent.Skills)
-	fmt.Printf("%sUsage: %v\n", spaceholder, agent.Usage)
-	fmt.Printf("%sMarkdown: %v\n", spaceholder, agent.Markdown)
+	fmt.Printf("%sCapabilities: %v\n", spaceholder, agent.Capabilities)
 	fmt.Printf("%sMax Recursions: %d\n", spaceholder, agent.MaxRecursions)
 }
 

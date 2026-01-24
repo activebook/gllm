@@ -5,76 +5,83 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
 
 func init() {
 	rootCmd.AddCommand(usageCmd)
-	usageCmd.AddCommand(usageOnCmd)
-	usageCmd.AddCommand(usageOffCmd)
+	usageCmd.AddCommand(usageSwitchCmd)
 }
 
 var usageCmd = &cobra.Command{
 	Use:     "usage",
 	Aliases: []string{"ua", "usage"}, // Optional alias
-	Short:   "Whether to include token usage metainfo in the output",
-	Long: `When Usage is switched on, the output will include token usage metainfo.
-When Usage is switched off, the output will not include any token usage metainfo.`,
+	Short:   "Manage token usage statistics output",
+	Long: `Manage whether to include token usage metainfo (prompt tokens, completion tokens, duration) in the output.
+Use 'gllm usage switch' to toggle this feature on or off.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(cmd.Long)
-		fmt.Println()
-		fmt.Print("Usage output is currently switched: ")
+		// Show status if no subcommand
 		store := data.NewConfigStore()
 		agent := store.GetActiveAgent()
 		if agent == nil {
-			fmt.Println(switchOffColor + "off" + resetColor)
+			fmt.Println("No active agent.")
 			return
 		}
-		usage := agent.Usage
-		if usage {
-			fmt.Println(switchOnColor + "on" + resetColor)
+
+		fmt.Print("Usage output is currently: ")
+		if service.IsTokenUsageEnabled(agent.Capabilities) {
+			fmt.Println(switchOnColor + "Enabled" + resetColor)
 		} else {
-			fmt.Println(switchOffColor + "off" + resetColor)
+			fmt.Println(switchOffColor + "Disabled" + resetColor)
 		}
+		fmt.Println("\nUse 'gllm usage switch' to change.")
 	},
 }
 
-var usageOnCmd = &cobra.Command{
-	Use:   "on",
-	Short: "Switch usage output on",
+var usageSwitchCmd = &cobra.Command{
+	Use:     "switch",
+	Aliases: []string{"sw", "sel", "select"},
+	Short:   "Switch usage output on/off",
+	Long:    "Interactive switch to enable or disable token usage statistics output.",
 	Run: func(cmd *cobra.Command, args []string) {
 		store := data.NewConfigStore()
 		agent := store.GetActiveAgent()
 		if agent == nil {
-			fmt.Println(switchOffColor + "off" + resetColor)
+			fmt.Println("No active agent to configure.")
 			return
 		}
-		agent.Usage = true
+
+		current := service.IsTokenUsageEnabled(agent.Capabilities)
+		var enable bool
+
+		// Helper for options
+		onOpt := huh.NewOption("On  - Enable usage stats", true).Selected(current)
+		offOpt := huh.NewOption("Off - Disable usage stats", false).Selected(!current)
+
+		err := huh.NewSelect[bool]().
+			Title("Token Usage Statistics").
+			Description("Include token usage metainfo in the output?").
+			Options(onOpt, offOpt).
+			Value(&enable).
+			Run()
+
+		if err != nil {
+			fmt.Println("Operation cancelled.")
+			return
+		}
+
+		if enable {
+			agent.Capabilities = service.EnableTokenUsage(agent.Capabilities)
+			fmt.Println("Usage output switched " + switchOnColor + "On" + resetColor)
+		} else {
+			agent.Capabilities = service.DisableTokenUsage(agent.Capabilities)
+			fmt.Println("Usage output switched " + switchOffColor + "Off" + resetColor)
+		}
+
 		if err := store.SetAgent(agent.Name, agent); err != nil {
-			service.Errorf("failed to save usage format output: %v", err)
+			service.Errorf("failed to save agent config: %v", err)
 			return
 		}
-
-		fmt.Println("Usage output switched " + switchOnColor + "on" + resetColor)
-	},
-}
-
-var usageOffCmd = &cobra.Command{
-	Use:   "off",
-	Short: "Switch usage output off",
-	Run: func(cmd *cobra.Command, args []string) {
-		store := data.NewConfigStore()
-		agent := store.GetActiveAgent()
-		if agent == nil {
-			fmt.Println(switchOffColor + "off" + resetColor)
-			return
-		}
-		agent.Usage = false
-		if err := store.SetAgent(agent.Name, agent); err != nil {
-			service.Errorf("failed to save usage format output: %v", err)
-			return
-		}
-
-		fmt.Println("Usage output switched " + switchOffColor + "off" + resetColor)
 	},
 }

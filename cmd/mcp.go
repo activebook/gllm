@@ -21,7 +21,7 @@ var mcpCmd = &cobra.Command{
 	Use:   "mcp",
 	Short: "Enable/Disable MCP (Model Context Protocol) servers and tools",
 	Long: `MCP gives gllm the ability to access external data, tools, and services.
-Switch on/off to enable/disable all mcp servers`,
+Use 'gllm mcp switch' to toggle this capability on or off.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
 		fmt.Println()
@@ -32,11 +32,59 @@ Switch on/off to enable/disable all mcp servers`,
 			fmt.Println(switchOffColor + "disabled" + resetColor)
 			return
 		}
-		enabled := agent.MCP
+		enabled := service.IsMCPServersEnabled(agent.Capabilities)
 		if enabled {
 			fmt.Println(switchOnColor + "enabled" + resetColor)
 		} else {
 			fmt.Println(switchOffColor + "disabled" + resetColor)
+		}
+		fmt.Println("\nUse 'gllm mcp switch' to change.")
+	},
+}
+
+var mcpSwitchCmd = &cobra.Command{
+	Use:     "switch",
+	Aliases: []string{"sw"},
+	Short:   "Switch MCP capability on/off",
+	Long:    "Interactive switch to enable or disable MCP capability for the current agent.",
+	Run: func(cmd *cobra.Command, args []string) {
+		store := data.NewConfigStore()
+		agent := store.GetActiveAgent()
+		if agent == nil {
+			fmt.Println("No active agent to configure.")
+			return
+		}
+
+		current := service.IsMCPServersEnabled(agent.Capabilities)
+		var enable bool
+
+		// Helper for options
+		onOpt := huh.NewOption("On  - Enable MCP servers", true).Selected(current)
+		offOpt := huh.NewOption("Off - Disable MCP servers", false).Selected(!current)
+
+		err := huh.NewSelect[bool]().
+			Title("MCP Capability").
+			Description("Allow agent to use Model Context Protocol servers?").
+			Options(onOpt, offOpt).
+			Value(&enable).
+			Run()
+
+		if err != nil {
+			fmt.Println("Operation cancelled.")
+			return
+		}
+
+		if enable {
+			agent.Capabilities = service.EnableMCPServers(agent.Capabilities)
+			fmt.Println("MCP capability " + switchOnColor + "Enabled" + resetColor)
+		} else {
+			agent.Capabilities = service.DisableMCPServers(agent.Capabilities)
+			fmt.Println("MCP capability " + switchOffColor + "Disabled" + resetColor)
+		}
+
+		if err := store.SetAgent(agent.Name, agent); err != nil {
+			fmt.Printf("Error writing config: %v\n", err)
+			return
 		}
 	},
 }
@@ -145,44 +193,6 @@ var mcpLoadCmd = &cobra.Command{
 				}
 			}
 		}
-	},
-}
-
-var mcpOnCmd = &cobra.Command{
-	Use:   "on",
-	Short: "Enable MCP Servers",
-	Run: func(cmd *cobra.Command, args []string) {
-		store := data.NewConfigStore()
-		agent := store.GetActiveAgent()
-		if agent == nil {
-			fmt.Printf("Error: No active agent found\n")
-			return
-		}
-		agent.MCP = true
-		if err := store.SetAgent(agent.Name, agent); err != nil {
-			fmt.Printf("Error writing config: %v\n", err)
-			return
-		}
-		fmt.Printf("MCP %s\n", switchOnColor+"enabled"+resetColor)
-	},
-}
-
-var mcpOffCmd = &cobra.Command{
-	Use:   "off",
-	Short: "Disable MCP Servers",
-	Run: func(cmd *cobra.Command, args []string) {
-		store := data.NewConfigStore()
-		agent := store.GetActiveAgent()
-		if agent == nil {
-			fmt.Printf("Error: No active agent found\n")
-			return
-		}
-		agent.MCP = false
-		if err := store.SetAgent(agent.Name, agent); err != nil {
-			fmt.Printf("Error writing config: %v\n", err)
-			return
-		}
-		fmt.Printf("MCP %s\n", switchOffColor+"disabled"+resetColor)
 	},
 }
 
@@ -312,11 +322,15 @@ var mcpPathCmd = &cobra.Command{
 	},
 }
 
-var mcpSwitchCmd = &cobra.Command{
-	Use:     "switch",
-	Aliases: []string{"select", "sw", "sel"},
-	Short:   "Toggle which MCP servers are allowed",
-	Long:    `Interactively select which MCP servers should be allowed. Use space to toggle, enter to confirm.`,
+// mcpSelectCmd (formerly mcpSwitchCmd)
+var mcpSelectCmd = &cobra.Command{
+	Use:     "select",
+	Aliases: []string{"sel", "switch"}, // Keep switch alias for muscle memory but it might conflict if not careful?
+	// Cobra handles subcommands. 'switch' is now a sibling command.
+	// If both exist, we should probably remove 'switch' alias from here to avoid ambiguity or overwrite.
+	// Removing 'switch' alias from 'select' command.
+	Short: "Toggle which MCP servers are allowed",
+	Long:  `Interactively select which MCP servers should be allowed. Use space to toggle, enter to confirm.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		store := data.NewMCPStore()
 		servers, _, err := store.Load()
@@ -497,9 +511,8 @@ func init() {
 
 	mcpCmd.AddCommand(mcpLoadCmd)
 	mcpCmd.AddCommand(mcpListCmd)
-	mcpCmd.AddCommand(mcpOnCmd)
-	mcpCmd.AddCommand(mcpOffCmd)
-	mcpCmd.AddCommand(mcpSwitchCmd)
+	mcpCmd.AddCommand(mcpSwitchCmd) // Capability toggle
+	mcpCmd.AddCommand(mcpSelectCmd) // Server selection (was switch)
 	mcpCmd.AddCommand(mcpExportCmd)
 	mcpCmd.AddCommand(mcpImportCmd)
 	mcpCmd.AddCommand(mcpPathCmd)

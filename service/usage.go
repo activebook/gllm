@@ -18,7 +18,10 @@ type TokenUsage struct {
 	CachedTokensInPrompt bool
 }
 
-const ()
+const (
+	CachedTokensInPrompt    = true
+	CachedTokensNotInPrompt = false
+)
 
 func NewTokenUsage() *TokenUsage {
 	return &TokenUsage{
