@@ -18,11 +18,16 @@ func NeedUserConfirm(info string, prompt string, description string) (bool, erro
 	var fields []huh.Field
 
 	description = strings.TrimSpace(description)
-	isLong := len(description) > 100
+	isLong := len(description) > 200
 
 	// If description is too long, use a Note before the Confirm field
 	if isLong {
-		fields = append(fields, huh.NewNote().Description(description))
+		// Only show the first 300 chars and last 300 chars if the description is too long
+		desc := description[:300] + "\n...\n...\n...\n" + description[len(description)-300:]
+		// Format description (remove code block and sanitize '_')
+		desc = strings.ReplaceAll(desc, "```", "")
+		desc = strings.ReplaceAll(desc, "_", "\\_")
+		fields = append(fields, huh.NewNote().Description(desc))
 	}
 
 	confirmField := huh.NewConfirm().
