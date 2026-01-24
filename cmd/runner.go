@@ -78,7 +78,10 @@ func RunAgent(prompt string, files []*service.FileData, convoName string, yolo b
 
 		// Load MCP config
 		mcpStore := data.NewMCPStore()
-		mcpConfig, _, _ := mcpStore.Load()
+		mcpConfig, err := mcpStore.Load()
+		if err != nil {
+			return err
+		}
 
 		// Stop indicator
 		indicator.Stop()

@@ -15,8 +15,14 @@ type SkillsSettings struct {
 	Disabled []string `json:"disabled"`
 }
 
+// MCPSettings holds MCP-related settings.
+type MCPSettings struct {
+	Allowed []string `json:"allowed"`
+}
+
 // Settings represents the structure of settings.json.
 type Settings struct {
+	MCP    MCPSettings    `json:"mcp"`
 	Skills SkillsSettings `json:"skills"`
 }
 
@@ -48,6 +54,9 @@ func NewSettingsStore() *SettingsStore {
 		settings: Settings{
 			Skills: SkillsSettings{
 				Disabled: []string{},
+			},
+			MCP: MCPSettings{
+				Allowed: []string{},
 			},
 		},
 	}
@@ -140,6 +149,62 @@ func (s *SettingsStore) EnableSkill(name string) error {
 		}
 	}
 	s.settings.Skills.Disabled = newDisabled
+	s.mu.Unlock()
+	return s.Save()
+}
+
+// GetAllowedMCPServers returns the list of allowed MCP server names.
+func (s *SettingsStore) GetAllowedMCPServers() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.settings.MCP.Allowed
+}
+
+// IsMCPServerAllowed checks if an MCP server is in the allowed list.
+func (s *SettingsStore) IsMCPServerAllowed(name string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, a := range s.settings.MCP.Allowed {
+		if a == name {
+			return true
+		}
+	}
+	return false
+}
+
+// AllowMCPServer adds an MCP server to the allowed list.
+func (s *SettingsStore) AllowMCPServer(name string) error {
+	s.mu.Lock()
+	// Check if already allowed
+	for _, a := range s.settings.MCP.Allowed {
+		if a == name {
+			s.mu.Unlock()
+			return nil // Already allowed
+		}
+	}
+	s.settings.MCP.Allowed = append(s.settings.MCP.Allowed, name)
+	s.mu.Unlock()
+	return s.Save()
+}
+
+// BlockMCPServer removes an MCP server from the allowed list.
+func (s *SettingsStore) BlockMCPServer(name string) error {
+	s.mu.Lock()
+	newAllowed := make([]string, 0, len(s.settings.MCP.Allowed))
+	for _, a := range s.settings.MCP.Allowed {
+		if a != name {
+			newAllowed = append(newAllowed, a)
+		}
+	}
+	s.settings.MCP.Allowed = newAllowed
+	s.mu.Unlock()
+	return s.Save()
+}
+
+// SetAllowedMCPServers sets the entire list of allowed MCP servers.
+func (s *SettingsStore) SetAllowedMCPServers(allowed []string) error {
+	s.mu.Lock()
+	s.settings.MCP.Allowed = allowed
 	s.mu.Unlock()
 	return s.Save()
 }

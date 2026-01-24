@@ -44,7 +44,7 @@ var mcpLoadCmd = &cobra.Command{
 
 		// Load config from data store
 		store := data.NewMCPStore()
-		mcpConfig, _, err := store.Load()
+		mcpConfig, err := store.Load()
 		if err != nil {
 			fmt.Printf("Error loading MCP config: %v\n", err)
 			return
@@ -147,7 +147,7 @@ var mcpListCmd = &cobra.Command{
 	Long:    `List all MCP servers in the configuration.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		store := data.NewMCPStore()
-		servers, _, err := store.Load()
+		servers, err := store.Load()
 		if err != nil {
 			fmt.Printf("Error loading MCP config: %v\n", err)
 			return
@@ -167,13 +167,14 @@ var mcpListCmd = &cobra.Command{
 		}
 		sort.Strings(names)
 
+		settingsStore := data.GetSettingsStore()
 		for _, name := range names {
 			server := servers[name]
 			indicator := "  "
 			pname := fmt.Sprintf("%-18s", name)
 			status := grayColor("(blocked)")
 
-			if server.Allowed {
+			if settingsStore.IsMCPServerAllowed(name) {
 				indicator = highlightColor("* ")
 				pname = highlightColor(pname)
 				status = greenColor("(allowed)")
@@ -274,7 +275,7 @@ var mcpSwitchCmd = &cobra.Command{
 	Long:    `Interactively select which MCP servers should be allowed. Use space to toggle, enter to confirm.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		store := data.NewMCPStore()
-		servers, _, err := store.Load()
+		servers, err := store.Load()
 		if err != nil {
 			fmt.Printf("Error loading MCP config: %v\n", err)
 			return
@@ -290,15 +291,17 @@ var mcpSwitchCmd = &cobra.Command{
 		for name := range servers {
 			names = append(names, name)
 		}
+		sort.Strings(names)
 
 		// Build options and pre-select allowed ones
+		settingsStore := data.GetSettingsStore()
 		var options []huh.Option[string]
 		var selected []string
 		for _, name := range names {
 			server := servers[name]
 			label := fmt.Sprintf("%-18s [%s]", name, server.Type)
 			options = append(options, huh.NewOption(label, name))
-			if server.Allowed {
+			if settingsStore.IsMCPServerAllowed(name) {
 				selected = append(selected, name)
 			}
 		}
@@ -316,24 +319,16 @@ var mcpSwitchCmd = &cobra.Command{
 			return // User cancelled
 		}
 
-		// Create a set for fast lookup
-		allowedSet := make(map[string]bool)
-		for _, s := range selected {
-			allowedSet[s] = true
-		}
-
-		// Update allowed state for each server
-		for name, server := range servers {
-			server.Allowed = allowedSet[name]
-		}
-
-		// Save updated config
-		if err := store.Save(servers, selected); err != nil {
-			fmt.Printf("Error saving MCP config: %v\n", err)
+		// Save updated allowed list to settings
+		if err := settingsStore.SetAllowedMCPServers(selected); err != nil {
+			fmt.Printf("Error saving MCP settings: %v\n", err)
 			return
 		}
 
-		fmt.Printf("Updated allowed MCP servers: %v\n", selected)
+		// Run mcp list to show updated list
+		fmt.Printf("\n%d MCP Server(s) enabled.\n", len(selected))
+		fmt.Println()
+		mcpListCmd.Run(mcpListCmd, args)
 	},
 }
 

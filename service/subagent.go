@@ -406,8 +406,8 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 	// Build system prompt
 	sysPrompt := store.GetSystemPrompt(agentConfig.SystemPrompt)
 
-	// Load MCP config
-	mcpConfig, _, _ := e.mcpStore.Load()
+	// Load MCP config (if error, just continue)
+	mcpConfig, _ := e.mcpStore.Load()
 
 	// Generate output file path (persistent)
 	// Use TaskKey in filename for better traceability

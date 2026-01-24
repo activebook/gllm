@@ -348,7 +348,10 @@ var skillsSwCmd = &cobra.Command{
 			}
 		}
 
+		// Run skills list to show updated list
 		fmt.Printf("\n%d skill(s) enabled.\n", len(selectedSkills))
+		fmt.Println()
+		skillsListCmd.Run(skillsListCmd, args)
 	},
 }
 

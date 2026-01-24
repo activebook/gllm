@@ -26,8 +26,7 @@ type MCPServer struct {
 
 // mcpConfigFile represents the raw JSON structure of mcp.json
 type mcpConfigFile struct {
-	MCPServers      map[string]mcpServerJSON `json:"mcpServers"`
-	AllowMCPServers []string                 `json:"allowMCPServers"`
+	MCPServers map[string]mcpServerJSON `json:"mcpServers"`
 }
 
 // mcpServerJSON is the raw JSON representation of an MCP server
@@ -64,26 +63,27 @@ func (m *MCPStore) GetPath() string {
 }
 
 // Load reads all MCP server configurations.
-// Returns empty map if file doesn't exist.
-// Return Servers and allowed list
-func (m *MCPStore) Load() (map[string]*MCPServer, []string, error) {
+// Returns servers with Allowed status from settings.json.
+func (m *MCPStore) Load() (map[string]*MCPServer, error) {
 	if _, err := os.Stat(m.path); os.IsNotExist(err) {
-		return make(map[string]*MCPServer), nil, nil
+		return make(map[string]*MCPServer), nil
 	}
 
 	data, err := os.ReadFile(m.path)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read MCP config: %w", err)
+		return nil, fmt.Errorf("failed to read MCP config: %w", err)
 	}
 
 	var config mcpConfigFile
 	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, nil, fmt.Errorf("failed to parse MCP config: %w", err)
+		return nil, fmt.Errorf("failed to parse MCP config: %w", err)
 	}
 
-	// Build allowed set for quick lookup
+	// Get allowed list from settings
+	settingsStore := GetSettingsStore()
+	allowedList := settingsStore.GetAllowedMCPServers()
 	allowedSet := make(map[string]bool)
-	for _, name := range config.AllowMCPServers {
+	for _, name := range allowedList {
 		allowedSet[name] = true
 	}
 
@@ -110,12 +110,12 @@ func (m *MCPStore) Load() (map[string]*MCPServer, []string, error) {
 		}
 	}
 
-	return servers, config.AllowMCPServers, nil
+	return servers, nil
 }
 
 // GetServer returns a specific MCP server by name.
 func (m *MCPStore) GetServer(name string) (*MCPServer, error) {
-	servers, _, err := m.Load()
+	servers, err := m.Load()
 	if err != nil {
 		return nil, err
 	}
@@ -135,8 +135,7 @@ func (m *MCPStore) CreateTemplate() error {
 	}
 	// Write a template
 	templateConfig := &mcpConfigFile{
-		MCPServers:      make(map[string]mcpServerJSON),
-		AllowMCPServers: []string{},
+		MCPServers: make(map[string]mcpServerJSON),
 	}
 	data, err := json.MarshalIndent(templateConfig, "", "  ")
 	if err != nil {
@@ -145,16 +144,15 @@ func (m *MCPStore) CreateTemplate() error {
 	return os.WriteFile(m.path, data, 0644)
 }
 
-// Save writes all MCP server configurations to disk.
-func (m *MCPStore) Save(servers map[string]*MCPServer, allowed []string) error {
+// Save writes all MCP server configurations to disk (without allowed list).
+func (m *MCPStore) Save(servers map[string]*MCPServer) error {
 	if err := os.MkdirAll(filepath.Dir(m.path), 0755); err != nil {
 		return fmt.Errorf("failed to create MCP config directory: %w", err)
 	}
 
 	// Convert to JSON structure
 	config := mcpConfigFile{
-		MCPServers:      make(map[string]mcpServerJSON),
-		AllowMCPServers: allowed,
+		MCPServers: make(map[string]mcpServerJSON),
 	}
 
 	for name, server := range servers {
@@ -184,25 +182,25 @@ func (m *MCPStore) Save(servers map[string]*MCPServer, allowed []string) error {
 
 // Export exports all MCP server configurations to a JSON file.
 func (m *MCPStore) Export(path string) error {
-	servers, allowed, err := m.Load()
+	servers, err := m.Load()
 	if err != nil {
 		return err
 	}
-	return m.SaveToPath(servers, allowed, path)
+	return m.SaveToPath(servers, path)
 }
 
 // Import imports MCP server configurations from a JSON file.
 func (m *MCPStore) Import(path string) error {
-	servers, allowed, err := m.LoadFromPath(path)
+	servers, err := m.LoadFromPath(path)
 	if err != nil {
 		return err
 	}
-	return m.Save(servers, allowed)
+	return m.Save(servers)
 }
 
 // AddServer adds a new MCP server. Returns error if it already exists.
 func (m *MCPStore) AddServer(server *MCPServer) error {
-	servers, allowed, err := m.Load()
+	servers, err := m.Load()
 	if err != nil {
 		return err
 	}
@@ -213,17 +211,20 @@ func (m *MCPStore) AddServer(server *MCPServer) error {
 
 	servers[server.Name] = server
 
-	// Add to allowed list if Allowed is true
+	// Update settings if Allowed is true
 	if server.Allowed {
-		allowed = append(allowed, server.Name)
+		settingsStore := GetSettingsStore()
+		if err := settingsStore.AllowMCPServer(server.Name); err != nil {
+			return err
+		}
 	}
 
-	return m.Save(servers, allowed)
+	return m.Save(servers)
 }
 
 // UpdateServer updates an existing MCP server.
 func (m *MCPStore) UpdateServer(server *MCPServer) error {
-	servers, allowed, err := m.Load()
+	servers, err := m.Load()
 	if err != nil {
 		return err
 	}
@@ -234,23 +235,24 @@ func (m *MCPStore) UpdateServer(server *MCPServer) error {
 
 	servers[server.Name] = server
 
-	// Update allowed list based on Allowed flag
-	newAllowed := make([]string, 0)
-	for _, name := range allowed {
-		if name != server.Name {
-			newAllowed = append(newAllowed, name)
+	// Update allowed list in settings based on Allowed flag
+	settingsStore := GetSettingsStore()
+	if server.Allowed {
+		if err := settingsStore.AllowMCPServer(server.Name); err != nil {
+			return err
+		}
+	} else {
+		if err := settingsStore.BlockMCPServer(server.Name); err != nil {
+			return err
 		}
 	}
-	if server.Allowed {
-		newAllowed = append(newAllowed, server.Name)
-	}
 
-	return m.Save(servers, newAllowed)
+	return m.Save(servers)
 }
 
 // RemoveServer removes an MCP server.
 func (m *MCPStore) RemoveServer(name string) error {
-	servers, allowed, err := m.Load()
+	servers, err := m.Load()
 	if err != nil {
 		return err
 	}
@@ -261,26 +263,23 @@ func (m *MCPStore) RemoveServer(name string) error {
 
 	delete(servers, name)
 
-	// Remove from allowed list
-	newAllowed := make([]string, 0)
-	for _, n := range allowed {
-		if n != name {
-			newAllowed = append(newAllowed, n)
-		}
+	// Remove from settings allowed list
+	settingsStore := GetSettingsStore()
+	if err := settingsStore.BlockMCPServer(name); err != nil {
+		return err
 	}
 
-	return m.Save(servers, newAllowed)
+	return m.Save(servers)
 }
 
 // SaveToPath writes MCP configuration to a specific path (for export).
-func (m *MCPStore) SaveToPath(servers map[string]*MCPServer, allowed []string, path string) error {
+func (m *MCPStore) SaveToPath(servers map[string]*MCPServer, path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	config := mcpConfigFile{
-		MCPServers:      make(map[string]mcpServerJSON),
-		AllowMCPServers: allowed,
+		MCPServers: make(map[string]mcpServerJSON),
 	}
 
 	for name, server := range servers {
@@ -309,23 +308,26 @@ func (m *MCPStore) SaveToPath(servers map[string]*MCPServer, allowed []string, p
 }
 
 // LoadFromPath reads MCP configuration from a specific path (for import).
-func (m *MCPStore) LoadFromPath(path string) (map[string]*MCPServer, []string, error) {
+func (m *MCPStore) LoadFromPath(path string) (map[string]*MCPServer, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, nil, fmt.Errorf("file not found: %s", path)
+		return nil, fmt.Errorf("file not found: %s", path)
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	var config mcpConfigFile
 	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
+	// Get allowed list from settings (ignore what's in the file)
+	settingsStore := GetSettingsStore()
+	allowedList := settingsStore.GetAllowedMCPServers()
 	allowedSet := make(map[string]bool)
-	for _, name := range config.AllowMCPServers {
+	for _, name := range allowedList {
 		allowedSet[name] = true
 	}
 
@@ -351,5 +353,5 @@ func (m *MCPStore) LoadFromPath(path string) (map[string]*MCPServer, []string, e
 		}
 	}
 
-	return servers, config.AllowMCPServers, nil
+	return servers, nil
 }

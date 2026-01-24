@@ -13,15 +13,9 @@ import (
 const (
 	EmbeddingToolsDescription = `Tools enable file system operations, command execution, and agent orchestration.
 
-1. Automatic agent switch (switch\_agent):
+Automatic agent switch (switch\_agent):
    - _Use when you want to delegate control completely to another agent_
-   - _Best for: "Already done the planning, switch to code mode"_
-
-2. Agent orchestration for workflow (call\_agent + state tools):
-   - _Use when you need to orchestrate multiple agents working in parallel_
-   - _Sub-agents execute tasks and return outputs_
-   - _Best for: "Execute these parallel tasks, report back to me"_
-   - _Companion tools: list\_agents (discover), get\_state/set\_state (coordinate)_`
+   - _Best for: "Already done the planning, switch to code mode"_`
 )
 
 func init() {
