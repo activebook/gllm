@@ -239,9 +239,11 @@ func CallAgent(op *AgentOptions) error {
 	}
 
 	// Inject memory into system prompt
-	memStore := data.NewMemoryStore()
-	if memoryContent := memStore.GetAll(); memoryContent != "" {
-		op.SysPrompt += "\n\n" + memoryContent
+	if IsAgentMemoryEnabled(op.Capabilities) {
+		memStore := data.NewMemoryStore()
+		if memoryContent := memStore.GetAll(); memoryContent != "" {
+			op.SysPrompt += "\n\n" + memoryContent
+		}
 	}
 
 	// Inject skills into system prompt if any are available and enabled
@@ -261,6 +263,13 @@ func CallAgent(op *AgentOptions) error {
 	} else {
 		// Automatically remove activate_skill if skills are disabled
 		enabledTools = RemoveSkillTools(enabledTools)
+	}
+
+	// Memory tool injection
+	if IsAgentMemoryEnabled(op.Capabilities) {
+		enabledTools = AppendMemoryTools(enabledTools)
+	} else {
+		enabledTools = RemoveMemoryTools(enabledTools)
 	}
 
 	// Subagents tool injection

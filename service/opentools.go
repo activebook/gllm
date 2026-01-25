@@ -72,9 +72,6 @@ var (
 		"read_multiple_files",
 		// web tools
 		"web_fetch",
-		// memory tools
-		"list_memory",
-		"save_memory",
 		// agent tools
 		"switch_agent",
 	}
@@ -85,6 +82,11 @@ var (
 	skillTools = []string{
 		// skill tools
 		"activate_skill",
+	}
+	memoryTools = []string{
+		// memory tools
+		"list_memory",
+		"save_memory",
 	}
 	subagentTools = []string{
 		// Sub-agent orchestration tools
@@ -113,6 +115,10 @@ func GetAllSkillTools() []string {
 	return skillTools
 }
 
+func GetAllMemoryTools() []string {
+	return memoryTools
+}
+
 func GetAllSubagentTools() []string {
 	return subagentTools
 }
@@ -137,6 +143,15 @@ func AvailableSearchTool(toolName string) bool {
 
 func AvailableSkillTool(toolName string) bool {
 	for _, tool := range skillTools {
+		if tool == toolName {
+			return true
+		}
+	}
+	return false
+}
+
+func AvailableMemoryTool(toolName string) bool {
+	for _, tool := range memoryTools {
 		if tool == toolName {
 			return true
 		}
@@ -186,6 +201,26 @@ func AppendSkillTools(tools []string) []string {
 // RemoveSkillTools removes skill tools from the given tools slice.
 func RemoveSkillTools(tools []string) []string {
 	for _, tool := range skillTools {
+		tools = slices.DeleteFunc(tools, func(t string) bool {
+			return t == tool
+		})
+	}
+	return tools
+}
+
+// AppendMemoryTools appends memory tools to the given tools slice if they are not already present.
+func AppendMemoryTools(tools []string) []string {
+	for _, tool := range memoryTools {
+		if !slices.Contains(tools, tool) {
+			tools = append(tools, tool)
+		}
+	}
+	return tools
+}
+
+// RemoveMemoryTools removes memory tools from the given tools slice.
+func RemoveMemoryTools(tools []string) []string {
+	for _, tool := range memoryTools {
 		tools = slices.DeleteFunc(tools, func(t string) bool {
 			return t == tool
 		})

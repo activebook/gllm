@@ -14,16 +14,13 @@ import (
 )
 
 const (
-	AgentMCPDescription = `The MCP (Model Context Protocol) enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.
-You need to set up MCP servers specifically to use this feature.`
-	AgentSkillsDescription = `Agent Skills are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.
-After integrating skills, agent will use skills automatically`
-	AgentSubAgentsDescription = `Subagents allow an agent to manage and call other agents to perform tasks or workflows.
-Use when you need to orchestrate multiple agents working in parallel`
-	MaxRecursionsDescription = `It controls the maximum number of recursive model calls allowed when tools are being used.
--- Increase for complex multi-step tasks (20-50)
--- Decrease for simple tasks (3-5) to save tokens`
+	MaxRecursionsDescription = `[Max recursions]() controls the maximum number of recursive model calls allowed when tools are being used.
+- _Increase for complex multi-step tasks (20-50)_
+- _Decrease for simple tasks (3-5) to save tokens_
+- _For recursive agent ( [RLM]()), set to 50-100 to allow for more complex tasks_`
 )
+
+var ()
 
 // agentCmd represents the agent subcommand for agents
 var agentCmd = &cobra.Command{
@@ -263,13 +260,11 @@ var agentAddCmd = &cobra.Command{
 		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewMultiSelect[string]().
-					Title("Tools").
-					Description("The tools to use for agent responses").
+					Title("Select Embedding Tools").
+					Description("Choose which tools to enable for this agent. Press space to toggle, enter to confirm.").
 					Options(toolsOptions...).
 					Value(&tools),
-				huh.NewNote().
-					Title("---").
-					Description(EmbeddingToolsDescription),
+				GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
 			),
 		).Run()
 		if err != nil {
@@ -284,9 +279,7 @@ var agentAddCmd = &cobra.Command{
 					Description("The maximum number of Model calling recursions allowed").
 					Value(&maxRecursions).
 					Validate(ValidateMaxRecursions),
-				huh.NewNote().
-					Title("---").
-					Description(MaxRecursionsDescription),
+				GetStaticHuhNote("Why set this", MaxRecursionsDescription),
 			),
 		).Run()
 		if err != nil {
@@ -316,30 +309,27 @@ var agentAddCmd = &cobra.Command{
 		// We can group these or keep them separate? Input is small. MultiSelect is potentially large-ish.
 		// Let's keep them somewhat together or just split to be safe?
 		// Split is safer.
+		msfeatures := huh.NewMultiSelect[string]().
+			Title("Agent Capabilities").
+			Description("Use space to toggle, enter to confirm.").
+			Options(huh.NewOption("Show Usage Stats", service.CapabilityTokenUsage).Selected(true),
+				huh.NewOption("Show Markdown Output", service.CapabilityMarkdown).Selected(true),
+				huh.NewOption("Enable MCP Servers", service.CapabilityMCPServers).Selected(false),
+				huh.NewOption("Enable Agent Skills", service.CapabilityAgentSkills).Selected(false),
+				huh.NewOption("Enable Agent Memory", service.CapabilityAgentMemory).Selected(false),
+				huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(false)).
+			Value(&capabilities)
+		featureNote := GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
 		err = huh.NewForm(
 			huh.NewGroup(
-				huh.NewMultiSelect[string]().
-					Title("Capabilities").
-					Options(
-						huh.NewOption("Show Usage Stats", service.CapabilityTokenUsage).Selected(true),
-						huh.NewOption("Show Markdown Output", service.CapabilityMarkdown).Selected(true),
-						huh.NewOption("Enable MCP Servers", service.CapabilityMCPServers).Selected(false),
-						huh.NewOption("Enable Agent Skills", service.CapabilityAgentSkills).Selected(false),
-						huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(false),
-					).
-					Value(&capabilities),
-				huh.NewNote().
-					Title("---").
-					Description(AgentMCPDescription+"\n\n"+AgentSkillsDescription+"\n\n"+AgentSubAgentsDescription),
+				msfeatures,
+				featureNote,
 			),
 		).Run()
 		if err != nil {
 			fmt.Println("Aborted.")
 			return
 		}
-
-		// Process capabilities
-		// Capabilities are already a string slice from the form, compatible with AgentConfig
 
 		// Construct typed config
 		var recursionVal int
@@ -564,13 +554,11 @@ var agentSetCmd = &cobra.Command{
 		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewMultiSelect[string]().
-					Title("Tools").
-					Description("The tools to use for agent responses").
+					Title("Select Embedding Tools").
+					Description("Choose which tools to enable for this agent. Press space to toggle, enter to confirm.").
 					Options(toolsOptions...).
 					Value(&tools),
-				huh.NewNote().
-					Title("---").
-					Description(EmbeddingToolsDescription),
+				GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
 			),
 		).Run()
 		if err != nil {
@@ -585,9 +573,7 @@ var agentSetCmd = &cobra.Command{
 					Description("The maximum number of Model calling recursions allowed").
 					Value(&maxRecursions).
 					Validate(ValidateMaxRecursions),
-				huh.NewNote().
-					Title("---").
-					Description(MaxRecursionsDescription),
+				GetStaticHuhNote("Why set this", MaxRecursionsDescription),
 			),
 		).Run()
 		if err != nil {
@@ -618,18 +604,20 @@ var agentSetCmd = &cobra.Command{
 			huh.NewOption("Show Markdown Output", service.CapabilityMarkdown).Selected(capsSet[service.CapabilityMarkdown]),
 			huh.NewOption("Enable MCP Servers", service.CapabilityMCPServers).Selected(capsSet[service.CapabilityMCPServers]),
 			huh.NewOption("Enable Agent Skills", service.CapabilityAgentSkills).Selected(capsSet[service.CapabilityAgentSkills]),
+			huh.NewOption("Enable Agent Memory", service.CapabilityAgentMemory).Selected(capsSet[service.CapabilityAgentMemory]),
 			huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(capsSet[service.CapabilitySubAgents]),
 		}
 		SortMultiOptions(capsOpts, capabilities)
+		msfeatures := huh.NewMultiSelect[string]().
+			Title("Agent Capabilities").
+			Description("Use space to toggle, enter to confirm.").
+			Options(capsOpts...).
+			Value(&capabilities)
+		featureNote := GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
 		err = huh.NewForm(
 			huh.NewGroup(
-				huh.NewMultiSelect[string]().
-					Title("Capabilities").
-					Options(capsOpts...).
-					Value(&capabilities),
-				huh.NewNote().
-					Title("---").
-					Description(AgentMCPDescription+"\n\n"+AgentSkillsDescription+"\n\n"+AgentSubAgentsDescription),
+				msfeatures,
+				featureNote,
 			),
 		).Run()
 

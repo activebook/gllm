@@ -3,6 +3,7 @@ package service
 const (
 	CapabilityMCPServers  = "mcp_servers"
 	CapabilityAgentSkills = "agent_skills"
+	CapabilityAgentMemory = "agent_memory"
 	CapabilityTokenUsage  = "token_usage"
 	CapabilityMarkdown    = "markdown_output"
 	CapabilitySubAgents   = "sub_agents"
@@ -113,4 +114,19 @@ func EnableSubAgents(capabilities []string) []string {
 
 func DisableSubAgents(capabilities []string) []string {
 	return disableCapability(capabilities, CapabilitySubAgents)
+}
+
+/*
+ * Agent Memory
+ */
+func IsAgentMemoryEnabled(capabilities []string) bool {
+	return isCapabilityEnabled(capabilities, CapabilityAgentMemory)
+}
+
+func EnableAgentMemory(capabilities []string) []string {
+	return enableCapability(capabilities, CapabilityAgentMemory)
+}
+
+func DisableAgentMemory(capabilities []string) []string {
+	return disableCapability(capabilities, CapabilityAgentMemory)
 }

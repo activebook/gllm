@@ -3,11 +3,49 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
+)
+
+const (
+	AgentMCPTitle                 = "MCP (Model Context Protocol)"
+	AgentSkillsTitle              = "Agent Skills"
+	AgentMemoryTitle              = "Agent Memory"
+	AgentSubAgentsTitle           = "Sub Agents"
+	AgentTokenUsageTitle          = "Token usage"
+	AgentMarkdownTitle            = "Markdown output"
+	AgentMCPTitleHighlight        = "[MCP (Model Context Protocol)]()"
+	AgentSkillsTitleHighlight     = "[Agent Skills]()"
+	AgentMemoryTitleHighlight     = "[Agent Memory]()"
+	AgentSubAgentsTitleHighlight  = "[Sub Agents]()"
+	AgentTokenUsageTitleHighlight = "[Token usage]()"
+	AgentMarkdownTitleHighlight   = "[Markdown output]()"
+
+	AgentMCPBody        = "enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."
+	AgentSkillsBody     = "are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.\nAfter integrating skills, **agent** will use skills automatically."
+	AgentMemoryBody     = "allows agents to remember important facts about you across sessions.\nFacts are used to personalize responses."
+	AgentSubAgentsBody  = "allow an agent to manage and call other agents to perform tasks or workflows.\nUse when you need to orchestrate multiple agents working in parallel."
+	AgentTokenUsageBody = "allows agents to track their token usage.\nThis helps you to control the cost of using the agent."
+	AgentMarkdownBody   = "allows agents to generate final response in Markdown format.\nThis helps you to format the response in a more readable way."
+
+	AgentMCPDescription        = AgentMCPTitle + " " + AgentMCPBody
+	AgentSkillsDescription     = AgentSkillsTitle + " " + AgentSkillsBody
+	AgentMemoryDescription     = AgentMemoryTitle + " " + AgentMemoryBody
+	AgentSubAgentsDescription  = AgentSubAgentsTitle + " " + AgentSubAgentsBody
+	AgentTokenUsageDescription = AgentTokenUsageTitle + " " + AgentTokenUsageBody
+	AgentMarkdownDescription   = AgentMarkdownTitle + " " + AgentMarkdownBody
+
+	// Agent Features Description Highlight
+	AgentMCPDescriptionHighlight        = AgentMCPTitleHighlight + AgentMCPBody
+	AgentSkillsDescriptionHighlight     = AgentSkillsTitleHighlight + AgentSkillsBody
+	AgentMemoryDescriptionHighlight     = AgentMemoryTitleHighlight + AgentMemoryBody
+	AgentSubAgentsDescriptionHighlight  = AgentSubAgentsTitleHighlight + AgentSubAgentsBody
+	AgentTokenUsageDescriptionHighlight = AgentTokenUsageTitleHighlight + AgentTokenUsageBody
+	AgentMarkdownDescriptionHighlight   = AgentMarkdownTitleHighlight + AgentMarkdownBody
 )
 
 func init() {
@@ -29,14 +67,7 @@ Use 'gllm features switch' to toggle capabilities on or off.`,
 			return
 		}
 
-		fmt.Println("Current Agent Features and Capabilities:")
-		fmt.Println()
-
-		printCapStatus("Token Usage", service.IsTokenUsageEnabled(agent.Capabilities))
-		printCapStatus("Markdown Output", service.IsMarkdownEnabled(agent.Capabilities))
-		printCapStatus("MCP Servers", service.IsMCPServersEnabled(agent.Capabilities))
-		printCapStatus("Agent Skills", service.IsAgentSkillsEnabled(agent.Capabilities))
-		printCapStatus("Sub Agents", service.IsSubAgentsEnabled(agent.Capabilities))
+		printCapSummary(agent.Capabilities)
 
 		fmt.Println()
 		fmt.Println("Use 'gllm features switch' to change.")
@@ -100,22 +131,27 @@ var capsSwitchCmd = &cobra.Command{
 			options = append(options, huh.NewOption("Subagents Workflow", service.CapabilitySubAgents))
 		}
 
+		// Agent Memory
+		if service.IsAgentMemoryEnabled(agent.Capabilities) {
+			options = append(options, huh.NewOption("Agent Memory", service.CapabilityAgentMemory).Selected(true))
+			selected = append(selected, service.CapabilityAgentMemory)
+		} else {
+			options = append(options, huh.NewOption("Agent Memory", service.CapabilityAgentMemory))
+		}
+
 		// Sort with selected at top
 		SortMultiOptions(options, selected)
 
+		// Create multi select
+		msfeatures := huh.NewMultiSelect[string]().
+			Title("Agent Capabilities").
+			Description("Use space to toggle, enter to confirm.").
+			Options(options...).
+			Value(&selected)
+		featureNote := GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
 		err := huh.NewForm(
-			huh.NewGroup(
-				huh.NewMultiSelect[string]().
-					Title("Agent Capabilities").
-					Description("Use space to toggle, enter to confirm.").
-					Options(options...).
-					Value(&selected),
-				huh.NewNote().
-					Title("---").
-					Description(AgentMCPDescription+"\n\n"+AgentSkillsDescription+"\n\n"+AgentSubAgentsDescription),
-			),
+			huh.NewGroup(msfeatures, featureNote),
 		).Run()
-
 		if err != nil {
 			fmt.Println("Operation cancelled.")
 			return
@@ -135,6 +171,7 @@ var capsSwitchCmd = &cobra.Command{
 			service.CapabilityTokenUsage,
 			service.CapabilityMarkdown,
 			service.CapabilitySubAgents,
+			service.CapabilityAgentMemory,
 		}
 		for _, cap := range allCaps {
 			if selectedSet[cap] {
@@ -149,9 +186,41 @@ var capsSwitchCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Println()
 		fmt.Printf("Capabilities updated. %d enabled.\n", len(newCaps))
+		fmt.Println()
+		printCapSummary(agent.Capabilities)
 	},
+}
+
+func getFeatureDescription(cap string) string {
+	switch cap {
+	case service.CapabilityMCPServers:
+		return AgentMCPDescriptionHighlight
+	case service.CapabilityAgentSkills:
+		return AgentSkillsDescriptionHighlight
+	case service.CapabilityTokenUsage:
+		return AgentTokenUsageDescriptionHighlight
+	case service.CapabilityMarkdown:
+		return AgentMarkdownDescriptionHighlight
+	case service.CapabilitySubAgents:
+		return AgentSubAgentsDescriptionHighlight
+	case service.CapabilityAgentMemory:
+		return AgentMemoryDescriptionHighlight
+	default:
+		return ""
+	}
+}
+
+func printCapSummary(caps []string) {
+	fmt.Println("Current Agent Features and Capabilities:")
+	fmt.Println()
+
+	printCapStatus("Token Usage", service.IsTokenUsageEnabled(caps))
+	printCapStatus("Markdown Output", service.IsMarkdownEnabled(caps))
+	printCapStatus("MCP Servers", service.IsMCPServersEnabled(caps))
+	printCapStatus("Agent Skills", service.IsAgentSkillsEnabled(caps))
+	printCapStatus("Agent Memory", service.IsAgentMemoryEnabled(caps))
+	printCapStatus("Sub Agents", service.IsSubAgentsEnabled(caps))
 }
 
 func printCapStatus(name string, enabled bool) {
@@ -160,4 +229,30 @@ func printCapStatus(name string, enabled bool) {
 		status = switchOnColor + "Enabled" + resetColor
 	}
 	fmt.Printf("  %-20s %s\n", name+":", status)
+
+	var desc string
+	switch name {
+	case "MCP Servers":
+		desc = AgentMCPDescription
+	case "Agent Skills":
+		desc = AgentSkillsDescription
+	case "Sub Agents":
+		desc = AgentSubAgentsDescription
+	case "Agent Memory":
+		desc = AgentMemoryDescription
+	case "Token Usage":
+		desc = AgentTokenUsageDescription
+	case "Markdown Output":
+		desc = AgentMarkdownDescription
+	}
+
+	if desc != "" {
+		lines := strings.Split(desc, "\n")
+		for _, line := range lines {
+			if strings.TrimSpace(line) != "" {
+				fmt.Printf("  %s\n", grayColor(line))
+			}
+		}
+	}
+	fmt.Println()
 }

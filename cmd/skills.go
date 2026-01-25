@@ -55,8 +55,6 @@ var skillsListCmd = &cobra.Command{
 			return
 		}
 
-		settingsStore := data.GetSettingsStore()
-
 		fmt.Println("Installed skills:")
 		fmt.Println()
 
@@ -66,14 +64,7 @@ var skillsListCmd = &cobra.Command{
 		})
 
 		for _, skill := range skills {
-			status := greenColor("Enabled")
-			if settingsStore.IsSkillDisabled(skill.Name) {
-				status = grayColor("Disabled")
-			}
-			fmt.Printf("  %s [%s]\n", skill.Name, status)
-			if skill.Description != "" {
-				fmt.Printf("    %s\n", grayColor(skill.Description))
-			}
+			printSkillMeta(skill)
 		}
 		fmt.Println()
 		fmt.Printf("Skills directory: %s\n", data.GetSkillsDirPath())
@@ -85,8 +76,9 @@ var skillsInstallPath string
 
 // skillsInstallCmd installs a skill from a path
 var skillsInstallCmd = &cobra.Command{
-	Use:   "install <path|url>",
-	Short: "Install a skill from a path or git URL",
+	Use:     "install <path|url>",
+	Aliases: []string{"add"},
+	Short:   "Install a skill from a path or git URL",
 	Long: `Install a skill by copying its directory to the skills storage.
 The source can be a local directory path or a git repository URL.
 If a git URL is provided, the repository will be cloned temporarily.
@@ -200,9 +192,10 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 
 // skillsUninstallCmd removes an installed skill
 var skillsUninstallCmd = &cobra.Command{
-	Use:   "uninstall <name>",
-	Short: "Uninstall an installed skill",
-	Long:  `Uninstall a skill by deleting its directory from the skills storage.`,
+	Use:     "uninstall <name>",
+	Aliases: []string{"rm", "remove"},
+	Short:   "Uninstall an installed skill",
+	Long:    `Uninstall a skill by deleting its directory from the skills storage.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var skillName string
 
@@ -319,13 +312,23 @@ var skillsSwCmd = &cobra.Command{
 		SortMultiOptions(options, enabledSkills)
 
 		var selectedSkills []string
+		multiSelect := huh.NewMultiSelect[string]().
+			Title("Select Skills").
+			Description("Choose which skills to enable. Press space to toggle, enter to confirm.").
+			Options(options...).
+			Value(&selectedSkills)
+		note := GetDynamicHuhNote("Skill Description", multiSelect, func(name string) string {
+			for _, s := range skills {
+				if s.Name == name {
+					return s.Description
+				}
+			}
+			return ""
+		})
 		err = huh.NewForm(
 			huh.NewGroup(
-				huh.NewMultiSelect[string]().
-					Title("Select Skills").
-					Description("Choose which skills to enable. Press space to toggle, enter to confirm.").
-					Options(options...).
-					Value(&selectedSkills),
+				multiSelect,
+				note,
 			),
 		).Run()
 
@@ -362,4 +365,23 @@ func init() {
 	skillsInstallCmd.Flags().StringVar(&skillsInstallPath, "path", "", "Path to the skill directory within the git repository")
 	skillsCmd.AddCommand(skillsUninstallCmd)
 	skillsCmd.AddCommand(skillsSwCmd)
+}
+
+// printSkillMeta prints a skill in a formatted way
+func printSkillMeta(skill data.SkillMetadata) {
+	settingsStore := data.GetSettingsStore()
+	status := greenColor("Enabled")
+	if settingsStore.IsSkillDisabled(skill.Name) {
+		status = grayColor("Disabled")
+	}
+	fmt.Printf("  %s [%s]\n", skill.Name, status)
+	if skill.Description != "" {
+		lines := strings.Split(skill.Description, "\n")
+		for _, line := range lines {
+			if strings.TrimSpace(line) != "" {
+				fmt.Printf("  %s\n", grayColor(line))
+			}
+		}
+	}
+	fmt.Println()
 }

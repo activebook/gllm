@@ -11,9 +11,14 @@ import (
 )
 
 const (
-	EmbeddingToolsDescription = `Tools enable file system operations, command execution, and agent orchestration.
+	EmbeddingToolsDescription = `[Tools]() enable file system operations, command execution, and agent switching.
 
-Automatic agent switch (switch\_agent):
+Run shell command or script ( [shell]()):
+   - _Use when need to run a local command such as python, node, bash, etc._
+   - _Or run any other command-line tool or script_
+   - _Best for: "Run this python script and give me result"_
+
+Automatic agent switch ( [switch\\_agent]()):
    - _Use when you want to delegate control completely to another agent_
    - _Best for: "Already done the planning, switch to code mode"_`
 )
@@ -80,9 +85,7 @@ var toolsSwCmd = &cobra.Command{
 					Description("Choose which tools to enable for this agent. Press space to toggle, enter to confirm.").
 					Options(options...).
 					Value(&selectedTools),
-				huh.NewNote().
-					Title("---").
-					Description(EmbeddingToolsDescription),
+				GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
 			),
 		).Run()
 
