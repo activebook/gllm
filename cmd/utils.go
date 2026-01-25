@@ -8,12 +8,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/activebook/gllm/service"
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/huh"
 )
 
 // readStdin checks if there's piped input and reads it
@@ -151,26 +150,6 @@ func convertUserInputToBool(input string) (bool, error) {
 const defaultSystemPromptContent = "You are a helpful assistant."
 const defaultTemplateContent = ""
 
-// GetHuhKeyMap returns a custom keymap for huh forms
-// Specifically disables the Editor key binding for Text fields as it interferes with input
-func GetHuhKeyMap() *huh.KeyMap {
-	// 1. Start with the default keymap
-	keyMap := huh.NewDefaultKeyMap()
-
-	// 2. Remap the Text field keys
-	// We swap 'enter' to be the submission key and 'alt+enter' for new lines
-	keyMap.Text.Submit = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "submit"))
-	// The Prev/Next keys are meant to navigate between multiple fields (like going from an Input field to a Text field to a Select field). Since there's only one field, pressing ctrl+[ or ctrl+] has nowhere to go!
-	// keyMap.Text.Prev = key.NewBinding(key.WithKeys("ctrl+["), key.WithHelp("ctrl+[", "prev"))
-	// keyMap.Text.Next = key.NewBinding(key.WithKeys("ctrl+]"), key.WithHelp("ctrl+]", "next"))
-	keyMap.Text.NewLine.SetHelp("ctrl+j", "new line")
-
-	// 3. Disable the Editor (Ctrl+E) keybinding
-	keyMap.Text.Editor = key.NewBinding(key.WithDisabled())
-
-	return keyMap
-}
-
 func validateInt(s string) error {
 	_, err := strconv.Atoi(s)
 	if err != nil {
@@ -182,4 +161,68 @@ func validateInt(s string) error {
 func toInt(s string) int {
 	v, _ := strconv.Atoi(s)
 	return v
+}
+
+// copyDir recursively copies a directory
+func copyDir(src, dst string) error {
+	// Create destination directory
+	if err := os.MkdirAll(dst, 0755); err != nil {
+		return err
+	}
+
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			// Skip hidden directories
+			if strings.HasPrefix(entry.Name(), ".") {
+				continue
+			}
+			if err := copyDir(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			// Skip hidden files
+			if strings.HasPrefix(entry.Name(), ".") {
+				continue
+			}
+			if err := copyFile(srcPath, dstPath); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// copyFile copies a single file
+func copyFile(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		return err
+	}
+
+	// Preserve permissions
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	return os.Chmod(dst, srcInfo.Mode())
 }

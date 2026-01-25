@@ -72,40 +72,36 @@ func RunAgent(prompt string, files []*service.FileData, convoName string, yolo b
 		// Build Final Prompt (Template + Input + @ Processing)
 		finalPrompt := buildFinalPrompt(agent, prompt)
 
-		// Get system prompt & Memory
+		// Get system prompt
 		store := data.NewConfigStore()
 		sysPrompt := store.GetSystemPrompt(agent.SystemPrompt)
-		memStore := data.NewMemoryStore()
-		memoryContent := memStore.GetFormatted()
-		if memoryContent != "" {
-			sysPrompt += "\n\n" + memoryContent
-		}
 
 		// Load MCP config
 		mcpStore := data.NewMCPStore()
-		mcpConfig, _, _ := mcpStore.Load()
+		mcpConfig, err := mcpStore.Load()
+		if err != nil {
+			return err
+		}
 
 		// Stop indicator
 		indicator.Stop()
 
 		// Prepare Agent Options
 		op := service.AgentOptions{
-			Prompt:         finalPrompt,
-			SysPrompt:      sysPrompt,
-			Files:          files,
-			ModelInfo:      &agent.Model,
-			SearchEngine:   &agent.Search,
-			MaxRecursions:  agent.MaxRecursions,
-			ThinkingLevel:  agent.Think,
-			EnabledTools:   agent.Tools,
-			UseMCP:         agent.MCP,
-			YoloMode:       yolo,
-			AppendUsage:    agent.Usage,
-			AppendMarkdown: agent.Markdown,
-			OutputFile:     outputFile,
-			QuietMode:      false,
-			ConvoName:      convoName,
-			MCPConfig:      mcpConfig,
+			Prompt:        finalPrompt,
+			SysPrompt:     sysPrompt,
+			Files:         files,
+			ModelInfo:     &agent.Model,
+			SearchEngine:  &agent.Search,
+			MaxRecursions: agent.MaxRecursions,
+			ThinkingLevel: agent.Think,
+			EnabledTools:  agent.Tools,
+			Capabilities:  agent.Capabilities,
+			YoloMode:      yolo,
+			OutputFile:    outputFile,
+			QuietMode:     false,
+			ConvoName:     convoName,
+			MCPConfig:     mcpConfig,
 			// Sub-agent orchestration
 			SharedState: sharedState,
 			AgentName:   agent.Name,

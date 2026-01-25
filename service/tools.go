@@ -109,7 +109,7 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, 
 		showDiff(diff)
 
 		// Directly prompt user for confirmation
-		confirm, err := NeedUserConfirm(fmt.Sprintf("write content to the file at path: %s", path), ToolUserConfirmPrompt)
+		confirm, err := NeedUserConfirm(fmt.Sprintf("write content to the file at path: %s", path), ToolUserConfirmPrompt, "")
 		if err != nil {
 			return "", err
 		}
@@ -213,7 +213,7 @@ func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse)
 
 	if needConfirm && !toolsUse.AutoApprove {
 		// Directly prompt user for confirmation
-		confirm, err := NeedUserConfirm(fmt.Sprintf("delete the file at path: %s", path), ToolUserConfirmPrompt)
+		confirm, err := NeedUserConfirm(fmt.Sprintf("delete the file at path: %s", path), ToolUserConfirmPrompt, "")
 		if err != nil {
 			return "", err
 		}
@@ -246,7 +246,7 @@ func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *Tool
 
 	if needConfirm && !toolsUse.AutoApprove {
 		// Directly prompt user for confirmation
-		confirm, err := NeedUserConfirm(fmt.Sprintf("delete the directory at path: %s and all its contents", path), ToolUserConfirmPrompt)
+		confirm, err := NeedUserConfirm(fmt.Sprintf("delete the directory at path: %s and all its contents", path), ToolUserConfirmPrompt, "")
 		if err != nil {
 			return "", err
 		}
@@ -284,7 +284,7 @@ func moveToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (stri
 
 	if needConfirm && !toolsUse.AutoApprove {
 		// Directly prompt user for confirmation
-		confirm, err := NeedUserConfirm(fmt.Sprintf("move the file or directory from %s to %s", source, destination), ToolUserConfirmPrompt)
+		confirm, err := NeedUserConfirm(fmt.Sprintf("move the file or directory from %s to %s", source, destination), ToolUserConfirmPrompt, "")
 		if err != nil {
 			return "", err
 		}
@@ -562,7 +562,7 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (str
 			//return "", fmt.Errorf("purpose not found in arguments")
 			descStr = ""
 		}
-		confirm, err := NeedUserConfirm(fmt.Sprintf(ToolRespConfirmShell, cmdStr, descStr), ToolUserConfirmPrompt)
+		confirm, err := NeedUserConfirm(fmt.Sprintf(ToolRespConfirmShell, cmdStr, descStr), ToolUserConfirmPrompt, "")
 		if err != nil {
 			return "", err
 		}
@@ -919,7 +919,7 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, s
 		showDiff(diff)
 
 		// Response with a prompt to let user confirm
-		confirm, err := NeedUserConfirm("", ToolUserConfirmPrompt)
+		confirm, err := NeedUserConfirm("", ToolUserConfirmPrompt, "")
 		closeDiff() // Close the diff
 		if err != nil {
 			return "", err
@@ -967,7 +967,7 @@ func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (stri
 
 	if needConfirm && !toolsUse.AutoApprove {
 		// Directly prompt user for confirmation
-		confirm, err := NeedUserConfirm(fmt.Sprintf("copy the file or directory from %s to %s", source, destination), ToolUserConfirmPrompt)
+		confirm, err := NeedUserConfirm(fmt.Sprintf("copy the file or directory from %s to %s", source, destination), ToolUserConfirmPrompt, "")
 		if err != nil {
 			return "", err
 		}
@@ -1145,8 +1145,8 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse
 		// List all agents with details
 		for _, n := range names {
 			ag := agents[n]
-			sb.WriteString(fmt.Sprintf("- %s: Model=%s, ThinkingLevel=%s, Tools=%v\n",
-				n, ag.Model.Model, ag.Think, ag.Tools))
+			sb.WriteString(fmt.Sprintf("- %s: Model=%s, ThinkingLevel=%s, Tools=%v, Capabilities=%v\n",
+				n, ag.Model.Model, ag.Think, ag.Tools, ag.Capabilities))
 			if ag.SystemPrompt != "" {
 				// Show more of the system prompt to help the model decide
 				sysPrompt := strings.ReplaceAll(ag.SystemPrompt, "\n", " ")
@@ -1179,7 +1179,7 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse
 	}
 
 	if needConfirm && !toolsUse.AutoApprove {
-		confirm, err := NeedUserConfirm(fmt.Sprintf("switch to agent '%s'", name), ToolUserConfirmPrompt)
+		confirm, err := NeedUserConfirm(fmt.Sprintf("switch to agent '%s'", name), ToolUserConfirmPrompt, "")
 		if err != nil {
 			return "", err
 		}
@@ -1237,8 +1237,8 @@ func listAgentToolCallImpl() (string, error) {
 			sb.WriteString("  Tools: none\n")
 		}
 
-		if ag.MCP {
-			sb.WriteString("  MCP: enabled\n")
+		if len(ag.Capabilities) > 0 {
+			sb.WriteString(fmt.Sprintf("  Capabilities: %v\n", ag.Capabilities))
 		}
 
 		if ag.SystemPrompt != "" {
@@ -1419,4 +1419,33 @@ func listStateToolCallImpl(state *data.SharedState) (string, error) {
 	}
 
 	return state.FormatList(), nil
+}
+
+// activateSkillToolCallImpl handles the activate_skill tool call.
+func activateSkillToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
+	name, ok := (*argsMap)["name"].(string)
+	if !ok {
+		return "", fmt.Errorf("skill name not found in arguments")
+	}
+
+	// Get or create skill manager (singleton pattern)
+	sm := GetSkillManager()
+	// Activate skill: Get skill details
+	skillDetails, err := sm.ActivateSkill(name)
+	if err != nil {
+		return "", err
+	}
+
+	// Check if confirmation is needed (default logic: always confirm unless AutoApprove is true)
+	if !toolsUse.AutoApprove {
+		confirm, err := NeedUserConfirm(fmt.Sprintf("activate skill '%s'", name), ToolUserConfirmPrompt, skillDetails)
+		if err != nil {
+			return "", err
+		}
+		if !confirm {
+			return fmt.Sprintf("Operation cancelled by user: activate skill %s", name), nil
+		}
+	}
+
+	return skillDetails, nil
 }

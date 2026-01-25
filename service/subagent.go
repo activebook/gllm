@@ -403,16 +403,11 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 		return
 	}
 
-	// Build system prompt with memory
+	// Build system prompt
 	sysPrompt := store.GetSystemPrompt(agentConfig.SystemPrompt)
-	memStore := data.NewMemoryStore()
-	memoryContent := memStore.GetFormatted()
-	if memoryContent != "" {
-		sysPrompt += "\n\n" + memoryContent
-	}
 
-	// Load MCP config
-	mcpConfig, _, _ := e.mcpStore.Load()
+	// Load MCP config (if error, just continue)
+	mcpConfig, _ := e.mcpStore.Load()
 
 	// Generate output file path (persistent)
 	// Use TaskKey in filename for better traceability
@@ -420,12 +415,7 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 	if task.TaskKey != "" {
 		keyPart = "_" + GetSanitizeTitle(task.TaskKey)
 	}
-	outputFile, err := GenerateTaskFilePath(fmt.Sprintf("subagent_%s%s", task.AgentName, keyPart), ".md")
-	if err != nil {
-		// Fallback to simpler path or handle error
-		outputFile = GenerateTempFilePath(fmt.Sprintf("subagent_%s%s", task.AgentName, keyPart), ".md")
-		Warnf("Failed to create persistent output file, using temp: %v\n", err)
-	}
+	outputFile := data.GenerateTaskFilePath(fmt.Sprintf("subagent_%s%s", task.AgentName, keyPart), ".md")
 	result.OutputFile = outputFile
 
 	// Prepare input context from SharedState dependencies
@@ -447,24 +437,22 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 
 	// Prepare agent options
 	op := AgentOptions{
-		Prompt:         finalInstruction,
-		SysPrompt:      sysPrompt,
-		Files:          nil,
-		ModelInfo:      &agentConfig.Model,
-		SearchEngine:   &agentConfig.Search,
-		MaxRecursions:  agentConfig.MaxRecursions,
-		ThinkingLevel:  agentConfig.Think,
-		EnabledTools:   agentConfig.Tools,
-		UseMCP:         agentConfig.MCP,
-		YoloMode:       true, // Sub-agents always auto-approve
-		AppendUsage:    agentConfig.Usage,
-		AppendMarkdown: agentConfig.Markdown,
-		OutputFile:     outputFile,
-		QuietMode:      true, // Sub-agents run quietly
-		ConvoName:      "",   // No conversation persistence for sub-agents
-		MCPConfig:      mcpConfig,
-		SharedState:    e.state,
-		AgentName:      task.AgentName,
+		Prompt:        finalInstruction,
+		SysPrompt:     sysPrompt,
+		Files:         nil,
+		ModelInfo:     &agentConfig.Model,
+		SearchEngine:  &agentConfig.Search,
+		MaxRecursions: agentConfig.MaxRecursions,
+		ThinkingLevel: agentConfig.Think,
+		EnabledTools:  agentConfig.Tools,
+		Capabilities:  agentConfig.Capabilities,
+		YoloMode:      true, // Sub-agents always auto-approve
+		OutputFile:    outputFile,
+		QuietMode:     true, // Sub-agents run quietly
+		ConvoName:     "",   // No conversation persistence for sub-agents
+		MCPConfig:     mcpConfig,
+		SharedState:   e.state,
+		AgentName:     task.AgentName,
 	}
 
 	// Check for context cancellation
@@ -480,7 +468,7 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 	}
 
 	// Execute the agent
-	err = e.runner(&op)
+	err := e.runner(&op)
 
 	result.EndTime = time.Now()
 	result.Duration = result.EndTime.Sub(result.StartTime)

@@ -13,6 +13,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	MaxRecursionsDescription = `[Max recursions]() controls the maximum number of recursive model calls allowed when tools are being used.
+- _Increase for complex multi-step tasks (20-50)_
+- _Decrease for simple tasks (3-5) to save tokens_
+- _For recursive agent ( [RLM]()), set to 50-100 to allow for more complex tasks_`
+)
+
+var ()
+
 // agentCmd represents the agent subcommand for agents
 var agentCmd = &cobra.Command{
 	Use:     "agent",
@@ -103,17 +112,13 @@ var agentAddCmd = &cobra.Command{
 			model         string
 			tools         []string
 			think         string
-			mcp           bool
 			search        string
 			template      string
 			sysPrompt     string
-			usage         bool
-			markdown      bool
 			maxRecursions string
 		)
 
 		// Initial defaults
-		markdown = true // Default to true typically
 		maxRecursions = "10"
 
 		// Get available options from data layer
@@ -255,13 +260,11 @@ var agentAddCmd = &cobra.Command{
 		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewMultiSelect[string]().
-					Title("Tools").
-					Description("The tools to use for agent responses").
+					Title("Select Embedding Tools").
+					Description("Choose which tools to enable for this agent. Press space to toggle, enter to confirm.").
 					Options(toolsOptions...).
 					Value(&tools),
-				huh.NewNote().
-					Title("Tips").
-					Description(EmbeddingToolsDescription),
+				GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
 			),
 		).Run()
 		if err != nil {
@@ -276,12 +279,7 @@ var agentAddCmd = &cobra.Command{
 					Description("The maximum number of Model calling recursions allowed").
 					Value(&maxRecursions).
 					Validate(ValidateMaxRecursions),
-				huh.NewNote().
-					Title("Tips").
-					Description(`It controls the maximum number of recursive model calls allowed when tools are being used.
-- Increase for complex multi-step tasks (20-50)
-- Decrease for simple tasks (3-5) to save tokens
-`),
+				GetStaticHuhNote("Why set this", MaxRecursionsDescription),
 			),
 		).Run()
 		if err != nil {
@@ -311,36 +309,26 @@ var agentAddCmd = &cobra.Command{
 		// We can group these or keep them separate? Input is small. MultiSelect is potentially large-ish.
 		// Let's keep them somewhat together or just split to be safe?
 		// Split is safer.
+		msfeatures := huh.NewMultiSelect[string]().
+			Title("Agent Capabilities").
+			Description("Use space to toggle, enter to confirm.").
+			Options(huh.NewOption("Show Usage Stats", service.CapabilityTokenUsage).Selected(true),
+				huh.NewOption("Show Markdown Output", service.CapabilityMarkdown).Selected(true),
+				huh.NewOption("Enable MCP Servers", service.CapabilityMCPServers).Selected(false),
+				huh.NewOption("Enable Agent Skills", service.CapabilityAgentSkills).Selected(false),
+				huh.NewOption("Enable Agent Memory", service.CapabilityAgentMemory).Selected(false),
+				huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(false)).
+			Value(&capabilities)
+		featureNote := GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
 		err = huh.NewForm(
 			huh.NewGroup(
-				huh.NewMultiSelect[string]().
-					Title("Capabilities").
-					Options(
-						huh.NewOption("Show Usage Stats", "usage").Selected(true),
-						huh.NewOption("Markdown Output", "markdown").Selected(true),
-						huh.NewOption("Enable MCP", "mcp").Selected(false),
-					).
-					Value(&capabilities),
-				huh.NewNote().
-					Title("Tips").
-					Description("The MCP (Model Context Protocol) enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."),
+				msfeatures,
+				featureNote,
 			),
 		).Run()
 		if err != nil {
 			fmt.Println("Aborted.")
 			return
-		}
-
-		// Process capabilities
-		for _, cap := range capabilities {
-			switch cap {
-			case "mcp":
-				mcp = true
-			case "usage":
-				usage = true
-			case "markdown":
-				markdown = true
-			}
 		}
 
 		// Construct typed config
@@ -353,9 +341,7 @@ var agentAddCmd = &cobra.Command{
 			Name:          name,
 			Model:         data.Model{Name: model},
 			Tools:         tools,
-			MCP:           mcp,
-			Usage:         usage,
-			Markdown:      markdown,
+			Capabilities:  capabilities,
 			Think:         think,
 			Search:        data.SearchEngine{Name: search},
 			Template:      template,
@@ -445,15 +431,7 @@ var agentSetCmd = &cobra.Command{
 		}
 
 		// Populate capabilities from struct fields
-		if agent.MCP {
-			capabilities = append(capabilities, "mcp")
-		}
-		if agent.Usage {
-			capabilities = append(capabilities, "usage")
-		}
-		if agent.Markdown {
-			capabilities = append(capabilities, "markdown")
-		}
+		capabilities = agent.Capabilities
 
 		// Reuse options logic - access data layer directly
 		modelsMap := store.GetModels()
@@ -576,13 +554,11 @@ var agentSetCmd = &cobra.Command{
 		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewMultiSelect[string]().
-					Title("Tools").
-					Description("The tools to use for agent responses").
+					Title("Select Embedding Tools").
+					Description("Choose which tools to enable for this agent. Press space to toggle, enter to confirm.").
 					Options(toolsOptions...).
 					Value(&tools),
-				huh.NewNote().
-					Title("Tips").
-					Description(EmbeddingToolsDescription),
+				GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
 			),
 		).Run()
 		if err != nil {
@@ -597,12 +573,7 @@ var agentSetCmd = &cobra.Command{
 					Description("The maximum number of Model calling recursions allowed").
 					Value(&maxRecursions).
 					Validate(ValidateMaxRecursions),
-				huh.NewNote().
-					Title("Tips").
-					Description(`It controls the maximum number of recursive model calls allowed when tools are being used.
-- Increase for complex multi-step tasks (20-50)
-- Decrease for simple tasks (3-5) to save tokens
-`),
+				GetStaticHuhNote("Why set this", MaxRecursionsDescription),
 			),
 		).Run()
 		if err != nil {
@@ -629,20 +600,24 @@ var agentSetCmd = &cobra.Command{
 			capsSet[c] = true
 		}
 		capsOpts := []huh.Option[string]{
-			huh.NewOption("Enable MCP", "mcp").Selected(capsSet["mcp"]),
-			huh.NewOption("Show Usage Stats", "usage").Selected(capsSet["usage"]),
-			huh.NewOption("Markdown Output", "markdown").Selected(capsSet["markdown"]),
+			huh.NewOption("Show Usage Stats", service.CapabilityTokenUsage).Selected(capsSet[service.CapabilityTokenUsage]),
+			huh.NewOption("Show Markdown Output", service.CapabilityMarkdown).Selected(capsSet[service.CapabilityMarkdown]),
+			huh.NewOption("Enable MCP Servers", service.CapabilityMCPServers).Selected(capsSet[service.CapabilityMCPServers]),
+			huh.NewOption("Enable Agent Skills", service.CapabilityAgentSkills).Selected(capsSet[service.CapabilityAgentSkills]),
+			huh.NewOption("Enable Agent Memory", service.CapabilityAgentMemory).Selected(capsSet[service.CapabilityAgentMemory]),
+			huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(capsSet[service.CapabilitySubAgents]),
 		}
 		SortMultiOptions(capsOpts, capabilities)
+		msfeatures := huh.NewMultiSelect[string]().
+			Title("Agent Capabilities").
+			Description("Use space to toggle, enter to confirm.").
+			Options(capsOpts...).
+			Value(&capabilities)
+		featureNote := GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
 		err = huh.NewForm(
 			huh.NewGroup(
-				huh.NewMultiSelect[string]().
-					Title("Capabilities").
-					Options(capsOpts...).
-					Value(&capabilities),
-				huh.NewNote().
-					Title("Tips").
-					Description("The MCP (Model Context Protocol) enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."),
+				msfeatures,
+				featureNote,
 			),
 		).Run()
 
@@ -658,20 +633,7 @@ var agentSetCmd = &cobra.Command{
 			recursionVal = 10
 		}
 
-		// Process capabilities - think uses string level
-		mcpEnabled := false
-		usageEnabled := false
-		markdownEnabled := false
-		for _, cap := range capabilities {
-			switch cap {
-			case "mcp":
-				mcpEnabled = true
-			case "usage":
-				usageEnabled = true
-			case "markdown":
-				markdownEnabled = true
-			}
-		}
+		// Process capabilities - no conversion needed
 
 		// Bugfix:
 		// We set None options as " " in the form, so we need to trim them
@@ -684,9 +646,7 @@ var agentSetCmd = &cobra.Command{
 			Name:          name,
 			Model:         data.Model{Name: model},
 			Tools:         tools,
-			MCP:           mcpEnabled,
-			Usage:         usageEnabled,
-			Markdown:      markdownEnabled,
+			Capabilities:  capabilities,
 			Think:         think,
 			Search:        data.SearchEngine{Name: search},
 			Template:      template,
@@ -934,9 +894,7 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 	fmt.Printf("%sTools:%s\n", spaceholder, toolsSlice)
 	fmt.Printf("%sThink: %v\n", spaceholder, agent.Think)
 
-	fmt.Printf("%sMCP: %v\n", spaceholder, agent.MCP)
-	fmt.Printf("%sUsage: %v\n", spaceholder, agent.Usage)
-	fmt.Printf("%sMarkdown: %v\n", spaceholder, agent.Markdown)
+	fmt.Printf("%sCapabilities: %v\n", spaceholder, agent.Capabilities)
 	fmt.Printf("%sMax Recursions: %d\n", spaceholder, agent.MaxRecursions)
 }
 

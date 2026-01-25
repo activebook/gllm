@@ -347,7 +347,7 @@ var systemRemoveCmd = &cobra.Command{
 
 var systemSwitchCmd = &cobra.Command{
 	Use:     "switch [NAME]",
-	Aliases: []string{"sw", "select"},
+	Aliases: []string{"sw", "select", "sel"},
 	Short:   "Switch to a different system prompt",
 	Long:    `Switch the current agent's system prompt to the specified one.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

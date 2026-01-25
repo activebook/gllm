@@ -21,23 +21,15 @@ var mcpCmd = &cobra.Command{
 	Use:   "mcp",
 	Short: "Enable/Disable MCP (Model Context Protocol) servers and tools",
 	Long: `MCP gives gllm the ability to access external data, tools, and services.
-Switch on/off to enable/disable all mcp servers`,
+
+Use 'gllm mcp list' to list all available MCP servers.
+Use 'gllm mcp load' to load all available MCP tools.
+Use 'gllm mcp switch' to switch MCP servers on or off.
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
 		fmt.Println()
-		fmt.Print("MCP is currently: ")
-		store := data.NewConfigStore()
-		agent := store.GetActiveAgent()
-		if agent == nil {
-			fmt.Println(switchOffColor + "disabled" + resetColor)
-			return
-		}
-		enabled := agent.MCP
-		if enabled {
-			fmt.Println(switchOnColor + "enabled" + resetColor)
-		} else {
-			fmt.Println(switchOffColor + "disabled" + resetColor)
-		}
+		mcpListCmd.Run(mcpListCmd, args)
 	},
 }
 
@@ -52,7 +44,7 @@ var mcpLoadCmd = &cobra.Command{
 
 		// Load config from data store
 		store := data.NewMCPStore()
-		mcpConfig, _, err := store.Load()
+		mcpConfig, err := store.Load()
 		if err != nil {
 			fmt.Printf("Error loading MCP config: %v\n", err)
 			return
@@ -148,44 +140,6 @@ var mcpLoadCmd = &cobra.Command{
 	},
 }
 
-var mcpOnCmd = &cobra.Command{
-	Use:   "on",
-	Short: "Enable MCP Servers",
-	Run: func(cmd *cobra.Command, args []string) {
-		store := data.NewConfigStore()
-		agent := store.GetActiveAgent()
-		if agent == nil {
-			fmt.Printf("Error: No active agent found\n")
-			return
-		}
-		agent.MCP = true
-		if err := store.SetAgent(agent.Name, agent); err != nil {
-			fmt.Printf("Error writing config: %v\n", err)
-			return
-		}
-		fmt.Printf("MCP %s\n", switchOnColor+"enabled"+resetColor)
-	},
-}
-
-var mcpOffCmd = &cobra.Command{
-	Use:   "off",
-	Short: "Disable MCP Servers",
-	Run: func(cmd *cobra.Command, args []string) {
-		store := data.NewConfigStore()
-		agent := store.GetActiveAgent()
-		if agent == nil {
-			fmt.Printf("Error: No active agent found\n")
-			return
-		}
-		agent.MCP = false
-		if err := store.SetAgent(agent.Name, agent); err != nil {
-			fmt.Printf("Error writing config: %v\n", err)
-			return
-		}
-		fmt.Printf("MCP %s\n", switchOffColor+"disabled"+resetColor)
-	},
-}
-
 var mcpListCmd = &cobra.Command{
 	Use:     "list",
 	Aliases: []string{"ls", "show", "pr"},
@@ -193,7 +147,7 @@ var mcpListCmd = &cobra.Command{
 	Long:    `List all MCP servers in the configuration.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		store := data.NewMCPStore()
-		servers, _, err := store.Load()
+		servers, err := store.Load()
 		if err != nil {
 			fmt.Printf("Error loading MCP config: %v\n", err)
 			return
@@ -213,13 +167,14 @@ var mcpListCmd = &cobra.Command{
 		}
 		sort.Strings(names)
 
+		settingsStore := data.GetSettingsStore()
 		for _, name := range names {
 			server := servers[name]
 			indicator := "  "
 			pname := fmt.Sprintf("%-18s", name)
 			status := grayColor("(blocked)")
 
-			if server.Allowed {
+			if settingsStore.IsMCPServerAllowed(name) {
 				indicator = highlightColor("* ")
 				pname = highlightColor(pname)
 				status = greenColor("(allowed)")
@@ -312,14 +267,15 @@ var mcpPathCmd = &cobra.Command{
 	},
 }
 
+// mcpSwitchCmd (formerly mcpSwitchCmd)
 var mcpSwitchCmd = &cobra.Command{
 	Use:     "switch",
-	Aliases: []string{"sw"},
+	Aliases: []string{"sw", "sel", "select"},
 	Short:   "Toggle which MCP servers are allowed",
 	Long:    `Interactively select which MCP servers should be allowed. Use space to toggle, enter to confirm.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		store := data.NewMCPStore()
-		servers, _, err := store.Load()
+		servers, err := store.Load()
 		if err != nil {
 			fmt.Printf("Error loading MCP config: %v\n", err)
 			return
@@ -335,15 +291,17 @@ var mcpSwitchCmd = &cobra.Command{
 		for name := range servers {
 			names = append(names, name)
 		}
+		sort.Strings(names)
 
 		// Build options and pre-select allowed ones
+		settingsStore := data.GetSettingsStore()
 		var options []huh.Option[string]
 		var selected []string
 		for _, name := range names {
 			server := servers[name]
 			label := fmt.Sprintf("%-18s [%s]", name, server.Type)
 			options = append(options, huh.NewOption(label, name))
-			if server.Allowed {
+			if settingsStore.IsMCPServerAllowed(name) {
 				selected = append(selected, name)
 			}
 		}
@@ -361,24 +319,16 @@ var mcpSwitchCmd = &cobra.Command{
 			return // User cancelled
 		}
 
-		// Create a set for fast lookup
-		allowedSet := make(map[string]bool)
-		for _, s := range selected {
-			allowedSet[s] = true
-		}
-
-		// Update allowed state for each server
-		for name, server := range servers {
-			server.Allowed = allowedSet[name]
-		}
-
-		// Save updated config
-		if err := store.Save(servers, selected); err != nil {
-			fmt.Printf("Error saving MCP config: %v\n", err)
+		// Save updated allowed list to settings
+		if err := settingsStore.SetAllowedMCPServers(selected); err != nil {
+			fmt.Printf("Error saving MCP settings: %v\n", err)
 			return
 		}
 
-		fmt.Printf("Updated allowed MCP servers: %v\n", selected)
+		// Run mcp list to show updated list
+		fmt.Printf("\n%d MCP Server(s) enabled.\n", len(selected))
+		fmt.Println()
+		mcpListCmd.Run(mcpListCmd, args)
 	},
 }
 
@@ -497,9 +447,7 @@ func init() {
 
 	mcpCmd.AddCommand(mcpLoadCmd)
 	mcpCmd.AddCommand(mcpListCmd)
-	mcpCmd.AddCommand(mcpOnCmd)
-	mcpCmd.AddCommand(mcpOffCmd)
-	mcpCmd.AddCommand(mcpSwitchCmd)
+	mcpCmd.AddCommand(mcpSwitchCmd) // Server selection
 	mcpCmd.AddCommand(mcpExportCmd)
 	mcpCmd.AddCommand(mcpImportCmd)
 	mcpCmd.AddCommand(mcpPathCmd)

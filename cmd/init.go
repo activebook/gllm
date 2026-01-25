@@ -178,7 +178,21 @@ func RunInitWizard() error {
 		defaultProvider = service.ModelProviderOpenAICompatible
 	}
 
-	// Group 2: Details
+	// Features/Capabilities Group
+	msfeatures := huh.NewMultiSelect[string]().
+		Title("Agent Capabilities").
+		Description("Select additional features to enable").
+		Options(
+			huh.NewOption("Show Token Usage Stats", service.CapabilityTokenUsage).Selected(true),
+			huh.NewOption("Show Markdown Output", service.CapabilityMarkdown).Selected(true),
+			huh.NewOption("Enable MCP Servers", service.CapabilityMCPServers).Selected(true),
+			huh.NewOption("Enable Agent Skills", service.CapabilityAgentSkills).Selected(true),
+			huh.NewOption("Enable Agent Memory", service.CapabilityAgentMemory).Selected(true),
+			huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(true),
+		).Value(&selectedFeatures)
+	featureNote := GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
+
+	// Details Group
 	// We use a dynamic form to set the default model
 	err = huh.NewForm(
 		huh.NewGroup(
@@ -225,17 +239,15 @@ func RunInitWizard() error {
 		// Group 3: Tools Selection
 		huh.NewGroup(
 			huh.NewMultiSelect[string]().
-				Title("Tools").
-				Description("Select which tools to enable for this agent").
+				Title("Select Embedding Tools").
+				Description("Choose which tools to enable for this agent. Press space to toggle, enter to confirm.").
 				Options(func() []huh.Option[string] {
 					opts := buildToolsOptions()
 					SortMultiOptions(opts, []string{}) // No tools selected by default
 					return opts
 				}()...).
 				Value(&selectedTools),
-			huh.NewNote().
-				Title("Tips").
-				Description(EmbeddingToolsDescription),
+			GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
 		),
 		// Group 4: Thinking Level
 		huh.NewGroup(
@@ -252,18 +264,7 @@ func RunInitWizard() error {
 		),
 		// Group 5: Capabilities
 		huh.NewGroup(
-			huh.NewMultiSelect[string]().
-				Title("Agent Capabilities").
-				Description("Select additional features to enable").
-				Options(
-					huh.NewOption("MCP Enabled", "mcp").Selected(true),
-					huh.NewOption("Token Usage Stats", "usage").Selected(true),
-					huh.NewOption("Markdown Output", "markdown").Selected(true),
-				).
-				Value(&selectedFeatures),
-			huh.NewNote().
-				Title("Tips").
-				Description("The MCP (Model Context Protocol) enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."),
+			msfeatures, featureNote,
 		),
 		huh.NewGroup(
 			huh.NewConfirm().
@@ -300,12 +301,10 @@ func RunInitWizard() error {
 
 	// Setup agent config
 	agentConfig := &data.AgentConfig{
-		Model:    newModel,
-		Tools:    selectedTools,
-		Think:    selectedThinkingLevel,
-		MCP:      contains(selectedFeatures, "mcp"),
-		Usage:    contains(selectedFeatures, "usage"),
-		Markdown: contains(selectedFeatures, "markdown"),
+		Model:        newModel,
+		Tools:        selectedTools,
+		Think:        selectedThinkingLevel,
+		Capabilities: selectedFeatures,
 	}
 
 	// Save Agent via data layer

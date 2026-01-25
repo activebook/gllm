@@ -8,23 +8,44 @@ import (
 )
 
 // NeedUserConfirm prompts the user for confirmation using charmbracelet/huh.
-func NeedUserConfirm(info string, prompt string) (bool, error) {
+func NeedUserConfirm(info string, prompt string, description string) (bool, error) {
 	// Output the info message if provided
 	if len(strings.TrimSpace(info)) > 0 {
 		fmt.Println(info)
 	}
 
 	var confirm bool
-	// Set the prompt question
+	var fields []huh.Field
+
+	description = strings.TrimSpace(description)
+	isLong := len(description) > 200
+
+	// If description is too long, use a Note before the Confirm field
+	if isLong {
+		// Only show the first 300 chars and last 300 chars if the description is too long
+		desc := description[:300] + "\n...\n...\n...\n" + description[len(description)-300:]
+		// Format description (remove code block and sanitize '_')
+		desc = strings.ReplaceAll(desc, "```", "")
+		desc = strings.ReplaceAll(desc, "_", "\\_")
+		fields = append(fields, huh.NewNote().Description(desc))
+	}
+
+	confirmField := huh.NewConfirm().
+		Title(prompt).
+		Value(&confirm).
+		Affirmative("Yes").
+		Negative("No")
+
+	// If description is not too long and not empty, use the built-in Description
+	if len(description) > 0 && !isLong {
+		confirmField.Description(description)
+	}
+
+	fields = append(fields, confirmField)
+
 	// Use a default styling or customize as needed
 	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewConfirm().
-				Title(prompt).
-				Value(&confirm).
-				Affirmative("Yes").
-				Negative("No"),
-		),
+		huh.NewGroup(fields...),
 	)
 
 	err := form.Run()

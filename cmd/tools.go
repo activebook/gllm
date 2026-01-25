@@ -11,17 +11,16 @@ import (
 )
 
 const (
-	EmbeddingToolsDescription = `Tools enable file system operations, command execution, and agent orchestration.
+	EmbeddingToolsDescription = `[Tools]() enable file system operations, command execution, and agent switching.
 
-1. Automatic agent switch (switch\_agent):
+Run shell command or script ( [shell]()):
+   - _Use when need to run a local command such as python, node, bash, etc._
+   - _Or run any other command-line tool or script_
+   - _Best for: "Run this python script and give me result"_
+
+Automatic agent switch ( [switch\\_agent]()):
    - _Use when you want to delegate control completely to another agent_
-   - _Best for: "Already done the planning, switch to code mode"_
-
-2. Agent orchestration for workflow (call\_agent + state tools):
-   - _Use when you need to orchestrate multiple agents working in parallel_
-   - _Sub-agents execute tasks and return outputs_
-   - _Best for: "Execute these parallel tasks, report back to me"_
-   - _Companion tools: list\_agents (discover), get\_state/set\_state (coordinate)_`
+   - _Best for: "Already done the planning, switch to code mode"_`
 )
 
 func init() {
@@ -42,9 +41,10 @@ Use 'gllm tools sw' to select which tools to enable for the current agent.`,
 }
 
 var toolsSwCmd = &cobra.Command{
-	Use:   "sw",
-	Short: "Switch tools on/off",
-	Long:  "Choose which embedding tools to enable for the current agent.",
+	Use:     "switch",
+	Aliases: []string{"sw", "select", "sel"},
+	Short:   "Switch tools on/off",
+	Long:    "Choose which embedding tools to enable for the current agent.",
 	Run: func(cmd *cobra.Command, args []string) {
 		store := data.NewConfigStore()
 		agent := store.GetActiveAgent()
@@ -85,9 +85,7 @@ var toolsSwCmd = &cobra.Command{
 					Description("Choose which tools to enable for this agent. Press space to toggle, enter to confirm.").
 					Options(options...).
 					Value(&selectedTools),
-				huh.NewNote().
-					Title("Tips").
-					Description(EmbeddingToolsDescription),
+				GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
 			),
 		).Run()
 

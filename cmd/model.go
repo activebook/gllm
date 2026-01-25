@@ -203,7 +203,6 @@ Example:
 						).
 						Value(&provider),
 					huh.NewNote().
-						Title("Tips").
 						Description("If you are using Chinese open-source models, then better choose 'Other (OpenAI Compatible)'"),
 				),
 			).Run()
@@ -429,7 +428,6 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 						).
 						Value(&provider),
 					huh.NewNote().
-						Title("Tips").
 						Description("If you are using Chinese open-source models, then better choose 'Other (OpenAI Compatible)'"),
 				),
 				huh.NewGroup(
@@ -724,7 +722,7 @@ gllm model clear --force`,
 
 var modelSwitchCmd = &cobra.Command{
 	Use:     "switch NAME",
-	Aliases: []string{"sw", "select"},
+	Aliases: []string{"sw", "select", "sel"},
 	Short:   "Switch to a different model",
 	Long: `Switch to a different model configuration. This will change your current model
 to the specified one for all subsequent operations.`,

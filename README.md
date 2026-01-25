@@ -23,6 +23,7 @@
 - **Memory Management**: Remember important facts about you across sessions for personalized responses.
 - **Context-Aware Agent Switching**: Agents can hand off tasks to other specialized agents with full context and instructions across different LLM providers.
 - **Agentic Workflow**: Orchestrate sophisticated multi-agent behaviors using state-of-the-art models for parallel task execution and save context window.
+- **Agent Skills**: Support agent skills, switch skills on and off, and install from git or local path.
 - **@ Reference Support**: Reference files and directories directly in prompts using @ syntax for seamless context inclusion.
 - **Cross-platform Support**: gllm is available for macOS, Windows, and Linux, and easy to install and update.
 
@@ -318,6 +319,63 @@ Recursive LM (RLM) instructs the LLM to act as a programmer managing large datas
 | RLM Subagent Task 3-4 | RLM Judge & Summary |
 |----------------|----------------|
 | ![RLM3](screenshots/rlm_deepseek_3.png) | ![RLM4](screenshots/rlm_deepseek_4.png) |
+
+---
+
+## 🧠 Agent Skills
+
+Agent Skills are a lightweight, open format for extending AI agent capabilities with specialized knowledge, specialized tools, and advanced workflows. Skills are encapsulated in directories containing a `SKILL.md` file with metadata and instructions.
+
+### Managing Skills
+
+You can manage skills using the `gllm skills` command:
+
+- **List installed skills:**
+
+  ```sh
+  gllm skills list
+  ```
+
+- **Install a skill from a local path:**
+
+  ```sh
+  gllm skills install ./path/to/skill
+  ```
+
+- **Install a skill from a Git repository:**
+
+  ```sh
+  gllm skills install https://github.com/user/skill-repo.git
+  # Or specify a subdirectory within the repo
+  gllm skills install https://github.com/user/skill-repo.git --path sub/dir
+  ```
+
+- **Enable/Disable skills interactively:**
+
+  ```sh
+  gllm skills switch
+  ```
+
+- **Uninstall a skill:**
+
+  ```sh
+  gllm skills uninstall skill-name
+  ```
+
+### Skill Format
+
+A skill is a directory containing a `SKILL.md` file. The file must start with YAML frontmatter:
+
+```markdown
+---
+name: My Skill
+description: This skill does awesome stuff.
+---
+
+Detailed instructions for the agent go here...
+```
+
+You can also include a `scripts/` directory for helper scripts and a `resources/` directory for additional data files that the skill may reference.
 
 ---
 

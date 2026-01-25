@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/fatih/color"
 	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
@@ -280,6 +281,19 @@ var colorCmd = &cobra.Command{
 			fmt.Println("- GNOME Terminal")
 			fmt.Println("- Konsole")
 		}
+
+		fmt.Println("=== Lipgloss ANSI 256 Color Range (230-255) ===")
+		for i := 230; i <= 255; i++ {
+			style := lipgloss.NewStyle().Foreground(lipgloss.Color(fmt.Sprintf("%d", i)))
+			block := style.Render("█")
+			if i == 240 {
+				fmt.Printf("%s[%d]%s ", block, i, resetColor)
+			} else {
+				fmt.Printf("%s%d%s ", block, i, resetColor)
+			}
+		}
+		fmt.Println()
+		fmt.Println()
 
 		// Reset at the end
 		color.New(color.Reset).Print("")

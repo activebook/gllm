@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/activebook/gllm/data"
@@ -71,22 +72,30 @@ var (
 		"read_multiple_files",
 		// web tools
 		"web_fetch",
+		// agent tools
+		"switch_agent",
+	}
+	searchTools = []string{
+		// web tools
+		"web_search",
+	}
+	skillTools = []string{
+		// skill tools
+		"activate_skill",
+	}
+	memoryTools = []string{
 		// memory tools
 		"list_memory",
 		"save_memory",
-		// agent tools
-		"switch_agent",
-		"list_agent",
+	}
+	subagentTools = []string{
 		// Sub-agent orchestration tools
+		"list_agent",
 		"call_agent",
 		// shared state tools
 		"get_state",
 		"set_state",
 		"list_state",
-	}
-	searchTools = []string{
-		// web tools
-		"web_search",
 	}
 )
 
@@ -100,6 +109,18 @@ func GetAllEmbeddingTools() []string {
 
 func GetAllSearchTools() []string {
 	return searchTools
+}
+
+func GetAllSkillTools() []string {
+	return skillTools
+}
+
+func GetAllMemoryTools() []string {
+	return memoryTools
+}
+
+func GetAllSubagentTools() []string {
+	return subagentTools
 }
 
 func AvailableEmbeddingTool(toolName string) bool {
@@ -118,6 +139,93 @@ func AvailableSearchTool(toolName string) bool {
 		}
 	}
 	return false
+}
+
+func AvailableSkillTool(toolName string) bool {
+	for _, tool := range skillTools {
+		if tool == toolName {
+			return true
+		}
+	}
+	return false
+}
+
+func AvailableMemoryTool(toolName string) bool {
+	for _, tool := range memoryTools {
+		if tool == toolName {
+			return true
+		}
+	}
+	return false
+}
+
+func AvailableSubagentTool(toolName string) bool {
+	for _, tool := range subagentTools {
+		if tool == toolName {
+			return true
+		}
+	}
+	return false
+}
+
+// AppendSubagentTools appends subagent tools to the given tools slice if they are not already present.
+func AppendSubagentTools(tools []string) []string {
+	for _, tool := range subagentTools {
+		if !slices.Contains(tools, tool) {
+			tools = append(tools, tool)
+		}
+	}
+	return tools
+}
+
+// RemoveSubagentTools removes subagent tools from the given tools slice.
+func RemoveSubagentTools(tools []string) []string {
+	for _, tool := range subagentTools {
+		tools = slices.DeleteFunc(tools, func(t string) bool {
+			return t == tool
+		})
+	}
+	return tools
+}
+
+// AppendSkillTools appends skill tools to the given tools slice if they are not already present.
+func AppendSkillTools(tools []string) []string {
+	for _, tool := range skillTools {
+		if !slices.Contains(tools, tool) {
+			tools = append(tools, tool)
+		}
+	}
+	return tools
+}
+
+// RemoveSkillTools removes skill tools from the given tools slice.
+func RemoveSkillTools(tools []string) []string {
+	for _, tool := range skillTools {
+		tools = slices.DeleteFunc(tools, func(t string) bool {
+			return t == tool
+		})
+	}
+	return tools
+}
+
+// AppendMemoryTools appends memory tools to the given tools slice if they are not already present.
+func AppendMemoryTools(tools []string) []string {
+	for _, tool := range memoryTools {
+		if !slices.Contains(tools, tool) {
+			tools = append(tools, tool)
+		}
+	}
+	return tools
+}
+
+// RemoveMemoryTools removes memory tools from the given tools slice.
+func RemoveMemoryTools(tools []string) []string {
+	for _, tool := range memoryTools {
+		tools = slices.DeleteFunc(tools, func(t string) bool {
+			return t == tool
+		})
+	}
+	return tools
 }
 
 // GetOpenEmbeddingToolsFiltered returns embedding tools filtered by the allowed list.
@@ -1031,6 +1139,30 @@ when it was created/updated, content type, and size.`,
 	}
 	tools = append(tools, &listStateTool)
 
+	// activate_skill tool
+	activateSkillFunc := OpenFunctionDefinition{
+		Name: "activate_skill",
+		Description: `Activates a specialized agent skill by name and returns the skill's instructions.
+The returned instructions provide specialized guidance for the current task.
+Use this when you identify a task that matches a skill's description.
+ONLY use names exactly as they appear in the <available_skills> section.`,
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"name": map[string]interface{}{
+					"type":        "string",
+					"description": "The exact name of the skill to activate (case-insensitive).",
+				},
+			},
+			"required": []string{"name"},
+		},
+	}
+	activateSkillTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &activateSkillFunc,
+	}
+	tools = append(tools, &activateSkillTool)
+
 	return tools
 }
 
@@ -1236,6 +1368,11 @@ func (op *OpenProcessor) closeDiffConfirm() {
 	// Confirm diff is over
 	op.status.ChangeTo(op.notify, StreamNotify{Status: StatusDiffConfirmOver}, op.proceed)
 }
+
+/*
+ * OpenAI tool call implements
+ *
+ */
 
 // OpenAI tool implementations (wrapper functions)
 func (op *OpenProcessor) OpenAIShellToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
@@ -1596,6 +1733,24 @@ func (op *OpenProcessor) OpenAIListStateToolCall(toolCall openai.ToolCall, argsM
 		Content:    response,
 	}, err
 }
+
+func (op *OpenProcessor) OpenAIActivateSkillToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+	response, err := activateSkillToolCallImpl(argsMap, op.toolsUse)
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	return openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Content:    response,
+	}, err
+}
+
+/*
+ * OpenChat tool call implements
+ *
+ */
 
 func (op *OpenProcessor) OpenChatSwitchAgentToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	response, err := switchAgentToolCallImpl(argsMap, op.toolsUse)
@@ -2056,6 +2211,23 @@ func (op *OpenProcessor) OpenChatSetStateToolCall(toolCall *model.ToolCall, args
 
 func (op *OpenProcessor) OpenChatListStateToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	response, err := listStateToolCallImpl(op.sharedState)
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolMessage := model.ChatCompletionMessage{
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Name:       Ptr(""),
+		Content: &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(response),
+		},
+	}
+	return &toolMessage, err
+}
+
+func (op *OpenProcessor) OpenChatActivateSkillToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	response, err := activateSkillToolCallImpl(argsMap, op.toolsUse)
 	if err != nil {
 		response = fmt.Sprintf("Error: %v", err)
 	}

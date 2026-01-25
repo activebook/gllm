@@ -17,9 +17,7 @@ type AgentConfig struct {
 	Name          string       // Name is the key in the agents map, not stored in YAML
 	Model         Model        // Model name reference
 	Tools         []string     // List of enabled tools
-	MCP           bool         // Whether MCP is enabled
-	Usage         bool         // Whether to show usage statistics
-	Markdown      bool         // Whether to render markdown
+	Capabilities  []string     // List of enabled capabilities (mcp, skills, usage, markdown, subagents)
 	Think         string       // Thinking level: off, low, medium, high
 	Search        SearchEngine // Search engine reference
 	Template      string       // Template reference
@@ -523,15 +521,13 @@ func (c *ConfigStore) parseAgentConfig(name string, config interface{}) *AgentCo
 	agent := &AgentConfig{
 		Name:          name,
 		Model:         c.getModelFromAgentMap(configMap, "model"),
-		MCP:           getBool(configMap, "mcp"),
-		Usage:         getBool(configMap, "usage"),
-		Markdown:      getBool(configMap, "markdown"),
 		Think:         getString(configMap, "think"),
 		Search:        c.getSearchEngineFromAgentMap(configMap, "search"),
 		Template:      getString(configMap, "template"),
 		SystemPrompt:  getString(configMap, "system_prompt"),
 		MaxRecursions: getInt(configMap, "max_recursions", 10),
 		Tools:         getStringSlice(configMap, "tools"),
+		Capabilities:  getStringSlice(configMap, "capabilities"),
 	}
 
 	return agent
@@ -542,9 +538,7 @@ func (c *ConfigStore) agentToMap(agent *AgentConfig) map[string]interface{} {
 	return map[string]interface{}{
 		"model":          agent.Model.Name,
 		"tools":          agent.Tools,
-		"mcp":            agent.MCP,
-		"usage":          agent.Usage,
-		"markdown":       agent.Markdown,
+		"capabilities":   agent.Capabilities,
 		"think":          agent.Think,
 		"search":         agent.Search.Name,
 		"template":       agent.Template,

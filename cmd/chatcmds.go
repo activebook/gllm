@@ -115,6 +115,9 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	case "/mcp":
 		runCommand(mcpCmd, parts[1:])
 
+	case "/skills":
+		runCommand(skillsCmd, parts[1:])
+
 	case "/memory", "/r":
 		runCommand(memoryCmd, parts[1:])
 
@@ -127,11 +130,8 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	case "/think", "/T":
 		runCommand(thinkCmd, parts[1:])
 
-	case "/usage", "/u":
-		runCommand(usageCmd, parts[1:])
-
-	case "/markdown", "/k":
-		runCommand(markdownCmd, parts[1:])
+	case "/features", "/f", "/capabilities", "/caps":
+		runCommand(capsCmd, parts[1:])
 
 	case "/editor", "/e":
 		if len(parts) < 2 {
@@ -175,14 +175,14 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /template, /p [subcmd] - Manage templates (list, switch, add, etc.)")
 	fmt.Println("  /system, /S [subcmd] - Manage system prompts (list, switch, add, etc.)")
 	fmt.Println("  /search, /s [subcmd] - Manage search engines (list, switch, etc.)")
-	fmt.Println("  /tools, /t [on|off] - Manage embedding tools")
-	fmt.Println("  /mcp [subcmd] - Manage MCP servers (on, off, list, etc.)")
 	fmt.Println("  /memory, /r [subcmd] - Manage memory (list, add, clear)")
+	fmt.Println("  /think, /T [off|low|medium|high|sw] - Set thinking level (sw for interactive)")
+	fmt.Println("  /tools, /t [on|off] - Manage embedding tools")
+	fmt.Println("  /mcp [subcmd] - Manage MCP servers (list, switch, etc.)")
+	fmt.Println("  /skills [subcmd] - Manage agent skills (list, switch, install, etc.)")
+	fmt.Println("  /features, /f [switch] - Switch agent features and capabilities (usage, markdown, etc.)")
 	fmt.Println("  /yolo, /y - Toggle YOLO mode (non-interactive tool execution)")
 	fmt.Println("  /convo, /c [subcmd] - Manage conversations (list, info, remove, etc.)")
-	fmt.Println("  /think, /T [off|low|medium|high|sw] - Set thinking level (sw for interactive)")
-	fmt.Println("  /usage, /u [on|off] - Switch token usage display")
-	fmt.Println("  /markdown, /k [on|off] - Switch markdown rendering")
 	fmt.Println("  /editor, /e [subcmd] - Manage editor or open for multi-line input")
 	fmt.Println("  /attach, /a <file> - Attach a file")
 	fmt.Println("  /detach, /d <file|all> - Detach a file")
