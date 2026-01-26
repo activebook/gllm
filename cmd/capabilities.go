@@ -224,9 +224,9 @@ func printCapSummary(caps []string) {
 }
 
 func printCapStatus(name string, enabled bool) {
-	status := switchOffColor + "Disabled" + resetColor
+	status := data.SwitchOffColor + "Disabled" + data.ResetSeq
 	if enabled {
-		status = switchOnColor + "Enabled" + resetColor
+		status = data.SwitchOnColor + "Enabled" + data.ResetSeq
 	}
 	fmt.Printf("  %-20s %s\n", name+":", status)
 
@@ -250,7 +250,7 @@ func printCapStatus(name string, enabled bool) {
 		lines := strings.Split(desc, "\n")
 		for _, line := range lines {
 			if strings.TrimSpace(line) != "" {
-				fmt.Printf("  %s\n", grayColor(line))
+				fmt.Printf("  %s%s%s\n", data.DetailColor, line, data.ResetSeq)
 			}
 		}
 	}

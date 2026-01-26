@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/activebook/gllm/data"
 	"github.com/charmbracelet/glamour"
 )
 
@@ -94,7 +95,7 @@ func (mr *Markdown) Render(r Render) {
 
 	// Print the colored task completion message directly
 	r.Writeln("")
-	r.Writeln(taskCompleteColor + "✓ Task Completed" + resetColor)
+	r.Writeln(data.TaskCompleteColor + "✓ Task Completed" + data.ResetSeq)
 
 	// Render the Markdown using glamour
 	tr, _ := glamour.NewTermRenderer(

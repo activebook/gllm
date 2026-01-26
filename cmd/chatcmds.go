@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/service"
 	"github.com/spf13/cobra"
 )
@@ -24,9 +25,9 @@ func contains(slice []string, item string) bool {
 func switchYoloMode() {
 	yoloFlag = !yoloFlag
 	if yoloFlag {
-		fmt.Printf("YOLO mode: %s\n", switchOnColor+"on"+resetColor)
+		fmt.Printf("YOLO mode: %s\n", data.SwitchOnColor+"on"+data.ResetSeq)
 	} else {
-		fmt.Printf("YOLO mode: %s\n", switchOffColor+"off"+resetColor)
+		fmt.Printf("YOLO mode: %s\n", data.SwitchOffColor+"off"+data.ResetSeq)
 	}
 }
 
@@ -195,7 +196,7 @@ func (ci *ChatInfo) showInfo() {
 	printSection := func(title string) {
 		fmt.Println()
 		fullTitle := fmt.Sprintf("=== %s ===", strings.ToUpper(title))
-		fmt.Printf("%s\n", sectionColor(fullTitle))
+		fmt.Printf("%s%s%s\n", data.SectionColor, fullTitle, data.ResetSeq)
 	}
 
 	printSection("CURRENT SETTINGS")
@@ -228,7 +229,7 @@ func (ci *ChatInfo) showInfo() {
 	// Attachments
 	printSection("ATTACHMENTS")
 	if len(ci.Files) > 0 {
-		fmt.Printf("%s (%d):\n", keyColor("Attachments"), len(ci.Files))
+		fmt.Printf("%s%s%s (%d):\n", data.KeyColor, "Attachments", data.ResetSeq, len(ci.Files))
 		for _, file := range ci.Files {
 			fmt.Printf("  - [%s]: %s\n", file.Format(), file.Path())
 		}

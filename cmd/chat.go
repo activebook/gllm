@@ -342,17 +342,17 @@ func (ci *ChatInfo) executeShellCommand(command string) {
 	// Display error if command failed
 	if err != nil {
 		if exitError, ok := err.(*exec.ExitError); ok {
-			fmt.Printf(cmdErrorColor+"Command failed with exit code %d\n"+resetColor, exitError.ExitCode())
+			service.Errorf("Command failed with exit code %d", exitError.ExitCode())
 		} else {
-			fmt.Printf(cmdErrorColor+"Command failed: %v\n"+resetColor, err)
+			service.Errorf("Command failed: %v", err)
 		}
 	}
 
 	// Display the output
 	if len(output) > 0 {
-		fmt.Printf(cmdOutputColor+"%s\n"+resetColor, output)
+		// shell output color
+		fmt.Printf(data.ShellOutputColor+"%s\n"+data.ResetSeq, output)
 	}
-	fmt.Print(resetColor) // Reset color after command output
 }
 
 func GenerateChatFileName() string {

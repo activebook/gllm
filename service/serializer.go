@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/activebook/gllm/data"
 	anthropic "github.com/anthropics/anthropic-sdk-go"
 	openai "github.com/sashabaranov/go-openai"
 	gemini "google.golang.org/genai"
@@ -21,22 +22,22 @@ var (
 func init() {
 	// Initialize the maps after the color variables are populated by color.go's init()
 	RoleColors = map[string]string{
-		"system":    roleSystemColor,
-		"user":      roleUserColor,
-		"assistant": roleAssistantColor,
-		"model":     roleAssistantColor,
-		"function":  toolCallColor,
-		"tool":      toolCallColor,
+		"system":    data.RoleSystemColor,
+		"user":      data.RoleUserColor,
+		"assistant": data.RoleAssistantColor,
+		"model":     data.RoleAssistantColor,
+		"function":  data.ToolCallColor,
+		"tool":      data.ToolCallColor,
 	}
 
 	ContentTypeColors = map[string]string{
-		"function_call":     toolCallColor,
-		"function_response": toolResponseColor,
-		"image":             mediaColor,
-		"file_data":         mediaColor,
-		"reasoning":         reasoningColor,
-		"reasoning_content": inReasoningColor,
-		"reset":             resetColor,
+		"function_call":     data.ToolCallColor,
+		"function_response": data.ToolResponseColor,
+		"image":             data.MediaColor,
+		"file_data":         data.MediaColor,
+		"reasoning":         data.ReasoningActiveColor,
+		"reasoning_content": data.ReasoningDoneColor,
+		"reset":             data.ResetSeq,
 	}
 }
 
@@ -122,10 +123,10 @@ func DetectAnthropicKeyMessage(msg *anthropic.MessageParam) bool {
  * Anthropic: Anthropic messages that are unique to Anthropic
  * Gemini: Gemini messages that are unique to Gemini
  */
-func DetectMessageProvider(data []byte) string {
+func DetectMessageProvider(input []byte) string {
 	// Try to unmarshal as array of messages
 	var messages []json.RawMessage
-	if err := json.Unmarshal(data, &messages); err != nil {
+	if err := json.Unmarshal(input, &messages); err != nil {
 		return ModelProviderUnknown
 	}
 
@@ -207,7 +208,7 @@ func styleEachRune(text string, color string, indent string) string {
 	// trim leading and trailing newlines
 	text = strings.Trim(text, "\n")
 	var sb strings.Builder
-	reset := resetColor
+	reset := data.ResetSeq
 	lines := strings.Split(text, "\n")
 	for i, line := range lines {
 		if i > 0 {
@@ -236,16 +237,16 @@ func indentText(text string, indent string) string {
 }
 
 // RenderGeminiConversationLog returns a string summary of Gemini conversation
-func RenderGeminiConversationLog(data []byte) string {
+func RenderGeminiConversationLog(input []byte) string {
 	var sb strings.Builder
 	var messages []gemini.Content
-	if err := json.Unmarshal(data, &messages); err != nil {
+	if err := json.Unmarshal(input, &messages); err != nil {
 		return fmt.Sprintf("Error parsing Gemini messages: %v\n", err)
 	}
 
 	// Summary section
 	sb.WriteString("Summary:\n")
-	sb.WriteString(fmt.Sprintf("  %sMessages: %d%s\n", resetColor, len(messages), resetColor))
+	sb.WriteString(fmt.Sprintf("  %sMessages: %d%s\n", data.ResetSeq, len(messages), data.ResetSeq))
 
 	var userCount, modelCount, functionCallCount, functionResponseCount, imageCount, fileCount int
 	for _, msg := range messages {
@@ -272,19 +273,19 @@ func RenderGeminiConversationLog(data []byte) string {
 		}
 	}
 
-	sb.WriteString(fmt.Sprintf("  %sUser messages: %d%s\n", RoleColors["user"], userCount, resetColor))
-	sb.WriteString(fmt.Sprintf("  %sModel responses: %d%s\n", RoleColors["model"], modelCount, resetColor))
+	sb.WriteString(fmt.Sprintf("  %sUser messages: %d%s\n", RoleColors["user"], userCount, data.ResetSeq))
+	sb.WriteString(fmt.Sprintf("  %sModel responses: %d%s\n", RoleColors["model"], modelCount, data.ResetSeq))
 	if functionCallCount > 0 {
-		sb.WriteString(fmt.Sprintf("  %sFunction calls: %d%s\n", ContentTypeColors["function_call"], functionCallCount, resetColor))
+		sb.WriteString(fmt.Sprintf("  %sFunction calls: %d%s\n", ContentTypeColors["function_call"], functionCallCount, data.ResetSeq))
 	}
 	if functionResponseCount > 0 {
-		sb.WriteString(fmt.Sprintf("  %sFunction responses: %d%s\n", ContentTypeColors["function_response"], functionResponseCount, resetColor))
+		sb.WriteString(fmt.Sprintf("  %sFunction responses: %d%s\n", ContentTypeColors["function_response"], functionResponseCount, data.ResetSeq))
 	}
 	if imageCount > 0 {
-		sb.WriteString(fmt.Sprintf("  %sImages: %d%s\n", ContentTypeColors["image"], imageCount, resetColor))
+		sb.WriteString(fmt.Sprintf("  %sImages: %d%s\n", ContentTypeColors["image"], imageCount, data.ResetSeq))
 	}
 	if fileCount > 0 {
-		sb.WriteString(fmt.Sprintf("  %sFiles: %d%s\n", ContentTypeColors["file_data"], fileCount, resetColor))
+		sb.WriteString(fmt.Sprintf("  %sFiles: %d%s\n", ContentTypeColors["file_data"], fileCount, data.ResetSeq))
 	}
 
 	// Conversation content
@@ -296,7 +297,7 @@ func RenderGeminiConversationLog(data []byte) string {
 			if roleColor == "" {
 				roleColor = ""
 			}
-			sb.WriteString(fmt.Sprintf("  %s%s%s: ", roleColor, msg.Role, resetColor))
+			sb.WriteString(fmt.Sprintf("  %s%s%s: ", roleColor, msg.Role, data.ResetSeq))
 
 			if len(msg.Parts) > 0 {
 				for j, part := range msg.Parts {
@@ -305,21 +306,21 @@ func RenderGeminiConversationLog(data []byte) string {
 					}
 					switch {
 					case part.FunctionCall != nil:
-						sb.WriteString(fmt.Sprintf("\n    %s[Function call: %s]%s", ContentTypeColors["function_call"], part.FunctionCall.Name, resetColor))
+						sb.WriteString(fmt.Sprintf("\n    %s[Function call: %s]%s", ContentTypeColors["function_call"], part.FunctionCall.Name, data.ResetSeq))
 						if len(part.FunctionCall.Args) > 0 {
 							argStr, _ := json.MarshalIndent(part.FunctionCall.Args, "    ", "  ")
 							sb.WriteString(fmt.Sprintf("\n    args: %s", string(argStr)))
 						}
 					case part.FunctionResponse != nil:
-						sb.WriteString(fmt.Sprintf("\n    %s[Function response]%s", ContentTypeColors["function_response"], resetColor))
+						sb.WriteString(fmt.Sprintf("\n    %s[Function response]%s", ContentTypeColors["function_response"], data.ResetSeq))
 						respPreview, _ := json.MarshalIndent(part.FunctionResponse.Response, "    ", "  ")
 						sb.WriteString(fmt.Sprintf("\n    data: %s", string(respPreview)))
 					case part.InlineData != nil:
 						mimeType := part.InlineData.MIMEType
 						if strings.HasPrefix(mimeType, "image/") {
-							sb.WriteString(fmt.Sprintf("\n    %s[Image content]%s", ContentTypeColors["image"], resetColor))
+							sb.WriteString(fmt.Sprintf("\n    %s[Image content]%s", ContentTypeColors["image"], data.ResetSeq))
 						} else {
-							sb.WriteString(fmt.Sprintf("\n    %s[File]%s", ContentTypeColors["file_data"], resetColor))
+							sb.WriteString(fmt.Sprintf("\n    %s[File]%s", ContentTypeColors["file_data"], data.ResetSeq))
 						}
 					case part.Thought:
 						sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
@@ -342,16 +343,16 @@ func RenderGeminiConversationLog(data []byte) string {
 }
 
 // RenderOpenAIConversationLog returns a string summary of OpenAI conversation
-func RenderOpenAIConversationLog(data []byte) string {
+func RenderOpenAIConversationLog(input []byte) string {
 	var sb strings.Builder
 	var messages []openai.ChatCompletionMessage
-	if err := json.Unmarshal(data, &messages); err != nil {
+	if err := json.Unmarshal(input, &messages); err != nil {
 		return fmt.Sprintf("Error parsing OpenAI messages: %v\n", err)
 	}
 
 	// Summary section
 	sb.WriteString("Summary:\n")
-	sb.WriteString(fmt.Sprintf("  %sMessages: %d%s\n", resetColor, len(messages), resetColor))
+	sb.WriteString(fmt.Sprintf("  %sMessages: %d%s\n", data.ResetSeq, len(messages), data.ResetSeq))
 
 	var systemCount, userCount, assistantCount int
 	var functionCallCount, functionResponseCount, imageCount int
@@ -380,17 +381,17 @@ func RenderOpenAIConversationLog(data []byte) string {
 		}
 	}
 
-	sb.WriteString(fmt.Sprintf("  %sSystem messages: %d%s\n", RoleColors["system"], systemCount, resetColor))
-	sb.WriteString(fmt.Sprintf("  %sUser messages: %d%s\n", RoleColors["user"], userCount, resetColor))
-	sb.WriteString(fmt.Sprintf("  %sAssistant responses: %d%s\n", RoleColors["assistant"], assistantCount, resetColor))
+	sb.WriteString(fmt.Sprintf("  %sSystem messages: %d%s\n", RoleColors["system"], systemCount, data.ResetSeq))
+	sb.WriteString(fmt.Sprintf("  %sUser messages: %d%s\n", RoleColors["user"], userCount, data.ResetSeq))
+	sb.WriteString(fmt.Sprintf("  %sAssistant responses: %d%s\n", RoleColors["assistant"], assistantCount, data.ResetSeq))
 	if functionCallCount > 0 {
-		sb.WriteString(fmt.Sprintf("  %sFunction/tool calls: %d%s\n", ContentTypeColors["function_call"], functionCallCount, resetColor))
+		sb.WriteString(fmt.Sprintf("  %sFunction/tool calls: %d%s\n", ContentTypeColors["function_call"], functionCallCount, data.ResetSeq))
 	}
 	if functionResponseCount > 0 {
-		sb.WriteString(fmt.Sprintf("  %sFunction/tool responses: %d%s\n", ContentTypeColors["function_response"], functionResponseCount, resetColor))
+		sb.WriteString(fmt.Sprintf("  %sFunction/tool responses: %d%s\n", ContentTypeColors["function_response"], functionResponseCount, data.ResetSeq))
 	}
 	if imageCount > 0 {
-		sb.WriteString(fmt.Sprintf("  %sImages: %d%s\n", ContentTypeColors["image"], imageCount, resetColor))
+		sb.WriteString(fmt.Sprintf("  %sImages: %d%s\n", ContentTypeColors["image"], imageCount, data.ResetSeq))
 	}
 
 	// Conversation content
@@ -402,7 +403,7 @@ func RenderOpenAIConversationLog(data []byte) string {
 			if roleColor == "" {
 				roleColor = ""
 			}
-			sb.WriteString(fmt.Sprintf("  %s%s%s", roleColor, msg.Role, resetColor))
+			sb.WriteString(fmt.Sprintf("  %s%s%s", roleColor, msg.Role, data.ResetSeq))
 
 			if msg.Name != "" {
 				sb.WriteString(fmt.Sprintf(" (%s)", msg.Name))
@@ -431,7 +432,7 @@ func RenderOpenAIConversationLog(data []byte) string {
 						sb.WriteString(fmt.Sprintf("\n    %s", indentText(item.Text, "    ")))
 					}
 					if item.Type == "image_url" {
-						sb.WriteString(fmt.Sprintf("\n    %simage%s", ContentTypeColors["image"], resetColor))
+						sb.WriteString(fmt.Sprintf("\n    %simage%s", ContentTypeColors["image"], data.ResetSeq))
 					}
 				}
 				// sb.WriteString("\n    ")
@@ -439,7 +440,7 @@ func RenderOpenAIConversationLog(data []byte) string {
 
 			// Function call details
 			if msg.FunctionCall != nil {
-				sb.WriteString(fmt.Sprintf("\n    %s[Function call: %s]%s", ContentTypeColors["function_call"], msg.FunctionCall.Name, resetColor))
+				sb.WriteString(fmt.Sprintf("\n    %s[Function call: %s]%s", ContentTypeColors["function_call"], msg.FunctionCall.Name, data.ResetSeq))
 				if msg.FunctionCall.Arguments != "" {
 					sb.WriteString(fmt.Sprintf(" args: %s", msg.FunctionCall.Arguments))
 				}
@@ -454,12 +455,12 @@ func RenderOpenAIConversationLog(data []byte) string {
 					}
 					sb.WriteString(fmt.Sprintf("%s (id: %s)", tool.Function.Name, tool.ID))
 				}
-				sb.WriteString(fmt.Sprintf("]%s", resetColor))
+				sb.WriteString(fmt.Sprintf("]%s", data.ResetSeq))
 			}
 
 			// Tool response details
 			if msg.ToolCallID != "" {
-				sb.WriteString(fmt.Sprintf("\n    %s[Response to tool call: %s]%s", ContentTypeColors["function_response"], msg.ToolCallID, resetColor))
+				sb.WriteString(fmt.Sprintf("\n    %s[Response to tool call: %s]%s", ContentTypeColors["function_response"], msg.ToolCallID, data.ResetSeq))
 			}
 
 			sb.WriteString("\n\n")
@@ -469,16 +470,16 @@ func RenderOpenAIConversationLog(data []byte) string {
 }
 
 // RenderAnthropicConversationLog returns a string summary of Anthropic conversation
-func RenderAnthropicConversationLog(data []byte) string {
+func RenderAnthropicConversationLog(input []byte) string {
 	var sb strings.Builder
 	var messages []anthropic.MessageParam
-	if err := json.Unmarshal(data, &messages); err != nil {
+	if err := json.Unmarshal(input, &messages); err != nil {
 		return fmt.Sprintf("Error parsing Anthropic messages: %v\n", err)
 	}
 
 	// Summary section
 	sb.WriteString("Summary:\n")
-	sb.WriteString(fmt.Sprintf("  %sMessages: %d%s\n", resetColor, len(messages), resetColor))
+	sb.WriteString(fmt.Sprintf("  %sMessages: %d%s\n", data.ResetSeq, len(messages), data.ResetSeq))
 
 	var userCount, assistantCount int
 	var toolUseCount, toolResultCount int
@@ -500,13 +501,13 @@ func RenderAnthropicConversationLog(data []byte) string {
 		}
 	}
 
-	sb.WriteString(fmt.Sprintf("  %sUser messages: %d%s\n", RoleColors["user"], userCount, resetColor))
-	sb.WriteString(fmt.Sprintf("  %sAssistant messages: %d%s\n", RoleColors["assistant"], assistantCount, resetColor))
+	sb.WriteString(fmt.Sprintf("  %sUser messages: %d%s\n", RoleColors["user"], userCount, data.ResetSeq))
+	sb.WriteString(fmt.Sprintf("  %sAssistant messages: %d%s\n", RoleColors["assistant"], assistantCount, data.ResetSeq))
 	if toolUseCount > 0 {
-		sb.WriteString(fmt.Sprintf("  %sTool uses: %d%s\n", ContentTypeColors["function_call"], toolUseCount, resetColor))
+		sb.WriteString(fmt.Sprintf("  %sTool uses: %d%s\n", ContentTypeColors["function_call"], toolUseCount, data.ResetSeq))
 	}
 	if toolResultCount > 0 {
-		sb.WriteString(fmt.Sprintf("  %sTool results: %d%s\n", ContentTypeColors["function_response"], toolResultCount, resetColor))
+		sb.WriteString(fmt.Sprintf("  %sTool results: %d%s\n", ContentTypeColors["function_response"], toolResultCount, data.ResetSeq))
 	}
 
 	// Conversation content
@@ -518,9 +519,9 @@ func RenderAnthropicConversationLog(data []byte) string {
 			// Color
 			roleColor := RoleColors[role]
 			if roleColor == "" {
-				roleColor = resetColor
+				roleColor = data.ResetSeq
 			}
-			sb.WriteString(fmt.Sprintf("  %s%s%s: ", roleColor, role, resetColor))
+			sb.WriteString(fmt.Sprintf("  %s%s%s: ", roleColor, role, data.ResetSeq))
 
 			for j, block := range msg.Content {
 				if j > 0 {
@@ -533,7 +534,7 @@ func RenderAnthropicConversationLog(data []byte) string {
 					}
 					sb.WriteString(indentText(v.Text, "    "))
 				} else if v := block.OfImage; v != nil {
-					sb.WriteString(fmt.Sprintf("\n    %s[Image]%s", ContentTypeColors["image"], resetColor))
+					sb.WriteString(fmt.Sprintf("\n    %s[Image]%s", ContentTypeColors["image"], data.ResetSeq))
 				} else if v := block.OfThinking; v != nil {
 					sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 					sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(v.Thinking, ContentTypeColors["reasoning_content"], "    ")))
@@ -543,12 +544,12 @@ func RenderAnthropicConversationLog(data []byte) string {
 					sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(v.Data, ContentTypeColors["reasoning_content"], "    ")))
 					sb.WriteString(fmt.Sprintf("\n    %s✓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 				} else if v := block.OfToolUse; v != nil {
-					sb.WriteString(fmt.Sprintf("\n    %s[Tool Use: %s]%s", ContentTypeColors["function_call"], v.Name, resetColor))
+					sb.WriteString(fmt.Sprintf("\n    %s[Tool Use: %s]%s", ContentTypeColors["function_call"], v.Name, data.ResetSeq))
 					// Input
 					inputJSON, _ := json.MarshalIndent(v.Input, "    ", "  ")
 					sb.WriteString(fmt.Sprintf("\n    input: %s", string(inputJSON)))
 				} else if v := block.OfToolResult; v != nil {
-					sb.WriteString(fmt.Sprintf("\n    %s[Tool Result: ID=%s]%s", ContentTypeColors["function_response"], v.ToolUseID, resetColor))
+					sb.WriteString(fmt.Sprintf("\n    %s[Tool Result: ID=%s]%s", ContentTypeColors["function_response"], v.ToolUseID, data.ResetSeq))
 					// Content
 					contentJSON, _ := json.MarshalIndent(v.Content, "    ", "  ")
 					sb.WriteString(fmt.Sprintf("\n    content: %s", string(contentJSON)))

@@ -227,11 +227,11 @@ func (e *SubAgentExecutor) Execute(timeout time.Duration) []SubAgentResult {
 
 			switch te.result.Status {
 			case StatusCompleted:
-				fmt.Printf("%s✓ > Task completed (%d/%d): %s%s\n", successColor, dones, total, te.task.TaskKey, resetColor)
+				fmt.Printf("%s✓ > Task completed (%d/%d): %s%s\n", data.StatusSuccessColor, dones, total, te.task.TaskKey, data.ResetSeq)
 			case StatusFailed:
-				fmt.Printf("%s✗ > Task failed (%d/%d): %s - %v%s\n", errorColor, dones, total, te.task.TaskKey, te.result.Error, resetColor)
+				fmt.Printf("%s✗ > Task failed (%d/%d): %s - %v%s\n", data.StatusErrorColor, dones, total, te.task.TaskKey, te.result.Error, data.ResetSeq)
 			case StatusCancelled:
-				fmt.Printf("%s! > Task cancelled (%d/%d): %s%s\n", warnColor, dones, total, te.task.TaskKey, resetColor)
+				fmt.Printf("%s! > Task cancelled (%d/%d): %s%s\n", data.StatusWarnColor, dones, total, te.task.TaskKey, data.ResetSeq)
 			}
 
 			// Mark task as completed and broadcast to waiting tasks

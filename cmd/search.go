@@ -28,7 +28,7 @@ You can switch to use which search engine.`,
 		defaultEngine := agent.Search.Name
 		fmt.Println()
 		if defaultEngine != "" {
-			fmt.Printf("Current search engine set to %s\n", switchOnColor+defaultEngine+resetColor)
+			fmt.Printf("Current search engine set to %s%s%s\n", data.SwitchOnColor, defaultEngine, data.ResetSeq)
 		} else {
 			fmt.Println("No search engine set.")
 		}
@@ -369,7 +369,7 @@ var searchListCmd = &cobra.Command{
 		// Update the list command to show default status
 		defaultEngine := GetEffectSearchEngineName()
 		if defaultEngine != "" {
-			fmt.Printf("Current search engine set to %s\n", switchOnColor+defaultEngine+resetColor)
+			fmt.Printf("Current search engine set to %s%s%s%s%s\n", data.SwitchOnColor, defaultEngine, data.ResetSeq, "", "")
 		} else {
 			fmt.Println("No search engine set.")
 		}

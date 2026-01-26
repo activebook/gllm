@@ -370,16 +370,16 @@ func init() {
 // printSkillMeta prints a skill in a formatted way
 func printSkillMeta(skill data.SkillMetadata) {
 	settingsStore := data.GetSettingsStore()
-	status := greenColor("Enabled")
+	status := data.SwitchOnColor + "Enabled" + data.ResetSeq
 	if settingsStore.IsSkillDisabled(skill.Name) {
-		status = grayColor("Disabled")
+		status = data.SwitchOffColor + "Disabled" + data.ResetSeq
 	}
 	fmt.Printf("  %s [%s]\n", skill.Name, status)
 	if skill.Description != "" {
 		lines := strings.Split(skill.Description, "\n")
 		for _, line := range lines {
 			if strings.TrimSpace(line) != "" {
-				fmt.Printf("  %s\n", grayColor(line))
+				fmt.Printf("  %s%s%s\n", data.DetailColor, line, data.ResetSeq)
 			}
 		}
 	}

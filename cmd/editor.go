@@ -197,12 +197,12 @@ func listAvailableEditors() {
 			indicator := "  "
 			pname := fmt.Sprintf("%-14s", editor)
 			if editor == current {
-				indicator = highlightColor("* ")
-				pname = highlightColor(pname)
+				indicator = data.HighlightColor + "* " + data.ResetSeq
+				pname = data.HighlightColor + pname + data.ResetSeq
 			}
-			fmt.Printf("%s%s %s\n", indicator, pname, greenColor("(installed)"))
+			fmt.Printf("%s%s %s%s%s\n", indicator, pname, data.SwitchOnColor, "(installed)", data.ResetSeq)
 		} else {
-			fmt.Printf("  %-14s %s\n", editor, grayColor("(not found)"))
+			fmt.Printf("  %-14s %s%s%s\n", editor, data.SwitchOffColor, "(not found)", data.ResetSeq)
 		}
 	}
 

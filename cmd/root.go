@@ -217,6 +217,9 @@ func initConfig() {
 		return
 	}
 
+	// Load the configured theme (or default to Dracula if not set)
+	data.LoadTheme(data.GetThemeFromConfig())
+
 	// *** Placeholder for Log Configuration ***
 	// We will add log setup based on Viper settings later.
 	setupLogging()

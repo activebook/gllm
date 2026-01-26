@@ -82,8 +82,8 @@ var agentListCmd = &cobra.Command{
 			// change color for selected agent
 			prefix := "  "
 			if name == activeAgentName {
-				prefix = highlightColor("* ")
-				name = highlightColor(name)
+				prefix = data.SwitchOnColor + "* " + data.ResetSeq
+				name = data.SwitchOnColor + name + data.ResetSeq
 			}
 			fmt.Printf("%s%s\n", prefix, name)
 		}

@@ -513,7 +513,7 @@ It writes a status message to both Std and OutputFile if they are available.
 */
 func (ag *Agent) StartReasoning() {
 	if ag.Std != nil {
-		ag.Std.Writeln(reasoningColor + "Thinking ↓")
+		ag.Std.Writeln(data.ReasoningActiveColor + "Thinking ↓")
 	}
 	if ag.OutputFile != nil {
 		ag.OutputFile.Writeln("Thinking ↓")
@@ -522,7 +522,7 @@ func (ag *Agent) StartReasoning() {
 
 func (ag *Agent) CompleteReasoning() {
 	if ag.Std != nil {
-		ag.Std.Writeln(resetColor + reasoningColor + "✓" + resetColor)
+		ag.Std.Writeln(data.ResetSeq + data.ReasoningActiveColor + "✓" + data.ResetSeq)
 	}
 	if ag.OutputFile != nil {
 		ag.OutputFile.Writeln("✓")
@@ -534,7 +534,7 @@ WriteReasoning writes the provided reasoning text to both the standard output an
 */
 func (ag *Agent) WriteReasoning(text string) {
 	if ag.Std != nil {
-		ag.Std.Writef("%s%s", inReasoningColor, text)
+		ag.Std.Writef("%s%s", data.ReasoningDoneColor, text)
 		ag.LastWrittenData = text
 	}
 	if ag.OutputFile != nil {
@@ -578,8 +578,8 @@ func (ag *Agent) WriteFunctionCall(text string) {
 			Args     interface{} `json:"args"`
 		}
 
-		var data ToolCallData
-		err := json.Unmarshal([]byte(text), &data)
+		var toolData ToolCallData
+		err := json.Unmarshal([]byte(text), &toolData)
 
 		var output string
 		if err == nil {
@@ -590,12 +590,12 @@ func (ag *Agent) WriteFunctionCall(text string) {
 			// Use lipgloss to render
 			style := lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color(hexToolResponse)).
+				BorderForeground(lipgloss.Color(data.CurrentTheme.Magenta)). // ToolResponseColor equivalent (Magenta)
 				Padding(0, 1).
 				Margin(0, 0)
 
 			titleStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color(hexToolCall)).
+				Foreground(lipgloss.Color(data.CurrentTheme.Cyan)). // ToolCallColor equivalent (Cyan)
 				Bold(true)
 
 			argsStyle := lipgloss.NewStyle().
@@ -605,7 +605,7 @@ func (ag *Agent) WriteFunctionCall(text string) {
 
 			// For built-in tools, we have a map of args
 			// We will try to extract purpose/description and command separately
-			if argsMap, ok := data.Args.(map[string]interface{}); ok {
+			if argsMap, ok := toolData.Args.(map[string]interface{}); ok {
 				// 1. Identify Purpose
 				// MCP tool calls may not have purpose/description
 				var purposeVal string
@@ -648,7 +648,7 @@ func (ag *Agent) WriteFunctionCall(text string) {
 				purposeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Width(tcol) // Grey, wrapped
 
 				var parts []string
-				parts = append(parts, titleStyle.Render(data.Function))
+				parts = append(parts, titleStyle.Render(toolData.Function))
 
 				if commandVal != "" {
 					parts = append(parts, cmdStyle.Render(commandVal))
@@ -665,19 +665,19 @@ func (ag *Agent) WriteFunctionCall(text string) {
 			if content == "" {
 				// Convert Args back to string for display
 				var argsStr string
-				if s, ok := data.Args.(string); ok {
+				if s, ok := toolData.Args.(string); ok {
 					argsStr = s
 				} else {
-					bytes, _ := json.MarshalIndent(data.Args, "", "  ")
+					bytes, _ := json.MarshalIndent(toolData.Args, "", "  ")
 					argsStr = string(bytes)
 				}
-				content = fmt.Sprintf("%s\n%s", titleStyle.Render(data.Function), argsStyle.Render(argsStr))
+				content = fmt.Sprintf("%s\n%s", titleStyle.Render(toolData.Function), argsStyle.Render(argsStr))
 			}
 
 			output = style.Render(content)
 		} else {
 			// Fallback to original text if not JSON
-			output = inCallingColor + text + resetColor
+			output = data.ToolCallColor + text + data.ResetSeq
 		}
 
 		ag.Std.Writeln(output)
@@ -693,7 +693,7 @@ func (ag *Agent) WriteEnd() {
 	//if ag.Std != nil && ag.Markdown == nil && ag.TokenUsage == nil {
 	if ag.Std != nil {
 		if !EndWithNewline(ag.LastWrittenData) {
-			ag.Std.Writeln(resetColor)
+			ag.Std.Writeln(data.ResetSeq)
 		}
 	}
 }
