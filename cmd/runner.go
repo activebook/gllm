@@ -92,7 +92,6 @@ func RunAgent(prompt string, files []*service.FileData, convoName string, yolo b
 			SysPrompt:     sysPrompt,
 			Files:         files,
 			ModelInfo:     &agent.Model,
-			SearchEngine:  &agent.Search,
 			MaxRecursions: agent.MaxRecursions,
 			ThinkingLevel: agent.Think,
 			EnabledTools:  agent.Tools,

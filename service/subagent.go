@@ -441,7 +441,6 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 		SysPrompt:     sysPrompt,
 		Files:         nil,
 		ModelInfo:     &agentConfig.Model,
-		SearchEngine:  &agentConfig.Search,
 		MaxRecursions: agentConfig.MaxRecursions,
 		ThinkingLevel: agentConfig.Think,
 		EnabledTools:  agentConfig.Tools,

@@ -112,7 +112,6 @@ var agentAddCmd = &cobra.Command{
 			model         string
 			tools         []string
 			think         string
-			search        string
 			template      string
 			sysPrompt     string
 			maxRecursions string
@@ -150,15 +149,6 @@ var agentAddCmd = &cobra.Command{
 			sysPromptOptions = append(sysPromptOptions, huh.NewOption(s, s))
 		}
 		SortOptions(sysPromptOptions, "")
-
-		// Search Engines
-		engines := store.GetSearchEngines()
-		var searchOptions []huh.Option[string]
-		searchOptions = append(searchOptions, huh.NewOption("None", ""))
-		for s := range engines {
-			searchOptions = append(searchOptions, huh.NewOption(s, s))
-		}
-		SortOptions(searchOptions, "")
 
 		// Tools
 		toolsList := service.GetAllEmbeddingTools()
@@ -242,20 +232,6 @@ var agentAddCmd = &cobra.Command{
 			return
 		}
 
-		// Search Engine
-		err = huh.NewForm(
-			huh.NewGroup(
-				huh.NewSelect[string]().
-					Title("Search Engine").
-					Description("The search engine to use for web search capabilities").
-					Options(searchOptions...).
-					Value(&search),
-			),
-		).Run()
-		if err != nil {
-			return
-		}
-
 		// Tools
 		err = huh.NewForm(
 			huh.NewGroup(
@@ -317,7 +293,8 @@ var agentAddCmd = &cobra.Command{
 				huh.NewOption("Enable MCP Servers", service.CapabilityMCPServers).Selected(false),
 				huh.NewOption("Enable Agent Skills", service.CapabilityAgentSkills).Selected(false),
 				huh.NewOption("Enable Agent Memory", service.CapabilityAgentMemory).Selected(false),
-				huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(false)).
+				huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(false),
+				huh.NewOption("Enable Web Search", service.CapabilityWebSearch).Selected(false)).
 			Value(&capabilities)
 		featureNote := GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
 		err = huh.NewForm(
@@ -343,7 +320,6 @@ var agentAddCmd = &cobra.Command{
 			Tools:         tools,
 			Capabilities:  capabilities,
 			Think:         think,
-			Search:        data.SearchEngine{Name: search},
 			Template:      template,
 			SystemPrompt:  sysPrompt,
 			MaxRecursions: recursionVal,
@@ -408,7 +384,6 @@ var agentSetCmd = &cobra.Command{
 		// Form variables populated with existing config
 		var (
 			model         string
-			search        string
 			tools         []string
 			think         string
 			template      string
@@ -419,7 +394,6 @@ var agentSetCmd = &cobra.Command{
 
 		// Access typed struct fields directly - no type assertions needed!
 		model = agent.Model.Name
-		search = agent.Search.Name
 		tools = agent.Tools
 		think = agent.Think
 		template = agent.Template
@@ -456,14 +430,6 @@ var agentSetCmd = &cobra.Command{
 			sysPromptOptions = append(sysPromptOptions, huh.NewOption(s, s))
 		}
 		SortOptions(sysPromptOptions, sysPrompt)
-
-		engines := store.GetSearchEngines()
-		var searchOptions []huh.Option[string]
-		searchOptions = append(searchOptions, huh.NewOption("None", " "))
-		for s := range engines {
-			searchOptions = append(searchOptions, huh.NewOption(s, s))
-		}
-		SortOptions(searchOptions, search)
 
 		// Tools - build options with pre-selected state
 		toolsList := service.GetAllEmbeddingTools()
@@ -536,20 +502,6 @@ var agentSetCmd = &cobra.Command{
 			return
 		}
 
-		// Search
-		err = huh.NewForm(
-			huh.NewGroup(
-				huh.NewSelect[string]().
-					Title("Search Engine").
-					Description("The search engine to use for web search capabilities").
-					Options(searchOptions...).
-					Value(&search),
-			),
-		).Run()
-		if err != nil {
-			return
-		}
-
 		// Tools
 		err = huh.NewForm(
 			huh.NewGroup(
@@ -606,6 +558,7 @@ var agentSetCmd = &cobra.Command{
 			huh.NewOption("Enable Agent Skills", service.CapabilityAgentSkills).Selected(capsSet[service.CapabilityAgentSkills]),
 			huh.NewOption("Enable Agent Memory", service.CapabilityAgentMemory).Selected(capsSet[service.CapabilityAgentMemory]),
 			huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(capsSet[service.CapabilitySubAgents]),
+			huh.NewOption("Enable Web Search", service.CapabilityWebSearch).Selected(capsSet[service.CapabilityWebSearch]),
 		}
 		SortMultiOptions(capsOpts, capabilities)
 		msfeatures := huh.NewMultiSelect[string]().
@@ -640,7 +593,6 @@ var agentSetCmd = &cobra.Command{
 		// Why set " " in the form: huh has a bug, without space, the sort doesn't work
 		template = strings.TrimSpace(template)
 		sysPrompt = strings.TrimSpace(sysPrompt)
-		search = strings.TrimSpace(search)
 
 		agentConfig := &data.AgentConfig{
 			Name:          name,
@@ -648,7 +600,6 @@ var agentSetCmd = &cobra.Command{
 			Tools:         tools,
 			Capabilities:  capabilities,
 			Think:         think,
-			Search:        data.SearchEngine{Name: search},
 			Template:      template,
 			SystemPrompt:  sysPrompt,
 			MaxRecursions: recursionVal,
@@ -839,12 +790,6 @@ func init() {
 	agentCmd.AddCommand(agentRemoveCmd)
 	agentCmd.AddCommand(agentSwitchCmd)
 	agentCmd.AddCommand(agentInfoCmd)
-
-	// Note: We removed flags for interactive commands, but we could keep them for scripting if needed.
-	// agentAddCmd flags
-
-	// agentSetCmd flags
-
 }
 
 // NOTE: getToolsFromConfig is no longer needed - data.AgentConfig.Tools is already []string
@@ -884,8 +829,6 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 	} else {
 		fmt.Printf("%sTemplate: \n", spaceholder)
 	}
-
-	fmt.Printf("%sSearch: %s\n", spaceholder, agent.Search.Name)
 
 	toolsSlice := ""
 	for _, tool := range agent.Tools {

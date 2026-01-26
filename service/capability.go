@@ -7,6 +7,7 @@ const (
 	CapabilityTokenUsage  = "token_usage"
 	CapabilityMarkdown    = "markdown_output"
 	CapabilitySubAgents   = "sub_agents"
+	CapabilityWebSearch   = "web_search"
 )
 
 /*
@@ -129,4 +130,19 @@ func EnableAgentMemory(capabilities []string) []string {
 
 func DisableAgentMemory(capabilities []string) []string {
 	return disableCapability(capabilities, CapabilityAgentMemory)
+}
+
+/*
+ * Web Search
+ */
+func IsWebSearchEnabled(capabilities []string) bool {
+	return isCapabilityEnabled(capabilities, CapabilityWebSearch)
+}
+
+func EnableWebSearch(capabilities []string) []string {
+	return enableCapability(capabilities, CapabilityWebSearch)
+}
+
+func DisableWebSearch(capabilities []string) []string {
+	return disableCapability(capabilities, CapabilityWebSearch)
 }

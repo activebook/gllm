@@ -136,10 +136,16 @@ func (ag *Agent) GenerateGeminiStream() error {
 	// - If UseCodeTool is true, enable code execution.
 	// - If UseTools is false but MCP client exists, enable MCP-only tools.
 	// Function tools and Google Search cannot be enabled simultaneously.
-	if len(ag.EnabledTools) > 0 {
+	if ag.SearchEngine.UseSearch {
+		// only load search tool
+		// **Remember: google doesn't support web_search tool plus function call
+		// Function call is not compatible with Google Search tool
+		config.Tools = append(config.Tools, ga.getGeminiWebSearchTool())
+	} else if len(ag.EnabledTools) > 0 {
 		// load embedding tools (include MCP if available)
 		includeMCP := ag.MCPClient != nil
 		config.Tools = append(config.Tools, ga.getGeminiEmbeddingTools(includeMCP))
+		// Check whether to show warning message
 		if ag.SearchEngine.UseSearch {
 			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
 			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn,
@@ -148,11 +154,6 @@ func (ag *Agent) GenerateGeminiStream() error {
 					" so Google Search is unavailable now.\n" +
 					"Please disable tools if you want to use Google Search.")}, nil)
 		}
-	} else if ag.SearchEngine.UseSearch {
-		// only load search tool
-		// **Remember: google doesn't support web_search tool plus function call
-		// Function call is not compatible with Google Search tool
-		config.Tools = append(config.Tools, ga.getGeminiWebSearchTool())
 	} else if ag.UseCodeTool {
 		// Remember: CodeExecution and GoogleSearch cannot be enabled at the same time
 		config.Tools = append(config.Tools, ga.getGeminiCodeExecTool())

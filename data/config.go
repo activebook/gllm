@@ -14,15 +14,14 @@ import (
 // All fields are strongly typed - no interface{} leaks to other layers.
 // Named AgentConfig to avoid conflict with the runtime Agent struct in service/agent.go.
 type AgentConfig struct {
-	Name          string       // Name is the key in the agents map, not stored in YAML
-	Model         Model        // Model name reference
-	Tools         []string     // List of enabled tools
-	Capabilities  []string     // List of enabled capabilities (mcp, skills, usage, markdown, subagents)
-	Think         string       // Thinking level: off, low, medium, high
-	Search        SearchEngine // Search engine reference
-	Template      string       // Template reference
-	SystemPrompt  string       // System prompt reference
-	MaxRecursions int          // Maximum tool call recursions
+	Name          string   // Name is the key in the agents map, not stored in YAML
+	Model         Model    // Model name reference
+	Tools         []string // List of enabled tools
+	Capabilities  []string // List of enabled capabilities (mcp, skills, usage, markdown, subagents)
+	Think         string   // Thinking level: off, low, medium, high
+	Template      string   // Template reference
+	SystemPrompt  string   // System prompt reference
+	MaxRecursions int      // Maximum tool call recursions
 }
 
 // Model represents a model definition.
@@ -345,28 +344,6 @@ func (c *ConfigStore) GetSearchEngines() map[string]*SearchEngine {
 	return result
 }
 
-// getSearchEngineFromAgentMap returns a specific search engine by name.
-// for private use only
-func (c *ConfigStore) getSearchEngineFromAgentMap(m map[string]interface{}, name string) SearchEngine {
-	val, exists := m[name]
-	if !exists {
-		return SearchEngine{}
-	}
-
-	if name, ok := val.(string); ok {
-		name = strings.ToLower(name)
-		searchMap := c.v.GetStringMap("search_engines")
-		if searchConfig, ok := searchMap[name]; ok {
-			if configMap := toStringMap(searchConfig); configMap != nil {
-				return c.mapToSearchEngine(name, configMap)
-			}
-		}
-		// Return partial model if not found found (or just name)
-		return SearchEngine{Name: name}
-	}
-	return SearchEngine{}
-}
-
 // GetSearchEngine returns a specific search engine by name.
 func (c *ConfigStore) GetSearchEngine(name string) *SearchEngine {
 	name = strings.ToLower(name)
@@ -522,7 +499,6 @@ func (c *ConfigStore) parseAgentConfig(name string, config interface{}) *AgentCo
 		Name:          name,
 		Model:         c.getModelFromAgentMap(configMap, "model"),
 		Think:         getString(configMap, "think"),
-		Search:        c.getSearchEngineFromAgentMap(configMap, "search"),
 		Template:      getString(configMap, "template"),
 		SystemPrompt:  getString(configMap, "system_prompt"),
 		MaxRecursions: getInt(configMap, "max_recursions", 10),
@@ -540,7 +516,6 @@ func (c *ConfigStore) agentToMap(agent *AgentConfig) map[string]interface{} {
 		"tools":          agent.Tools,
 		"capabilities":   agent.Capabilities,
 		"think":          agent.Think,
-		"search":         agent.Search.Name,
 		"template":       agent.Template,
 		"system_prompt":  agent.SystemPrompt,
 		"max_recursions": agent.MaxRecursions,

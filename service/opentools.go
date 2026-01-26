@@ -228,6 +228,26 @@ func RemoveMemoryTools(tools []string) []string {
 	return tools
 }
 
+// AppendSearchTools appends search tools to the given tools slice if they are not already present.
+func AppendSearchTools(tools []string) []string {
+	for _, tool := range searchTools {
+		if !slices.Contains(tools, tool) {
+			tools = append(tools, tool)
+		}
+	}
+	return tools
+}
+
+// RemoveSearchTools removes search tools from the given tools slice.
+func RemoveSearchTools(tools []string) []string {
+	for _, tool := range searchTools {
+		tools = slices.DeleteFunc(tools, func(t string) bool {
+			return t == tool
+		})
+	}
+	return tools
+}
+
 // GetOpenEmbeddingToolsFiltered returns embedding tools filtered by the allowed list.
 // If allowedTools is nil or empty, returns all embedding tools.
 // Unknown tool names are gracefully ignored.
@@ -460,6 +480,28 @@ func getOpenEmbeddingTools() []*OpenTool {
 	}
 
 	tools = append(tools, &webFetchTool)
+
+	// Search tool
+	searchFunc := OpenFunctionDefinition{
+		Name:        "web_search",
+		Description: "Retrieve the most relevant and up-to-date information from the web.",
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"query": map[string]interface{}{
+					"type":        "string",
+					"description": "The search term or question to find information about.",
+				},
+			},
+			"required": []string{"query"},
+		},
+	}
+	searchTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &searchFunc,
+	}
+
+	tools = append(tools, &searchTool)
 
 	// Read file tool
 	readFileFunc := OpenFunctionDefinition{
@@ -748,61 +790,6 @@ func getOpenEmbeddingTools() []*OpenTool {
 	tools = append(tools, &readMultipleFilesTool)
 
 	// Edit file tool
-	// editFileFunc := OpenFunctionDefinition{
-	// 	Name:        "edit_file",
-	// 	Description: "Edit specific lines in a file. This tool allows adding, replacing, or deleting content at specific line numbers.",
-	// 	Parameters: map[string]interface{}{
-	// 		"type": "object",
-	// 		"properties": map[string]interface{}{
-	// 			"path": map[string]interface{}{
-	// 				"type":        "string",
-	// 				"description": "The path to the file to edit.",
-	// 			},
-	// 			"edits": map[string]interface{}{
-	// 				"type": "array",
-	// 				"items": map[string]interface{}{
-	// 					"type": "object",
-	// 					"properties": map[string]interface{}{
-	// 						"line": map[string]interface{}{
-	// 							"type":        "integer",
-	// 							"description": "The line number to edit (1-indexed). For add operations, this is the position where content will be inserted.",
-	// 						},
-	// 						"content": map[string]interface{}{
-	// 							"type":        "string",
-	// 							"description": "The new content for the line. Empty string to delete the line (unless operation is specified).",
-	// 						},
-	// 						"operation": map[string]interface{}{
-	// 							"type": "string",
-	// 							"description": "The operation to perform on the specified line (1-indexed):\n" +
-	// 								"- 'add' or '++' to insert content at the given line position (if line is greater than the number of lines, content is appended).\n" +
-	// 								"- 'delete' or '--' to remove the line.\n" +
-	// 								"- 'replace' or '==' to replace the line content.\n" +
-	// 								"If 'operation' is omitted, 'delete' is assumed when 'content' is empty, otherwise 'replace' is used.\n" +
-	// 								"Accepted values: 'add', 'delete', 'replace'.",
-	// 							"enum": []string{"add", "delete", "replace"},
-	// 						},
-	// 					},
-	// 					"required": []string{"line"},
-	// 				},
-	// 				"description": "Array of edits to apply to the file. Each edit specifies a line number and the operation to perform.",
-	// 			},
-	// 			"need_confirm": map[string]interface{}{
-	// 				"type": "boolean",
-	// 				"description": "Specifies whether to prompt the user for confirmation before editing the file. " +
-	// 					"This should always be true for safety.",
-	// 				"default": true,
-	// 			},
-	// 		},
-	// 		"required": []string{"path", "edits"},
-	// 	},
-	// }
-	// editFileTool := OpenTool{
-	// 	Type:     ToolTypeFunction,
-	// 	Function: &editFileFunc,
-	// }
-
-	// tools = append(tools, &editFileTool)
-
 	editFileFunc := OpenFunctionDefinition{
 		Name: "edit_file",
 		Description: "Apply targeted edits to a file using search-replace operations. " +
@@ -1226,29 +1213,6 @@ LLM should call with:
 	}
 
 	return &shellTool
-}
-
-func getOpenWebSearchTool() *OpenTool {
-	searchFunc := OpenFunctionDefinition{
-		Name:        "web_search",
-		Description: "Retrieve the most relevant and up-to-date information from the web.",
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"query": map[string]interface{}{
-					"type":        "string",
-					"description": "The search term or question to find information about.",
-				},
-			},
-			"required": []string{"query"},
-		},
-	}
-	searchTool := OpenTool{
-		Type:     ToolTypeFunction,
-		Function: &searchFunc,
-	}
-
-	return &searchTool
 }
 
 // MCPToolsToOpenTool converts an MCPTools struct to an OpenTool with proper JSON schema

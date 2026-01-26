@@ -144,12 +144,6 @@ func (ag *Agent) GenerateOpenAIStream() error {
 		tools = append(tools, embeddingTools...)
 	}
 	// OpenAI webtools and embedding tools are compatible
-	if ag.SearchEngine.UseSearch {
-		// Only add the search tool if general tools are not enabled,
-		// but the search flag is explicitly set.
-		searchTool := ag.getOpenAIWebSearchTool()
-		tools = append(tools, searchTool)
-	}
 	if ag.MCPClient != nil {
 		// Add MCP tools if MCP client is available
 		mcpTools := ag.getOpenAIMCPTools()
@@ -601,13 +595,6 @@ func (ag *Agent) getOpenAIEmbeddingTools() []openai.Tool {
 	}
 
 	return tools
-}
-
-// getOpenAIWebSearchTool returns the web search tool for OpenAI
-func (ag *Agent) getOpenAIWebSearchTool() openai.Tool {
-	// Get generic web search tool and convert it to OpenAI tool
-	genericTool := getOpenWebSearchTool()
-	return genericTool.ToOpenAITool()
 }
 
 func (ag *Agent) getOpenAIMCPTools() []openai.Tool {

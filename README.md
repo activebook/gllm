@@ -25,6 +25,7 @@
 - **Agentic Workflow**: Orchestrate sophisticated multi-agent behaviors using state-of-the-art models for parallel task execution and save context window.
 - **Agent Skills**: Support agent skills, switch skills on and off, and install from git or local path.
 - **@ Reference Support**: Reference files and directories directly in prompts using @ syntax for seamless context inclusion.
+- **Colorful Themes**: Supports hundreds of popular themes, compatible with light and dark modes, ANSI-color, and full true-color.
 - **Cross-platform Support**: gllm is available for macOS, Windows, and Linux, and easy to install and update.
 
 ---
@@ -376,6 +377,30 @@ Detailed instructions for the agent go here...
 ```
 
 You can also include a `scripts/` directory for helper scripts and a `resources/` directory for additional data files that the skill may reference.
+
+---
+
+## 🎨 Themes
+
+`gllm` supports hundreds of popular themes, compatible with light and dark modes, ANSI-color, and full true-color.
+
+### Manage Themes
+
+- **Show current theme and samples:**
+
+  ```sh
+  gllm theme
+  ```
+
+- **Switch to a different theme:**
+
+  ```sh
+  gllm theme switch
+  ```
+
+| Light mode VSCode Theme | Dark mode Dracula Theme |
+|:---:|:---:|
+| ![VSCode](screenshots/themes_1.png) | ![Dracula](screenshots/themes_2.png) |
 
 ---
 

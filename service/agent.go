@@ -82,18 +82,35 @@ func constructModelInfo(model *data.Model) *ModelInfo {
 	return &mi
 }
 
-func constructSearchEngine(searchEngine *data.SearchEngine) *SearchEngine {
+func constructSearchEngine(capabilities []string) *SearchEngine {
 	se := SearchEngine{}
 	se.Name = GetNoneSearchEngineName()
 	se.UseSearch = false
-	if searchEngine != nil && searchEngine.Name != "" && searchEngine.Name != GetNoneSearchEngineName() {
-		se.UseSearch = true
-		se.Name = searchEngine.Name
-		se.ApiKey = searchEngine.Config["key"]
-		se.CxKey = searchEngine.Config["cx"]
-		se.DeepDive = searchEngine.DeepDive
-		se.MaxReferences = searchEngine.Reference
+
+	if IsWebSearchEnabled(capabilities) {
+		// Get allowed search engine from settings
+		store := data.GetSettingsStore()
+		engineName := store.GetAllowedSearchEngine()
+
+		// If no engine set, try to default to Google if available, or just keep none
+		if engineName == "" {
+			engineName = GetDefaultSearchEngineName()
+		}
+
+		// Get engine config from config store
+		configStore := data.NewConfigStore()
+		engineConfig := configStore.GetSearchEngine(engineName)
+
+		if engineConfig != nil {
+			se.UseSearch = true
+			se.Name = engineConfig.Name
+			se.ApiKey = engineConfig.Config["key"]
+			se.CxKey = engineConfig.Config["cx"]
+			se.DeepDive = engineConfig.DeepDive
+			se.MaxReferences = engineConfig.Reference
+		}
 	}
+
 	Debugf("Search engine: %v, %v", se.Name, se.UseSearch)
 	return &se
 }
@@ -147,7 +164,6 @@ type AgentOptions struct {
 	SysPrompt     string
 	Files         []*FileData
 	ModelInfo     *data.Model
-	SearchEngine  *data.SearchEngine
 	MaxRecursions int
 	ThinkingLevel string
 	EnabledTools  []string // List of enabled embedding tools
@@ -168,8 +184,8 @@ func CallAgent(op *AgentOptions) error {
 	// Set up model settings
 	mi := constructModelInfo(op.ModelInfo)
 
-	// Set up search engine settings
-	se := constructSearchEngine(op.SearchEngine)
+	// Set up search engine settings based on capabilities
+	se := constructSearchEngine(op.Capabilities)
 	toolsUse := ToolsUse{AutoApprove: op.YoloMode}
 
 	// Set up code tool settings
@@ -277,6 +293,13 @@ func CallAgent(op *AgentOptions) error {
 		enabledTools = AppendSubagentTools(enabledTools)
 	} else {
 		enabledTools = RemoveSubagentTools(enabledTools)
+	}
+
+	// Web Search tool injection
+	if IsWebSearchEnabled(op.Capabilities) {
+		enabledTools = AppendSearchTools(enabledTools)
+	} else {
+		enabledTools = RemoveSearchTools(enabledTools)
 	}
 
 	ag := Agent{

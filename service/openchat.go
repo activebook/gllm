@@ -167,12 +167,6 @@ func (ag *Agent) GenerateOpenChatStream() error {
 		tools = append(tools, embeddingTools...)
 	}
 	// Openchat webtools and embedding tools are compatible
-	if ag.SearchEngine.UseSearch {
-		// Only add the search tool if general tools are not enabled,
-		// but the search flag is explicitly set.
-		searchTool := ag.getOpenChatWebSearchTool()
-		tools = append(tools, searchTool)
-	}
 	if ag.MCPClient != nil {
 		// Add MCP tools if MCP client is available
 		mcpTools := ag.getOpenChatMCPTools()
@@ -655,12 +649,6 @@ func (ag *Agent) getOpenChatEmbeddingTools() []*model.Tool {
 	}
 
 	return tools
-}
-
-func (ag *Agent) getOpenChatWebSearchTool() *model.Tool {
-	// Get generic web search tool and convert it to OpenChat tool
-	genericTool := getOpenWebSearchTool()
-	return genericTool.ToOpenChatTool()
 }
 
 func (ag *Agent) getOpenChatMCPTools() []*model.Tool {
