@@ -590,16 +590,16 @@ func (ag *Agent) WriteFunctionCall(text string) {
 			// Use lipgloss to render
 			style := lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color(data.CurrentTheme.Magenta)). // ToolResponseColor equivalent (Magenta)
+				BorderForeground(lipgloss.Color(data.BorderHex)). // Tool Border
 				Padding(0, 1).
 				Margin(0, 0)
 
 			titleStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color(data.CurrentTheme.Cyan)). // ToolCallColor equivalent (Cyan)
+				Foreground(lipgloss.Color(data.SectionHex)). // Tool Title
 				Bold(true)
 
 			argsStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("250")).Width(tcol) // Light Gray
+				Foreground(lipgloss.Color(data.DetailHex)).Width(tcol) // Tool Args
 
 			var content string
 
@@ -644,8 +644,8 @@ func (ag *Agent) WriteFunctionCall(text string) {
 				// Command -> White (With keys)
 				// Purpose -> Gray, Dim, Wrapped
 
-				cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("7")).Width(tcol)       // White
-				purposeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Width(tcol) // Grey, wrapped
+				cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.LabelHex)).Width(tcol)      // Cmd Label
+				purposeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.DetailHex)).Width(tcol) // Cmd Purpose
 
 				var parts []string
 				parts = append(parts, titleStyle.Render(toolData.Function))

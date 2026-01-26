@@ -71,6 +71,8 @@ var (
 	SectionColor     string
 	KeyColor         string
 	HighlightColor   string
+	ForegroundColor  string
+	BackgroundColor  string
 	LabelColor       string
 	DetailColor      string
 	ShellOutputColor string
@@ -145,7 +147,7 @@ func applyTheme(t goghthemes.Theme) {
 	StatusDebugColor = toAnsi(t.BrightBlack) // Gray
 
 	// 4. Reasoning
-	ReasoningActiveColor = toAnsi(t.BrightGreen)
+	ReasoningActiveColor = toAnsi(t.Green)
 	ReasoningDoneColor = toAnsi(t.BrightBlack) // Dimmed out
 
 	// Reasoning Levels (Heatmap style)
@@ -176,6 +178,8 @@ func applyTheme(t goghthemes.Theme) {
 	SectionColor = toAnsi(t.BrightCyan)
 	KeyColor = toAnsi(t.BrightMagenta)
 	HighlightColor = toAnsi(t.BrightGreen)
+	ForegroundColor = toAnsi(t.Foreground)
+	BackgroundColor = toAnsi(t.Background)
 	LabelColor = toAnsi(t.Foreground)
 	DetailColor = toAnsi(t.BrightBlack)
 	ShellOutputColor = toAnsi(t.BrightBlack)

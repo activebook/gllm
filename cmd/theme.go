@@ -11,14 +11,42 @@ func init() {
 	rootCmd.AddCommand(themeCmd)
 	themeCmd.AddCommand(themeListCmd)
 	themeCmd.AddCommand(themeSwitchCmd)
-	themeCmd.AddCommand(themePreviewCmd)
 }
 
 var themeCmd = &cobra.Command{
 	Use:   "theme",
 	Short: "Manage and switch themes",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Current Theme: %s\n", data.CurrentThemeName)
+		fmt.Printf("Current Theme: %s%s%s\n", data.HighlightColor, data.CurrentThemeName, data.ResetSeq)
+		fmt.Println()
+		fmt.Println("--- Theme Color Sample ---")
+
+		// 1. Enable/Disable
+		fmt.Printf("%-20s: %sEnabled%s / %sDisabled%s\n", "Toggle State", data.SwitchOnColor, data.ResetSeq, data.SwitchOffColor, data.ResetSeq)
+
+		// 2. Success/Warning/Debug/Info/Error
+		fmt.Printf("%-20s: %sInfo%s | %sWarn%s | %sSuccess%s | %sDebug%s | %sError%s\n",
+			"Status Levels",
+			data.StatusInfoColor, data.ResetSeq,
+			data.StatusWarnColor, data.ResetSeq,
+			data.StatusSuccessColor, data.ResetSeq,
+			data.StatusDebugColor, data.ResetSeq,
+			data.StatusErrorColor, data.ResetSeq)
+
+		// 3. Normal / Thinking
+		fmt.Printf("%-20s: %sThinking ✓%s\n", "Thinking State", data.ReasoningActiveColor, data.ResetSeq)
+		fmt.Printf("%-20s: %sInner Thinking...%s\n", "Thinking Message", data.ReasoningDoneColor, data.ResetSeq)
+		fmt.Printf("%-20s: %sAssistant Response%s\n", "Normal Message", data.ForegroundColor, data.ResetSeq)
+
+		// 4. Task Complete
+		fmt.Printf("%-20s: %s[✓] Task Completed%s\n", "Completion", data.TaskCompleteColor, data.ResetSeq)
+
+		// 5. Tool Call
+		fmt.Printf("%-20s: %s[TOOL] execute_command()%s\n", "Tool Call", data.ToolCallColor, data.ResetSeq)
+
+		// 6. Border Line
+		fmt.Printf("%-20s: %s----------%s\n", "Border Line", data.BorderColor, data.ResetSeq)
+		fmt.Println("--------------------------")
 	},
 }
 
@@ -56,28 +84,5 @@ var themeSwitchCmd = &cobra.Command{
 		}
 
 		fmt.Printf("%sSuccessfully switched to theme: %s%s\n", data.StatusSuccessColor, name, data.ResetSeq)
-	},
-}
-
-var themePreviewCmd = &cobra.Command{
-	Use:   "preview <name>",
-	Short: "Preview a theme without saving",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		name := args[0]
-		err := data.LoadTheme(name)
-		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			return
-		}
-
-		// Show preview using existing color command logic (but inline here or just simple output)
-		fmt.Printf("Previewing Theme: %s\n", name)
-		fmt.Println("--- Sample Output ---")
-		fmt.Printf("%sSystem: You are a helpful assistant.%s\n", data.RoleSystemColor, data.ResetSeq)
-		fmt.Printf("%sUser: Hello world!%s\n", data.RoleUserColor, data.ResetSeq)
-		fmt.Printf("%sAssistant: Hi! I love this %s theme!%s\n", data.RoleAssistantColor, name, data.ResetSeq)
-		fmt.Printf("%s[TOOL CALL] list_files()%s\n", data.ToolCallColor, data.ResetSeq)
-		fmt.Printf("%sSuccess: Operation completed.%s\n", data.StatusSuccessColor, data.ResetSeq)
 	},
 }
