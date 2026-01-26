@@ -158,6 +158,9 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	case "/info", "/i":
 		ci.showInfo()
 
+	case "/theme":
+		runCommand(themeCmd, parts[1:])
+
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 	}
@@ -187,6 +190,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /editor, /e [subcmd] - Manage editor or open for multi-line input")
 	fmt.Println("  /attach, /a <file> - Attach a file")
 	fmt.Println("  /detach, /d <file|all> - Detach a file")
+	fmt.Println("  /theme [subcmd] - Manage and switch themes")
 	fmt.Println("  !<command> - Execute a shell command")
 }
 

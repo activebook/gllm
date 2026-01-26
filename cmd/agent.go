@@ -894,7 +894,13 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 	fmt.Printf("%sTools:%s\n", spaceholder, toolsSlice)
 	fmt.Printf("%sThink: %v\n", spaceholder, agent.Think)
 
-	fmt.Printf("%sCapabilities: %v\n", spaceholder, agent.Capabilities)
+	// capabilities
+	capsSlice := ""
+	for _, cap := range agent.Capabilities {
+		capsSlice += fmt.Sprintf("\n%s  - %s", spaceholder, cap)
+	}
+	fmt.Printf("%sCapabilities:%s\n", spaceholder, capsSlice)
+
 	fmt.Printf("%sMax Recursions: %d\n", spaceholder, agent.MaxRecursions)
 }
 
