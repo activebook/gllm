@@ -100,22 +100,22 @@ type ChatInfo struct {
 func (ci *ChatInfo) printWelcome() {
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("5")). // Purple
+		Foreground(lipgloss.Color(data.KeyHex)).
 		MarginTop(1).
 		MarginBottom(1).
 		Padding(0, 0)
 
 	contentStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("7")). // White/Light gray
+		Foreground(lipgloss.Color(data.DetailHex)).
 		Padding(0, 2)
 
 	hintStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("8")). // Dark gray
+		Foreground(lipgloss.Color(data.DetailHex)).
 		Italic(true)
 
 	borderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("6")). // Cyan
+		BorderForeground(lipgloss.Color(data.BorderHex)).
 		Padding(1)
 
 	welcomeText := "Welcome to GLLM Interactive Chat"
@@ -170,9 +170,9 @@ func (ci *ChatInfo) startREPL() {
 	// Define prompt style
 	tcol := service.GetTerminalWidth() - 4
 	promptStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("#282A2C")). // Grey background
-		Foreground(lipgloss.Color("#cecece")). // White text
-		Padding(1, 2).Margin(0, 0, 1, 0).      // padding and margin
+		Background(lipgloss.Color(data.CurrentTheme.Background)).
+		Foreground(lipgloss.Color(data.CurrentTheme.Foreground)).
+		Padding(1, 2).Margin(0, 0, 1, 0). // padding and margin
 		Bold(false).
 		// Align(lipgloss.Right). 	// align would break code formatting
 		Width(tcol) // align and width

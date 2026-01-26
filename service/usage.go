@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/activebook/gllm/data"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -47,11 +48,17 @@ func (tu *TokenUsage) renderLipgloss() string {
 	}
 
 	// Styles
-	borderColor := lipgloss.Color("63")  // Purple/Blue-ish
-	titleColor := lipgloss.Color("86")   // Cyan
-	labelColor := lipgloss.Color("7")    // White
-	valueColor := lipgloss.Color("7")    // White
-	headerColor := lipgloss.Color("252") // Bright output
+	borderColor := lipgloss.Color(data.BorderHex) // Theme Border Color
+	titleColor := lipgloss.Color(data.SectionHex) // Theme Section Color
+	totalColor := lipgloss.Color(data.SectionHex) // Theme Section Color
+	labelColor := lipgloss.Color(data.DetailHex)  // Theme Detail Color
+	valueColor := lipgloss.Color(data.DetailHex)  // Theme Detail Color
+	headerColor := lipgloss.Color(data.DetailHex) // Theme Detail Color
+
+	// Fallback if bright white is empty (some themes might be weird)
+	if data.CurrentTheme.BrightWhite == "" {
+		headerColor = lipgloss.Color(data.CurrentTheme.Foreground)
+	}
 
 	// Main Box Style
 	boxStyle := lipgloss.NewStyle().
@@ -115,13 +122,13 @@ func (tu *TokenUsage) renderLipgloss() string {
 	// Determine color based on percentage
 	var pctColor lipgloss.Color
 	if cachedPercentage > 80 {
-		pctColor = lipgloss.Color("46") // Bright Green
+		pctColor = lipgloss.Color(data.HighCachedHex)
 	} else if cachedPercentage > 50 {
-		pctColor = lipgloss.Color("118") // Light Green
+		pctColor = lipgloss.Color(data.MedCachedHex) // Greenish/BrightGreenish
 	} else if cachedPercentage > 20 {
-		pctColor = lipgloss.Color("190") // Yellow-Green
+		pctColor = lipgloss.Color(data.LowCachedHex)
 	} else {
-		pctColor = lipgloss.Color("240") // Grey
+		pctColor = lipgloss.Color(data.OffCachedHex)
 	}
 
 	rowCachedPct := lipgloss.JoinHorizontal(lipgloss.Left,
@@ -136,7 +143,7 @@ func (tu *TokenUsage) renderLipgloss() string {
 
 	rowTotal := lipgloss.JoinHorizontal(lipgloss.Left,
 		labelStyle.Bold(true).Render("Total"),
-		valueStyle.Bold(true).Foreground(lipgloss.Color("86")).Render(fmt.Sprintf("%d", tu.TotalTokens)),
+		valueStyle.Bold(true).Foreground(totalColor).Render(fmt.Sprintf("%d", tu.TotalTokens)),
 	)
 
 	block := lipgloss.JoinVertical(lipgloss.Left,

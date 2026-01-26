@@ -71,6 +71,7 @@ var colorCmd = &cobra.Command{
 		printColor("MediaColor", data.MediaColor)
 
 		fmt.Println("\n-- UI & Colors --")
+		printColor("BorderColor", data.BorderColor)
 		printColor("SectionColor", data.SectionColor)
 		printColor("KeyColor", data.KeyColor)
 		printColor("HighlightColor", data.HighlightColor)

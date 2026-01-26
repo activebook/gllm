@@ -66,12 +66,24 @@ var (
 	BoolTrueColor  string
 	BoolFalseColor string
 
-	// Additional UI Colors
+	// Additional UI Colors (ANSI Sequences)
+	BorderColor      string
 	SectionColor     string
 	KeyColor         string
 	HighlightColor   string
 	DetailColor      string
 	ShellOutputColor string
+
+	// Hex Codes (for lipgloss or other UI libs)
+	BorderHex  string
+	SectionHex string
+	KeyHex     string
+	DetailHex  string
+
+	HighCachedHex string
+	MedCachedHex  string
+	LowCachedHex  string
+	OffCachedHex  string
 
 	// Functional Helpers (for backwards compatibility or convenience)
 	// These might wrap the strings above
@@ -158,11 +170,23 @@ func applyTheme(t goghthemes.Theme) {
 	BoolFalseColor = toAnsi(t.BrightBlack)
 
 	// Additional UI
+	BorderColor = toAnsi(t.BrightMagenta)
 	SectionColor = toAnsi(t.BrightCyan)
 	KeyColor = toAnsi(t.BrightMagenta)
 	HighlightColor = toAnsi(t.BrightGreen)
 	DetailColor = toAnsi(t.BrightBlack)
 	ShellOutputColor = toAnsi(t.BrightBlack)
+
+	// Hex Codes
+	BorderHex = t.BrightMagenta
+	SectionHex = t.BrightCyan
+	KeyHex = t.BrightMagenta
+	DetailHex = t.BrightBlack
+
+	HighCachedHex = t.Green
+	MedCachedHex = t.Yellow
+	LowCachedHex = t.Red
+	OffCachedHex = t.BrightBlack
 }
 
 // ListThemes returns a sorted list of all available theme names.
