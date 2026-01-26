@@ -19,21 +19,14 @@ var searchCmd = &cobra.Command{
 You can switch to use which search engine.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
-		store := data.NewConfigStore()
-		agent := store.GetActiveAgent()
-		if agent == nil {
-			fmt.Println("No active agent found")
-			return
-		}
-		defaultEngine := agent.Search.Name
+		settings := data.GetSettingsStore()
+		defaultEngine := settings.GetAllowedSearchEngine()
 		fmt.Println()
 		if defaultEngine != "" {
-			fmt.Printf("Current search engine set to %s\n", switchOnColor+defaultEngine+resetColor)
+			fmt.Printf("Current search engine set to %s%s%s\n", data.SwitchOnColor, defaultEngine, data.ResetSeq)
 		} else {
 			fmt.Println("No search engine set.")
 		}
-		fmt.Println()
-		ListSearchTools()
 	},
 }
 
@@ -44,7 +37,6 @@ var searchSwitchCmd = &cobra.Command{
 	Short:   "Switch the active search engine",
 	Long:    `Switch the search engine used by the current agent. Options: google, bing, tavily, none.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		store := data.NewConfigStore()
 		var engine string
 
 		// Check if engine name provided as argument
@@ -68,12 +60,8 @@ var searchSwitchCmd = &cobra.Command{
 			}
 
 			// Default to current
-			activeAgent := store.GetActiveAgent()
-			if activeAgent == nil {
-				fmt.Println("No active agent found")
-				return nil
-			}
-			current := activeAgent.Search.Name
+			settings := data.GetSettingsStore()
+			current := settings.GetAllowedSearchEngine()
 			if current == "" {
 				engine = service.NoneSearchEngine
 			} else {
@@ -93,14 +81,9 @@ var searchSwitchCmd = &cobra.Command{
 			}
 		}
 
-		activeAgent := store.GetActiveAgent()
-		if activeAgent == nil {
-			fmt.Println("No active agent found")
-			return nil
-		}
-		activeAgent.Search.Name = engine
-		if err := store.SetAgent(activeAgent.Name, activeAgent); err != nil {
-			return fmt.Errorf("failed to saving configuration: %w", err)
+		settings := data.GetSettingsStore()
+		if err := settings.SetAllowedSearchEngine(engine); err != nil {
+			return fmt.Errorf("failed to save configuration: %w", err)
 		}
 
 		if engine == service.NoneSearchEngine {
@@ -109,9 +92,6 @@ var searchSwitchCmd = &cobra.Command{
 			fmt.Printf("Switched search engine to: %s\n", engine)
 		}
 
-		// List search tools
-		fmt.Println()
-		ListSearchTools()
 		return nil
 	},
 }
@@ -127,12 +107,10 @@ var searchSetCmd = &cobra.Command{
 		if len(args) > 0 {
 			engine = args[0]
 		} else {
-			activeAgent := store.GetActiveAgent()
-			if activeAgent != nil {
-				engine = activeAgent.Search.Name
-				if engine == "" {
-					engine = service.NoneSearchEngine
-				}
+			settings := data.GetSettingsStore()
+			engine = settings.GetAllowedSearchEngine()
+			if engine == "" {
+				engine = service.NoneSearchEngine
 			}
 			// Select engine to configure
 			options := []huh.Option[string]{
@@ -178,9 +156,6 @@ var searchSetCmd = &cobra.Command{
 
 			err := huh.NewForm(
 				huh.NewGroup(
-					huh.NewNote().
-						Title("Google Search Engine Configuration").
-						Description("Quota: 100 searches per day (free tier)"),
 					huh.NewInput().
 						Title("Google Search API Key").
 						Description("API Key from Google Cloud Console").
@@ -200,6 +175,7 @@ var searchSetCmd = &cobra.Command{
 						Description("Number of references to display (default: 5)").
 						Value(&mrStr).
 						Validate(validateInt),
+					GetStaticHuhNote("", "Quota: 100 searches per day (free tier)"),
 				),
 			).Run()
 			if err != nil {
@@ -227,9 +203,6 @@ var searchSetCmd = &cobra.Command{
 
 			err := huh.NewForm(
 				huh.NewGroup(
-					huh.NewNote().
-						Title("Bing Search Engine Configuration").
-						Description("Quota: 100 searches per month (free tier)"),
 					huh.NewInput().
 						Title("Bing Search API Key").
 						Description("API Key for Bing Search (via SerpAPI)").
@@ -245,6 +218,7 @@ var searchSetCmd = &cobra.Command{
 						Description("Number of references to display (default: 5)").
 						Value(&mrStr).
 						Validate(validateInt),
+					GetStaticHuhNote("", "Quota: 100 searches per month (free tier)"),
 				),
 			).Run()
 			if err != nil {
@@ -271,9 +245,6 @@ var searchSetCmd = &cobra.Command{
 
 			err := huh.NewForm(
 				huh.NewGroup(
-					huh.NewNote().
-						Title("Tavily Search Engine Configuration").
-						Description("Quota: 1000 searches per month (free tier)"),
 					huh.NewInput().
 						Title("Tavily API Key").
 						Description("API Key from Tavily").
@@ -289,6 +260,7 @@ var searchSetCmd = &cobra.Command{
 						Description("Number of references to display (default: 5)").
 						Value(&mrStr).
 						Validate(validateInt),
+					GetStaticHuhNote("", "Quota: 1000 searches per month (free tier)"),
 				),
 			).Run()
 			if err != nil {
@@ -369,7 +341,7 @@ var searchListCmd = &cobra.Command{
 		// Update the list command to show default status
 		defaultEngine := GetEffectSearchEngineName()
 		if defaultEngine != "" {
-			fmt.Printf("Current search engine set to %s\n", switchOnColor+defaultEngine+resetColor)
+			fmt.Printf("Current search engine set to %s%s%s%s%s\n", data.SwitchOnColor, defaultEngine, data.ResetSeq, "", "")
 		} else {
 			fmt.Println("No search engine set.")
 		}
@@ -401,13 +373,8 @@ func IsSearchEnabled() bool {
 }
 
 func GetEffectSearchEngineName() string {
-	store := data.NewConfigStore()
-	activeAgent := store.GetActiveAgent()
-	if activeAgent == nil {
-		return ""
-	}
-	defaultName := activeAgent.Search.Name
-	return defaultName
+	settings := data.GetSettingsStore()
+	return settings.GetAllowedSearchEngine()
 }
 
 func init() {
@@ -418,16 +385,4 @@ func init() {
 	searchCmd.AddCommand(searchListCmd)
 	searchCmd.AddCommand(searchSwitchCmd)
 	searchCmd.AddCommand(searchSetCmd)
-}
-
-func ListSearchTools() {
-	enabled := IsSearchEnabled()
-	fmt.Println("Available[✔] search tools:")
-	for _, tool := range service.GetAllSearchTools() {
-		if enabled {
-			fmt.Printf("[✔] %s\n", tool)
-		} else {
-			fmt.Printf("[ ] %s\n", tool)
-		}
-	}
 }

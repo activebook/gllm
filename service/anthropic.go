@@ -58,10 +58,6 @@ func (ag *Agent) GenerateAnthropicStream() error {
 		embeddingTools := ag.getAnthropicEmbeddingTools()
 		tools = append(tools, embeddingTools...)
 	}
-	if ag.SearchEngine.UseSearch {
-		searchTool := ag.getAnthropicWebSearchTool()
-		tools = append(tools, searchTool)
-	}
 	if ag.MCPClient != nil {
 		mcpTools := ag.getAnthropicMCPTools()
 		tools = append(tools, mcpTools...)
@@ -514,11 +510,6 @@ func (ag *Agent) getAnthropicEmbeddingTools() []anthropic.ToolUnionParam {
 		tools = append(tools, genericTool.ToAnthropicTool())
 	}
 	return tools
-}
-
-func (ag *Agent) getAnthropicWebSearchTool() anthropic.ToolUnionParam {
-	genericTool := getOpenWebSearchTool()
-	return genericTool.ToAnthropicTool()
 }
 
 func (ag *Agent) getAnthropicMCPTools() []anthropic.ToolUnionParam {

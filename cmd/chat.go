@@ -24,7 +24,7 @@ This provides a Read-Eval-Print-Loop (REPL) interface where you can
 have a continuous conversation with the model.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Create an indeterminate progress bar
-		indicator := service.NewIndicator("Processing...")
+		indicator := service.NewIndicator()
 
 		var chatInfo *ChatInfo
 		store := data.NewConfigStore()
@@ -100,22 +100,22 @@ type ChatInfo struct {
 func (ci *ChatInfo) printWelcome() {
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("5")). // Purple
+		Foreground(lipgloss.Color(data.KeyHex)).
 		MarginTop(1).
 		MarginBottom(1).
 		Padding(0, 0)
 
 	contentStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("7")). // White/Light gray
+		Foreground(lipgloss.Color(data.LabelHex)).
 		Padding(0, 2)
 
 	hintStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("8")). // Dark gray
+		Foreground(lipgloss.Color(data.DetailHex)).
 		Italic(true)
 
 	borderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("6")). // Cyan
+		BorderForeground(lipgloss.Color(data.BorderHex)).
 		Padding(1)
 
 	welcomeText := "Welcome to GLLM Interactive Chat"
@@ -168,11 +168,11 @@ func (ci *ChatInfo) startREPL() {
 	ci.printWelcome()
 
 	// Define prompt style
-	tcol := service.GetTerminalWidth() - 4
+	tcol := service.GetTerminalWidth()
 	promptStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("#282A2C")). // Grey background
-		Foreground(lipgloss.Color("#cecece")). // White text
-		Padding(1, 2).Margin(0, 0, 1, 0).      // padding and margin
+		Background(lipgloss.Color(data.CurrentTheme.Background)).
+		Foreground(lipgloss.Color(data.CurrentTheme.Foreground)).
+		Padding(1, 2).Margin(0, 0, 1, 0). // padding and margin
 		Bold(false).
 		// Align(lipgloss.Right). 	// align would break code formatting
 		Width(tcol) // align and width
@@ -342,17 +342,17 @@ func (ci *ChatInfo) executeShellCommand(command string) {
 	// Display error if command failed
 	if err != nil {
 		if exitError, ok := err.(*exec.ExitError); ok {
-			fmt.Printf(cmdErrorColor+"Command failed with exit code %d\n"+resetColor, exitError.ExitCode())
+			service.Errorf("Command failed with exit code %d", exitError.ExitCode())
 		} else {
-			fmt.Printf(cmdErrorColor+"Command failed: %v\n"+resetColor, err)
+			service.Errorf("Command failed: %v", err)
 		}
 	}
 
 	// Display the output
 	if len(output) > 0 {
-		fmt.Printf(cmdOutputColor+"%s\n"+resetColor, output)
+		// shell output color
+		fmt.Printf(data.ShellOutputColor+"%s\n"+data.ResetSeq, output)
 	}
-	fmt.Print(resetColor) // Reset color after command output
 }
 
 func GenerateChatFileName() string {

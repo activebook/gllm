@@ -61,8 +61,7 @@ var mcpLoadCmd = &cobra.Command{
 			client = &service.MCPClient{}
 			defer client.Close() // ensure resources are cleaned up
 		}
-		indicator := service.NewIndicator("")
-		indicator.Start("MCP Loading...")
+		indicator := service.NewIndicator()
 		err = client.Init(mcpConfig, service.MCPLoadOption{
 			LoadAll:       all,
 			LoadTools:     true,
@@ -84,14 +83,14 @@ var mcpLoadCmd = &cobra.Command{
 		fmt.Println("Available MCP Servers:")
 
 		for _, server := range servers {
-			status := switchOffColor + "Blocked" + resetColor
+			status := data.SwitchOffColor + "Blocked" + data.ResetSeq
 			if server.Allowed {
-				status = switchOnColor + "Allowed" + resetColor
+				status = data.SwitchOnColor + "Allowed" + data.ResetSeq
 			}
-			fmt.Printf("\n%sServer: %s%s (%s)\n", switchOnColor, server.Name, resetColor, status)
+			fmt.Printf("\n%sServer: %s%s (%s)\n", data.SwitchOnColor, server.Name, data.ResetSeq, status)
 			if server.Tools != nil {
 				for _, tool := range *server.Tools {
-					fmt.Printf("  • %s%s%s\n", cmdOutputColor, tool.Name, resetColor)
+					fmt.Printf("  • %s%s%s\n", data.StatusWarnColor, tool.Name, data.ResetSeq)
 					if tool.Description != "" {
 						fmt.Printf("    Description: %s\n", tool.Description)
 					}
@@ -107,7 +106,7 @@ var mcpLoadCmd = &cobra.Command{
 			if server.Resources != nil && len(*server.Resources) > 0 {
 				fmt.Println("  Resources:")
 				for _, resource := range *server.Resources {
-					fmt.Printf("    • %s%s%s\n", cmdOutputColor, resource.Name, resetColor)
+					fmt.Printf("    • %s%s%s\n", data.StatusWarnColor, resource.Name, data.ResetSeq)
 					if resource.Description != "" {
 						fmt.Printf("      Description: %s\n", resource.Description)
 					}
@@ -123,7 +122,7 @@ var mcpLoadCmd = &cobra.Command{
 			if server.Prompts != nil && len(*server.Prompts) > 0 {
 				fmt.Println("  Prompts:")
 				for _, prompt := range *server.Prompts {
-					fmt.Printf("    • %s%s%s\n", cmdOutputColor, prompt.Name, resetColor)
+					fmt.Printf("    • %s%s%s\n", data.StatusWarnColor, prompt.Name, data.ResetSeq)
 					if prompt.Description != "" {
 						fmt.Printf("      Description: %s\n", prompt.Description)
 					}
@@ -172,12 +171,12 @@ var mcpListCmd = &cobra.Command{
 			server := servers[name]
 			indicator := "  "
 			pname := fmt.Sprintf("%-18s", name)
-			status := grayColor("(blocked)")
+			status := data.SwitchOffColor + "(blocked)" + data.ResetSeq
 
 			if settingsStore.IsMCPServerAllowed(name) {
-				indicator = highlightColor("* ")
-				pname = highlightColor(pname)
-				status = greenColor("(allowed)")
+				indicator = data.HighlightColor + "* " + data.ResetSeq
+				pname = data.HighlightColor + pname + data.ResetSeq
+				status = data.SwitchOnColor + "(allowed)" + data.ResetSeq
 			}
 
 			fmt.Printf("%s%s %-7s %s\n", indicator, pname, server.Type, status)

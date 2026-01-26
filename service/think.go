@@ -3,6 +3,7 @@ package service
 import (
 	"strings"
 
+	"github.com/activebook/gllm/data"
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"google.golang.org/genai"
@@ -65,15 +66,15 @@ func (t ThinkingLevel) String() string {
 func (t ThinkingLevel) Display() string {
 	switch t {
 	case ThinkingLevelOff:
-		return reasoningColorOff + "off" + resetColor
+		return data.ReasoningOffColor + "off" + data.ResetSeq
 	case ThinkingLevelLow:
-		return reasoningColorLow + "low" + resetColor
+		return data.ReasoningLowColor + "low" + data.ResetSeq
 	case ThinkingLevelMedium:
-		return reasoningColorMed + "medium" + resetColor
+		return data.ReasoningMedColor + "medium" + data.ResetSeq
 	case ThinkingLevelHigh:
-		return reasoningColorHigh + "high" + resetColor
+		return data.ReasoningHighColor + "high" + data.ResetSeq
 	default:
-		return reasoningColorOff + "off" + resetColor
+		return data.ReasoningOffColor + "off" + data.ResetSeq
 	}
 }
 

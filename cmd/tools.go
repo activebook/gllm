@@ -36,7 +36,7 @@ Use 'gllm tools sw' to select which tools to enable for the current agent.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
 		fmt.Println()
-		ListAllTools()
+		ListEmbeddingTools()
 	},
 }
 
@@ -103,7 +103,7 @@ var toolsSwCmd = &cobra.Command{
 		}
 
 		fmt.Printf("\n%d tool(s) enabled for current agent.\n\n", len(selectedTools))
-		ListAllTools()
+		ListEmbeddingTools()
 	},
 }
 
@@ -147,10 +147,4 @@ func ListEmbeddingTools() {
 			fmt.Printf("[ ] %s\n", tool)
 		}
 	}
-}
-
-func ListAllTools() {
-	ListEmbeddingTools()
-	fmt.Println()
-	ListSearchTools()
 }

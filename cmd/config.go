@@ -130,7 +130,7 @@ var configPrintCmd = &cobra.Command{
 		printSection := func(title string) {
 			fmt.Println()
 			fullTitle := fmt.Sprintf("=== %s ===", strings.ToUpper(title))
-			fmt.Printf("%s\n", sectionColor(fullTitle))
+			fmt.Printf("%s%s%s\n", data.SectionColor, fullTitle, data.ResetSeq)
 		}
 
 		// Models section
@@ -160,7 +160,12 @@ var configPrintCmd = &cobra.Command{
 
 		// Plugins section
 		printSection("Tools")
-		ListAllTools()
+		ListEmbeddingTools()
+		w.Flush()
+
+		// Skills section
+		printSection("Skills")
+		skillsListCmd.Run(skillsListCmd, []string{})
 		w.Flush()
 
 		// Current Agent section

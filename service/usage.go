@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/activebook/gllm/data"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -34,73 +35,6 @@ func NewTokenUsage() *TokenUsage {
 	}
 }
 
-func (tu *TokenUsage) getTokenUsageTip() string {
-	if tu.TotalTokens > 0 {
-		cachedPercentage := 0.0
-		if tu.InputTokens > 0 {
-			if tu.CachedTokensInPrompt {
-				// Cached tokens are included in the input tokens, so we don't need to add them
-				cachedPercentage = float64(tu.CachedTokens) / float64(tu.InputTokens) * 100
-			} else {
-				// Cached tokens are not included in the input tokens, so we need to add them
-				cachedPercentage = float64(tu.CachedTokens) / float64(tu.InputTokens+tu.CachedTokens) * 100
-			}
-		}
-		return fmt.Sprintf(
-			bbColor+"\n"+
-				"┌──────────────────────────────────────────────────────────────────────────────────────────┐\n"+
-				"│"+resetColor+hiBlueColor+" Token Usage"+resetColor+bbColor+"                                                                              │\n"+
-				"│"+resetColor+" Input: %s%6d%s "+bbColor+"│"+resetColor+" Output: %s%6d%s "+bbColor+"│"+resetColor+" Cached: %s%6d %s%s "+bbColor+"│"+resetColor+" Thought: %s%6d%s "+bbColor+"│"+resetColor+" Total: %s%6d%s "+bbColor+"│"+resetColor+"\n"+bbColor+
-				"└──────────────────────────────────────────────────────────────────────────────────────────┘"+
-				resetColor,
-			hiBlueColor, tu.InputTokens, resetColor,
-			hiBlueColor, tu.OutputTokens, resetColor,
-			hiBlueColor, tu.CachedTokens, "("+fmt.Sprintf("%3.1f%%", cachedPercentage)+")", resetColor,
-			hiBlueColor, tu.ThoughtTokens, resetColor,
-			hiBlueColor, tu.TotalTokens, resetColor,
-		)
-	}
-	return ""
-}
-
-func (tu *TokenUsage) getTokenUsageBox() string {
-	if tu.TotalTokens > 0 {
-		cachedPercentage := 0.0
-		if tu.InputTokens > 0 {
-			if tu.CachedTokensInPrompt {
-				// Cached tokens are included in the input tokens, so we don't need to add them
-				cachedPercentage = float64(tu.CachedTokens) / float64(tu.InputTokens) * 100
-			} else {
-				// Cached tokens are not included in the input tokens, so we need to add them
-				cachedPercentage = float64(tu.CachedTokens) / float64(tu.InputTokens+tu.CachedTokens) * 100
-			}
-		}
-		return fmt.Sprintf(
-			bbColor+"\n"+
-				"┌───────────────┬────────────┐\n"+
-				"│ %sToken Type%s    │      %sCount%s │\n"+
-				"├───────────────┼────────────┤\n"+
-				"│ %sInput%s         │ %s%10d%s"+bbColor+" │\n"+
-				"│ %sOutput%s        │ %s%10d%s"+bbColor+" │\n"+
-				"│ %sCached%s        │ %s%10d%s"+bbColor+" │\n"+
-				"│               │ %s%10s%s"+bbColor+" │\n"+
-				"│ %sThought%s       │ %s%10d%s"+bbColor+" │\n"+
-				"├───────────────┼────────────┤\n"+
-				"│ %sTotal%s         │ %s%10d%s"+bbColor+" │\n"+
-				"└───────────────┴────────────┘"+
-				resetColor,
-			resetColor, bbColor, resetColor, bbColor,
-			resetColor, bbColor, hiBlueColor, tu.InputTokens, resetColor,
-			resetColor, bbColor, hiBlueColor, tu.OutputTokens, resetColor,
-			resetColor, bbColor, hiBlueColor, tu.CachedTokens, resetColor,
-			hiBlueColor, fmt.Sprintf("%4.1f%%", cachedPercentage), resetColor,
-			resetColor, bbColor, hiBlueColor, tu.ThoughtTokens, resetColor,
-			resetColor, bbColor, hiBlueColor, tu.TotalTokens, resetColor,
-		)
-	}
-	return ""
-}
-
 func (tu *TokenUsage) Render(render Render) {
 	// Get the token usage
 	// usages := tu.getTokenUsageBox()
@@ -114,11 +48,17 @@ func (tu *TokenUsage) renderLipgloss() string {
 	}
 
 	// Styles
-	borderColor := lipgloss.Color("63")  // Purple/Blue-ish
-	titleColor := lipgloss.Color("86")   // Cyan
-	labelColor := lipgloss.Color("7")    // White
-	valueColor := lipgloss.Color("7")    // White
-	headerColor := lipgloss.Color("252") // Bright output
+	borderColor := lipgloss.Color(data.BorderHex) // Theme Border Color
+	titleColor := lipgloss.Color(data.SectionHex) // Theme Section Color
+	headerColor := lipgloss.Color(data.LabelHex)  // Theme Detail Color
+	labelColor := lipgloss.Color(data.LabelHex)   // Theme Detail Color
+	valueColor := lipgloss.Color(data.DetailHex)  // Theme Detail Color
+	totalColor := lipgloss.Color(data.SectionHex) // Theme Section Color
+
+	// Fallback if bright white is empty (some themes might be weird)
+	if data.CurrentTheme.BrightWhite == "" {
+		headerColor = lipgloss.Color(data.CurrentTheme.Foreground)
+	}
 
 	// Main Box Style
 	boxStyle := lipgloss.NewStyle().
@@ -155,8 +95,8 @@ func (tu *TokenUsage) renderLipgloss() string {
 
 	// Headers
 	headers := lipgloss.JoinHorizontal(lipgloss.Left,
-		headerStyle.Render("Type"),
-		headerValStyle.Render("Count"),
+		headerStyle.Bold(true).Render("Type"),
+		headerValStyle.Bold(true).Render("Count"),
 	)
 
 	// underline
@@ -182,13 +122,13 @@ func (tu *TokenUsage) renderLipgloss() string {
 	// Determine color based on percentage
 	var pctColor lipgloss.Color
 	if cachedPercentage > 80 {
-		pctColor = lipgloss.Color("46") // Bright Green
+		pctColor = lipgloss.Color(data.HighCachedHex)
 	} else if cachedPercentage > 50 {
-		pctColor = lipgloss.Color("118") // Light Green
+		pctColor = lipgloss.Color(data.MedCachedHex) // Greenish/BrightGreenish
 	} else if cachedPercentage > 20 {
-		pctColor = lipgloss.Color("190") // Yellow-Green
+		pctColor = lipgloss.Color(data.LowCachedHex)
 	} else {
-		pctColor = lipgloss.Color("240") // Grey
+		pctColor = lipgloss.Color(data.OffCachedHex)
 	}
 
 	rowCachedPct := lipgloss.JoinHorizontal(lipgloss.Left,
@@ -203,7 +143,7 @@ func (tu *TokenUsage) renderLipgloss() string {
 
 	rowTotal := lipgloss.JoinHorizontal(lipgloss.Left,
 		labelStyle.Bold(true).Render("Total"),
-		valueStyle.Bold(true).Foreground(lipgloss.Color("86")).Render(fmt.Sprintf("%d", tu.TotalTokens)),
+		valueStyle.Bold(true).Foreground(totalColor).Render(fmt.Sprintf("%d", tu.TotalTokens)),
 	)
 
 	block := lipgloss.JoinVertical(lipgloss.Left,

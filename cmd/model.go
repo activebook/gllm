@@ -111,8 +111,8 @@ var modelListCmd = &cobra.Command{
 
 			// Check if this model is default (compare to defaultModel string)
 			if modelName == defaultModelName {
-				indicator = highlightColor("*") // Mark the default model
-				pname = highlightColor(name)
+				indicator = data.HighlightColor + "*" + data.ResetSeq // Mark the default model
+				pname = data.HighlightColor + name + data.ResetSeq
 			} else {
 				indicator = " "
 				pname = name

@@ -107,7 +107,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 			}
 
 			// Create an indeterminate progress bar
-			indicator := service.NewIndicator("Processing...")
+			indicator := service.NewIndicator()
 
 			// If conversation flag is provided, find the conversation file
 			if cmd.Flags().Changed("conversation") {
@@ -216,6 +216,9 @@ func initConfig() {
 		cobra.CheckErr(err)
 		return
 	}
+
+	// Load the configured theme (or default to Dracula if not set)
+	data.LoadTheme(data.GetThemeFromConfig())
 
 	// *** Placeholder for Log Configuration ***
 	// We will add log setup based on Viper settings later.

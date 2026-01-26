@@ -82,18 +82,35 @@ func constructModelInfo(model *data.Model) *ModelInfo {
 	return &mi
 }
 
-func constructSearchEngine(searchEngine *data.SearchEngine) *SearchEngine {
+func constructSearchEngine(capabilities []string) *SearchEngine {
 	se := SearchEngine{}
 	se.Name = GetNoneSearchEngineName()
 	se.UseSearch = false
-	if searchEngine != nil && searchEngine.Name != "" && searchEngine.Name != GetNoneSearchEngineName() {
-		se.UseSearch = true
-		se.Name = searchEngine.Name
-		se.ApiKey = searchEngine.Config["key"]
-		se.CxKey = searchEngine.Config["cx"]
-		se.DeepDive = searchEngine.DeepDive
-		se.MaxReferences = searchEngine.Reference
+
+	if IsWebSearchEnabled(capabilities) {
+		// Get allowed search engine from settings
+		store := data.GetSettingsStore()
+		engineName := store.GetAllowedSearchEngine()
+
+		// If no engine set, try to default to Google if available, or just keep none
+		if engineName == "" {
+			engineName = GetDefaultSearchEngineName()
+		}
+
+		// Get engine config from config store
+		configStore := data.NewConfigStore()
+		engineConfig := configStore.GetSearchEngine(engineName)
+
+		if engineConfig != nil {
+			se.UseSearch = true
+			se.Name = engineConfig.Name
+			se.ApiKey = engineConfig.Config["key"]
+			se.CxKey = engineConfig.Config["cx"]
+			se.DeepDive = engineConfig.DeepDive
+			se.MaxReferences = engineConfig.Reference
+		}
 	}
+
 	Debugf("Search engine: %v, %v", se.Name, se.UseSearch)
 	return &se
 }
@@ -147,7 +164,6 @@ type AgentOptions struct {
 	SysPrompt     string
 	Files         []*FileData
 	ModelInfo     *data.Model
-	SearchEngine  *data.SearchEngine
 	MaxRecursions int
 	ThinkingLevel string
 	EnabledTools  []string // List of enabled embedding tools
@@ -168,8 +184,8 @@ func CallAgent(op *AgentOptions) error {
 	// Set up model settings
 	mi := constructModelInfo(op.ModelInfo)
 
-	// Set up search engine settings
-	se := constructSearchEngine(op.SearchEngine)
+	// Set up search engine settings based on capabilities
+	se := constructSearchEngine(op.Capabilities)
 	toolsUse := ToolsUse{AutoApprove: op.YoloMode}
 
 	// Set up code tool settings
@@ -192,7 +208,7 @@ func CallAgent(op *AgentOptions) error {
 	var std *StdRenderer
 	if !op.QuietMode {
 		std = NewStdRenderer()
-		indicator = NewIndicator("Processing...")
+		indicator = NewIndicator()
 	}
 
 	// Need to output a file
@@ -212,7 +228,7 @@ func CallAgent(op *AgentOptions) error {
 	if IsMCPServersEnabled(op.Capabilities) {
 		mc = GetMCPClient() // use the shared instance
 		if !op.QuietMode {
-			indicator.Start("Loading MCP servers...")
+			indicator.Start(IndicatorLoadingMCP)
 		}
 		err := mc.Init(op.MCPConfig, MCPLoadOption{
 			LoadAll:   false,
@@ -277,6 +293,13 @@ func CallAgent(op *AgentOptions) error {
 		enabledTools = AppendSubagentTools(enabledTools)
 	} else {
 		enabledTools = RemoveSubagentTools(enabledTools)
+	}
+
+	// Web Search tool injection
+	if IsWebSearchEnabled(op.Capabilities) {
+		enabledTools = AppendSearchTools(enabledTools)
+	} else {
+		enabledTools = RemoveSearchTools(enabledTools)
 	}
 
 	ag := Agent{
@@ -513,7 +536,7 @@ It writes a status message to both Std and OutputFile if they are available.
 */
 func (ag *Agent) StartReasoning() {
 	if ag.Std != nil {
-		ag.Std.Writeln(reasoningColor + "Thinking ↓")
+		ag.Std.Writeln(data.ReasoningActiveColor + "Thinking ↓")
 	}
 	if ag.OutputFile != nil {
 		ag.OutputFile.Writeln("Thinking ↓")
@@ -522,7 +545,7 @@ func (ag *Agent) StartReasoning() {
 
 func (ag *Agent) CompleteReasoning() {
 	if ag.Std != nil {
-		ag.Std.Writeln(resetColor + reasoningColor + "✓" + resetColor)
+		ag.Std.Writeln(data.ResetSeq + data.ReasoningActiveColor + "✓" + data.ResetSeq)
 	}
 	if ag.OutputFile != nil {
 		ag.OutputFile.Writeln("✓")
@@ -534,7 +557,7 @@ WriteReasoning writes the provided reasoning text to both the standard output an
 */
 func (ag *Agent) WriteReasoning(text string) {
 	if ag.Std != nil {
-		ag.Std.Writef("%s%s", inReasoningColor, text)
+		ag.Std.Writef("%s%s", data.ReasoningDoneColor, text)
 		ag.LastWrittenData = text
 	}
 	if ag.OutputFile != nil {
@@ -578,8 +601,8 @@ func (ag *Agent) WriteFunctionCall(text string) {
 			Args     interface{} `json:"args"`
 		}
 
-		var data ToolCallData
-		err := json.Unmarshal([]byte(text), &data)
+		var toolData ToolCallData
+		err := json.Unmarshal([]byte(text), &toolData)
 
 		var output string
 		if err == nil {
@@ -590,22 +613,22 @@ func (ag *Agent) WriteFunctionCall(text string) {
 			// Use lipgloss to render
 			style := lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color(hexToolResponse)).
+				BorderForeground(lipgloss.Color(data.BorderHex)). // Tool Border
 				Padding(0, 1).
 				Margin(0, 0)
 
 			titleStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color(hexToolCall)).
+				Foreground(lipgloss.Color(data.SectionHex)). // Tool Title
 				Bold(true)
 
 			argsStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("250")).Width(tcol) // Light Gray
+				Foreground(lipgloss.Color(data.DetailHex)).Width(tcol) // Tool Args
 
 			var content string
 
 			// For built-in tools, we have a map of args
 			// We will try to extract purpose/description and command separately
-			if argsMap, ok := data.Args.(map[string]interface{}); ok {
+			if argsMap, ok := toolData.Args.(map[string]interface{}); ok {
 				// 1. Identify Purpose
 				// MCP tool calls may not have purpose/description
 				var purposeVal string
@@ -644,11 +667,11 @@ func (ag *Agent) WriteFunctionCall(text string) {
 				// Command -> White (With keys)
 				// Purpose -> Gray, Dim, Wrapped
 
-				cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("7")).Width(tcol)       // White
-				purposeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Width(tcol) // Grey, wrapped
+				cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.LabelHex)).Width(tcol)      // Cmd Label
+				purposeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.DetailHex)).Width(tcol) // Cmd Purpose
 
 				var parts []string
-				parts = append(parts, titleStyle.Render(data.Function))
+				parts = append(parts, titleStyle.Render(toolData.Function))
 
 				if commandVal != "" {
 					parts = append(parts, cmdStyle.Render(commandVal))
@@ -665,19 +688,19 @@ func (ag *Agent) WriteFunctionCall(text string) {
 			if content == "" {
 				// Convert Args back to string for display
 				var argsStr string
-				if s, ok := data.Args.(string); ok {
+				if s, ok := toolData.Args.(string); ok {
 					argsStr = s
 				} else {
-					bytes, _ := json.MarshalIndent(data.Args, "", "  ")
+					bytes, _ := json.MarshalIndent(toolData.Args, "", "  ")
 					argsStr = string(bytes)
 				}
-				content = fmt.Sprintf("%s\n%s", titleStyle.Render(data.Function), argsStyle.Render(argsStr))
+				content = fmt.Sprintf("%s\n%s", titleStyle.Render(toolData.Function), argsStyle.Render(argsStr))
 			}
 
 			output = style.Render(content)
 		} else {
 			// Fallback to original text if not JSON
-			output = inCallingColor + text + resetColor
+			output = data.ToolCallColor + text + data.ResetSeq
 		}
 
 		ag.Std.Writeln(output)
@@ -693,7 +716,7 @@ func (ag *Agent) WriteEnd() {
 	//if ag.Std != nil && ag.Markdown == nil && ag.TokenUsage == nil {
 	if ag.Std != nil {
 		if !EndWithNewline(ag.LastWrittenData) {
-			ag.Std.Writeln(resetColor)
+			ag.Std.Writeln(data.ResetSeq)
 		}
 	}
 }

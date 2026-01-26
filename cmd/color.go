@@ -3,101 +3,13 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/fatih/color"
+	"github.com/activebook/gllm/data"
 	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
 )
 
-var (
-	// Terminal ANSI colors (raw strings for direct concatenation)
-	switchOffColor string
-	switchOnColor  string
-	resetColor     string
-
-	cmdOutputColor string
-	cmdErrorColor  string
-
-	// Functional colors using SprintFunc
-	highlightColor func(a ...interface{}) string
-	sectionColor   func(a ...interface{}) string
-	keyColor       func(a ...interface{}) string
-
-	// Specialized UI colors
-	memoryHeaderColor func(a ...interface{}) string
-	memoryItemColor   func(a ...interface{}) string
-
-	// Helper colors
-	greenColor func(a ...interface{}) string
-	grayColor  func(a ...interface{}) string
-)
-
 func init() {
 	rootCmd.AddCommand(colorCmd)
-	setupColors()
-}
-
-func setupColors() {
-	p := termenv.ColorProfile()
-
-	// 1. Raw ANSI strings for concatenation
-	resetColor = "\033[0m"
-
-	if p == termenv.TrueColor {
-		// Vibrant TrueColor (24-bit)
-		switchOffColor = "\033[38;2;128;128;128m" // Grey #808080
-		switchOnColor = "\033[38;2;0;255;127m"    // Spring Green #00FF7F
-		cmdOutputColor = "\033[38;2;255;255;224m" // Light Yellow #FFFFE0
-		cmdErrorColor = "\033[38;2;255;105;180m"  // Hot Pink #FF69B4
-	} else if p >= termenv.ANSI256 {
-		// ANSI 256 Color (8-bit)
-		switchOffColor = "\033[38;5;244m"
-		switchOnColor = "\033[38;5;82m"
-		cmdOutputColor = "\033[38;5;187m"
-		cmdErrorColor = "\033[38;5;175m"
-	} else {
-		// Basic ANSI (4-bit)
-		switchOffColor = "\033[90m"
-		switchOnColor = "\033[92m"
-		cmdOutputColor = "\033[33m"
-		cmdErrorColor = "\033[35m"
-	}
-
-	// 2. Functional colors (SprintFunc style)
-	style := func(color string, bold bool) func(a ...interface{}) string {
-		return func(a ...interface{}) string {
-			s := termenv.String(fmt.Sprint(a...)).Foreground(p.Color(color))
-			if bold {
-				s = s.Bold()
-			}
-			return s.String()
-		}
-	}
-
-	if p == termenv.TrueColor {
-		highlightColor = style("#00FF7F", true)
-		sectionColor = style("#00CED1", true)
-		keyColor = style("#FF69B4", true)
-		memoryHeaderColor = style("#00BFFF", true)
-		memoryItemColor = style("#ADFF2F", false)
-		greenColor = style("#00FF00", false)
-		grayColor = style("#808080", false)
-	} else {
-		// Fallback to fatih/color for consistent basic/256 output
-		if p >= termenv.ANSI256 {
-			highlightColor = color.New(color.FgHiGreen, color.Bold).SprintFunc()
-			sectionColor = color.New(color.FgHiCyan, color.Bold).SprintFunc()
-			keyColor = color.New(color.FgHiMagenta, color.Bold).SprintFunc()
-		} else {
-			highlightColor = color.New(color.FgGreen, color.Bold).SprintFunc()
-			sectionColor = color.New(color.FgCyan, color.Bold).SprintFunc()
-			keyColor = color.New(color.FgMagenta, color.Bold).SprintFunc()
-		}
-		memoryHeaderColor = color.New(color.FgCyan, color.Bold).SprintFunc()
-		memoryItemColor = color.New(color.FgGreen).SprintFunc()
-		greenColor = color.New(color.FgGreen).SprintFunc()
-		grayColor = color.New(color.FgHiBlack).SprintFunc()
-	}
 }
 
 var colorCmd = &cobra.Command{
@@ -105,201 +17,68 @@ var colorCmd = &cobra.Command{
 	Hidden: true, // hidden from help
 	Short:  "Test different colors of gllm output",
 	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Printf("Current Theme: %s\n", data.CurrentThemeName)
 		fmt.Printf("Terminal Color Support: ")
-		if supportsTrueColor() {
-			color.New(color.FgGreen, color.Bold).Println("TRUE COLOR (24-bit)")
+		p := termenv.ColorProfile()
+		if p == termenv.TrueColor {
+			fmt.Println(data.SwitchOnColor + "TRUE COLOR (24-bit)" + data.ResetSeq)
 		} else {
-			color.New(color.FgYellow).Println("256-color or basic")
+			fmt.Println(data.StatusWarnColor + fmt.Sprintf("%v", p) + data.ResetSeq)
 		}
 		fmt.Println()
 
-		// Basic ANSI colors
-		fmt.Println("=== Basic ANSI Colors ===")
-		color.Black("Black Text")
-		color.Red("Red Text")
-		color.Green("Green Text")
-		color.Yellow("Yellow Text")
-		color.Blue("Blue Text")
-		color.Magenta("Magenta Text")
-		color.Cyan("Cyan Text")
-		color.White("White Text")
-		fmt.Println()
-
-		// Bright colors
-		fmt.Println("=== Bright Colors ===")
-		color.HiBlack("Bright Black")
-		color.HiRed("Bright Red")
-		color.HiGreen("Bright Green")
-		color.HiYellow("Bright Yellow")
-		color.HiBlue("Bright Blue")
-		color.HiMagenta("Bright Magenta")
-		color.HiCyan("Bright Cyan")
-		color.HiWhite("Bright White")
-		fmt.Println()
-
-		// Background colors
-		fmt.Println("=== Background Colors ===")
-		color.New(color.BgBlack, color.FgWhite).Print("Black BG")
-		fmt.Print(" ")
-		color.New(color.BgRed, color.FgWhite).Print("Red BG")
-		fmt.Print(" ")
-		color.New(color.BgGreen, color.FgBlack).Print("Green BG")
-		fmt.Print(" ")
-		color.New(color.BgBlue, color.FgWhite).Print("Blue BG")
-		fmt.Print(" ")
-		color.New(color.BgMagenta, color.FgWhite).Print("Magenta BG")
-		fmt.Print(" ")
-		color.New(color.BgCyan, color.FgBlack).Print("Cyan BG")
-		fmt.Print(" ")
-		color.New(color.BgYellow, color.FgBlack).Print("Yellow BG")
-		fmt.Print(" ")
-		color.New(color.BgWhite, color.FgBlack).Print("White BG")
-		fmt.Println()
-		fmt.Println()
-
-		// True color examples (only if supported)
-		if supportsTrueColor() {
-			fmt.Println("=== TRUE COLOR (24-bit RGB) Examples ===")
-
-			// Rainbow gradient
-			fmt.Println("Rainbow Gradient:")
-			rainbow := []struct{ r, g, b int }{
-				{255, 0, 0}, {255, 165, 0}, {255, 255, 0}, {0, 255, 0},
-				{0, 255, 255}, {0, 0, 255}, {128, 0, 128},
-			}
-			for _, rgb := range rainbow {
-				color.RGB(rgb.r, rgb.g, rgb.b).Print("█")
-			}
-			fmt.Println()
-
-			// Beautiful color palette
-			fmt.Println("Color Palette:")
-			palette := []struct {
-				name    string
-				r, g, b int
-			}{
-				{"Crimson", 220, 20, 60},
-				{"Coral", 255, 127, 80},
-				{"Gold", 255, 215, 0},
-				{"Lime", 0, 255, 0},
-				{"Aqua", 0, 255, 255},
-				{"Royal Blue", 65, 105, 225},
-				{"Purple", 128, 0, 128},
-				{"Hot Pink", 255, 105, 180},
-				{"Turquoise", 64, 224, 208},
-				{"Orange Red", 255, 69, 0},
-				{"Spring Green", 0, 255, 127},
-				{"Deep Sky Blue", 0, 191, 255},
-				{"Violet", 238, 130, 238},
-				{"Tomato", 255, 99, 71},
-				{"Chartreuse", 127, 255, 0},
-				{"Sky Blue", 135, 206, 235},
-			}
-
-			for i, c := range palette {
-				col := color.RGB(c.r, c.g, c.b)
-				col.Printf("%-15s", c.name)
-				if (i+1)%4 == 0 {
-					fmt.Println()
-				}
-			}
-			fmt.Println()
-
-			// Background colors with true color
-			fmt.Println("True Color Backgrounds:")
-			trueBgColors := []struct {
-				name    string
-				r, g, b int
-			}{
-				{"Dark Red", 139, 0, 0},
-				{"Dark Green", 0, 100, 0},
-				{"Dark Blue", 0, 0, 139},
-				{"Dark Purple", 75, 0, 130},
-				{"Dark Orange", 255, 140, 0},
-				{"Dark Cyan", 0, 139, 139},
-			}
-
-			for _, bg := range trueBgColors {
-				color.BgRGB(bg.r, bg.g, bg.b).SprintFunc()(fmt.Sprintf(" %-12s ", bg.name))
-			}
-			fmt.Println()
-			fmt.Println()
-
-			// Gradient examples
-			fmt.Println("Gradient Examples:")
-			// Red to yellow gradient
-			fmt.Print("Red→Yellow: ")
-			for i := 0; i <= 20; i++ {
-				r := 255
-				g := (255 * i) / 20
-				b := 0
-				color.RGB(r, g, b).Print("█")
-			}
-			fmt.Println()
-
-			// Blue to green gradient
-			fmt.Print("Blue→Green: ")
-			for i := 0; i <= 20; i++ {
-				r := 0
-				g := (255 * i) / 20
-				b := 255 - (255*i)/20
-				color.RGB(r, g, b).Print("█")
-			}
-			fmt.Println()
-
-			// Test termenv sequences from service/color.go
-			fmt.Println("Termenv TrueColor Sequences Test:")
-			testColors := []struct {
-				name string
-				seq  string
-			}{
-				{"RoleSystem", "\033[38;2;255;167;38m"},    // #FFA726
-				{"RoleUser", "\033[38;2;102;187;106m"},     // #66BB6A
-				{"RoleAssistant", "\033[38;2;66;165;245m"}, // #42A5F5
-				{"ToolCall", "\033[38;2;38;198;218m"},      // #26C6DA
-				{"ToolResponse", "\033[38;2;149;117;205m"}, // #9575CD
-				{"Media", "\033[38;2;38;166;154m"},         // #26A69A
-				{"Success", "\033[38;2;60;179;113m"},       // MediumSeaGreen
-				{"Info", "\033[38;2;95;158;160m"},          // CadetBlue
-				{"Error", "\033[38;2;255;69;0m"},           // Orangered
-				{"Gray", "\033[38;2;128;128;128m"},         // Gray
-				{"Purple", "\033[38;2;147;112;219m"},       // MediumPurple
-				{"Gold", "\033[38;2;255;215;0m"},           // Gold
-			}
-			for _, tc := range testColors {
-				fmt.Printf("%s%s%s ", tc.seq, tc.name, "\033[0m")
-			}
-			fmt.Println()
-			fmt.Println()
-		} else {
-			fmt.Println("=== Limited Color Support ===")
-			fmt.Println("Your terminal doesn't support true color (24-bit).")
-			fmt.Println("For full color experience, use a modern terminal like:")
-			fmt.Println("- iTerm2")
-			fmt.Println("- Alacritty")
-			fmt.Println("- Windows Terminal")
-			fmt.Println("- GNOME Terminal")
-			fmt.Println("- Konsole")
+		// Helper
+		printColor := func(name, colorSeq string) {
+			fmt.Printf("%s%s%s (Text)\n", colorSeq, name, data.ResetSeq)
 		}
 
-		fmt.Println("=== Lipgloss ANSI 256 Color Range (230-255) ===")
-		for i := 230; i <= 255; i++ {
-			style := lipgloss.NewStyle().Foreground(lipgloss.Color(fmt.Sprintf("%d", i)))
-			block := style.Render("█")
-			if i == 240 {
-				fmt.Printf("%s[%d]%s ", block, i, resetColor)
-			} else {
-				fmt.Printf("%s%d%s ", block, i, resetColor)
-			}
-		}
-		fmt.Println()
-		fmt.Println()
+		fmt.Println("=== Semantic Colors ===")
 
-		// Reset at the end
-		color.New(color.Reset).Print("")
+		fmt.Println("\n-- Roles --")
+		printColor("RoleSystemColor", data.RoleSystemColor)
+		printColor("RoleUserColor", data.RoleUserColor)
+		printColor("RoleAssistantColor", data.RoleAssistantColor)
+
+		fmt.Println("\n-- Tools --")
+		printColor("ToolCallColor", data.ToolCallColor)
+		printColor("ToolResponseColor", data.ToolResponseColor)
+
+		fmt.Println("\n-- Status --")
+		printColor("StatusErrorColor", data.StatusErrorColor)
+		printColor("StatusSuccessColor", data.StatusSuccessColor)
+		printColor("StatusWarnColor", data.StatusWarnColor)
+		printColor("StatusInfoColor", data.StatusInfoColor)
+		printColor("StatusDebugColor", data.StatusDebugColor)
+
+		fmt.Println("\n-- Reasoning --")
+		printColor("ReasoningActiveColor", data.ReasoningActiveColor)
+		printColor("ReasoningDoneColor", data.ReasoningDoneColor)
+
+		printColor("ReasoningOffColor", data.ReasoningOffColor)
+		printColor("ReasoningLowColor", data.ReasoningLowColor)
+		printColor("ReasoningMedColor", data.ReasoningMedColor)
+		printColor("ReasoningHighColor", data.ReasoningHighColor)
+
+		fmt.Println("\n-- UI & Workflow --")
+		printColor("SwitchOnColor", data.SwitchOnColor)
+		printColor("SwitchOffColor", data.SwitchOffColor)
+		printColor("TaskCompleteColor", data.TaskCompleteColor)
+		printColor("WorkflowColor", data.WorkflowColor)
+		printColor("AgentRoleColor", data.AgentRoleColor)
+		printColor("ModelColor", data.ModelColor)
+		printColor("DirectoryColor", data.DirectoryColor)
+		printColor("PromptColor", data.PromptColor)
+		printColor("MediaColor", data.MediaColor)
+
+		fmt.Println("\n-- UI & Colors --")
+		printColor("BorderColor", data.BorderColor)
+		printColor("SectionColor", data.SectionColor)
+		printColor("KeyColor", data.KeyColor)
+		printColor("HighlightColor", data.HighlightColor)
+		printColor("DetailColor", data.DetailColor)
+		printColor("ShellOutputColor", data.ShellOutputColor)
+
+		fmt.Println()
+		fmt.Println(data.ResetSeq)
 	},
-}
-
-func supportsTrueColor() bool {
-	return termenv.ColorProfile() == termenv.TrueColor
 }

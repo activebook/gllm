@@ -16,12 +16,14 @@ const (
 	AgentSkillsTitle              = "Agent Skills"
 	AgentMemoryTitle              = "Agent Memory"
 	AgentSubAgentsTitle           = "Sub Agents"
+	AgentWebSearchTitle           = "Web Search"
 	AgentTokenUsageTitle          = "Token usage"
 	AgentMarkdownTitle            = "Markdown output"
 	AgentMCPTitleHighlight        = "[MCP (Model Context Protocol)]()"
 	AgentSkillsTitleHighlight     = "[Agent Skills]()"
 	AgentMemoryTitleHighlight     = "[Agent Memory]()"
 	AgentSubAgentsTitleHighlight  = "[Sub Agents]()"
+	AgentWebSearchTitleHighlight  = "[Web Search]()"
 	AgentTokenUsageTitleHighlight = "[Token usage]()"
 	AgentMarkdownTitleHighlight   = "[Markdown output]()"
 
@@ -29,6 +31,7 @@ const (
 	AgentSkillsBody     = "are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.\nAfter integrating skills, **agent** will use skills automatically."
 	AgentMemoryBody     = "allows agents to remember important facts about you across sessions.\nFacts are used to personalize responses."
 	AgentSubAgentsBody  = "allow an agent to manage and call other agents to perform tasks or workflows.\nUse when you need to orchestrate multiple agents working in parallel."
+	AgentWebSearchBody  = "enables the agent to search the web for real-time information.\nYou must configure a search engine (Google, Bing, Tavily) to use this feature."
 	AgentTokenUsageBody = "allows agents to track their token usage.\nThis helps you to control the cost of using the agent."
 	AgentMarkdownBody   = "allows agents to generate final response in Markdown format.\nThis helps you to format the response in a more readable way."
 
@@ -36,6 +39,7 @@ const (
 	AgentSkillsDescription     = AgentSkillsTitle + " " + AgentSkillsBody
 	AgentMemoryDescription     = AgentMemoryTitle + " " + AgentMemoryBody
 	AgentSubAgentsDescription  = AgentSubAgentsTitle + " " + AgentSubAgentsBody
+	AgentWebSearchDescription  = AgentWebSearchTitle + " " + AgentWebSearchBody
 	AgentTokenUsageDescription = AgentTokenUsageTitle + " " + AgentTokenUsageBody
 	AgentMarkdownDescription   = AgentMarkdownTitle + " " + AgentMarkdownBody
 
@@ -44,6 +48,7 @@ const (
 	AgentSkillsDescriptionHighlight     = AgentSkillsTitleHighlight + AgentSkillsBody
 	AgentMemoryDescriptionHighlight     = AgentMemoryTitleHighlight + AgentMemoryBody
 	AgentSubAgentsDescriptionHighlight  = AgentSubAgentsTitleHighlight + AgentSubAgentsBody
+	AgentWebSearchDescriptionHighlight  = AgentWebSearchTitleHighlight + AgentWebSearchBody
 	AgentTokenUsageDescriptionHighlight = AgentTokenUsageTitleHighlight + AgentTokenUsageBody
 	AgentMarkdownDescriptionHighlight   = AgentMarkdownTitleHighlight + AgentMarkdownBody
 )
@@ -139,6 +144,14 @@ var capsSwitchCmd = &cobra.Command{
 			options = append(options, huh.NewOption("Agent Memory", service.CapabilityAgentMemory))
 		}
 
+		// Web Search
+		if service.IsWebSearchEnabled(agent.Capabilities) {
+			options = append(options, huh.NewOption("Web Search", service.CapabilityWebSearch).Selected(true))
+			selected = append(selected, service.CapabilityWebSearch)
+		} else {
+			options = append(options, huh.NewOption("Web Search", service.CapabilityWebSearch))
+		}
+
 		// Sort with selected at top
 		SortMultiOptions(options, selected)
 
@@ -172,6 +185,7 @@ var capsSwitchCmd = &cobra.Command{
 			service.CapabilityMarkdown,
 			service.CapabilitySubAgents,
 			service.CapabilityAgentMemory,
+			service.CapabilityWebSearch,
 		}
 		for _, cap := range allCaps {
 			if selectedSet[cap] {
@@ -206,6 +220,8 @@ func getFeatureDescription(cap string) string {
 		return AgentSubAgentsDescriptionHighlight
 	case service.CapabilityAgentMemory:
 		return AgentMemoryDescriptionHighlight
+	case service.CapabilityWebSearch:
+		return AgentWebSearchDescriptionHighlight
 	default:
 		return ""
 	}
@@ -217,6 +233,7 @@ func printCapSummary(caps []string) {
 
 	printCapStatus("Token Usage", service.IsTokenUsageEnabled(caps))
 	printCapStatus("Markdown Output", service.IsMarkdownEnabled(caps))
+	printCapStatus("Web Search", service.IsWebSearchEnabled(caps))
 	printCapStatus("MCP Servers", service.IsMCPServersEnabled(caps))
 	printCapStatus("Agent Skills", service.IsAgentSkillsEnabled(caps))
 	printCapStatus("Agent Memory", service.IsAgentMemoryEnabled(caps))
@@ -224,9 +241,9 @@ func printCapSummary(caps []string) {
 }
 
 func printCapStatus(name string, enabled bool) {
-	status := switchOffColor + "Disabled" + resetColor
+	status := data.SwitchOffColor + "Disabled" + data.ResetSeq
 	if enabled {
-		status = switchOnColor + "Enabled" + resetColor
+		status = data.SwitchOnColor + "Enabled" + data.ResetSeq
 	}
 	fmt.Printf("  %-20s %s\n", name+":", status)
 
@@ -240,6 +257,8 @@ func printCapStatus(name string, enabled bool) {
 		desc = AgentSubAgentsDescription
 	case "Agent Memory":
 		desc = AgentMemoryDescription
+	case "Web Search":
+		desc = AgentWebSearchDescription
 	case "Token Usage":
 		desc = AgentTokenUsageDescription
 	case "Markdown Output":
@@ -250,7 +269,7 @@ func printCapStatus(name string, enabled bool) {
 		lines := strings.Split(desc, "\n")
 		for _, line := range lines {
 			if strings.TrimSpace(line) != "" {
-				fmt.Printf("  %s\n", grayColor(line))
+				fmt.Printf("  %s%s%s\n", data.DetailColor, line, data.ResetSeq)
 			}
 		}
 	}

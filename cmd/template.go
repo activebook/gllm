@@ -65,8 +65,8 @@ var templateListCmd = &cobra.Command{
 				prefix := "  "
 				pname := name
 				if name == activeTemplate {
-					prefix = highlightColor("* ")
-					pname = highlightColor(name)
+					prefix = data.HighlightColor + "* " + data.ResetSeq
+					pname = data.HighlightColor + name + data.ResetSeq
 				}
 				fmt.Printf("%s%s\n %s\n\n", prefix, pname, templates[name])
 			}
@@ -76,8 +76,8 @@ var templateListCmd = &cobra.Command{
 				prefix := "  "
 				pname := name
 				if name == activeTemplate {
-					prefix = highlightColor("* ")
-					pname = highlightColor(name)
+					prefix = data.HighlightColor + "* " + data.ResetSeq
+					pname = data.HighlightColor + name + data.ResetSeq
 				}
 				fmt.Printf("%s%s\n", prefix, pname)
 			}

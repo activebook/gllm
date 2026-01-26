@@ -20,10 +20,16 @@ type MCPSettings struct {
 	Allowed []string `json:"allowed"`
 }
 
+// SearchSettings holds search-related settings.
+type SearchSettings struct {
+	Allowed string `json:"allowed"` // The allowed search engine name (e.g., "google", "bing", "tavily")
+}
+
 // Settings represents the structure of settings.json.
 type Settings struct {
 	MCP    MCPSettings    `json:"mcp"`
 	Skills SkillsSettings `json:"skills"`
+	Search SearchSettings `json:"search"`
 }
 
 // SettingsStore provides access to settings.json.
@@ -57,6 +63,9 @@ func NewSettingsStore() *SettingsStore {
 			},
 			MCP: MCPSettings{
 				Allowed: []string{},
+			},
+			Search: SearchSettings{
+				Allowed: "", // Default to empty (use first configured engine)
 			},
 		},
 	}
@@ -205,6 +214,21 @@ func (s *SettingsStore) BlockMCPServer(name string) error {
 func (s *SettingsStore) SetAllowedMCPServers(allowed []string) error {
 	s.mu.Lock()
 	s.settings.MCP.Allowed = allowed
+	s.mu.Unlock()
+	return s.Save()
+}
+
+// GetAllowedSearchEngine returns the allowed search engine name.
+func (s *SettingsStore) GetAllowedSearchEngine() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.settings.Search.Allowed
+}
+
+// SetAllowedSearchEngine sets the allowed search engine name.
+func (s *SettingsStore) SetAllowedSearchEngine(name string) error {
+	s.mu.Lock()
+	s.settings.Search.Allowed = name
 	s.mu.Unlock()
 	return s.Save()
 }
