@@ -48,12 +48,12 @@ func (tu *TokenUsage) renderLipgloss() string {
 	}
 
 	// Styles
-	borderColor := lipgloss.Color(data.BorderHex) // Theme Border Color
-	titleColor := lipgloss.Color(data.SectionHex) // Theme Section Color
-	totalColor := lipgloss.Color(data.SectionHex) // Theme Section Color
-	labelColor := lipgloss.Color(data.DetailHex)  // Theme Detail Color
-	valueColor := lipgloss.Color(data.DetailHex)  // Theme Detail Color
-	headerColor := lipgloss.Color(data.DetailHex) // Theme Detail Color
+	borderColor := lipgloss.Color(data.BorderHex)  // Theme Border Color
+	titleColor := lipgloss.Color(data.SectionHex)  // Theme Section Color
+	headerColor := lipgloss.Color(data.LabelColor) // Theme Detail Color
+	labelColor := lipgloss.Color(data.LabelHex)    // Theme Detail Color
+	valueColor := lipgloss.Color(data.DetailHex)   // Theme Detail Color
+	totalColor := lipgloss.Color(data.SectionHex)  // Theme Section Color
 
 	// Fallback if bright white is empty (some themes might be weird)
 	if data.CurrentTheme.BrightWhite == "" {

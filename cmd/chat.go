@@ -106,7 +106,7 @@ func (ci *ChatInfo) printWelcome() {
 		Padding(0, 0)
 
 	contentStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(data.DetailHex)).
+		Foreground(lipgloss.Color(data.LabelHex)).
 		Padding(0, 2)
 
 	hintStyle := lipgloss.NewStyle().
@@ -168,7 +168,7 @@ func (ci *ChatInfo) startREPL() {
 	ci.printWelcome()
 
 	// Define prompt style
-	tcol := service.GetTerminalWidth() - 4
+	tcol := service.GetTerminalWidth()
 	promptStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color(data.CurrentTheme.Background)).
 		Foreground(lipgloss.Color(data.CurrentTheme.Foreground)).

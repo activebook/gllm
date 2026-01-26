@@ -71,6 +71,7 @@ var (
 	SectionColor     string
 	KeyColor         string
 	HighlightColor   string
+	LabelColor       string
 	DetailColor      string
 	ShellOutputColor string
 
@@ -78,6 +79,7 @@ var (
 	BorderHex  string
 	SectionHex string
 	KeyHex     string
+	LabelHex   string
 	DetailHex  string
 
 	HighCachedHex string
@@ -174,13 +176,15 @@ func applyTheme(t goghthemes.Theme) {
 	SectionColor = toAnsi(t.BrightCyan)
 	KeyColor = toAnsi(t.BrightMagenta)
 	HighlightColor = toAnsi(t.BrightGreen)
+	LabelColor = toAnsi(t.Foreground)
 	DetailColor = toAnsi(t.BrightBlack)
 	ShellOutputColor = toAnsi(t.BrightBlack)
 
 	// Hex Codes
-	BorderHex = t.BrightMagenta
+	BorderHex = t.Foreground
 	SectionHex = t.BrightCyan
 	KeyHex = t.BrightMagenta
+	LabelHex = t.Foreground
 	DetailHex = t.BrightBlack
 
 	HighCachedHex = t.Green
