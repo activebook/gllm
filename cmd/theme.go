@@ -4,12 +4,13 @@ import (
 	"fmt"
 
 	"github.com/activebook/gllm/data"
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
 func init() {
 	rootCmd.AddCommand(themeCmd)
-	themeCmd.AddCommand(themeListCmd)
 	themeCmd.AddCommand(themeSwitchCmd)
 }
 
@@ -17,61 +18,81 @@ var themeCmd = &cobra.Command{
 	Use:   "theme",
 	Short: "Manage and switch themes",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Current Theme: %s%s%s\n", data.HighlightColor, data.CurrentThemeName, data.ResetSeq)
-		fmt.Println()
-		fmt.Println("--- Theme Color Sample ---")
+		fmt.Printf("\nCurrent Theme: %s%s%s\n\n", data.HighlightColor, data.CurrentThemeName, data.ResetSeq)
+
+		var samples []string
 
 		// 1. Enable/Disable
-		fmt.Printf("%-20s: %sEnabled%s / %sDisabled%s\n", "Toggle State", data.SwitchOnColor, data.ResetSeq, data.SwitchOffColor, data.ResetSeq)
+		samples = append(samples, fmt.Sprintf("%-20s: %sEnabled%s / %sDisabled%s", "Toggle State", data.SwitchOnColor, data.ResetSeq, data.SwitchOffColor, data.ResetSeq))
 
-		// 2. Success/Warning/Debug/Info/Error
-		fmt.Printf("%-20s: %sInfo%s | %sWarn%s | %sSuccess%s | %sDebug%s | %sError%s\n",
+		// 2. Status Levels
+		samples = append(samples, fmt.Sprintf("%-20s: %sInfo%s | %sWarn%s | %sSuccess%s | %sDebug%s | %sError%s",
 			"Status Levels",
 			data.StatusInfoColor, data.ResetSeq,
 			data.StatusWarnColor, data.ResetSeq,
 			data.StatusSuccessColor, data.ResetSeq,
 			data.StatusDebugColor, data.ResetSeq,
-			data.StatusErrorColor, data.ResetSeq)
+			data.StatusErrorColor, data.ResetSeq))
 
 		// 3. Normal / Thinking
-		fmt.Printf("%-20s: %sThinking ✓%s\n", "Thinking State", data.ReasoningActiveColor, data.ResetSeq)
-		fmt.Printf("%-20s: %sInner Thinking...%s\n", "Thinking Message", data.ReasoningDoneColor, data.ResetSeq)
-		fmt.Printf("%-20s: %sAssistant Response%s\n", "Normal Message", data.ForegroundColor, data.ResetSeq)
+		samples = append(samples, fmt.Sprintf("%-20s: %sThinking ↓%s", "Thinking State", data.ReasoningActiveColor, data.ResetSeq))
+		samples = append(samples, fmt.Sprintf("%-20s: %sInner Thinking...%s", "Thinking Message", data.ReasoningDoneColor, data.ResetSeq))
+
+		// Thinking Effort
+		samples = append(samples, fmt.Sprintf("%-20s: %sHigh%s | %sMedium%s | %sLow%s | %sOff%s", "Thinking Effort", data.ReasoningHighColor, data.ResetSeq, data.ReasoningMedColor, data.ResetSeq, data.ReasoningLowColor, data.ResetSeq, data.ReasoningOffColor, data.ResetSeq))
+
+		// Normal Message
+		samples = append(samples, fmt.Sprintf("%-20s: Assistant Response", "Normal Message"))
 
 		// 4. Task Complete
-		fmt.Printf("%-20s: %s[✓] Task Completed%s\n", "Completion", data.TaskCompleteColor, data.ResetSeq)
+		samples = append(samples, fmt.Sprintf("%-20s: %s[✓] Task Completed%s", "Completion", data.TaskCompleteColor, data.ResetSeq))
 
 		// 5. Tool Call
-		fmt.Printf("%-20s: %s[TOOL] execute_command()%s\n", "Tool Call", data.ToolCallColor, data.ResetSeq)
+		samples = append(samples, fmt.Sprintf("%-20s: %s[TOOL] execute_command()%s", "Tool Call", data.ToolCallColor, data.ResetSeq))
 
-		// 6. Border Line
-		fmt.Printf("%-20s: %s----------%s\n", "Border Line", data.BorderColor, data.ResetSeq)
-		fmt.Println("--------------------------")
-	},
-}
+		block := lipgloss.JoinVertical(lipgloss.Left, samples...)
 
-var themeListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all available themes",
-	Run: func(cmd *cobra.Command, args []string) {
-		themes := data.ListThemes()
-		for _, name := range themes {
-			if name == data.CurrentThemeName {
-				fmt.Printf("%s* %s%s\n", data.SwitchOnColor, name, data.ResetSeq)
-			} else {
-				fmt.Println(name)
-			}
-		}
+		style := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color(data.BorderHex)).
+			Padding(1, 2).
+			MarginLeft(1)
+
+		fmt.Println(style.Render(block))
 	},
 }
 
 var themeSwitchCmd = &cobra.Command{
-	Use:     "switch <name>",
+	Use:     "switch [name]",
 	Aliases: []string{"sw"},
 	Short:   "Switch to a different theme",
-	Args:    cobra.ExactArgs(1),
+	Args:    cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		name := args[0]
+		var name string
+		if len(args) > 0 {
+			name = args[0]
+		} else {
+			// Interactive mode with filtering
+			themes := data.ListThemes()
+			options := make([]huh.Option[string], len(themes))
+			for i, t := range themes {
+				options[i] = huh.NewOption(t, t)
+			}
+			SortOptions(options, data.CurrentThemeName)
+
+			err := huh.NewSelect[string]().
+				Title("Select Theme").
+				Description("Search through 300+ themes using / to filter").
+				Options(options...).
+				Filtering(true).
+				Value(&name).
+				Run()
+
+			if err != nil {
+				return // User cancelled
+			}
+		}
+
 		err := data.LoadTheme(name)
 		if err != nil {
 			fmt.Printf("%sError: %v%s\n", data.StatusErrorColor, err, data.ResetSeq)
@@ -84,5 +105,7 @@ var themeSwitchCmd = &cobra.Command{
 		}
 
 		fmt.Printf("%sSuccessfully switched to theme: %s%s\n", data.StatusSuccessColor, name, data.ResetSeq)
+		// Run theme command to show new samples
+		themeCmd.Run(themeCmd, []string{})
 	},
 }
