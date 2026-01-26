@@ -61,8 +61,7 @@ var mcpLoadCmd = &cobra.Command{
 			client = &service.MCPClient{}
 			defer client.Close() // ensure resources are cleaned up
 		}
-		indicator := service.NewIndicator("")
-		indicator.Start("MCP Loading...")
+		indicator := service.NewIndicator()
 		err = client.Init(mcpConfig, service.MCPLoadOption{
 			LoadAll:       all,
 			LoadTools:     true,

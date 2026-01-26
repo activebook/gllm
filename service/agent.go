@@ -192,7 +192,7 @@ func CallAgent(op *AgentOptions) error {
 	var std *StdRenderer
 	if !op.QuietMode {
 		std = NewStdRenderer()
-		indicator = NewIndicator("Processing...")
+		indicator = NewIndicator()
 	}
 
 	// Need to output a file
@@ -212,7 +212,7 @@ func CallAgent(op *AgentOptions) error {
 	if IsMCPServersEnabled(op.Capabilities) {
 		mc = GetMCPClient() // use the shared instance
 		if !op.QuietMode {
-			indicator.Start("Loading MCP servers...")
+			indicator.Start(IndicatorLoadingMCP)
 		}
 		err := mc.Init(op.MCPConfig, MCPLoadOption{
 			LoadAll:   false,

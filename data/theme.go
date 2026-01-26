@@ -83,6 +83,7 @@ var (
 	KeyHex     string
 	LabelHex   string
 	DetailHex  string
+	SpinnerHex string
 
 	HighCachedHex string
 	MedCachedHex  string
@@ -190,6 +191,7 @@ func applyTheme(t goghthemes.Theme) {
 	KeyHex = t.BrightMagenta
 	LabelHex = t.Foreground
 	DetailHex = t.BrightBlack
+	SpinnerHex = t.BrightMagenta
 
 	HighCachedHex = t.Green
 	MedCachedHex = t.Yellow

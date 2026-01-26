@@ -107,7 +107,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 			}
 
 			// Create an indeterminate progress bar
-			indicator := service.NewIndicator("Processing...")
+			indicator := service.NewIndicator()
 
 			// If conversation flag is provided, find the conversation file
 			if cmd.Flags().Changed("conversation") {
