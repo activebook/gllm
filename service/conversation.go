@@ -8,7 +8,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/activebook/gllm/data"
 	openai "github.com/sashabaranov/go-openai"
+
 	//"github.com/google/generative-ai-go/genai"
 
 	"github.com/anthropics/anthropic-sdk-go"
@@ -410,7 +412,8 @@ type ConvoMeta struct {
 }
 
 func GetConvoDir() string {
-	dir := MakeUserSubDir("gllm", "convo")
+	dir := data.GetConvoDirPath()
+	os.MkdirAll(dir, 0750)
 	return dir
 }
 
