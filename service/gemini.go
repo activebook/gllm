@@ -266,6 +266,7 @@ func (ag *Agent) GenerateGeminiStream() error {
 			// Skip if not our expected function
 			// Because some model made up function name
 			if funcCall.Name != "" && !IsAvailableOpenTool(funcCall.Name) && !IsAvailableMCPTool(funcCall.Name, ag.MCPClient) {
+				Warnf("Skipping tool call with unknown function name: %s", funcCall.Name)
 				continue
 			}
 			// Handle tool call
