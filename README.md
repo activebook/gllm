@@ -327,6 +327,10 @@ Recursive LM (RLM) instructs the LLM to act as a programmer managing large datas
 
 Agent Skills are a lightweight, open format for extending AI agent capabilities with specialized knowledge, specialized tools, and advanced workflows. Skills are encapsulated in directories containing a `SKILL.md` file with metadata and instructions.
 
+| Arxiv Skill Search Paper | YouTube Download Skill |
+|--------------------------|------------------------|
+| ![Arxiv Skill](screenshots/agentskills_1.png) | ![YouTube Skill](screenshots/agentskills_2.png) |
+
 ### Managing Skills
 
 You can manage skills using the `gllm skills` command:
