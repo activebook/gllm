@@ -21,53 +21,18 @@ Usually, this happens when you get a mysterious error like this one
 This means that you can't use a built-in tool and function calling at the same time in the same agent.
 */
 
-// Tool definitions for Gemini 2
-func (ga *GeminiAgent) getGeminiEmbeddingTools(includeMCP bool) *genai.Tool {
+// Tool definitions for Gemini
+func (ga *GeminiAgent) getGeminiTools() *genai.Tool {
 	// Get filtered tools based on agent's enabled tools list
-	openTools := GetOpenEmbeddingToolsFiltered(ga.EnabledTools)
+	openTools := GetOpenToolsFiltered(ga.EnabledTools)
 	var funcs []*genai.FunctionDeclaration
-
-	// Track registered tool names to prevent duplicates
-	registeredNames := make(map[string]bool)
 
 	for _, openTool := range openTools {
 		geminiTool := openTool.ToGeminiFunctions()
 		funcs = append(funcs, geminiTool)
-		registeredNames[geminiTool.Name] = true
-	}
-
-	// Add MCP tools if requested and client is available
-	if includeMCP && ga.MCPClient != nil {
-		mcpTools := getMCPTools(ga.MCPClient)
-		for _, mcpTool := range mcpTools {
-			geminiTool := mcpTool.ToGeminiFunctions()
-			// Skip MCP tools that have the same name as built-in tools to avoid Gemini duplicate function declaration error
-			if registeredNames[geminiTool.Name] {
-				continue
-			}
-			funcs = append(funcs, geminiTool)
-			registeredNames[geminiTool.Name] = true
-		}
 	}
 
 	// The Gemini API expects all function declarations to be grouped together under a single Tool object.
-	return &genai.Tool{
-		FunctionDeclarations: funcs,
-	}
-}
-
-func (ga *GeminiAgent) getGeminiMCPTools() *genai.Tool {
-	if ga.MCPClient == nil {
-		return nil
-	}
-	mcpTools := getMCPTools(ga.MCPClient)
-	var funcs []*genai.FunctionDeclaration
-
-	for _, mcpTool := range mcpTools {
-		geminiTool := mcpTool.ToGeminiFunctions()
-		funcs = append(funcs, geminiTool)
-	}
-
 	return &genai.Tool{
 		FunctionDeclarations: funcs,
 	}
@@ -100,7 +65,7 @@ func (ga *GeminiAgent) GeminiCloseDiffConfirm() {
 	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusDiffConfirmOver}, ga.ProceedChan)
 }
 
-// Tool implementation functions for Gemini 2
+// Tool implementation functions for Gemini
 
 /**
  * Bug note:

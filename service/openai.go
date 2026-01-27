@@ -139,11 +139,9 @@ func (ag *Agent) GenerateOpenAIStream() error {
 	// Create tools
 	tools := []openai.Tool{}
 	if len(ag.EnabledTools) > 0 {
-		// Add embedding operation tools, which includes the web_search tool
-		embeddingTools := ag.getOpenAIEmbeddingTools()
-		tools = append(tools, embeddingTools...)
+		// Add tools
+		tools = ag.getOpenAITools()
 	}
-	// OpenAI webtools and embedding tools are compatible
 	if ag.MCPClient != nil {
 		// Add MCP tools if MCP client is available
 		mcpTools := ag.getOpenAIMCPTools()
@@ -395,7 +393,8 @@ func (oa *OpenAI) processStream(stream *openai.ChatCompletionStream) (openai.Cha
 
 					// Skip if not our expected function
 					// Because some model made up function name
-					if functionName != "" && !AvailableEmbeddingTool(functionName) && !AvailableSearchTool(functionName) && !AvailableMCPTool(functionName, oa.op.mcpClient) {
+					if functionName != "" && !IsAvailableOpenTool(functionName) && !IsAvailableMCPTool(functionName, oa.op.mcpClient) {
+						Warnf("Skipping tool call with unknown function name: %s", functionName)
 						continue
 					}
 
@@ -487,9 +486,9 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 	var filteredArgs map[string]interface{}
 	if toolCall.Function.Name == "edit_file" || toolCall.Function.Name == "write_file" {
 		// Don't show content(the modified content could be too long)
-		filteredArgs = FilterToolArguments(argsMap, []string{"content", "edits"})
+		filteredArgs = FilterOpenToolArguments(argsMap, []string{"content", "edits"})
 	} else {
-		filteredArgs = FilterToolArguments(argsMap, []string{})
+		filteredArgs = FilterOpenToolArguments(argsMap, []string{})
 	}
 
 	// Call function
@@ -584,12 +583,12 @@ func addUpOpenAITokenUsage(ag *Agent, resp *openai.ChatCompletionStreamResponse)
 	}
 }
 
-// getOpenAIEmbeddingTools returns the embedding tools for OpenAI
-func (ag *Agent) getOpenAIEmbeddingTools() []openai.Tool {
+// getOpenAITools returns the tools for OpenAI
+func (ag *Agent) getOpenAITools() []openai.Tool {
 	var tools []openai.Tool
 
 	// Get filtered tools based on agent's enabled tools list
-	genericTools := GetOpenEmbeddingToolsFiltered(ag.EnabledTools)
+	genericTools := GetOpenToolsFiltered(ag.EnabledTools)
 	for _, genericTool := range genericTools {
 		tools = append(tools, genericTool.ToOpenAITool())
 	}

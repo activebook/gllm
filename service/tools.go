@@ -562,7 +562,8 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (str
 			//return "", fmt.Errorf("purpose not found in arguments")
 			descStr = ""
 		}
-		confirm, err := NeedUserConfirm(fmt.Sprintf(ToolRespConfirmShell, cmdStr, descStr), ToolUserConfirmPrompt, "")
+		// Don't expose shell details too much
+		confirm, err := NeedUserConfirm("", ToolUserConfirmPrompt, descStr)
 		if err != nil {
 			return "", err
 		}

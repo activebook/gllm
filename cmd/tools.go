@@ -36,7 +36,7 @@ Use 'gllm tools sw' to select which tools to enable for the current agent.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
 		fmt.Println()
-		ListEmbeddingTools()
+		ListAllTools()
 	},
 }
 
@@ -103,11 +103,11 @@ var toolsSwCmd = &cobra.Command{
 		}
 
 		fmt.Printf("\n%d tool(s) enabled for current agent.\n\n", len(selectedTools))
-		ListEmbeddingTools()
+		ListAllTools()
 	},
 }
 
-func ListEmbeddingTools() {
+func ListAllTools() {
 	store := data.NewConfigStore()
 	agent := store.GetActiveAgent()
 	if agent == nil {
@@ -115,7 +115,7 @@ func ListEmbeddingTools() {
 		return
 	}
 
-	allTools := service.GetAllEmbeddingTools()
+	allTools := service.GetAllOpenTools()
 
 	// Sort for consistent display
 	sortedTools := make([]string, len(allTools))
@@ -134,12 +134,43 @@ func ListEmbeddingTools() {
 		}
 	}
 
+	// Add skill tools if skills are enabled
+	if service.IsAgentSkillsEnabled(agent.Capabilities) {
+		skillTools := service.GetAllSkillTools()
+		for _, t := range skillTools {
+			enabledSet[t] = true
+		}
+	}
+
+	// Add web search tools if web search is enabled
+	if service.IsWebSearchEnabled(agent.Capabilities) {
+		webSearchTools := service.GetAllSearchTools()
+		for _, t := range webSearchTools {
+			enabledSet[t] = true
+		}
+	}
+
+	// Add sub agents tools if sub agents are enabled
+	if service.IsSubAgentsEnabled(agent.Capabilities) {
+		subAgentsTools := service.GetAllSubagentTools()
+		for _, t := range subAgentsTools {
+			enabledSet[t] = true
+		}
+	}
+
+	// Add agent memory tools if agent memory is enabled
+	if service.IsAgentMemoryEnabled(agent.Capabilities) {
+		agentMemoryTools := service.GetAllMemoryTools()
+		for _, t := range agentMemoryTools {
+			enabledSet[t] = true
+		}
+	}
+
 	enabledCount := 0
 	for range enabledSet {
 		enabledCount++
 	}
 
-	fmt.Println("Embedding tools:")
 	for _, tool := range sortedTools {
 		if enabledSet[tool] {
 			fmt.Printf("[✔] %s\n", tool)

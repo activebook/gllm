@@ -301,13 +301,13 @@ gllm "Read this file @build.sh and change function name"
 
 Build complex workflows where agents collaborate autonomously.
 
-| **GPT-5.2 Workflow** | **DeepSeek V3.2 Workflow** |
+| **GPT-5.2 Workflow** | **Gemini 3.0 Workflow** |
 |:---:|:---:|
-| ![GPT5](screenshots/workflow_gpt5.png) | ![DeepSeek 1](screenshots/workflow_deepseek_1.png)<br>![DeepSeek 2](screenshots/workflow_deepseek_2.png)<br>![DeepSeek 3](screenshots/workflow_deepseek_3.png) |
+| ![GPT5](screenshots/workflow_gpt5.png) | ![Gemini 1](screenshots/workflow_gemini_1.png)<br>![Gemini 2](screenshots/workflow_gemini_2.png)<br>![Gemini 3](screenshots/workflow_gemini_3.png) |
 
-| **Gemini 3.0 Workflow** | **LongCat Workflow** |
-|:---:|:---:|
-| ![Gemini 1](screenshots/workflow_gemini_1.png)<br>![Gemini 2](screenshots/workflow_gemini_2.png)<br>![Gemini 3](screenshots/workflow_gemini_3.png) | ![LongCat 1](screenshots/workflow_longcat_1.png)<br>![LongCat 2](screenshots/workflow_longcat_2.png)<br>![LongCat 3](screenshots/workflow_longcat_3.png) |
+| **DeepSeek V3.2 Workflow** | **Qwen Workflow** | **LongCat Workflow** |
+|:---:|:---:|:---:|
+| ![DeepSeek 1](screenshots/workflow_deepseek_1.png)<br>![DeepSeek 2](screenshots/workflow_deepseek_2.png)<br>![DeepSeek 3](screenshots/workflow_deepseek_3.png) | ![Qwen](screenshots/rlm_qwen_1.png) | ![LongCat 1](screenshots/workflow_longcat_1.png)<br>![LongCat 2](screenshots/workflow_longcat_2.png)<br>![LongCat 3](screenshots/workflow_longcat_3.png) |
 
 #### Recursive LM Workflows
 
@@ -326,6 +326,10 @@ Recursive LM (RLM) instructs the LLM to act as a programmer managing large datas
 ## 🧠 Agent Skills
 
 Agent Skills are a lightweight, open format for extending AI agent capabilities with specialized knowledge, specialized tools, and advanced workflows. Skills are encapsulated in directories containing a `SKILL.md` file with metadata and instructions.
+
+| Arxiv Skill Search Paper | YouTube Download Skill |
+|--------------------------|------------------------|
+| ![Arxiv Skill](screenshots/agentskills_1.png) | ![YouTube Skill](screenshots/agentskills_2.png) |
 
 ### Managing Skills
 

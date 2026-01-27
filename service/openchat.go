@@ -162,11 +162,9 @@ func (ag *Agent) GenerateOpenChatStream() error {
 	// Create a tool with the function
 	tools := []*model.Tool{}
 	if len(ag.EnabledTools) > 0 {
-		// Add embedding operation tools, which includes the web_search tool
-		embeddingTools := ag.getOpenChatEmbeddingTools()
-		tools = append(tools, embeddingTools...)
+		// Add tools
+		tools = ag.getOpenChatTools()
 	}
-	// Openchat webtools and embedding tools are compatible
 	if ag.MCPClient != nil {
 		// Add MCP tools if MCP client is available
 		mcpTools := ag.getOpenChatMCPTools()
@@ -444,7 +442,8 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 
 					// Skip if not our expected function
 					// Because some model made up function name
-					if functionName != "" && !AvailableEmbeddingTool(functionName) && !AvailableSearchTool(functionName) && !AvailableMCPTool(functionName, c.op.mcpClient) {
+					if functionName != "" && !IsAvailableOpenTool(functionName) && !IsAvailableMCPTool(functionName, c.op.mcpClient) {
+						Warnf("Skipping tool call with unknown function name: %s", functionName)
 						continue
 					}
 
@@ -548,9 +547,9 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	var filteredArgs map[string]interface{}
 	if toolCall.Function.Name == "edit_file" || toolCall.Function.Name == "write_file" {
 		// Don't show content(the modified content could be too long)
-		filteredArgs = FilterToolArguments(argsMap, []string{"content", "edits"})
+		filteredArgs = FilterOpenToolArguments(argsMap, []string{"content", "edits"})
 	} else {
-		filteredArgs = FilterToolArguments(argsMap, []string{})
+		filteredArgs = FilterOpenToolArguments(argsMap, []string{})
 	}
 
 	// Call function
@@ -639,11 +638,11 @@ func (ag *Agent) addUpOpenChatTokenUsage(resp *model.ChatCompletionStreamRespons
 	}
 }
 
-func (ag *Agent) getOpenChatEmbeddingTools() []*model.Tool {
+func (ag *Agent) getOpenChatTools() []*model.Tool {
 	var tools []*model.Tool
 
 	// Get filtered tools based on agent's enabled tools list
-	genericTools := GetOpenEmbeddingToolsFiltered(ag.EnabledTools)
+	genericTools := GetOpenToolsFiltered(ag.EnabledTools)
 	for _, genericTool := range genericTools {
 		tools = append(tools, genericTool.ToOpenChatTool())
 	}
