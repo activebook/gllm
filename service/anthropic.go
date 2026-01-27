@@ -55,8 +55,7 @@ func (ag *Agent) GenerateAnthropicStream() error {
 	// Create tools
 	var tools []anthropic.ToolUnionParam
 	if len(ag.EnabledTools) > 0 {
-		embeddingTools := ag.getAnthropicEmbeddingTools()
-		tools = append(tools, embeddingTools...)
+		tools = ag.getAnthropicTools()
 	}
 	if ag.MCPClient != nil {
 		mcpTools := ag.getAnthropicMCPTools()
@@ -285,11 +284,19 @@ func (a *Anthropic) processStream(stream *ssestream.Stream[anthropic.MessageStre
 			case "tool_use": // "tool_use"
 				// Start Tool Use
 				// block.ToolUse is not a field. It's flat.
+				// Skip if not our expected function
+				// Because some model made up function name
+				functionID := block.ID
+				functionName := block.Name
+				if functionName != "" && !IsAvailableOpenTool(functionName) && !IsAvailableMCPTool(functionName, a.op.mcpClient) {
+					Warnf("Skipping tool call with unknown function name: %s", functionName)
+					continue
+				}
 				// ContentBlockStartEventContentBlockUnion fields are embedded.
 				// We can access ID, Name directly.
 				currentToolUse = &anthropic.ToolUseBlockParam{
-					ID:   block.ID,
-					Name: block.Name,
+					ID:   functionID,
+					Name: functionName,
 					Type: constant.ToolUse("tool_use"),
 				}
 				currentInputBuilder.Reset()
@@ -404,9 +411,9 @@ func (a *Anthropic) processToolCall(toolCall anthropic.ToolUseBlockParam) (anthr
 	var filteredArgs map[string]interface{}
 	if toolCall.Name == "edit_file" || toolCall.Name == "write_file" {
 		// Don't show content(the modified content could be too long)
-		filteredArgs = FilterToolArguments(argsMap, []string{"content", "edits"})
+		filteredArgs = FilterOpenToolArguments(argsMap, []string{"content", "edits"})
 	} else {
-		filteredArgs = FilterToolArguments(argsMap, []string{})
+		filteredArgs = FilterOpenToolArguments(argsMap, []string{})
 	}
 
 	// Notify UI
@@ -503,9 +510,9 @@ func (ag *Agent) SortAnthropicMessagesByOrder() error {
 	return nil
 }
 
-func (ag *Agent) getAnthropicEmbeddingTools() []anthropic.ToolUnionParam {
+func (ag *Agent) getAnthropicTools() []anthropic.ToolUnionParam {
 	var tools []anthropic.ToolUnionParam
-	genericTools := GetOpenEmbeddingToolsFiltered(ag.EnabledTools)
+	genericTools := GetOpenToolsFiltered(ag.EnabledTools)
 	for _, genericTool := range genericTools {
 		tools = append(tools, genericTool.ToAnthropicTool())
 	}

@@ -123,6 +123,27 @@ func GetAllSubagentTools() []string {
 	return subagentTools
 }
 
+func GetAllOpenTools() []string {
+	tools := GetAllEmbeddingTools()
+	tools = append(tools, GetAllSearchTools()...)
+	tools = append(tools, GetAllSkillTools()...)
+	tools = append(tools, GetAllMemoryTools()...)
+	tools = append(tools, GetAllSubagentTools()...)
+	return tools
+}
+
+// IsAvailableTool checks if a tool is available for the current agent.
+// It checks if the tool is available in the
+// embedding tools, search tools, skill tools, memory tools, subagent tools, or MCP tools.
+func IsAvailableOpenTool(toolName string) bool {
+	return AvailableEmbeddingTool(toolName) ||
+		AvailableSearchTool(toolName) ||
+		AvailableSkillTool(toolName) ||
+		AvailableMemoryTool(toolName) ||
+		AvailableSubagentTool(toolName)
+}
+
+// AvailableEmbeddingTool checks if a tool is available in the embedding tools.
 func AvailableEmbeddingTool(toolName string) bool {
 	for _, tool := range embeddingTools {
 		if tool == toolName {
@@ -132,6 +153,7 @@ func AvailableEmbeddingTool(toolName string) bool {
 	return false
 }
 
+// AvailableSearchTool checks if a tool is available in the search tools.
 func AvailableSearchTool(toolName string) bool {
 	for _, tool := range searchTools {
 		if tool == toolName {
@@ -141,6 +163,7 @@ func AvailableSearchTool(toolName string) bool {
 	return false
 }
 
+// AvailableSkillTool checks if a tool is available in the skill tools.
 func AvailableSkillTool(toolName string) bool {
 	for _, tool := range skillTools {
 		if tool == toolName {
@@ -150,6 +173,7 @@ func AvailableSkillTool(toolName string) bool {
 	return false
 }
 
+// AvailableMemoryTool checks if a tool is available in the memory tools.
 func AvailableMemoryTool(toolName string) bool {
 	for _, tool := range memoryTools {
 		if tool == toolName {
@@ -159,6 +183,7 @@ func AvailableMemoryTool(toolName string) bool {
 	return false
 }
 
+// AvailableSubagentTool checks if a tool is available in the subagent tools.
 func AvailableSubagentTool(toolName string) bool {
 	for _, tool := range subagentTools {
 		if tool == toolName {
@@ -248,11 +273,11 @@ func RemoveSearchTools(tools []string) []string {
 	return tools
 }
 
-// GetOpenEmbeddingToolsFiltered returns embedding tools filtered by the allowed list.
-// If allowedTools is nil or empty, returns all embedding tools.
+// GetOpenToolsFiltered returns tools filtered by the allowed list.
+// If allowedTools is nil or empty, returns all tools.
 // Unknown tool names are gracefully ignored.
-func GetOpenEmbeddingToolsFiltered(allowedTools []string) []*OpenTool {
-	allTools := getOpenEmbeddingTools()
+func GetOpenToolsFiltered(allowedTools []string) []*OpenTool {
+	allTools := getOpenTools()
 
 	// If no filter specified, return all tools
 	if len(allowedTools) == 0 {
@@ -276,19 +301,7 @@ func GetOpenEmbeddingToolsFiltered(allowedTools []string) []*OpenTool {
 	return filtered
 }
 
-// IsValidEmbeddingTool checks if a tool name is a valid embedding tool
-func IsValidEmbeddingTool(toolName string) bool {
-	return AvailableEmbeddingTool(toolName)
-}
-
-func AvailableMCPTool(toolName string, client *MCPClient) bool {
-	if client == nil {
-		return false
-	}
-	return client.FindTool(toolName) != nil
-}
-
-func FilterToolArguments(argsMap map[string]interface{}, ignoreKeys []string) map[string]interface{} {
+func FilterOpenToolArguments(argsMap map[string]interface{}, ignoreKeys []string) map[string]interface{} {
 	// Create a lookup map for efficient key checking
 	ignoreMap := make(map[string]bool)
 	for _, key := range ignoreKeys {
@@ -450,8 +463,8 @@ func (ot *OpenTool) ToGeminiFunctions() *genai.FunctionDeclaration {
 	}
 }
 
-// getOpenEmbeddingTools returns the embedding tools for all models
-func getOpenEmbeddingTools() []*OpenTool {
+// getOpenTools returns the tools for all models
+func getOpenTools() []*OpenTool {
 	var tools []*OpenTool
 
 	// Shell tool
@@ -481,8 +494,8 @@ func getOpenEmbeddingTools() []*OpenTool {
 
 	tools = append(tools, &webFetchTool)
 
-	// Search tool
-	searchFunc := OpenFunctionDefinition{
+	// Web Search tool
+	webSearchFunc := OpenFunctionDefinition{
 		Name:        "web_search",
 		Description: "Retrieve the most relevant and up-to-date information from the web.",
 		Parameters: map[string]interface{}{
@@ -496,12 +509,12 @@ func getOpenEmbeddingTools() []*OpenTool {
 			"required": []string{"query"},
 		},
 	}
-	searchTool := OpenTool{
+	webSearchTool := OpenTool{
 		Type:     ToolTypeFunction,
-		Function: &searchFunc,
+		Function: &webSearchFunc,
 	}
 
-	tools = append(tools, &searchTool)
+	tools = append(tools, &webSearchTool)
 
 	// Read file tool
 	readFileFunc := OpenFunctionDefinition{
@@ -1213,88 +1226,6 @@ LLM should call with:
 	}
 
 	return &shellTool
-}
-
-// MCPToolsToOpenTool converts an MCPTools struct to an OpenTool with proper JSON schema
-func MCPToolsToOpenTool(mcpTool MCPTool) *OpenTool {
-	properties := make(map[string]interface{})
-	var required []string
-
-	// Use the Properties field which contains the full schema information
-	// instead of the Parameters field which only contains string descriptions
-	for paramName, schema := range mcpTool.Properties {
-		prop := make(map[string]interface{})
-
-		// Set the type
-		if schema.Type != "" {
-			prop["type"] = schema.Type
-		} else if len(schema.Types) > 0 {
-			// If multiple types, use the first one
-			prop["type"] = schema.Types[0]
-		} else {
-			// Default to string if no type specified
-			prop["type"] = "string"
-		}
-
-		// Set the description
-		if schema.Description != "" {
-			prop["description"] = schema.Description
-		}
-
-		// Set default value if present
-		if schema.Default != nil {
-			prop["default"] = schema.Default
-		}
-
-		// Handle enum values
-		if len(schema.Enum) > 0 {
-			prop["enum"] = schema.Enum
-		}
-
-		// Handle array items
-		if schema.Items != nil && schema.Type == "array" {
-			items := make(map[string]interface{})
-			if schema.Items.Type != "" {
-				items["type"] = schema.Items.Type
-			}
-			prop["items"] = items
-		}
-
-		properties[paramName] = prop
-		required = append(required, paramName)
-	}
-
-	parameters := map[string]interface{}{
-		"type":       "object",
-		"properties": properties,
-		"required":   required,
-	}
-
-	return &OpenTool{
-		Type: ToolTypeFunction,
-		Function: &OpenFunctionDefinition{
-			Name:        mcpTool.Name,
-			Description: mcpTool.Description,
-			Parameters:  parameters,
-		},
-	}
-}
-
-// getMCPTools retrieves all MCP tools from the MCPClient and converts them to OpenTool format
-func getMCPTools(client *MCPClient) []*OpenTool {
-	var tools []*OpenTool
-
-	servers := client.GetAllServers()
-	for _, server := range servers {
-		if server.Tools != nil {
-			for _, mcpTool := range *server.Tools {
-				openTool := MCPToolsToOpenTool(mcpTool)
-				tools = append(tools, openTool)
-			}
-		}
-	}
-
-	return tools
 }
 
 // OpenProcessor is the main processor for OpenAI-like models

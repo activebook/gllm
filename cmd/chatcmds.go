@@ -224,7 +224,7 @@ func (ci *ChatInfo) showInfo() {
 
 	// Plugins section
 	printSection("Tools")
-	ListEmbeddingTools()
+	ListAllTools()
 
 	// Current Agent section
 	printSection("Agents")

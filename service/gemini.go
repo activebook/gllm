@@ -131,37 +131,42 @@ func (ag *Agent) GenerateGeminiStream() error {
 		config.SystemInstruction = &genai.Content{Parts: []*genai.Part{{Text: ag.SystemPrompt}}}
 	}
 
-	// - If UseTools is true, enable embedding tools (include MCP if client exists).
-	// - If UseSearch is true, enable Google Search (disable function tools).
-	// - If UseCodeTool is true, enable code execution.
-	// - If UseTools is false but MCP client exists, enable MCP-only tools.
-	// Function tools and Google Search cannot be enabled simultaneously.
+	var tool *genai.Tool
+	if len(ag.EnabledTools) > 0 {
+		// get tools(functions)
+		tool = ga.getGeminiTools()
+	}
+	if ag.MCPClient != nil {
+		// Append MCP tools(functions) to the existing tools
+		if mcpTool := getGeminiMCPTools(ag.MCPClient); mcpTool != nil {
+			tool = appendGeminiTool(tool, mcpTool)
+		}
+	}
+	// Add function tools to config
+	if tool != nil {
+		config.Tools = append(config.Tools, tool)
+	}
 	if ag.SearchEngine.UseSearch {
-		// only load search tool
-		// **Remember: google doesn't support web_search tool plus function call
+		// Add web search tool to config
+		tool = ga.getGeminiWebSearchTool()
+		config.Tools = append(config.Tools, tool)
+	}
+	// // Incompatible tools yet
+	// if ag.UseCodeTool {
+	// 	// Remember: CodeExecution and GoogleSearch cannot be enabled at the same time
+	// 	config.Tools = append(config.Tools, ga.getGeminiCodeExecTool())
+	// }
+
+	// Check whether to show warning message
+	if len(config.Tools) > 1 {
+		// Function tools and Google Search cannot be enabled simultaneously.
 		// Function call is not compatible with Google Search tool
-		config.Tools = append(config.Tools, ga.getGeminiWebSearchTool())
-	} else if len(ag.EnabledTools) > 0 {
-		// load embedding tools (include MCP if available)
-		includeMCP := ag.MCPClient != nil
-		config.Tools = append(config.Tools, ga.getGeminiEmbeddingTools(includeMCP))
-		// Check whether to show warning message
-		if ag.SearchEngine.UseSearch {
-			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
-			ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn,
-				Data: fmt.Sprint("Function tools are enabled.\n" +
-					"Because function tools are not compatible with Google Search tool," +
-					" so Google Search is unavailable now.\n" +
-					"Please disable tools if you want to use Google Search.")}, nil)
-		}
-	} else if ag.UseCodeTool {
-		// Remember: CodeExecution and GoogleSearch cannot be enabled at the same time
-		config.Tools = append(config.Tools, ga.getGeminiCodeExecTool())
-	} else if ag.MCPClient != nil {
-		// Load MCP-only tools when embedding tools are disabled but MCP client exists
-		if mcpTool := ga.getGeminiMCPTools(); mcpTool != nil {
-			config.Tools = append(config.Tools, mcpTool)
-		}
+		// Only keep the first one
+		config.Tools = config.Tools[:1]
+		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
+		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn,
+			Data: fmt.Sprint("Function tools are not compatible with Google Search tool, so Google Search is unavailable now.\n" +
+				"Please disable tools if you want to use Google Search.")}, nil)
 	}
 
 	// Create a chat session - this is the important part
@@ -260,7 +265,7 @@ func (ag *Agent) GenerateGeminiStream() error {
 
 			// Skip if not our expected function
 			// Because some model made up function name
-			if funcCall.Name != "" && !AvailableEmbeddingTool(funcCall.Name) && !AvailableSearchTool(funcCall.Name) && !AvailableMCPTool(funcCall.Name, ag.MCPClient) {
+			if funcCall.Name != "" && !IsAvailableOpenTool(funcCall.Name) && !IsAvailableMCPTool(funcCall.Name, ag.MCPClient) {
 				continue
 			}
 			// Handle tool call
@@ -400,9 +405,9 @@ func (ga *GeminiAgent) processGeminiToolCall(call *genai.FunctionCall) (*genai.F
 	var filteredArgs map[string]interface{}
 	if call.Name == "edit_file" || call.Name == "write_file" {
 		// Don't show content(the modified content could be too long)
-		filteredArgs = FilterToolArguments(call.Args, []string{"content", "edits"})
+		filteredArgs = FilterOpenToolArguments(call.Args, []string{"content", "edits"})
 	} else {
-		filteredArgs = FilterToolArguments(call.Args, []string{})
+		filteredArgs = FilterOpenToolArguments(call.Args, []string{})
 	}
 
 	// Call function
