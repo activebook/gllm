@@ -7,9 +7,14 @@ import (
 	"time"
 )
 
+// get current task dir, it should append a date under tasks
+func GetCurrentTaskDirPath() string {
+	return filepath.Join(GetTasksDirPath(), time.Now().Format("20060102"))
+}
+
 // EnsureTasksDir creates the tasks directory if it doesn't exist.
 func EnsureTasksDir() error {
-	tasksDir := GetTasksDirPath()
+	tasksDir := GetCurrentTaskDirPath()
 	return os.MkdirAll(tasksDir, 0755)
 }
 
@@ -23,7 +28,7 @@ func GenerateTaskFilePath(prefix string, ext string) string {
 	timestamp := time.Now().Format("20060102150405.000")
 	filename := fmt.Sprintf("%s_%s%s", prefix, timestamp, ext)
 
-	tasksDir := GetTasksDirPath()
+	tasksDir := GetCurrentTaskDirPath()
 	return filepath.Join(tasksDir, filename)
 }
 
