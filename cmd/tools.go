@@ -171,11 +171,20 @@ func ListAllTools() {
 		enabledCount++
 	}
 
+	// Append char ' behind the tool name of those non-embedding tools
+	// to tell user those tools are not switchable
+	// they are built-in capabilities tools
 	for _, tool := range sortedTools {
+		displayName := tool
+		if !service.AvailableEmbeddingTool(tool) {
+			displayName += "'"
+		}
 		if enabledSet[tool] {
-			fmt.Printf("[✔] %s\n", tool)
+			fmt.Printf("[✔] %s\n", displayName)
 		} else {
-			fmt.Printf("[ ] %s\n", tool)
+			fmt.Printf("[ ] %s\n", displayName)
 		}
 	}
+	fmt.Printf("\n%d tool(s) enabled for current agent.\n", enabledCount)
+	fmt.Println("' behind the tool name means it is a built-in capabilities tool which can be switched on/off in agent capabilities settings.")
 }

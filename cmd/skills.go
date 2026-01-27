@@ -374,7 +374,7 @@ func printSkillMeta(skill data.SkillMetadata) {
 	if settingsStore.IsSkillDisabled(skill.Name) {
 		status = data.SwitchOffColor + "Disabled" + data.ResetSeq
 	}
-	fmt.Printf("  %s [%s]\n", skill.Name, status)
+	fmt.Printf("  %-30s [%s]\n", skill.Name, status)
 	if skill.Description != "" {
 		lines := strings.Split(skill.Description, "\n")
 		for _, line := range lines {

@@ -241,9 +241,9 @@ func printCapSummary(caps []string) {
 }
 
 func printCapStatus(name string, enabled bool) {
-	status := data.SwitchOffColor + "Disabled" + data.ResetSeq
+	status := "[" + data.SwitchOffColor + "Disabled" + data.ResetSeq + "]"
 	if enabled {
-		status = data.SwitchOnColor + "Enabled" + data.ResetSeq
+		status = "[" + data.SwitchOnColor + "Enabled" + data.ResetSeq + "]"
 	}
 	fmt.Printf("  %-20s %s\n", name+":", status)
 
