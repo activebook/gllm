@@ -10,6 +10,10 @@ import (
 	"github.com/activebook/gllm/data"
 )
 
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
 // FormatEnabledIndicator returns a consistent enabled/disabled bracket indicator
 // When enabled: [✔] with green color
 // When disabled: [ ] with no color
@@ -96,25 +100,50 @@ func GetRandomProcessingWord() string {
 }
 
 type Indicator struct {
-	s *spinner.Spinner
+	s            *spinner.Spinner
+	rotating     bool
+	lastRotation time.Time
+	lastWord     string
+}
+
+func (i *Indicator) setupSpinner() {
+	i.s = spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+	i.s.Color("fgHiMagenta", "bold")
+
+	// Setup the pre-update hook for word rotation
+	i.s.PreUpdate = func(s *spinner.Spinner) {
+		if i.rotating {
+			// Change word every 2 seconds for a whimsical feel
+			if time.Since(i.lastRotation) > 2000*time.Millisecond {
+				newWord := GetRandomProcessingWord()
+				// Try to avoid repeating the same word
+				for newWord == i.lastWord && len(WhimsicalProcessingWords) > 1 {
+					newWord = GetRandomProcessingWord()
+				}
+				s.Suffix = fmt.Sprintf(" %s", newWord)
+				i.lastWord = newWord
+				i.lastRotation = time.Now()
+			}
+		}
+	}
 }
 
 func NewIndicator() *Indicator {
-	i := &Indicator{}
-	i.s = spinner.New(spinner.CharSets[14], 100*time.Millisecond)
-	i.s.Suffix = fmt.Sprintf(" %s", GetRandomProcessingWord())
-	i.s.Color("fgHiMagenta", "bold")
-	i.s.Start()
+	i := &Indicator{
+		rotating: true,
+	}
+	i.setupSpinner()
+	i.Start("")
 	return i
 }
 
-// NewIndicatorWithText creates a new indicator with custom text
+// NewIndicatorWithText creates a new indicator with custom text (no rotation)
 func NewIndicatorWithText(text string) *Indicator {
-	i := &Indicator{}
-	i.s = spinner.New(spinner.CharSets[14], 100*time.Millisecond)
-	i.s.Suffix = fmt.Sprintf(" %s", text)
-	i.s.Color("fgHiMagenta", "bold")
-	i.s.Start()
+	i := &Indicator{
+		rotating: false,
+	}
+	i.setupSpinner()
+	i.Start(text)
 	return i
 }
 
@@ -126,14 +155,21 @@ func (i *Indicator) Stop() {
 
 func (i *Indicator) Start(text string) {
 	if text == "" {
+		i.rotating = true
 		text = GetRandomProcessingWord()
+		i.lastWord = text
+		i.lastRotation = time.Now()
+	} else {
+		i.rotating = false
 	}
+
+	// Always restart to ensure fresh state
 	if i.s.Active() {
 		i.s.Stop()
-		i.s.Suffix = fmt.Sprintf(" %s", text)
-		i.s.Start()
-	} else {
-		i.s.Suffix = fmt.Sprintf(" %s", text)
-		i.s.Start()
 	}
+
+	i.s.Lock()
+	i.s.Suffix = fmt.Sprintf(" %s", text)
+	i.s.Unlock()
+	i.s.Start()
 }
