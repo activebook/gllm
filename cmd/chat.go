@@ -25,7 +25,7 @@ This provides a Read-Eval-Print-Loop (REPL) interface where you can
 have a continuous conversation with the model.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Create an indeterminate progress bar
-		indicator := service.NewIndicator()
+		indicator := ui.NewIndicator()
 
 		var chatInfo *ChatInfo
 		store := data.NewConfigStore()

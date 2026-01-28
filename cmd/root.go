@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	log "github.com/sirupsen/logrus" // Import logrus
 	"github.com/spf13/cobra"
@@ -107,7 +108,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 			}
 
 			// Create an indeterminate progress bar
-			indicator := service.NewIndicator()
+			indicator := ui.NewIndicator()
 
 			// If conversation flag is provided, find the conversation file
 			if cmd.Flags().Changed("conversation") {

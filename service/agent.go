@@ -55,7 +55,7 @@ type Agent struct {
 	OutputFile      *FileRenderer       // File renderer
 	Status          StatusStack         // Stack to manage streaming status
 	Convo           ConversationManager // Conversation manager
-	Indicator       *Indicator          // Indicator Spinner
+	Indicator       *ui.Indicator       // Indicator Spinner
 	LastWrittenData string              // Last written data
 
 	// Sub-agent orchestration
@@ -205,11 +205,11 @@ func CallAgent(op *AgentOptions) error {
 	activeDataCh := dataCh
 
 	// Only create StdRenderer if not in quiet mode
-	var indicator *Indicator
+	var indicator *ui.Indicator
 	var std *StdRenderer
 	if !op.QuietMode {
 		std = NewStdRenderer()
-		indicator = NewIndicator()
+		indicator = ui.NewIndicator()
 	}
 
 	// Need to output a file
@@ -229,7 +229,7 @@ func CallAgent(op *AgentOptions) error {
 	if IsMCPServersEnabled(op.Capabilities) {
 		mc = GetMCPClient() // use the shared instance
 		if !op.QuietMode {
-			indicator.Start(IndicatorLoadingMCP)
+			indicator.Start(ui.IndicatorLoadingMCP)
 		}
 		err := mc.Init(op.MCPConfig, MCPLoadOption{
 			LoadAll:   false,
