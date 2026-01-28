@@ -25,8 +25,7 @@ var mcpCmd = &cobra.Command{
 
 Use 'gllm mcp list' to list all available MCP servers.
 Use 'gllm mcp load' to load all available MCP tools.
-Use 'gllm mcp switch' to switch MCP servers on or off.
-`,
+Use 'gllm mcp switch' to switch MCP servers on or off.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
 		fmt.Println()
@@ -84,11 +83,14 @@ var mcpLoadCmd = &cobra.Command{
 		fmt.Println("Available MCP Servers:")
 
 		for _, server := range servers {
-			status := data.SwitchOffColor + "Blocked" + data.ResetSeq
+			enableIndicator := ui.FormatEnabledIndicator(server.Allowed)
+			var statusSuffix string
 			if server.Allowed {
-				status = data.SwitchOnColor + "Allowed" + data.ResetSeq
+				statusSuffix = data.SwitchOnColor + "(allowed)" + data.ResetSeq
+			} else {
+				statusSuffix = data.SwitchOffColor + "(blocked)" + data.ResetSeq
 			}
-			fmt.Printf("\n%sServer: %s%s (%s)\n", data.SwitchOnColor, server.Name, data.ResetSeq, status)
+			fmt.Printf("\n%s %sServer: %s%s %s\n", enableIndicator, data.SwitchOnColor, server.Name, data.ResetSeq, statusSuffix)
 			if server.Tools != nil {
 				for _, tool := range *server.Tools {
 					fmt.Printf("  • %s%s%s\n", data.StatusWarnColor, tool.Name, data.ResetSeq)
@@ -170,20 +172,20 @@ var mcpListCmd = &cobra.Command{
 		settingsStore := data.GetSettingsStore()
 		for _, name := range names {
 			server := servers[name]
-			indicator := "  "
-			pname := fmt.Sprintf("%-18s", name)
-			status := data.SwitchOffColor + "(blocked)" + data.ResetSeq
+			allowed := settingsStore.IsMCPServerAllowed(name)
+			enableIndicator := ui.FormatEnabledIndicator(allowed)
 
-			if settingsStore.IsMCPServerAllowed(name) {
-				indicator = data.HighlightColor + "* " + data.ResetSeq
-				pname = data.HighlightColor + pname + data.ResetSeq
-				status = data.SwitchOnColor + "(allowed)" + data.ResetSeq
+			var statusSuffix string
+			if allowed {
+				statusSuffix = data.SwitchOnColor + "(allowed)" + data.ResetSeq
+			} else {
+				statusSuffix = data.SwitchOffColor + "(blocked)" + data.ResetSeq
 			}
 
-			fmt.Printf("%s%s %-7s %s\n", indicator, pname, server.Type, status)
+			fmt.Printf("  %s %-18s %-7s %s\n", enableIndicator, name, server.Type, statusSuffix)
 		}
 
-		fmt.Printf("\n(*) Indicates the allowed MCP server.\n")
+		fmt.Printf("\n%s = Allowed MCP server\n", ui.FormatEnabledIndicator(true))
 	},
 }
 
@@ -326,7 +328,7 @@ var mcpSwitchCmd = &cobra.Command{
 		}
 
 		// Run mcp list to show updated list
-		fmt.Printf("\n%d MCP Server(s) enabled.\n", len(selected))
+		fmt.Printf("%d MCP Server(s) enabled.\n", len(selected))
 		fmt.Println()
 		mcpListCmd.Run(mcpListCmd, args)
 	},

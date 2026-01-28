@@ -26,8 +26,7 @@ Agent Skills are a lightweight, open format for extending AI agent capabilities 
 Use 'gllm skills switch' to switch skills on/off.
 Use 'gllm skills list' to list all installed skills.
 Use 'gllm skills install <path>' to install a skill.
-Use 'gllm skills uninstall <name>' to uninstall a skill.
-`,
+Use 'gllm skills uninstall <name>' to uninstall a skill.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
 		fmt.Println()
@@ -67,7 +66,7 @@ var skillsListCmd = &cobra.Command{
 		for _, skill := range skills {
 			printSkillMeta(skill)
 		}
-		fmt.Println()
+		fmt.Printf("%s = Enabled skill\n", ui.FormatEnabledIndicator(true))
 		fmt.Printf("Skills directory: %s\n", data.GetSkillsDirPath())
 	},
 }
@@ -353,7 +352,7 @@ var skillsSwCmd = &cobra.Command{
 		}
 
 		// Run skills list to show updated list
-		fmt.Printf("\n%d skill(s) enabled.\n", len(selectedSkills))
+		fmt.Printf("%d skill(s) enabled.\n", len(selectedSkills))
 		fmt.Println()
 		skillsListCmd.Run(skillsListCmd, args)
 	},
@@ -371,11 +370,10 @@ func init() {
 // printSkillMeta prints a skill in a formatted way
 func printSkillMeta(skill data.SkillMetadata) {
 	settingsStore := data.GetSettingsStore()
-	status := data.SwitchOnColor + "Enabled" + data.ResetSeq
-	if settingsStore.IsSkillDisabled(skill.Name) {
-		status = data.SwitchOffColor + "Disabled" + data.ResetSeq
-	}
-	fmt.Printf("  %-30s [%s]\n", skill.Name, status)
+	enabled := !settingsStore.IsSkillDisabled(skill.Name)
+	indicator := ui.FormatEnabledIndicator(enabled)
+
+	fmt.Printf("  %s %s\n", indicator, skill.Name)
 	if skill.Description != "" {
 		lines := strings.Split(skill.Description, "\n")
 		for _, line := range lines {

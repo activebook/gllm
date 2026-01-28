@@ -69,6 +69,7 @@ var agentListCmd = &cobra.Command{
 		}
 
 		fmt.Println("Available agents:")
+		fmt.Println()
 
 		// Get agent names and sort them
 		names := make([]string, 0, len(agents))
@@ -80,17 +81,17 @@ var agentListCmd = &cobra.Command{
 		activeAgentName := store.GetActiveAgentName()
 		// Display agents in a clean, simple list
 		for _, name := range names {
-			// change color for selected agent
-			prefix := "  "
-			if name == activeAgentName {
-				prefix = data.SwitchOnColor + "* " + data.ResetSeq
-				name = data.SwitchOnColor + name + data.ResetSeq
+			active := name == activeAgentName
+			indicator := ui.FormatEnabledIndicator(active)
+			displayName := name
+			if active {
+				displayName = data.SwitchOnColor + name + data.ResetSeq
 			}
-			fmt.Printf("%s%s\n", prefix, name)
+			fmt.Printf("  %s %s\n", indicator, displayName)
 		}
 
 		if activeAgentName != "" {
-			fmt.Println("\n(*) Indicates the current agent.")
+			fmt.Printf("\n%s = Current agent\n", ui.FormatEnabledIndicator(true))
 		} else {
 			fmt.Println("\nNo agent selected. Use 'gllm agent switch <name>' to select one.")
 			fmt.Println("The first available agent will be used if needed.")

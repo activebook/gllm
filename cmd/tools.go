@@ -103,7 +103,6 @@ var toolsSwCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Printf("\n%d tool(s) enabled for current agent.\n\n", len(selectedTools))
 		ListAllTools()
 	},
 }
@@ -180,11 +179,8 @@ func ListAllTools() {
 		if !service.AvailableEmbeddingTool(tool) {
 			displayName += "'"
 		}
-		if enabledSet[tool] {
-			fmt.Printf("[✔] %s\n", displayName)
-		} else {
-			fmt.Printf("[ ] %s\n", displayName)
-		}
+		indicator := ui.FormatEnabledIndicator(enabledSet[tool])
+		fmt.Printf("%s %s\n", indicator, displayName)
 	}
 	fmt.Printf("\n%d tool(s) enabled for current agent.\n", enabledCount)
 	fmt.Println("' behind the tool name means it is a built-in capabilities tool which can be switched on/off in agent capabilities settings.")
