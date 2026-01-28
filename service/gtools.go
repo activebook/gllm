@@ -648,7 +648,7 @@ func (ga *GeminiAgent) GeminiListAgentToolCall(call *genai.FunctionCall) (*genai
 	return &resp, err
 }
 
-func (ga *GeminiAgent) GeminiCallAgentToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *GeminiAgent) GeminiSpawnSubAgentsToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -660,7 +660,7 @@ func (ga *GeminiAgent) GeminiCallAgentToolCall(call *genai.FunctionCall) (*genai
 		argsMap[k] = v
 	}
 
-	response, err := callAgentToolCallImpl(&argsMap, ga.executor)
+	response, err := spawnSubAgentsToolCallImpl(&argsMap, ga.executor)
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)

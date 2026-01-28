@@ -1257,13 +1257,13 @@ func listAgentToolCallImpl() (string, error) {
 		sb.WriteString("\n")
 	}
 
-	sb.WriteString("Use call_agent to invoke a sub-agent, or switch_agent to hand off to another agent.")
+	sb.WriteString("Use spawn_subagents to invoke a sub-agent, or switch_agent to hand off to another agent.")
 	return sb.String(), nil
 }
 
-// callAgentToolCallImpl handles the call_agent tool call
+// spawnSubAgentsToolCallImpl handles the spawn_subagents tool call
 // Invokes one or more sub-agents and returns progress summary
-func callAgentToolCallImpl(
+func spawnSubAgentsToolCallImpl(
 	argsMap *map[string]interface{},
 	executor *SubAgentExecutor,
 ) (string, error) {

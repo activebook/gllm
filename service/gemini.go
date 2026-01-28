@@ -443,7 +443,7 @@ func (ga *GeminiAgent) processGeminiToolCall(call *genai.FunctionCall) (*genai.F
 		"save_memory":         ga.GeminiSaveMemoryToolCall,
 		"switch_agent":        ga.GeminiSwitchAgentToolCall,
 		"list_agent":          ga.GeminiListAgentToolCall,
-		"call_agent":          ga.GeminiCallAgentToolCall,
+		"spawn_subagents":     ga.GeminiSpawnSubAgentsToolCall,
 		"get_state":           ga.GeminiGetStateToolCall,
 		"set_state":           ga.GeminiSetStateToolCall,
 		"list_state":          ga.GeminiListStateToolCall,
