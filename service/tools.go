@@ -1433,14 +1433,15 @@ func activateSkillToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsU
 	// Get or create skill manager (singleton pattern)
 	sm := GetSkillManager()
 	// Activate skill: Get skill details
-	skillDetails, err := sm.ActivateSkill(name)
+	skillDetails, desc, tree, err := sm.ActivateSkill(name)
 	if err != nil {
 		return "", err
 	}
 
 	// Check if confirmation is needed (default logic: always confirm unless AutoApprove is true)
 	if !toolsUse.AutoApprove {
-		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("activate skill '%s'", name), ToolUserConfirmPrompt, skillDetails)
+		description := "Description:\n" + desc + "\n\nResources:\n" + tree
+		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("activate skill '%s'", name), ToolUserConfirmPrompt, description)
 		if err != nil {
 			return "", err
 		}

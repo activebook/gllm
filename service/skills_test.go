@@ -78,9 +78,16 @@ Do testing stuff.`
 	}
 
 	// Test ActivateSkill
-	instructions, err := sm.ActivateSkill(skillName)
+	instructions, description, resources, err := sm.ActivateSkill(skillName)
 	if err != nil {
 		t.Fatalf("ActivateSkill failed: %v", err)
+	}
+
+	if description != "A test skill" {
+		t.Errorf("Description mismatch. Got: %s", description)
+	}
+	if resources == "" {
+		t.Error("Resources should not be empty")
 	}
 
 	if !strings.Contains(instructions, "Do testing stuff") {

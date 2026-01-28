@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -111,13 +112,17 @@ func (sm *SkillManager) GetAvailableSkills() string {
 //
 // Returns:
 //   - string: A structured XML string containing the skill instructions and available resources
+//   - string: The skill description
+//   - string: A structured XML string representing the skill's directory tree
 //   - error: An error if the skill is not found, the file cannot be read, or the file tree cannot be generated
 //
 // Note:
 //   - The function assumes skill files follow the YAML frontmatter format with three "---" delimiters
 //   - The function uses read locks for concurrent access to the skills list
 //   - If the skill file does not contain frontmatter, the entire file content is treated as instructions
-func (sm *SkillManager) ActivateSkill(name string) (string, error) {
+
+// ActivateSkill activates a skill by name and returns its instructions, description, and available resources.
+func (sm *SkillManager) ActivateSkill(name string) (string, string, string, error) {
 	sm.mu.RLock()
 	var selectedSkill *data.SkillMetadata
 	lowerName := strings.ToLower(name)
@@ -130,13 +135,13 @@ func (sm *SkillManager) ActivateSkill(name string) (string, error) {
 	sm.mu.RUnlock()
 
 	if selectedSkill == nil {
-		return "", fmt.Errorf("skill '%s' not found", name)
+		return "", "", "", fmt.Errorf("skill '%s' not found", name)
 	}
 
 	// Read content (already validated during scan/parse)
 	content, err := os.ReadFile(selectedSkill.Location)
 	if err != nil {
-		return "", fmt.Errorf("failed to read skill file: %w", err)
+		return "", "", "", fmt.Errorf("failed to read skill file: %w", err)
 	}
 
 	// Remove frontmatter
@@ -150,7 +155,7 @@ func (sm *SkillManager) ActivateSkill(name string) (string, error) {
 	skillDir := filepath.Dir(selectedSkill.Location)
 	tree, err := sm.GenerateFileTree(skillDir)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate file tree: %w", err)
+		return "", "", "", fmt.Errorf("failed to generate file tree: %w", err)
 	}
 
 	var sb strings.Builder
@@ -163,54 +168,70 @@ func (sm *SkillManager) ActivateSkill(name string) (string, error) {
 	sb.WriteString("  </available_resources>\n")
 	sb.WriteString("</activated_skill>")
 
-	return sb.String(), nil
+	return sb.String(), selectedSkill.Description, tree, nil
 }
 
-// GenerateFileTree generates a tree representation of the skill directory
-// Only includes relevant files, ignoring .git, .DS_Store etc.
+// GenerateFileTree generates a professional tree representation of the skill directory
+// utilizing Unicode box-drawing characters for enhanced structural clarity.
 func (sm *SkillManager) GenerateFileTree(dir string) (string, error) {
 	var sb strings.Builder
-	rootPath := dir
-
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Handle exclusions
-		if info.IsDir() {
-			if strings.HasPrefix(info.Name(), ".") || info.Name() == "node_modules" {
-				return filepath.SkipDir
-			}
-		}
-
-		// Calculate depth and indentation
-		relPath, _ := filepath.Rel(rootPath, path)
-		if relPath == "." {
-			return nil
-		}
-
-		depth := strings.Count(relPath, string(os.PathSeparator))
-		indent := strings.Repeat("    ", depth)
-
-		// Format: indent + name
-		if info.IsDir() {
-			sb.WriteString(fmt.Sprintf("%s%s/\n", indent, info.Name()))
-		} else {
-			if info.Name() == ".DS_Store" {
-				return nil
-			}
-			sb.WriteString(fmt.Sprintf("%s%s\n", indent, info.Name()))
-		}
-
-		return nil
-	})
-
+	sb.WriteString(fmt.Sprintf("%s\n", dir))
+	err := sm.generateTreeRecursive(dir, "", &sb)
 	if err != nil {
 		return "", err
 	}
-
 	return sb.String(), nil
+}
+
+// generateTreeRecursive is a helper that traverses the directory tree and builds the string representation.
+func (sm *SkillManager) generateTreeRecursive(dir string, prefix string, sb *strings.Builder) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+
+	// Filter and separate directories and files for organized sorting
+	var filtered []os.DirEntry
+	for _, entry := range entries {
+		name := entry.Name()
+		if name == ".git" || name == "node_modules" || name == ".DS_Store" || strings.HasPrefix(name, ".") {
+			continue
+		}
+		filtered = append(filtered, entry)
+	}
+
+	// Sort logic: Directories first, then alphabetical
+	sort.Slice(filtered, func(i, j int) bool {
+		if filtered[i].IsDir() && !filtered[j].IsDir() {
+			return true
+		}
+		if !filtered[i].IsDir() && filtered[j].IsDir() {
+			return false
+		}
+		return filtered[i].Name() < filtered[j].Name()
+	})
+
+	for i, entry := range filtered {
+		isLast := i == len(filtered)-1
+		connector := "├── "
+		newPrefix := prefix + "│   "
+		if isLast {
+			connector = "└── "
+			newPrefix = prefix + "    "
+		}
+
+		name := entry.Name()
+		if entry.IsDir() {
+			sb.WriteString(fmt.Sprintf("%s%s%s/\n", prefix, connector, name))
+			if err := sm.generateTreeRecursive(filepath.Join(dir, name), newPrefix, sb); err != nil {
+				return err
+			}
+		} else {
+			sb.WriteString(fmt.Sprintf("%s%s%s\n", prefix, connector, name))
+		}
+	}
+
+	return nil
 }
 
 // CreateTestSkill creates a temporary test skill for verification
