@@ -446,7 +446,8 @@ func CallAgent(op *AgentOptions) error {
 
 			switch notify.Status {
 			case StatusProcessing:
-				ag.StartIndicator("Processing...")
+				// Start indicator (let indicator decide the text)
+				ag.StartIndicator("")
 				proceedCh <- true
 			case StatusStarted:
 				ag.StopIndicator()
