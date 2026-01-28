@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -69,7 +70,7 @@ var searchSwitchCmd = &cobra.Command{
 			}
 
 			// Interactive select
-			SortOptions(options, engine)
+			ui.SortOptions(options, engine)
 			err := huh.NewSelect[string]().
 				Title("Switch Search Engine").
 				Description("Select the search engine to use for the current agent").
@@ -118,7 +119,7 @@ var searchSetCmd = &cobra.Command{
 				huh.NewOption("Bing", service.BingSearchEngine),
 				huh.NewOption("Tavily", service.TavilySearchEngine),
 			}
-			SortOptions(options, engine)
+			ui.SortOptions(options, engine)
 
 			err := huh.NewSelect[string]().
 				Title("Select Search Engine to Configure").
@@ -175,7 +176,7 @@ var searchSetCmd = &cobra.Command{
 						Description("Number of references to display (default: 5)").
 						Value(&mrStr).
 						Validate(validateInt),
-					GetStaticHuhNote("", "Quota: 100 searches per day (free tier)"),
+					ui.GetStaticHuhNote("", "Quota: 100 searches per day (free tier)"),
 				),
 			).Run()
 			if err != nil {
@@ -218,7 +219,7 @@ var searchSetCmd = &cobra.Command{
 						Description("Number of references to display (default: 5)").
 						Value(&mrStr).
 						Validate(validateInt),
-					GetStaticHuhNote("", "Quota: 100 searches per month (free tier)"),
+					ui.GetStaticHuhNote("", "Quota: 100 searches per month (free tier)"),
 				),
 			).Run()
 			if err != nil {
@@ -260,7 +261,7 @@ var searchSetCmd = &cobra.Command{
 						Description("Number of references to display (default: 5)").
 						Value(&mrStr).
 						Validate(validateInt),
-					GetStaticHuhNote("", "Quota: 1000 searches per month (free tier)"),
+					ui.GetStaticHuhNote("", "Quota: 1000 searches per month (free tier)"),
 				),
 			).Run()
 			if err != nil {

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -123,7 +124,7 @@ Examples:
 							return nil
 						}),
 				),
-			).WithKeyMap(GetHuhKeyMap()).Run()
+			).WithKeyMap(ui.GetHuhKeyMap()).Run()
 			if err != nil {
 				return
 			}

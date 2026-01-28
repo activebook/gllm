@@ -7,6 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -73,7 +74,7 @@ var editorSwitchCmd = &cobra.Command{
 			for _, ed := range installed {
 				options = append(options, huh.NewOption(ed, ed))
 			}
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Preferred Editor").

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -217,7 +218,7 @@ var skillsUninstallCmd = &cobra.Command{
 			for _, s := range skills {
 				options = append(options, huh.NewOption(s.Name, s.Name))
 			}
-			SortOptions(options, "")
+			ui.SortOptions(options, "")
 
 			err = huh.NewSelect[string]().
 				Title("Select skill to uninstall").
@@ -309,7 +310,7 @@ var skillsSwCmd = &cobra.Command{
 			options = append(options, opt)
 		}
 
-		SortMultiOptions(options, enabledSkills)
+		ui.SortMultiOptions(options, enabledSkills)
 
 		var selectedSkills []string
 		multiSelect := huh.NewMultiSelect[string]().
@@ -317,7 +318,7 @@ var skillsSwCmd = &cobra.Command{
 			Description("Choose which skills to enable. Press space to toggle, enter to confirm.").
 			Options(options...).
 			Value(&selectedSkills)
-		note := GetDynamicHuhNote("Skill Description", multiSelect, func(name string) string {
+		note := ui.GetDynamicHuhNote("Skill Description", multiSelect, func(name string) string {
 			for _, s := range skills {
 				if s.Name == name {
 					return s.Description

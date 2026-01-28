@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -379,7 +380,7 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 			for m := range modelsMap {
 				options = append(options, huh.NewOption(m, m))
 			}
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Edit").
@@ -560,7 +561,7 @@ var modelInfoCmd = &cobra.Command{
 			for n := range modelsMap {
 				options = append(options, huh.NewOption(n, n))
 			}
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Check").
@@ -631,7 +632,7 @@ gllm model remove gpt4 --force`,
 			for m := range modelsMap {
 				options = append(options, huh.NewOption(m, m))
 			}
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Remove").
@@ -749,7 +750,7 @@ to the specified one for all subsequent operations.`,
 			for m := range modelsMap {
 				options = append(options, huh.NewOption(m, m))
 			}
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Model").

@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -306,7 +307,7 @@ var mcpSwitchCmd = &cobra.Command{
 		}
 
 		// Sort options by name alphabetically and keep selected ones at top
-		SortMultiOptions(options, selected)
+		ui.SortMultiOptions(options, selected)
 
 		err = huh.NewMultiSelect[string]().
 			Title("Select MCP servers to allow").
@@ -406,7 +407,7 @@ var mcpSetCmd = &cobra.Command{
 						Value(&content).
 						WithHeight(height),
 				),
-			).WithKeyMap(GetHuhKeyMap())
+			).WithKeyMap(ui.GetHuhKeyMap())
 			err = form.Run()
 			if err != nil {
 				fmt.Println("Edit cancelled.")

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -153,7 +154,7 @@ var capsSwitchCmd = &cobra.Command{
 		}
 
 		// Sort with selected at top
-		SortMultiOptions(options, selected)
+		ui.SortMultiOptions(options, selected)
 
 		// Create multi select
 		msfeatures := huh.NewMultiSelect[string]().
@@ -161,7 +162,7 @@ var capsSwitchCmd = &cobra.Command{
 			Description("Use space to toggle, enter to confirm.").
 			Options(options...).
 			Value(&selected)
-		featureNote := GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
+		featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
 		err := huh.NewForm(
 			huh.NewGroup(msfeatures, featureNote),
 		).Run()

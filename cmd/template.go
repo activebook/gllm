@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -130,7 +131,7 @@ Example:
 							return nil
 						}),
 				),
-			).WithKeyMap(GetHuhKeyMap())
+			).WithKeyMap(ui.GetHuhKeyMap())
 			err := form.Run()
 			if err != nil {
 				return nil
@@ -181,7 +182,7 @@ Example:
 			for n := range templates {
 				options = append(options, huh.NewOption(n, n))
 			}
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Template to Edit").
@@ -207,7 +208,7 @@ Example:
 						Value(&content).
 						Lines(10),
 				),
-			).WithKeyMap(GetHuhKeyMap()).Run()
+			).WithKeyMap(ui.GetHuhKeyMap()).Run()
 			if err != nil {
 				return nil
 			}
@@ -246,7 +247,7 @@ var templateInfoCmd = &cobra.Command{
 			for n := range templates {
 				options = append(options, huh.NewOption(n, n))
 			}
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Template to Check").
@@ -291,7 +292,7 @@ var templateRemoveCmd = &cobra.Command{
 			for n := range templates {
 				options = append(options, huh.NewOption(n, n))
 			}
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Template to Remove").
@@ -376,7 +377,7 @@ var templateSwitchCmd = &cobra.Command{
 				// bugfix: must set a non-empty value, otherwise the sort will fail
 				options = append(options, huh.NewOption("None", " "))
 			}
-			SortOptions(options, currentName)
+			ui.SortOptions(options, currentName)
 
 			name = currentName
 

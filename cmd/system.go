@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -135,7 +136,7 @@ Example:
 							return nil
 						}),
 				),
-			).WithKeyMap(GetHuhKeyMap())
+			).WithKeyMap(ui.GetHuhKeyMap())
 			err := form.Run()
 			if err != nil {
 				return nil // User cancelled
@@ -185,7 +186,7 @@ Example:
 			for n := range sysPrompts {
 				options = append(options, huh.NewOption(n, n))
 			}
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select System Prompt to Edit").
@@ -212,7 +213,7 @@ Example:
 						Value(&content).
 						Lines(10),
 				),
-			).WithKeyMap(GetHuhKeyMap()).Run()
+			).WithKeyMap(ui.GetHuhKeyMap()).Run()
 			if err != nil {
 				return nil
 			}
@@ -251,7 +252,7 @@ var systemInfoCmd = &cobra.Command{
 			for n := range sysPrompts {
 				options = append(options, huh.NewOption(n, n))
 			}
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select System Prompt to Check").
@@ -298,7 +299,7 @@ var systemRemoveCmd = &cobra.Command{
 			for n := range sysPrompts {
 				options = append(options, huh.NewOption(n, n))
 			}
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select System Prompt to Remove").
@@ -387,7 +388,7 @@ var systemSwitchCmd = &cobra.Command{
 				options = append(options, huh.NewOption("None", " "))
 			}
 
-			SortOptions(options, currentName)
+			ui.SortOptions(options, currentName)
 
 			name = currentName // Pre-fill with current
 

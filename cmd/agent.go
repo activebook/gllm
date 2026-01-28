@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -130,7 +131,7 @@ var agentAddCmd = &cobra.Command{
 			modelOptions = append(modelOptions, huh.NewOption(m, m))
 		}
 		// Sort models
-		SortOptions(modelOptions, "")
+		ui.SortOptions(modelOptions, "")
 
 		// Templates
 		templatesMap := store.GetTemplates()
@@ -139,7 +140,7 @@ var agentAddCmd = &cobra.Command{
 		for t := range templatesMap {
 			templateOptions = append(templateOptions, huh.NewOption(t, t))
 		}
-		SortOptions(templateOptions, "")
+		ui.SortOptions(templateOptions, "")
 
 		// System Prompts
 		sysPromptsMap := store.GetSystemPrompts()
@@ -148,7 +149,7 @@ var agentAddCmd = &cobra.Command{
 		for s := range sysPromptsMap {
 			sysPromptOptions = append(sysPromptOptions, huh.NewOption(s, s))
 		}
-		SortOptions(sysPromptOptions, "")
+		ui.SortOptions(sysPromptOptions, "")
 
 		// Tools
 		toolsList := service.GetAllEmbeddingTools()
@@ -156,7 +157,7 @@ var agentAddCmd = &cobra.Command{
 		for _, s := range toolsList {
 			toolsOptions = append(toolsOptions, huh.NewOption(s, s).Selected(true))
 		}
-		SortOptions(toolsOptions, "")
+		ui.SortOptions(toolsOptions, "")
 
 		// Build form
 
@@ -240,7 +241,7 @@ var agentAddCmd = &cobra.Command{
 					Description("Choose which tools to enable for this agent. Press space to toggle, enter to confirm.").
 					Options(toolsOptions...).
 					Value(&tools),
-				GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
+				ui.GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
 			),
 		).Run()
 		if err != nil {
@@ -255,7 +256,7 @@ var agentAddCmd = &cobra.Command{
 					Description("The maximum number of Model calling recursions allowed").
 					Value(&maxRecursions).
 					Validate(ValidateMaxRecursions),
-				GetStaticHuhNote("Why set this", MaxRecursionsDescription),
+				ui.GetStaticHuhNote("Why set this", MaxRecursionsDescription),
 			),
 		).Run()
 		if err != nil {
@@ -296,7 +297,7 @@ var agentAddCmd = &cobra.Command{
 				huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(false),
 				huh.NewOption("Enable Web Search", service.CapabilityWebSearch).Selected(false)).
 			Value(&capabilities)
-		featureNote := GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
+		featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
 		err = huh.NewForm(
 			huh.NewGroup(
 				msfeatures,
@@ -361,7 +362,7 @@ var agentSetCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			// Sort names alphabetically and keep selected agent at top if exists
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent to Edit").
@@ -413,7 +414,7 @@ var agentSetCmd = &cobra.Command{
 		for name := range modelsMap {
 			modelOptions = append(modelOptions, huh.NewOption(name, name))
 		}
-		SortOptions(modelOptions, model)
+		ui.SortOptions(modelOptions, model)
 
 		templatesMap := store.GetTemplates()
 		var templateOptions []huh.Option[string]
@@ -421,7 +422,7 @@ var agentSetCmd = &cobra.Command{
 		for t := range templatesMap {
 			templateOptions = append(templateOptions, huh.NewOption(t, t))
 		}
-		SortOptions(templateOptions, template)
+		ui.SortOptions(templateOptions, template)
 
 		sysPromptsMap := store.GetSystemPrompts()
 		var sysPromptOptions []huh.Option[string]
@@ -429,7 +430,7 @@ var agentSetCmd = &cobra.Command{
 		for s := range sysPromptsMap {
 			sysPromptOptions = append(sysPromptOptions, huh.NewOption(s, s))
 		}
-		SortOptions(sysPromptOptions, sysPrompt)
+		ui.SortOptions(sysPromptOptions, sysPrompt)
 
 		// Tools - build options with pre-selected state
 		toolsList := service.GetAllEmbeddingTools()
@@ -446,7 +447,7 @@ var agentSetCmd = &cobra.Command{
 			toolsOptions = append(toolsOptions, opt)
 		}
 		// Sort: selected items first, then alphabetically within each group
-		SortMultiOptions(toolsOptions, tools)
+		ui.SortMultiOptions(toolsOptions, tools)
 
 		// Think
 		// Current level for pre-selection
@@ -457,7 +458,7 @@ var agentSetCmd = &cobra.Command{
 			huh.NewOption("Medium - Moderate reasoning", "medium").Selected(currentThinkLevel == service.ThinkingLevelMedium),
 			huh.NewOption("High - Maximum reasoning", "high").Selected(currentThinkLevel == service.ThinkingLevelHigh),
 		}
-		SortOptions(thinkOptions, think)
+		ui.SortOptions(thinkOptions, think)
 
 		// Build form
 		// Model
@@ -510,7 +511,7 @@ var agentSetCmd = &cobra.Command{
 					Description("Choose which tools to enable for this agent. Press space to toggle, enter to confirm.").
 					Options(toolsOptions...).
 					Value(&tools),
-				GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
+				ui.GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
 			),
 		).Run()
 		if err != nil {
@@ -525,7 +526,7 @@ var agentSetCmd = &cobra.Command{
 					Description("The maximum number of Model calling recursions allowed").
 					Value(&maxRecursions).
 					Validate(ValidateMaxRecursions),
-				GetStaticHuhNote("Why set this", MaxRecursionsDescription),
+				ui.GetStaticHuhNote("Why set this", MaxRecursionsDescription),
 			),
 		).Run()
 		if err != nil {
@@ -560,13 +561,13 @@ var agentSetCmd = &cobra.Command{
 			huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(capsSet[service.CapabilitySubAgents]),
 			huh.NewOption("Enable Web Search", service.CapabilityWebSearch).Selected(capsSet[service.CapabilityWebSearch]),
 		}
-		SortMultiOptions(capsOpts, capabilities)
+		ui.SortMultiOptions(capsOpts, capabilities)
 		msfeatures := huh.NewMultiSelect[string]().
 			Title("Agent Capabilities").
 			Description("Use space to toggle, enter to confirm.").
 			Options(capsOpts...).
 			Value(&capabilities)
-		featureNote := GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
+		featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
 		err = huh.NewForm(
 			huh.NewGroup(
 				msfeatures,
@@ -639,7 +640,7 @@ var agentRemoveCmd = &cobra.Command{
 			for n := range agents {
 				options = append(options, huh.NewOption(n, n))
 			}
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent to Remove").
@@ -709,7 +710,7 @@ tools, search settings, and other preferences to match the selected agent.`,
 				options = append(options, huh.NewOption(n, n))
 			}
 			// Sort names alphabetically and keep selected agent at top if exists
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent").
@@ -756,7 +757,7 @@ var agentInfoCmd = &cobra.Command{
 			for n := range agents {
 				options = append(options, huh.NewOption(n, n))
 			}
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent to Check").

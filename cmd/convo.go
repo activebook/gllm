@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
@@ -105,7 +106,7 @@ gllm convo remove "2 - 5" --force`,
 				}
 				options = append(options, huh.NewOption(label, c.Name))
 			}
-			SortOptions(options, "")
+			ui.SortOptions(options, "")
 
 			var selected []string
 			err = huh.NewMultiSelect[string]().
@@ -345,7 +346,7 @@ Using the --message-chars (-c) flag, set the maximum length of each message's co
 				}
 				options = append(options, huh.NewOption(label, c.Name))
 			}
-			SortOptions(options, "")
+			ui.SortOptions(options, "")
 
 			err = huh.NewSelect[string]().
 				Title("Select Conversation").
@@ -411,7 +412,7 @@ Using the --message-chars (-c) flag, set the maximum length of each message's co
 		}
 
 		// Show viewport
-		m := NewViewportModel(provider, content, func() string {
+		m := ui.NewViewportModel(provider, content, func() string {
 			return fmt.Sprintf("Conversation: %s", convoName)
 		})
 
@@ -455,7 +456,7 @@ var convoRenameCmd = &cobra.Command{
 					}
 					options = append(options, huh.NewOption(label, c.Name))
 				}
-				SortOptions(options, "")
+				ui.SortOptions(options, "")
 
 				err = huh.NewSelect[string]().
 					Title("Select Conversation to Rename").

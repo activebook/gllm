@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -190,7 +191,7 @@ func RunInitWizard() error {
 			huh.NewOption("Enable Agent Memory", service.CapabilityAgentMemory).Selected(true),
 			huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(true),
 		).Value(&selectedFeatures)
-	featureNote := GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
+	featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
 
 	// Details Group
 	// We use a dynamic form to set the default model
@@ -243,11 +244,11 @@ func RunInitWizard() error {
 				Description("Choose which tools to enable for this agent. Press space to toggle, enter to confirm.").
 				Options(func() []huh.Option[string] {
 					opts := buildToolsOptions()
-					SortMultiOptions(opts, []string{}) // No tools selected by default
+					ui.SortMultiOptions(opts, []string{}) // No tools selected by default
 					return opts
 				}()...).
 				Value(&selectedTools),
-			GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
+			ui.GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
 		),
 		// Group 4: Thinking Level
 		huh.NewGroup(

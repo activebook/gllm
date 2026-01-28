@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 )
 
 // Tool robustness constants
@@ -105,11 +106,11 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, 
 		}
 
 		// Show diff if we have current content
-		diff := Diff(currentContent, content, "", "", 3)
+		diff := ui.Diff(currentContent, content, "", "", 3)
 		showDiff(diff)
 
 		// Directly prompt user for confirmation
-		confirm, err := NeedUserConfirm(fmt.Sprintf("write content to the file at path: %s", path), ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("write content to the file at path: %s", path), ToolUserConfirmPrompt, "")
 		if err != nil {
 			return "", err
 		}
@@ -213,7 +214,7 @@ func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse)
 
 	if needConfirm && !toolsUse.AutoApprove {
 		// Directly prompt user for confirmation
-		confirm, err := NeedUserConfirm(fmt.Sprintf("delete the file at path: %s", path), ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("delete the file at path: %s", path), ToolUserConfirmPrompt, "")
 		if err != nil {
 			return "", err
 		}
@@ -246,7 +247,7 @@ func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *Tool
 
 	if needConfirm && !toolsUse.AutoApprove {
 		// Directly prompt user for confirmation
-		confirm, err := NeedUserConfirm(fmt.Sprintf("delete the directory at path: %s and all its contents", path), ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("delete the directory at path: %s and all its contents", path), ToolUserConfirmPrompt, "")
 		if err != nil {
 			return "", err
 		}
@@ -284,7 +285,7 @@ func moveToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (stri
 
 	if needConfirm && !toolsUse.AutoApprove {
 		// Directly prompt user for confirmation
-		confirm, err := NeedUserConfirm(fmt.Sprintf("move the file or directory from %s to %s", source, destination), ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("move the file or directory from %s to %s", source, destination), ToolUserConfirmPrompt, "")
 		if err != nil {
 			return "", err
 		}
@@ -563,7 +564,7 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (str
 			descStr = ""
 		}
 		// Don't expose shell details too much
-		confirm, err := NeedUserConfirm("", ToolUserConfirmPrompt, descStr)
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, descStr)
 		if err != nil {
 			return "", err
 		}
@@ -916,11 +917,11 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, s
 	// If confirmation is needed, show the diff and ask the user
 	if needConfirm && !toolsUse.AutoApprove {
 		// Show the diff
-		diff := Diff(content, modifiedContent, "", "", 3)
+		diff := ui.Diff(content, modifiedContent, "", "", 3)
 		showDiff(diff)
 
 		// Response with a prompt to let user confirm
-		confirm, err := NeedUserConfirm("", ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, "")
 		closeDiff() // Close the diff
 		if err != nil {
 			return "", err
@@ -968,7 +969,7 @@ func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (stri
 
 	if needConfirm && !toolsUse.AutoApprove {
 		// Directly prompt user for confirmation
-		confirm, err := NeedUserConfirm(fmt.Sprintf("copy the file or directory from %s to %s", source, destination), ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("copy the file or directory from %s to %s", source, destination), ToolUserConfirmPrompt, "")
 		if err != nil {
 			return "", err
 		}
@@ -1180,7 +1181,7 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse
 	}
 
 	if needConfirm && !toolsUse.AutoApprove {
-		confirm, err := NeedUserConfirm(fmt.Sprintf("switch to agent '%s'", name), ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("switch to agent '%s'", name), ToolUserConfirmPrompt, "")
 		if err != nil {
 			return "", err
 		}
@@ -1439,7 +1440,7 @@ func activateSkillToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsU
 
 	// Check if confirmation is needed (default logic: always confirm unless AutoApprove is true)
 	if !toolsUse.AutoApprove {
-		confirm, err := NeedUserConfirm(fmt.Sprintf("activate skill '%s'", name), ToolUserConfirmPrompt, skillDetails)
+		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("activate skill '%s'", name), ToolUserConfirmPrompt, skillDetails)
 		if err != nil {
 			return "", err
 		}

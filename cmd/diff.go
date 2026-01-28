@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/activebook/gllm/service"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +42,7 @@ The command will display lines that are different between the two files:
 			os.Exit(1)
 		}
 
-		diff := service.Diff(string(content1), string(content2), file1, file2, contextLines)
+		diff := ui.Diff(string(content1), string(content2), file1, file2, contextLines)
 		fmt.Println(diff)
 	},
 }

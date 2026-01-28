@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -82,7 +83,7 @@ var themeSwitchCmd = &cobra.Command{
 			for i, t := range themes {
 				options[i] = huh.NewOption(t, t)
 			}
-			SortOptions(options, data.CurrentThemeName)
+			ui.SortOptions(options, data.CurrentThemeName)
 
 			err := huh.NewSelect[string]().
 				Title("Select Theme").

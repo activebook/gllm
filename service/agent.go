@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -607,7 +608,7 @@ func (ag *Agent) WriteFunctionCall(text string) {
 		var output string
 		if err == nil {
 			// Make sure we have enough space for the border
-			tcol := GetTerminalWidth() - 8
+			tcol := ui.GetTerminalWidth() - 8
 
 			// Structured data available
 			// Use lipgloss to render

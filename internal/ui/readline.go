@@ -1,4 +1,4 @@
-package service
+package ui
 
 import (
 	"fmt"
@@ -24,10 +24,7 @@ func NeedUserConfirm(info string, prompt string, description string) (bool, erro
 	if isLong {
 		// Only show the first 300 chars and last 300 chars if the description is too long
 		desc := description[:300] + "\n...\n...\n...\n" + description[len(description)-300:]
-		// Format description (remove code block and sanitize '_')
-		desc = strings.ReplaceAll(desc, "```", "")
-		desc = strings.ReplaceAll(desc, "_", "\\_")
-		fields = append(fields, huh.NewNote().Description(desc))
+		fields = append(fields, GetStaticHuhNote("", desc))
 	}
 
 	confirmField := huh.NewConfirm().

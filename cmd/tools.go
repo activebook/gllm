@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -75,7 +76,7 @@ var toolsSwCmd = &cobra.Command{
 			options = append(options, opt)
 		}
 		// Sort: selected items first, then alphabetically within each group
-		SortMultiOptions(options, enabledTools)
+		ui.SortMultiOptions(options, enabledTools)
 
 		var selectedTools []string
 		err := huh.NewForm(
@@ -85,7 +86,7 @@ var toolsSwCmd = &cobra.Command{
 					Description("Choose which tools to enable for this agent. Press space to toggle, enter to confirm.").
 					Options(options...).
 					Value(&selectedTools),
-				GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
+				ui.GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
 			),
 		).Run()
 
