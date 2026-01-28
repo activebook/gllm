@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -25,8 +26,7 @@ Agent Skills are a lightweight, open format for extending AI agent capabilities 
 Use 'gllm skills switch' to switch skills on/off.
 Use 'gllm skills list' to list all installed skills.
 Use 'gllm skills install <path>' to install a skill.
-Use 'gllm skills uninstall <name>' to uninstall a skill.
-`,
+Use 'gllm skills uninstall <name>' to uninstall a skill.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
 		fmt.Println()
@@ -66,7 +66,7 @@ var skillsListCmd = &cobra.Command{
 		for _, skill := range skills {
 			printSkillMeta(skill)
 		}
-		fmt.Println()
+		fmt.Printf("%s = Enabled skill\n", ui.FormatEnabledIndicator(true))
 		fmt.Printf("Skills directory: %s\n", data.GetSkillsDirPath())
 	},
 }
@@ -217,7 +217,7 @@ var skillsUninstallCmd = &cobra.Command{
 			for _, s := range skills {
 				options = append(options, huh.NewOption(s.Name, s.Name))
 			}
-			SortOptions(options, "")
+			ui.SortOptions(options, "")
 
 			err = huh.NewSelect[string]().
 				Title("Select skill to uninstall").
@@ -309,7 +309,7 @@ var skillsSwCmd = &cobra.Command{
 			options = append(options, opt)
 		}
 
-		SortMultiOptions(options, enabledSkills)
+		ui.SortMultiOptions(options, enabledSkills)
 
 		var selectedSkills []string
 		multiSelect := huh.NewMultiSelect[string]().
@@ -317,7 +317,7 @@ var skillsSwCmd = &cobra.Command{
 			Description("Choose which skills to enable. Press space to toggle, enter to confirm.").
 			Options(options...).
 			Value(&selectedSkills)
-		note := GetDynamicHuhNote("Skill Description", multiSelect, func(name string) string {
+		note := ui.GetDynamicHuhNote("Skill Description", multiSelect, func(name string) string {
 			for _, s := range skills {
 				if s.Name == name {
 					return s.Description
@@ -352,7 +352,7 @@ var skillsSwCmd = &cobra.Command{
 		}
 
 		// Run skills list to show updated list
-		fmt.Printf("\n%d skill(s) enabled.\n", len(selectedSkills))
+		fmt.Printf("%d skill(s) enabled.\n", len(selectedSkills))
 		fmt.Println()
 		skillsListCmd.Run(skillsListCmd, args)
 	},
@@ -370,11 +370,10 @@ func init() {
 // printSkillMeta prints a skill in a formatted way
 func printSkillMeta(skill data.SkillMetadata) {
 	settingsStore := data.GetSettingsStore()
-	status := data.SwitchOnColor + "Enabled" + data.ResetSeq
-	if settingsStore.IsSkillDisabled(skill.Name) {
-		status = data.SwitchOffColor + "Disabled" + data.ResetSeq
-	}
-	fmt.Printf("  %s [%s]\n", skill.Name, status)
+	enabled := !settingsStore.IsSkillDisabled(skill.Name)
+	indicator := ui.FormatEnabledIndicator(enabled)
+
+	fmt.Printf("  %s %s\n", indicator, skill.Name)
 	if skill.Description != "" {
 		lines := strings.Split(skill.Description, "\n")
 		for _, line := range lines {

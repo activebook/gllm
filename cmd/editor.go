@@ -7,6 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -73,7 +74,7 @@ var editorSwitchCmd = &cobra.Command{
 			for _, ed := range installed {
 				options = append(options, huh.NewOption(ed, ed))
 			}
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Preferred Editor").
@@ -186,28 +187,24 @@ func setPreferredEditor(editor string) error {
 // listAvailableEditors shows all available editors
 func listAvailableEditors() {
 	fmt.Println("Available editors:")
+	fmt.Println()
 
 	commonEditors := []string{"vim", "vi", "nvim", "neovim", "nano", "pico", "emacs", "emacsclient", "code", "code-insiders", "subl", "sublime_text", "atom", "gedit", "pluma", "kate", "kwrite", "notepad.exe", "notepad++", "textedit"}
-
 	store := data.NewConfigStore()
 	current := store.GetEditor()
 
 	for _, editor := range commonEditors {
+		enableIndicator := ui.FormatEnabledIndicator(editor == current)
 		if _, err := exec.LookPath(editor); err == nil {
-			indicator := "  "
-			pname := fmt.Sprintf("%-14s", editor)
-			if editor == current {
-				indicator = data.HighlightColor + "* " + data.ResetSeq
-				pname = data.HighlightColor + pname + data.ResetSeq
-			}
-			fmt.Printf("%s%s %s%s%s\n", indicator, pname, data.SwitchOnColor, "(installed)", data.ResetSeq)
+			pname := editor
+			fmt.Printf("  %s %-14s %s%s%s\n", enableIndicator, pname, data.SwitchOnColor, "(installed)", data.ResetSeq)
 		} else {
-			fmt.Printf("  %-14s %s%s%s\n", editor, data.SwitchOffColor, "(not found)", data.ResetSeq)
+			fmt.Printf("  %s %-14s %s%s%s\n", enableIndicator, editor, data.SwitchOffColor, "(not found)", data.ResetSeq)
 		}
 	}
 
 	if current != "" {
-		fmt.Printf("\n(*) Indicates the current preferred editor.\n")
+		fmt.Printf("\n%s = Current preferred editor\n", ui.FormatEnabledIndicator(true))
 	} else {
 		fmt.Println("\nNo preferred editor set. Use 'gllm editor switch' to select one.")
 	}

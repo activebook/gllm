@@ -524,7 +524,7 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 		"save_memory":         oa.op.OpenAISaveMemoryToolCall,
 		"switch_agent":        oa.op.OpenAISwitchAgentToolCall,
 		"list_agent":          oa.op.OpenAIListAgentToolCall,
-		"call_agent":          oa.op.OpenAICallAgentToolCall,
+		"spawn_subagents":     oa.op.OpenAISpawnSubAgentsToolCall,
 		"get_state":           oa.op.OpenAIGetStateToolCall,
 		"set_state":           oa.op.OpenAISetStateToolCall,
 		"list_state":          oa.op.OpenAIListStateToolCall,

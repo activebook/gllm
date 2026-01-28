@@ -448,7 +448,7 @@ func (a *Anthropic) processToolCall(toolCall anthropic.ToolUseBlockParam) (anthr
 		"save_memory":         a.op.AnthropicSaveMemoryToolCall,
 		"switch_agent":        a.op.AnthropicSwitchAgentToolCall,
 		"list_agent":          a.op.AnthropicListAgentToolCall,
-		"call_agent":          a.op.AnthropicCallAgentToolCall,
+		"spawn_subagents":     a.op.AnthropicSpawnSubAgentsToolCall,
 		"get_state":           a.op.AnthropicGetStateToolCall,
 		"set_state":           a.op.AnthropicSetStateToolCall,
 		"list_state":          a.op.AnthropicListStateToolCall,

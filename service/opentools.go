@@ -91,7 +91,7 @@ var (
 	subagentTools = []string{
 		// Sub-agent orchestration tools
 		"list_agent",
-		"call_agent",
+		"spawn_subagents",
 		// shared state tools
 		"get_state",
 		"set_state",
@@ -979,7 +979,7 @@ When a switch occurs, if an instruction is provided, it replaces the original pr
 	listAgentFunc := OpenFunctionDefinition{
 		Name: "list_agent",
 		Description: `List all available agents with their capabilities, models, and configurations.
-Use this tool to discover which agents are available before using call_agent or switch_agent.`,
+Use this tool to discover which agents are available before using spawn_subagents or switch_agent.`,
 		Parameters: map[string]interface{}{
 			"type":       "object",
 			"properties": map[string]interface{}{},
@@ -992,9 +992,9 @@ Use this tool to discover which agents are available before using call_agent or 
 	}
 	tools = append(tools, &listAgentTool)
 
-	// call_agent tool - The core orchestration tool
-	callAgentFunc := OpenFunctionDefinition{
-		Name: "call_agent",
+	// spawn_subagents tool - The core orchestration tool
+	spawnSubAgentsFunc := OpenFunctionDefinition{
+		Name: "spawn_subagents",
 		Description: `Orchestrate concurrent sub-agents to execute specialized tasks in parallel.
 
 This tool enables sophisticated Map/Reduce workflows by dispatching tasks to isolated agent instances.
@@ -1013,7 +1013,7 @@ Key operational details:
 - Returns progress summary; use get_state(task_key) for full detailed results
 
 Differs from switch_agent:
-- call_agent: Sub-agents return results to you; you maintain control
+- spawn_subagents: Sub-agents return results to you; you maintain control
 - switch_agent: Permanently hands off control; you won't see results`,
 		Parameters: map[string]interface{}{
 			"type": "object",
@@ -1061,11 +1061,11 @@ Differs from switch_agent:
 			"required": []string{"tasks"},
 		},
 	}
-	callAgentTool := OpenTool{
+	spawnSubAgentsTool := OpenTool{
 		Type:     ToolTypeFunction,
-		Function: &callAgentFunc,
+		Function: &spawnSubAgentsFunc,
 	}
-	tools = append(tools, &callAgentTool)
+	tools = append(tools, &spawnSubAgentsTool)
 
 	// get_state tool - Read from SharedState
 	getStateFunc := OpenFunctionDefinition{
@@ -1073,7 +1073,7 @@ Differs from switch_agent:
 		Description: `Retrieve a value from the SharedState memory.
 
 SharedState is a key-value store for communication between the orchestrator and sub-agents.
-Sub-agents store their results in SharedState when you specify an output_key in call_agent.
+Sub-agents store their results in SharedState when you specify an output_key in spawn_subagents.
 Use list_state to see available keys.`,
 		Parameters: map[string]interface{}{
 			"type": "object",
@@ -1246,7 +1246,7 @@ type OpenProcessor struct {
 
 	// Sub-agent orchestration
 	sharedState *data.SharedState // Shared state for inter-agent communication
-	executor    *SubAgentExecutor // Sub-agent executor for call_agent tool
+	executor    *SubAgentExecutor // Sub-agent executor for spawn_subagents tool
 	agentName   string            // Current agent name (for set_state metadata)
 }
 
@@ -1577,8 +1577,8 @@ func (op *OpenProcessor) OpenAIListAgentToolCall(toolCall openai.ToolCall, argsM
 	}, err
 }
 
-func (op *OpenProcessor) OpenAICallAgentToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := callAgentToolCallImpl(argsMap, op.executor)
+func (op *OpenProcessor) OpenAISpawnSubAgentsToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+	response, err := spawnSubAgentsToolCallImpl(argsMap, op.executor)
 	if err != nil {
 		response = fmt.Sprintf("Error: %v", err)
 	}
@@ -2053,8 +2053,8 @@ func (op *OpenProcessor) OpenChatListAgentToolCall(toolCall *model.ToolCall, arg
 	return &toolMessage, err
 }
 
-func (op *OpenProcessor) OpenChatCallAgentToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := callAgentToolCallImpl(argsMap, op.executor)
+func (op *OpenProcessor) OpenChatSpawnSubAgentsToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	response, err := spawnSubAgentsToolCallImpl(argsMap, op.executor)
 	if err != nil {
 		response = fmt.Sprintf("Error: %v", err)
 	}

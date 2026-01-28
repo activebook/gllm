@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -87,6 +88,7 @@ var modelListCmd = &cobra.Command{
 		verbose, _ := cmd.Flags().GetBool("verbose")
 
 		fmt.Println("Available models:")
+		fmt.Println()
 		// Sort keys for consistent output
 		names := make([]string, 0, len(modelsMap))
 		for name := range modelsMap {
@@ -104,20 +106,15 @@ var modelListCmd = &cobra.Command{
 		}
 
 		for _, name := range names {
-			indicator := " "
-			pname := ""
-
 			modelName := displayToKey[name]
-
-			// Check if this model is default (compare to defaultModel string)
-			if modelName == defaultModelName {
-				indicator = data.HighlightColor + "*" + data.ResetSeq // Mark the default model
+			isDefault := modelName == defaultModelName
+			indicator := ui.FormatEnabledIndicator(isDefault)
+			pname := name
+			if isDefault {
 				pname = data.HighlightColor + name + data.ResetSeq
-			} else {
-				indicator = " "
-				pname = name
 			}
 			fmt.Printf(" %s %s\n", indicator, pname)
+
 			if verbose {
 				if modelConfig := modelsMap[modelName]; modelConfig != nil {
 					fmt.Printf("\tProvider: %s\n", modelConfig.Provider)
@@ -132,7 +129,7 @@ var modelListCmd = &cobra.Command{
 			}
 		}
 		if defaultModelName != "" {
-			fmt.Println("\n(*) Indicates the current model.")
+			fmt.Printf("\n%s = Current model\n", ui.FormatEnabledIndicator(true))
 		} else {
 			fmt.Println("\nNo model selected. Use 'gllm model switch <name>' to select one.")
 			fmt.Println("The first available model will be used if needed.")
@@ -379,7 +376,7 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 			for m := range modelsMap {
 				options = append(options, huh.NewOption(m, m))
 			}
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Edit").
@@ -560,7 +557,7 @@ var modelInfoCmd = &cobra.Command{
 			for n := range modelsMap {
 				options = append(options, huh.NewOption(n, n))
 			}
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Check").
@@ -631,7 +628,7 @@ gllm model remove gpt4 --force`,
 			for m := range modelsMap {
 				options = append(options, huh.NewOption(m, m))
 			}
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Remove").
@@ -749,7 +746,7 @@ to the specified one for all subsequent operations.`,
 			for m := range modelsMap {
 				options = append(options, huh.NewOption(m, m))
 			}
-			SortOptions(options, name)
+			ui.SortOptions(options, name)
 
 			err := huh.NewSelect[string]().
 				Title("Select Model").

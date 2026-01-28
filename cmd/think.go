@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -75,7 +76,7 @@ var thinkSwitchCmd = &cobra.Command{
 			huh.NewOption("High - Maximum reasoning", "high"),
 		}
 		// Sort options by Selected at first
-		SortOptions(options, selected)
+		ui.SortOptions(options, selected)
 
 		form := huh.NewForm(
 			huh.NewGroup(

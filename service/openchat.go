@@ -585,7 +585,7 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		"save_memory":         c.op.OpenChatSaveMemoryToolCall,
 		"switch_agent":        c.op.OpenChatSwitchAgentToolCall,
 		"list_agent":          c.op.OpenChatListAgentToolCall,
-		"call_agent":          c.op.OpenChatCallAgentToolCall,
+		"spawn_subagents":     c.op.OpenChatSpawnSubAgentsToolCall,
 		"get_state":           c.op.OpenChatGetStateToolCall,
 		"set_state":           c.op.OpenChatSetStateToolCall,
 		"list_state":          c.op.OpenChatListStateToolCall,

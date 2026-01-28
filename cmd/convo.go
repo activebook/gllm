@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
@@ -105,7 +106,7 @@ gllm convo remove "2 - 5" --force`,
 				}
 				options = append(options, huh.NewOption(label, c.Name))
 			}
-			SortOptions(options, "")
+			ui.SortOptions(options, "")
 
 			var selected []string
 			err = huh.NewMultiSelect[string]().
@@ -345,7 +346,7 @@ Using the --message-chars (-c) flag, set the maximum length of each message's co
 				}
 				options = append(options, huh.NewOption(label, c.Name))
 			}
-			SortOptions(options, "")
+			ui.SortOptions(options, "")
 
 			err = huh.NewSelect[string]().
 				Title("Select Conversation").
@@ -411,7 +412,7 @@ Using the --message-chars (-c) flag, set the maximum length of each message's co
 		}
 
 		// Show viewport
-		m := NewViewportModel(provider, content, func() string {
+		m := ui.NewViewportModel(provider, content, func() string {
 			return fmt.Sprintf("Conversation: %s", convoName)
 		})
 
@@ -455,7 +456,7 @@ var convoRenameCmd = &cobra.Command{
 					}
 					options = append(options, huh.NewOption(label, c.Name))
 				}
-				SortOptions(options, "")
+				ui.SortOptions(options, "")
 
 				err = huh.NewSelect[string]().
 					Title("Select Conversation to Rename").
@@ -539,6 +540,61 @@ var convoRenameCmd = &cobra.Command{
 	},
 }
 
+// convoShareCmd represents the convo share command
+var convoShareCmd = &cobra.Command{
+	Use:     "share [conversation|index] [destination]",
+	Aliases: []string{"export"},
+	Short:   "Share/Export a conversation",
+	Long:    `Export a conversation to a specified file path.`,
+	Args:    cobra.RangeArgs(1, 2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		convoName := args[0]
+		var destPath string
+		if len(args) > 1 {
+			destPath = args[1]
+		}
+
+		// Try to resolve name if it's an index
+		resolvedName, err := service.FindConvosByIndex(convoName)
+		if err != nil {
+			return err
+		}
+		if resolvedName == "" {
+			return fmt.Errorf("conversation '%s' not found", convoName)
+		}
+		convoName = resolvedName
+
+		convoDir := service.GetConvoDir()
+		sourcePath := service.GetFilePath(convoDir, convoName+".json")
+
+		if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
+			return fmt.Errorf("conversation '%s' not found", convoName)
+		}
+
+		data, err := os.ReadFile(sourcePath)
+		if err != nil {
+			return fmt.Errorf("failed to read conversation: %v", err)
+		}
+
+		// If destPath is not given, use convo name in local path
+		if destPath == "" {
+			destPath = convoName + ".json"
+		} else {
+			// If destPath is a directory, append the filename
+			if info, err := os.Stat(destPath); err == nil && info.IsDir() {
+				destPath = filepath.Join(destPath, convoName+".json")
+			}
+		}
+
+		if err := os.WriteFile(destPath, data, 0644); err != nil {
+			return fmt.Errorf("failed to export conversation: %v", err)
+		}
+
+		fmt.Printf("Conversation '%s' exported to '%s'\n", convoName, destPath)
+		return nil
+	},
+}
+
 func init() {
 	// Add convo command to root command
 	rootCmd.AddCommand(convoCmd)
@@ -549,6 +605,7 @@ func init() {
 	convoCmd.AddCommand(convoInfoCmd)
 	convoCmd.AddCommand(convoClearCmd)
 	convoCmd.AddCommand(convoRenameCmd)
+	convoCmd.AddCommand(convoShareCmd)
 
 	// Add flags for other prompt commands if needed in the future
 	convoInfoCmd.Flags().IntVarP(&convoMessageCount, "message-num", "n", 20, "Number of messages to display")

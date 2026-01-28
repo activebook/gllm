@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
@@ -150,7 +151,7 @@ func (ci *ChatInfo) awaitChat() (string, error) {
 				Value(&input).
 				Placeholder("Type your message..."),
 		),
-	).WithKeyMap(GetHuhKeyMap()) // 4. CRITICAL: Apply the keymap to the FORM level
+	).WithKeyMap(ui.GetHuhKeyMap()) // 4. CRITICAL: Apply the keymap to the FORM level
 
 	err := form.Run()
 	if err != nil {
@@ -168,7 +169,7 @@ func (ci *ChatInfo) startREPL() {
 	ci.printWelcome()
 
 	// Define prompt style
-	tcol := service.GetTerminalWidth()
+	tcol := ui.GetTerminalWidth()
 	promptStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color(data.CurrentTheme.Background)).
 		Foreground(lipgloss.Color(data.CurrentTheme.Foreground)).
@@ -300,7 +301,7 @@ func (ci *ChatInfo) showHistory() {
 	}
 
 	// Show viewport in full screen
-	m := NewViewportModel(provider, content, func() string {
+	m := ui.NewViewportModel(provider, content, func() string {
 		return fmt.Sprintf("Conversation: %s", convoName)
 	})
 	p := tea.NewProgram(m, tea.WithAltScreen())

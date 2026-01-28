@@ -286,8 +286,8 @@ gllm "Read this file @build.sh and change function name"
 
 #### How it Works
 
-1.  **Agent Tools (`call_agent`)**:
-    - An Orchestrator agent can spawn independent sub-agents using the `call_agent` tool.
+1.  **Agent Tools (`spawn_subagents`)**:
+    - An Orchestrator agent can spawn independent sub-agents using the `spawn_subagents` tool.
     - Each sub-agent runs in its own isolated context, preventing the "context window explosion" typical of long chains.
     - Sub-agents can run in parallel, maximizing efficiency.
 

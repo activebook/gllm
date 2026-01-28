@@ -131,7 +131,7 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	case "/think", "/T":
 		runCommand(thinkCmd, parts[1:])
 
-	case "/features", "/f", "/capabilities", "/caps":
+	case "/features", "/feats", "/f", "/capabilities", "/caps":
 		runCommand(capsCmd, parts[1:])
 
 	case "/editor", "/e":

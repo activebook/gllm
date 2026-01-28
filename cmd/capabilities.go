@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -30,7 +31,7 @@ const (
 	AgentMCPBody        = "enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."
 	AgentSkillsBody     = "are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.\nAfter integrating skills, **agent** will use skills automatically."
 	AgentMemoryBody     = "allows agents to remember important facts about you across sessions.\nFacts are used to personalize responses."
-	AgentSubAgentsBody  = "allow an agent to manage and call other agents to perform tasks or workflows.\nUse when you need to orchestrate multiple agents working in parallel."
+	AgentSubAgentsBody  = "allow an agent to respawn other agents to perform tasks or workflows.\nUse when you need to orchestrate multiple agents working in parallel."
 	AgentWebSearchBody  = "enables the agent to search the web for real-time information.\nYou must configure a search engine (Google, Bing, Tavily) to use this feature."
 	AgentTokenUsageBody = "allows agents to track their token usage.\nThis helps you to control the cost of using the agent."
 	AgentMarkdownBody   = "allows agents to generate final response in Markdown format.\nThis helps you to format the response in a more readable way."
@@ -74,7 +75,6 @@ Use 'gllm features switch' to toggle capabilities on or off.`,
 
 		printCapSummary(agent.Capabilities)
 
-		fmt.Println()
 		fmt.Println("Use 'gllm features switch' to change.")
 	},
 }
@@ -153,7 +153,7 @@ var capsSwitchCmd = &cobra.Command{
 		}
 
 		// Sort with selected at top
-		SortMultiOptions(options, selected)
+		ui.SortMultiOptions(options, selected)
 
 		// Create multi select
 		msfeatures := huh.NewMultiSelect[string]().
@@ -161,7 +161,7 @@ var capsSwitchCmd = &cobra.Command{
 			Description("Use space to toggle, enter to confirm.").
 			Options(options...).
 			Value(&selected)
-		featureNote := GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
+		featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
 		err := huh.NewForm(
 			huh.NewGroup(msfeatures, featureNote),
 		).Run()
@@ -238,14 +238,13 @@ func printCapSummary(caps []string) {
 	printCapStatus("Agent Skills", service.IsAgentSkillsEnabled(caps))
 	printCapStatus("Agent Memory", service.IsAgentMemoryEnabled(caps))
 	printCapStatus("Sub Agents", service.IsSubAgentsEnabled(caps))
+
+	fmt.Printf("%s = Enabled capability\n", ui.FormatEnabledIndicator(true))
 }
 
 func printCapStatus(name string, enabled bool) {
-	status := data.SwitchOffColor + "Disabled" + data.ResetSeq
-	if enabled {
-		status = data.SwitchOnColor + "Enabled" + data.ResetSeq
-	}
-	fmt.Printf("  %-20s %s\n", name+":", status)
+	indicator := ui.FormatEnabledIndicator(enabled)
+	fmt.Printf("  %s %s\n", indicator, name)
 
 	var desc string
 	switch name {

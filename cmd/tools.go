@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -75,7 +76,7 @@ var toolsSwCmd = &cobra.Command{
 			options = append(options, opt)
 		}
 		// Sort: selected items first, then alphabetically within each group
-		SortMultiOptions(options, enabledTools)
+		ui.SortMultiOptions(options, enabledTools)
 
 		var selectedTools []string
 		err := huh.NewForm(
@@ -85,7 +86,7 @@ var toolsSwCmd = &cobra.Command{
 					Description("Choose which tools to enable for this agent. Press space to toggle, enter to confirm.").
 					Options(options...).
 					Value(&selectedTools),
-				GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
+				ui.GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
 			),
 		).Run()
 
@@ -102,7 +103,6 @@ var toolsSwCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Printf("\n%d tool(s) enabled for current agent.\n\n", len(selectedTools))
 		ListAllTools()
 	},
 }
@@ -171,11 +171,17 @@ func ListAllTools() {
 		enabledCount++
 	}
 
+	// Append char ' behind the tool name of those non-embedding tools
+	// to tell user those tools are not switchable
+	// they are built-in capabilities tools
 	for _, tool := range sortedTools {
-		if enabledSet[tool] {
-			fmt.Printf("[✔] %s\n", tool)
-		} else {
-			fmt.Printf("[ ] %s\n", tool)
+		displayName := tool
+		if !service.AvailableEmbeddingTool(tool) {
+			displayName += "'"
 		}
+		indicator := ui.FormatEnabledIndicator(enabledSet[tool])
+		fmt.Printf("%s %s\n", indicator, displayName)
 	}
+	fmt.Printf("\n%d tool(s) enabled for current agent.\n", enabledCount)
+	fmt.Println("' behind the tool name means it is a built-in capabilities tool which can be switched on/off in agent capabilities settings.")
 }
