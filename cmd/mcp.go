@@ -160,7 +160,8 @@ var mcpListCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Println("MCP servers:")
+		fmt.Println("Available MCP servers:")
+		fmt.Println()
 
 		// Sort keys for consistent output
 		names := make([]string, 0, len(servers))
