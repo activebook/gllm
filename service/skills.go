@@ -152,7 +152,8 @@ func (sm *SkillManager) ActivateSkill(name string) (string, string, string, erro
 		instructionContent = strings.TrimSpace(parts[2])
 	}
 
-	skillDir := filepath.Dir(selectedSkill.Location)
+	// Generate file tree
+	skillDir := filepath.Dir(selectedSkill.Location) + string(filepath.Separator)
 	tree, err := sm.GenerateFileTree(skillDir)
 	if err != nil {
 		return "", "", "", fmt.Errorf("failed to generate file tree: %w", err)
