@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 )
 
@@ -54,7 +55,7 @@ func RunAgent(prompt string, files []*service.FileData, convoName string, yolo b
 
 	for {
 		// Create an indeterminate progress bar
-		indicator := service.NewIndicator()
+		indicator := ui.NewIndicator()
 
 		// Ensure Active Agent
 		agent, err := EnsureActiveAgent()

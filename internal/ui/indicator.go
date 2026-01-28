@@ -2,9 +2,17 @@ package ui
 
 import (
 	"fmt"
+	"math/rand"
+	"time"
+
+	"github.com/briandowns/spinner"
 
 	"github.com/activebook/gllm/data"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 // FormatEnabledIndicator returns a consistent enabled/disabled bracket indicator
 // When enabled: [✔] with green color
@@ -14,4 +22,154 @@ func FormatEnabledIndicator(enabled bool) string {
 		return fmt.Sprintf("[%s✔%s]", data.SwitchOnColor, data.ResetSeq)
 	}
 	return "[ ]"
+}
+
+// Indicators
+// For long-running operations, we can use a spinner indicator
+
+const (
+	IndicatorLoadingMCP = "Loading MCP servers..."
+)
+
+// WhimsicalProcessingWords is a collection of fun, playful processing indicators
+// inspired by Claude Code's delightful personality
+var WhimsicalProcessingWords = []string{
+	// Thoughtful/Philosophical
+	"Channelling...",
+	"Pondering...",
+	"Cogitating...",
+	"Contemplating...",
+	"Ruminating...",
+	"Philosophising...",
+	"Musing...",
+	"Deliberating...",
+
+	// Magical/Whimsical
+	"Conjuring...",
+	"Wizarding...",
+	"Enchanting...",
+	"Spellcrafting...",
+	"Transmuting...",
+	"Alchemizing...",
+
+	// Technical
+	"Computing...",
+	"Calculating...",
+	"Synthesizing...",
+	"Compiling...",
+	"Architecting...",
+	"Optimizing...",
+
+	// Playful/Fun
+	"Booping...",
+	"Smooshing...",
+	"Discombobulating...",
+	"Flibbertigibbeting...",
+	"Bamboozling...",
+	"Zigzagging...",
+	"Percolating...",
+	"Noodling...",
+
+	// Action-oriented
+	"Crafting...",
+	"Assembling...",
+	"Constructing...",
+	"Fabricating...",
+	"Orchestrating...",
+	"Choreographing...",
+
+	// Creative
+	"Imagining...",
+	"Dreaming...",
+	"Inventing...",
+	"Innovating...",
+	"Improvising...",
+
+	// Quirky
+	"Tinkering...",
+	"Fiddling...",
+	"Futzing...",
+	"Wrangling...",
+	"Massaging...",
+	"Finessing...",
+}
+
+// GetRandomProcessingWord returns a random whimsical processing word
+func GetRandomProcessingWord() string {
+	return WhimsicalProcessingWords[rand.Intn(len(WhimsicalProcessingWords))]
+}
+
+type Indicator struct {
+	s            *spinner.Spinner
+	rotating     bool
+	lastRotation time.Time
+	lastWord     string
+}
+
+func (i *Indicator) setupSpinner() {
+	i.s = spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+	i.s.Color("fgHiMagenta", "bold")
+
+	// Setup the pre-update hook for word rotation
+	i.s.PreUpdate = func(s *spinner.Spinner) {
+		if i.rotating {
+			// Change word every 2 seconds for a whimsical feel
+			if time.Since(i.lastRotation) > 2000*time.Millisecond {
+				newWord := GetRandomProcessingWord()
+				// Try to avoid repeating the same word
+				for newWord == i.lastWord && len(WhimsicalProcessingWords) > 1 {
+					newWord = GetRandomProcessingWord()
+				}
+				s.Suffix = fmt.Sprintf(" %s", newWord)
+				i.lastWord = newWord
+				i.lastRotation = time.Now()
+			}
+		}
+	}
+}
+
+func NewIndicator() *Indicator {
+	i := &Indicator{
+		rotating: true,
+	}
+	i.setupSpinner()
+	i.Start("")
+	return i
+}
+
+// NewIndicatorWithText creates a new indicator with custom text (no rotation)
+func NewIndicatorWithText(text string) *Indicator {
+	i := &Indicator{
+		rotating: false,
+	}
+	i.setupSpinner()
+	i.Start(text)
+	return i
+}
+
+func (i *Indicator) Stop() {
+	if i.s.Active() {
+		i.s.Stop()
+	}
+}
+
+func (i *Indicator) Start(text string) {
+	if text == "" {
+		i.rotating = true
+		text = GetRandomProcessingWord()
+		i.lastWord = text
+		i.lastRotation = time.Now()
+	} else {
+		i.rotating = false
+	}
+
+	// Always restart to ensure fresh state
+	if i.s.Active() {
+		i.s.Stop()
+	}
+
+	i.s.Lock()
+	i.s.Suffix = fmt.Sprintf(" %s", text)
+	i.s.Unlock()
+	i.s.Start()
 }

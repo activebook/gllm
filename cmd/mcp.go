@@ -61,7 +61,7 @@ var mcpLoadCmd = &cobra.Command{
 			client = &service.MCPClient{}
 			defer client.Close() // ensure resources are cleaned up
 		}
-		indicator := service.NewIndicator()
+		indicator := ui.NewIndicator()
 		err = client.Init(mcpConfig, service.MCPLoadOption{
 			LoadAll:       all,
 			LoadTools:     true,
@@ -160,7 +160,8 @@ var mcpListCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Println("MCP servers:")
+		fmt.Println("Available MCP servers:")
+		fmt.Println()
 
 		// Sort keys for consistent output
 		names := make([]string, 0, len(servers))
