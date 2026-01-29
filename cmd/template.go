@@ -18,6 +18,12 @@ var templateCmd = &cobra.Command{
 	Aliases: []string{"tmpl", "temp"}, // Optional alias
 	Short:   "Manage gllm template prompt configuration",
 	Long:    `Define, view, list, or delete reusable template prompts.`,
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return []string{"list", "add", "set", "info", "remove", "switch", "clear"}, cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		// Print current template prompt
 		store := data.NewConfigStore()

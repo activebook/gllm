@@ -11,20 +11,27 @@ import (
 )
 
 var thinkCmd = &cobra.Command{
-	Use:   "think [off|low|medium|high]",
-	Short: "View or set thinking level",
+	Use:       "think [off|low|medium|high]",
+	Short:     "View or set thinking level",
+	ValidArgs: []string{"off", "low", "medium", "high"},
 	Long: `View or set the thinking/reasoning level for the active agent.
-	
+
 Thinking levels:
   off    - Disable thinking mode
   low    - Minimal reasoning effort
-  medium - Moderate reasoning effort  
+  medium - Moderate reasoning effort
   high   - Maximum reasoning effort
 
 The actual behavior depends on the model provider:
   OpenAI:    Maps to reasoning_effort parameter
   Anthropic: Maps to thinking budget tokens
   Gemini:    Maps to ThinkingLevel or ThinkingBudget`,
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return []string{"off", "low", "medium", "high", "switch"}, cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		store := data.NewConfigStore()
 		agent := store.GetActiveAgent()

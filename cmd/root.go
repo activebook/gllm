@@ -37,8 +37,13 @@ Configure your API keys and preferred models, then start chatting or executing c
 		// Add completion command
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			if len(args) == 0 {
-				// Complete the root command
-				return []string{"chat", "convo", "search", "agent", "tools", "mcp", "memory", "config", "init", "version", "help", "completion"}, cobra.ShellCompDirectiveNoFileComp
+				// Complete the root command - list all available commands
+				return []string{
+					"agent", "chat", "completion", "config", "convo",
+					"diff", "editor", "features", "help", "init",
+					"mcp", "memory", "model", "search", "skills",
+					"system", "template", "theme", "think", "tools", "version",
+				}, cobra.ShellCompDirectiveNoFileComp
 			}
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		},

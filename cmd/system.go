@@ -22,6 +22,12 @@ var systemCmd = &cobra.Command{
 	Aliases: []string{"sys", "system_prompt"}, // Optional alias
 	Short:   "Manage gllm system prompt configuration",
 	Long:    `Define, view, list, or delete reusable system prompts.`,
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return []string{"list", "add", "set", "info", "remove", "switch", "clear"}, cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		// Print current system prompt
 		store := data.NewConfigStore()
