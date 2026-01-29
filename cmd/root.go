@@ -4,6 +4,7 @@ package cmd
 import (
 	"fmt"
 	"os" // Import filepath
+	"runtime"
 	"strings"
 
 	"github.com/activebook/gllm/data"
@@ -212,25 +213,9 @@ func addCompletionCommand() {
 		Use:       "completion [shell]",
 		Short:     "Generate shell completion scripts",
 		ValidArgs: []string{"bash", "zsh", "fish", "powershell"},
-		Args:      cobra.ExactArgs(1),
+		Args:      cobra.MaximumNArgs(1), // Changed from ExactArgs(1) to MaximumNArgs(1)
 		Long: `Generate shell completion scripts for gllm.
-
-Supported shells: bash, zsh, fish, powershell
-
-To install completions for bash:
-	gllm completion bash > ~/.gllm-completion.bash
-	echo "source ~/.gllm-completion.bash" >> ~/.bashrc
-
-To install completions for zsh:
-	gllm completion zsh > ~/.gllm-completion.zsh
-	echo "source ~/.gllm-completion.zsh" >> ~/.zshrc
-
-To install completions for fish:
-	gllm completion fish > ~/.config/fish/completions/gllm.fish
-
-To install completions for powershell:
-	gllm completion powershell > gllm.ps1
-	`,
+Supported shells: bash, zsh, fish, powershell`,
 		Example: `  # Generate bash completion
   gllm completion bash > ~/.gllm-completion.bash
 
@@ -240,12 +225,74 @@ To install completions for powershell:
   # Generate fish completion
   gllm completion fish > ~/.config/fish/completions/gllm.fish`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return generateCompletion(args[0])
+			var shell string
+			if len(args) == 0 {
+				// Auto-detect shell when no argument is provided
+				// This is not ideal
+				// shell = detectCurrentShell()
+				return cmd.Help()
+			} else {
+				shell = args[0]
+			}
+			return generateCompletion(shell)
 		},
 	}
 
 	// Add completion command to root
 	rootCmd.AddCommand(completionCmd)
+}
+
+// detectCurrentShell attempts to detect the current shell by checking environment variables
+// and falls back to common defaults based on the operating system.
+func detectCurrentShell() string {
+	// Check SHELL environment variable first (most reliable on Unix-like systems)
+	if shell := os.Getenv("SHELL"); shell != "" {
+		// Extract just the shell name from the path
+		parts := strings.Split(shell, "/")
+		if len(parts) > 0 {
+			shellName := parts[len(parts)-1]
+			// Map common shell names to supported completion types
+			switch shellName {
+			case "bash":
+				return "bash"
+			case "zsh":
+				return "zsh"
+			case "fish":
+				return "fish"
+			case "pwsh", "powershell":
+				return "powershell"
+			}
+		}
+	}
+
+	// Check for Windows PowerShell/Command Prompt
+	if runtime.GOOS == "windows" {
+		// Check if running in PowerShell
+		if os.Getenv("PSModulePath") != "" {
+			return "powershell"
+		}
+		// Default to PowerShell on Windows (more modern than cmd)
+		return "powershell"
+	}
+
+	// On Unix-like systems, try to detect based on common patterns
+	// Check if we're in a login shell context
+	if os.Getenv("ZSH_VERSION") != "" {
+		return "zsh"
+	}
+	if os.Getenv("BASH_VERSION") != "" {
+		return "bash"
+	}
+
+	// Final fallback: try to guess based on common defaults
+	// macOS typically uses zsh as default since Catalina
+	// Linux distributions vary, but bash is very common
+	if runtime.GOOS == "darwin" {
+		return "zsh"
+	}
+
+	// Default to bash for other Unix-like systems
+	return "bash"
 }
 
 // This function runs when the package is initialized.
