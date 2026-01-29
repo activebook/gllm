@@ -184,12 +184,33 @@ func Execute() {
 	}
 }
 
+// generateCompletion generates shell completion scripts for the specified shell.
+// Returns an error if the shell is unsupported or if generation fails.
+func generateCompletion(shell string) error {
+	switch shell {
+	case "bash":
+		return rootCmd.GenBashCompletion(os.Stdout)
+	case "zsh":
+		return rootCmd.GenZshCompletion(os.Stdout)
+	case "fish":
+		return rootCmd.GenFishCompletion(os.Stdout, true)
+	case "powershell":
+		return rootCmd.GenPowerShellCompletion(os.Stdout)
+	default:
+		return fmt.Errorf("unsupported shell: %s\nSupported shells: bash, zsh, fish, powershell", shell)
+	}
+}
+
 // Add completion command
 func addCompletionCommand() {
 	completionCmd := &cobra.Command{
-		Use:   "completion",
-		Short: "Generate shell completion scripts",
+		Use:       "completion [shell]",
+		Short:     "Generate shell completion scripts",
+		ValidArgs: []string{"bash", "zsh", "fish", "powershell"},
+		Args:      cobra.ExactArgs(1),
 		Long: `Generate shell completion scripts for gllm.
+
+Supported shells: bash, zsh, fish, powershell
 
 To install completions for bash:
 	gllm completion bash > ~/.gllm-completion.bash
@@ -205,31 +226,18 @@ To install completions for fish:
 To install completions for powershell:
 	gllm completion powershell > gllm.ps1
 	`,
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) == 0 {
-				cmd.Help()
-				return
-			}
+		Example: `  # Generate bash completion
+  gllm completion bash > ~/.gllm-completion.bash
 
-			switch args[0] {
-			case "bash":
-				rootCmd.GenBashCompletion(os.Stdout)
-			case "zsh":
-				rootCmd.GenZshCompletion(os.Stdout)
-			case "fish":
-				rootCmd.GenFishCompletion(os.Stdout, true)
-			case "powershell":
-				rootCmd.GenPowerShellCompletion(os.Stdout)
-			default:
-				fmt.Printf("Unsupported shell: %s\n", args[0])
-				fmt.Println("Supported shells: bash, zsh, fish, powershell")
-				os.Exit(1)
-			}
+  # Generate and install zsh completion
+  gllm completion zsh > "${fpath[1]}/_gllm"
+
+  # Generate fish completion
+  gllm completion fish > ~/.config/fish/completions/gllm.fish`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return generateCompletion(args[0])
 		},
 	}
-
-	// Add completion flags
-	completionCmd.Flags().BoolP("help", "h", false, "Show help for completion command")
 
 	// Add completion command to root
 	rootCmd.AddCommand(completionCmd)
