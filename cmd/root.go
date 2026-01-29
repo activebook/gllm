@@ -34,6 +34,14 @@ var (
 Configure your API keys and preferred models, then start chatting or executing commands.`,
 		// Accept arbitrary arguments as prompts
 		Args: cobra.ArbitraryArgs,
+		// Add completion command
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) == 0 {
+				// Complete the root command
+				return []string{"chat", "convo", "search", "agent", "tools", "mcp", "memory", "config", "init", "version", "help", "completion"}, cobra.ShellCompDirectiveNoFileComp
+			}
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		},
 		// Uncomment the following line if your bare application
 		// has an action associated with it:
 		// Run: func(cmd *cobra.Command, args []string) { },
@@ -176,6 +184,57 @@ func Execute() {
 	}
 }
 
+// Add completion command
+func addCompletionCommand() {
+	completionCmd := &cobra.Command{
+		Use:   "completion",
+		Short: "Generate shell completion scripts",
+		Long: `Generate shell completion scripts for gllm.
+
+To install completions for bash:
+	gllm completion bash > ~/.gllm-completion.bash
+	echo "source ~/.gllm-completion.bash" >> ~/.bashrc
+
+To install completions for zsh:
+	gllm completion zsh > ~/.gllm-completion.zsh
+	echo "source ~/.gllm-completion.zsh" >> ~/.zshrc
+
+To install completions for fish:
+	gllm completion fish > ~/.config/fish/completions/gllm.fish
+
+To install completions for powershell:
+	gllm completion powershell > gllm.ps1
+	`,
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) == 0 {
+				cmd.Help()
+				return
+			}
+
+			switch args[0] {
+			case "bash":
+				rootCmd.GenBashCompletion(os.Stdout)
+			case "zsh":
+				rootCmd.GenZshCompletion(os.Stdout)
+			case "fish":
+				rootCmd.GenFishCompletion(os.Stdout, true)
+			case "powershell":
+				rootCmd.GenPowerShellCompletion(os.Stdout)
+			default:
+				fmt.Printf("Unsupported shell: %s\n", args[0])
+				fmt.Println("Supported shells: bash, zsh, fish, powershell")
+				os.Exit(1)
+			}
+		},
+	}
+
+	// Add completion flags
+	completionCmd.Flags().BoolP("help", "h", false, "Show help for completion command")
+
+	// Add completion command to root
+	rootCmd.AddCommand(completionCmd)
+}
+
 // This function runs when the package is initialized.
 func init() {
 	// Initialize Viper configuration
@@ -188,6 +247,9 @@ func init() {
 
 	// Disable the default completion command
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
+
+	// Add completion command
+	addCompletionCommand()
 
 	// Define the flags
 	rootCmd.Flags().StringVarP(&agentName, "agent", "g", "", "Switch to the agent to use")

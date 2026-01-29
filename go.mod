@@ -23,7 +23,7 @@ require (
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
-	github.com/volcengine/volcengine-go-sdk v1.2.9
+	github.com/volcengine/volcengine-go-sdk v1.2.10
 	github.com/willyv3/gogh-themes v1.2.0
 	golang.org/x/term v0.39.0
 	google.golang.org/api v0.263.0

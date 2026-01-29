@@ -1,4 +1,4 @@
-// File: cmd/agents.go
+// File: cmd/agent.go
 package cmd
 
 import (
@@ -30,6 +30,13 @@ var agentCmd = &cobra.Command{
 	Short:   "Manage agent configurations",
 	Long: `Manage agent configurations that allow you to quickly switch between
 different AI assistant setups with different models, tools, and settings.`,
+	// Add completion support
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return []string{"list", "create", "edit", "delete", "switch", "info", "--help"}, cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		// Show current agent configuration first
 		store := data.NewConfigStore()

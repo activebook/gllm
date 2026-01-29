@@ -23,6 +23,13 @@ var chatCmd = &cobra.Command{
 	Long: `Start an interactive chat session with the configured LLM.
 This provides a Read-Eval-Print-Loop (REPL) interface where you can
 have a continuous conversation with the model.`,
+	// Add completion support
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return []string{"--agent", "--conversation", "--yolo", "--help"}, cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Create an indeterminate progress bar
 		indicator := ui.NewIndicator()

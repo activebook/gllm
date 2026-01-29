@@ -1,4 +1,3 @@
-// File: cmd/init.go
 package cmd
 
 import (
@@ -18,6 +17,10 @@ var initCmd = &cobra.Command{
 	Short: "Initialize gllm configuration",
 	Long: `Interactive setup wizard to configure gllm with your preferred LLM provider.
 It will create or update the 'gllm.yaml' configuration file.`,
+	// Add completion support
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := RunInitWizard(); err != nil {
 			return fmt.Errorf("Initialization failed: %w\n", err)
