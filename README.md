@@ -121,6 +121,18 @@ This will guide you through setting up your preferred LLM provider, API keys, an
   gllm "Document this new feature based on the code: @service/atref.go and @test/test_atref.go"
   ```
 
+### Shell Completion
+
+To enable tab completion for `gllm` commands in your shell, add the following to your shell configuration file:
+
+```sh
+# For bash, add to ~/.bashrc or ~/.bash_profile
+gllm completion bash > ~/.gllm-completion.bash
+echo 'source ~/.gllm-completion.bash' >> ~/.bashrc
+```
+
+After adding the appropriate line to your shell configuration file, restart your shell or run `source ~/.bashrc` (or the equivalent for your shell) to enable completion.
+
 ### Interactive Chat
 
 Start an interactive chat session:
