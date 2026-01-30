@@ -26,6 +26,12 @@ var convoCmd = &cobra.Command{
 	Short:   "Manage conversations",
 	Long:    `Commands to list, remove, and show details of conversations.`,
 	Args:    cobra.NoArgs,
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return []string{"list", "remove", "info", "clear", "rename", "share"}, cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return convoListCmd.RunE(cmd, args)
 	},

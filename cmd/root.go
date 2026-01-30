@@ -4,6 +4,7 @@ package cmd
 import (
 	"fmt"
 	"os" // Import filepath
+	"runtime"
 	"strings"
 
 	"github.com/activebook/gllm/data"
@@ -34,6 +35,19 @@ var (
 Configure your API keys and preferred models, then start chatting or executing commands.`,
 		// Accept arbitrary arguments as prompts
 		Args: cobra.ArbitraryArgs,
+		// Add completion command
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) == 0 {
+				// Complete the root command - list all available commands
+				return []string{
+					"agent", "chat", "completion", "config", "convo",
+					"diff", "editor", "features", "help", "init",
+					"mcp", "memory", "model", "search", "skills",
+					"system", "template", "theme", "think", "tools", "version",
+				}, cobra.ShellCompDirectiveNoFileComp
+			}
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		},
 		// Uncomment the following line if your bare application
 		// has an action associated with it:
 		// Run: func(cmd *cobra.Command, args []string) { },
@@ -176,6 +190,114 @@ func Execute() {
 	}
 }
 
+// generateCompletion generates shell completion scripts for the specified shell.
+// Returns an error if the shell is unsupported or if generation fails.
+func generateCompletion(shell string) error {
+	switch shell {
+	case "bash":
+		return rootCmd.GenBashCompletion(os.Stdout)
+	case "zsh":
+		return rootCmd.GenZshCompletion(os.Stdout)
+	case "fish":
+		return rootCmd.GenFishCompletion(os.Stdout, true)
+	case "powershell":
+		return rootCmd.GenPowerShellCompletion(os.Stdout)
+	default:
+		return fmt.Errorf("unsupported shell: %s\nSupported shells: bash, zsh, fish, powershell", shell)
+	}
+}
+
+// Add completion command
+func addCompletionCommand() {
+	completionCmd := &cobra.Command{
+		Use:       "completion [shell]",
+		Short:     "Generate shell completion scripts",
+		ValidArgs: []string{"bash", "zsh", "fish", "powershell"},
+		Args:      cobra.MaximumNArgs(1), // Changed from ExactArgs(1) to MaximumNArgs(1)
+		Long: `Generate shell completion scripts for gllm.
+Supported shells: bash, zsh, fish, powershell`,
+		Example: `  # Generate bash completion
+  gllm completion bash > ~/.gllm-completion.bash
+
+  # Generate and install zsh completion
+  gllm completion zsh > "${fpath[1]}/_gllm"
+
+  # Generate fish completion
+  gllm completion fish > ~/.config/fish/completions/gllm.fish
+  
+  # Add this to your ~/.bash_profile or ~/.bashrc
+  echo 'source ~/.gllm-completion.bash' >> ~/.bash_profile `,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var shell string
+			if len(args) == 0 {
+				// Auto-detect shell when no argument is provided
+				// This is not ideal
+				// shell = detectCurrentShell()
+				return cmd.Help()
+			} else {
+				shell = args[0]
+			}
+			return generateCompletion(shell)
+		},
+	}
+
+	// Add completion command to root
+	rootCmd.AddCommand(completionCmd)
+}
+
+// detectCurrentShell attempts to detect the current shell by checking environment variables
+// and falls back to common defaults based on the operating system.
+func detectCurrentShell() string {
+	// Check SHELL environment variable first (most reliable on Unix-like systems)
+	if shell := os.Getenv("SHELL"); shell != "" {
+		// Extract just the shell name from the path
+		parts := strings.Split(shell, "/")
+		if len(parts) > 0 {
+			shellName := parts[len(parts)-1]
+			// Map common shell names to supported completion types
+			switch shellName {
+			case "bash":
+				return "bash"
+			case "zsh":
+				return "zsh"
+			case "fish":
+				return "fish"
+			case "pwsh", "powershell":
+				return "powershell"
+			}
+		}
+	}
+
+	// Check for Windows PowerShell/Command Prompt
+	if runtime.GOOS == "windows" {
+		// Check if running in PowerShell
+		if os.Getenv("PSModulePath") != "" {
+			return "powershell"
+		}
+		// Default to PowerShell on Windows (more modern than cmd)
+		return "powershell"
+	}
+
+	// On Unix-like systems, try to detect based on common patterns
+	// Check if we're in a login shell context
+	if os.Getenv("ZSH_VERSION") != "" {
+		return "zsh"
+	}
+	if os.Getenv("BASH_VERSION") != "" {
+		return "bash"
+	}
+
+	// Final fallback: try to guess based on common defaults
+	// macOS typically uses zsh as default since Catalina
+	// Linux distributions vary, but bash is very common
+	if runtime.GOOS == "darwin" {
+		return "zsh"
+	}
+
+	// Default to bash for other Unix-like systems
+	return "bash"
+}
+
 // This function runs when the package is initialized.
 func init() {
 	// Initialize Viper configuration
@@ -188,6 +310,9 @@ func init() {
 
 	// Disable the default completion command
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
+
+	// Add completion command
+	addCompletionCommand()
 
 	// Define the flags
 	rootCmd.Flags().StringVarP(&agentName, "agent", "g", "", "Switch to the agent to use")

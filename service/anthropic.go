@@ -174,10 +174,10 @@ func (a *Anthropic) process(ag *Agent) error {
 		params.Thinking = ag.ThinkingLevel.ToAnthropicParams()
 
 		// Temperature/TopP
+		// Bug: `temperature` and `top_p` cannot both be specified for this model. Please use only one.
 		if ag.Model.Temperature > 0 {
 			params.Temperature = param.NewOpt(float64(ag.Model.Temperature))
-		}
-		if ag.Model.TopP > 0 {
+		} else if ag.Model.TopP > 0 {
 			params.TopP = param.NewOpt(float64(ag.Model.TopP))
 		}
 

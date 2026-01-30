@@ -26,6 +26,13 @@ var mcpCmd = &cobra.Command{
 Use 'gllm mcp list' to list all available MCP servers.
 Use 'gllm mcp load' to load all available MCP tools.
 Use 'gllm mcp switch' to switch MCP servers on or off.`,
+	// Add completion support
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return []string{"list", "load", "switch", "export", "import", "path", "set", "--help"}, cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
 		fmt.Println()

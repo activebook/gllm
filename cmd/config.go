@@ -1,4 +1,3 @@
-// File: cmd/config.go
 package cmd
 
 import (
@@ -22,6 +21,13 @@ var configCmd = &cobra.Command{
 
 Use subcommands to target specific configuration areas like models or prompts,
 or use 'config path' to see where the configuration file is located.`,
+	// Add completion support
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return []string{"list", "set", "get", "edit", "path", "export", "import", "--help"}, cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	// Run: func(cmd *cobra.Command, args []string) {
 	// 	fmt.Println("Use 'gllm config [subcommand] --help' for more information.")
 	// },

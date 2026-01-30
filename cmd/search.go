@@ -18,6 +18,13 @@ var searchCmd = &cobra.Command{
 	Short: "Configure and manage search engines globally",
 	Long: `Configure API keys and settings for various search engines used with gllm.
 You can switch to use which search engine.`,
+	// Add completion support
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return []string{"switch", "set", "list", "--help"}, cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
 		settings := data.GetSettingsStore()

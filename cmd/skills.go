@@ -27,6 +27,12 @@ Use 'gllm skills switch' to switch skills on/off.
 Use 'gllm skills list' to list all installed skills.
 Use 'gllm skills install <path>' to install a skill.
 Use 'gllm skills uninstall <name>' to uninstall a skill.`,
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return []string{"list", "install", "uninstall", "switch"}, cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(cmd.Long)
 		fmt.Println()
