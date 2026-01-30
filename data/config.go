@@ -628,6 +628,13 @@ func getFloat(m map[string]interface{}, key string, defaultVal float32) float32 
 		return v
 	case float64:
 		return float32(v)
+	// Buxfix: handle int values as well
+	// When saving 0 to the YAML configuration, it was sometimes parsed as an integer 0.
+	// This caused getFloat to return the default value(1.0) instead of 0.0.
+	case int:
+		return float32(v)
+	case int64:
+		return float32(v)
 	}
 	return defaultVal
 }

@@ -327,9 +327,9 @@ Example:
 			return fmt.Errorf("temperature must be between 0 and 2.0, got: %f", temp)
 		}
 
-		// Validate top_p value (should be between 0 and 1, exclusive of 0)
-		if topP <= 0 || topP > 1.0 {
-			return fmt.Errorf("top_p must be greater than 0 and less than or equal to 1.0, got: %f", topP)
+		// Validate top_p value (should be between 0 and 1)
+		if topP < 0 || topP > 1.0 {
+			return fmt.Errorf("top_p must be between 0 and 1.0, got: %f", topP)
 		}
 
 		// Only add seed if it's not 0 (0 means random)
