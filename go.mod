@@ -4,7 +4,7 @@ go 1.25.3
 
 require (
 	github.com/PuerkitoBio/goquery v1.11.0
-	github.com/anthropics/anthropic-sdk-go v1.19.0
+	github.com/anthropics/anthropic-sdk-go v1.20.0
 	github.com/briandowns/spinner v1.23.2
 	github.com/charmbracelet/bubbles v0.21.1-0.20250623103423-23b8fd6302d7
 	github.com/charmbracelet/bubbletea v1.3.10
@@ -26,7 +26,7 @@ require (
 	github.com/volcengine/volcengine-go-sdk v1.2.10
 	github.com/willyv3/gogh-themes v1.2.0
 	golang.org/x/term v0.39.0
-	google.golang.org/api v0.263.0
+	google.golang.org/api v0.264.0
 	google.golang.org/genai v1.43.0
 	gopkg.in/yaml.v3 v3.0.1
 )
