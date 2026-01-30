@@ -17,7 +17,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 BASE_BRANCH="main"
-HEAD_BRANCH="develop"
+HEAD_BRANCH=""
 
 ##############################################################################
 # Functions
@@ -33,6 +33,23 @@ print_error() {
 
 print_warning() {
     echo -e "${YELLOW}Warning:${NC} $1"
+}
+
+show_usage() {
+    cat << EOF
+Usage: $0 [OPTIONS]
+
+Creates a pull request from the current branch to the base branch (default: main).
+Following GitHub best practices for PR creation.
+
+Options:
+    -b, --base <branch>   Base branch to merge into (default: main)
+    -h, --help            Show this help message
+
+Examples:
+    $0                    # Create PR from current branch to main
+    $0 --base develop     # Create PR from current branch to develop
+EOF
 }
 
 check_gh_cli() {
@@ -71,11 +88,44 @@ ensure_branch_updated() {
 # Main Script
 ##############################################################################
 
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            show_usage
+            exit 0
+            ;; 
+        -b|--base)
+            BASE_BRANCH="$2"
+            shift
+            shift
+            ;; 
+        *)
+            print_error "Unknown option: $1"
+            show_usage
+            exit 1
+            ;; 
+    esac
+done
+
+# Detect current branch
+HEAD_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
 echo ""
 echo "╔════════════════════════════════════════════════════╗"
-echo "║     GitHub Pull Request Creator (develop→main)     ║"
+echo "║           GitHub Pull Request Creator              ║"
 echo "╚════════════════════════════════════════════════════╝"
 echo ""
+echo "Current Branch: $HEAD_BRANCH"
+echo "Target Branch:  $BASE_BRANCH"
+echo ""
+
+# Validation: Don't create PR from main/master
+if [[ "$HEAD_BRANCH" == "main" || "$HEAD_BRANCH" == "master" ]]; then
+    print_error "Cannot create PR from '$HEAD_BRANCH' branch."
+    echo "Please switch to a feature branch first."
+    exit 1
+fi
 
 # Step 1: Verify GitHub CLI is installed
 print_step "Checking GitHub CLI installation..."
@@ -124,7 +174,7 @@ fi
 print_step "Generating PR title and description..."
 
 # Default title with timestamp
-DEFAULT_TITLE="Merge develop into main - $(date +%Y-%m-%d)"
+DEFAULT_TITLE="Merge $HEAD_BRANCH into $BASE_BRANCH - $(date +%Y-%m-%d)"
 
 # Generate commit summary for description
 COMMIT_COUNT=$(git rev-list --count "$BASE_BRANCH..$HEAD_BRANCH")
@@ -134,7 +184,7 @@ print_step "Found $COMMIT_COUNT commit(s) to merge"
 DESCRIPTION=$(cat <<EOF
 ## 🚀 Deployment PR
 
-This PR merges the latest changes from \`develop\` into \`main\`.
+This PR merges the latest changes from \`$HEAD_BRANCH\` into \`$BASE_BRANCH\`.
 
 ### 📊 Summary
 - **Commits**: $COMMIT_COUNT
