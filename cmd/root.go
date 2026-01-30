@@ -223,7 +223,10 @@ Supported shells: bash, zsh, fish, powershell`,
   gllm completion zsh > "${fpath[1]}/_gllm"
 
   # Generate fish completion
-  gllm completion fish > ~/.config/fish/completions/gllm.fish`,
+  gllm completion fish > ~/.config/fish/completions/gllm.fish
+  
+  # Add this to your ~/.bash_profile or ~/.bashrc
+  echo 'source ~/.gllm-completion.bash' >> ~/.bash_profile `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var shell string
 			if len(args) == 0 {
