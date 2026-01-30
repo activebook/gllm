@@ -81,7 +81,7 @@ EOF
 get_pr_info() {
     local pr_number=$1
     
-    PR_INFO=$(gh pr view "$pr_number" --json number,title,state,headRefName,baseRefName,mergeable,url 2>&1)
+    PR_INFO=$(gh pr view "$pr_number" --json number,title,body,state,headRefName,baseRefName,mergeable,url 2>/dev/null)
     
     if [ $? -ne 0 ]; then
         print_error "Could not find PR #$pr_number"
@@ -189,13 +189,25 @@ print_step "Fetching PR #$PR_NUMBER information..."
 PR_INFO=$(get_pr_info "$PR_NUMBER")
 
 PR_TITLE=$(echo "$PR_INFO" | jq -r '.title')
+PR_BODY=$(echo "$PR_INFO" | jq -r '.body')
 PR_URL=$(echo "$PR_INFO" | jq -r '.url')
 HEAD_BRANCH=$(echo "$PR_INFO" | jq -r '.headRefName')
 BASE_BRANCH=$(echo "$PR_INFO" | jq -r '.baseRefName')
 
-echo ""
-echo "PR #$PR_NUMBER: $PR_TITLE"
-echo "URL: $PR_URL"
+# Display PR details
+PR_STATE=$(echo "$PR_INFO" | jq -r '.state')
+PR_MERGEABLE=$(echo "$PR_INFO" | jq -r '.mergeable')
+
+print_info "PR Details:"
+echo "  Title: $PR_TITLE"
+echo "  State: $PR_STATE"
+echo "  Branches: $HEAD_BRANCH → $BASE_BRANCH"
+echo "  Mergeable: $PR_MERGEABLE"
+echo "  URL: $PR_URL"
+echo "  Details: "
+echo "=========================================================="
+echo "$PR_BODY"
+echo "=========================================================="
 echo ""
 
 # Step 4: Check PR status

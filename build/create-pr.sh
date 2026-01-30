@@ -145,10 +145,10 @@ This PR merges the latest changes from \`develop\` into \`main\`.
 $(git log "$BASE_BRANCH..$HEAD_BRANCH" --oneline --max-count=10 | sed 's/^/- /')
 
 ### ✅ Checklist
-- [ ] All tests pass
-- [ ] Code has been reviewed
-- [ ] Documentation is updated (if needed)
-- [ ] Ready for production deployment
+- All tests pass
+- Code has been reviewed
+- Documentation is updated (if needed)
+- Ready for production deployment
 EOF
 )
 
