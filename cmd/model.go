@@ -798,6 +798,13 @@ func CheckModelName(name string) error {
 	return nil
 }
 
+/*
+Temperature: Typically in the range [0, 2] (inclusive).
+  - 0 : Deterministic output (greedy decoding; always picks the highest-
+    probability token).
+  - 1 : Balanced output (default).
+  - 2 : Highly random/diverse output.
+*/
 func ValidateTemperature(s string) error {
 	if s == "" {
 		return nil
@@ -812,6 +819,14 @@ func ValidateTemperature(s string) error {
 	return nil
 }
 
+/*
+Top_p (nucleus sampling): In the range [0, 1] (inclusive).
+  - 0 : Effectively selects only the single highest-probability token
+    (similar to greedy; very rare in practice, as cumulative prob mass never
+    reaches exactly 0).
+  - 1 : No filtering—samples from the full probability distribution
+    (equivalent to no top_p effect).
+*/
 func ValidateTopP(s string) error {
 	if s == "" {
 		return nil
@@ -820,7 +835,7 @@ func ValidateTopP(s string) error {
 	if err != nil {
 		return err
 	}
-	if v <= 0 || v > 1.0 {
+	if v < 0 || v > 1.0 {
 		return fmt.Errorf("top_p must be greater than 0.0 and less than or equal to 1.0")
 	}
 	return nil
