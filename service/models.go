@@ -143,8 +143,11 @@ var DefaultModelLimits = map[string]ModelLimits{
 
 	// Anthropic (verified)
 	"claude-opus-4.5":   {ContextWindow: 200000, MaxOutputTokens: 64000},
+	"claude-4.5-opus":   {ContextWindow: 200000, MaxOutputTokens: 64000},
 	"claude-sonnet-4.5": {ContextWindow: 1000000, MaxOutputTokens: 64000},
+	"claude-4.5-sonnet": {ContextWindow: 1000000, MaxOutputTokens: 64000},
 	"claude-haiku-4.5":  {ContextWindow: 200000, MaxOutputTokens: 64000},
+	"claude-4.5-haiku":  {ContextWindow: 200000, MaxOutputTokens: 64000},
 	"claude-opus-4.1":   {ContextWindow: 200000, MaxOutputTokens: 64000},
 	"claude-sonnet-4":   {ContextWindow: 1000000, MaxOutputTokens: 64000},
 	"claude-3.7-sonnet": {ContextWindow: 200000, MaxOutputTokens: 8192},
