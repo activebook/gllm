@@ -3,6 +3,8 @@ package ui
 import (
 	"fmt"
 	"math/rand"
+	"os"
+	"sync"
 	"time"
 
 	"github.com/briandowns/spinner"
@@ -100,18 +102,39 @@ func GetRandomProcessingWord() string {
 }
 
 type Indicator struct {
+	mu           sync.Mutex
 	s            *spinner.Spinner
 	rotating     bool
 	lastRotation time.Time
 	lastWord     string
 }
 
+var (
+	globalIndicator *Indicator
+	indicatorOnce   sync.Once
+)
+
+// GetIndicator returns the singleton indicator instance
+func GetIndicator() *Indicator {
+	indicatorOnce.Do(func() {
+		globalIndicator = &Indicator{
+			rotating: true,
+		}
+		globalIndicator.setupSpinner()
+	})
+	return globalIndicator
+}
+
 func (i *Indicator) setupSpinner() {
-	i.s = spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+	i.s = spinner.New(spinner.CharSets[14],
+		100*time.Millisecond,
+		spinner.WithWriter(os.Stderr))
 	i.s.Color("fgHiMagenta", "bold")
 
 	// Setup the pre-update hook for word rotation
 	i.s.PreUpdate = func(s *spinner.Spinner) {
+		i.mu.Lock()
+		defer i.mu.Unlock()
 		if i.rotating {
 			// Change word every 2 seconds for a whimsical feel
 			if time.Since(i.lastRotation) > 2000*time.Millisecond {
@@ -127,33 +150,24 @@ func (i *Indicator) setupSpinner() {
 		}
 	}
 }
-
-func NewIndicator() *Indicator {
-	i := &Indicator{
-		rotating: true,
-	}
-	i.setupSpinner()
-	i.Start("")
-	return i
-}
-
-// NewIndicatorWithText creates a new indicator with custom text (no rotation)
-func NewIndicatorWithText(text string) *Indicator {
-	i := &Indicator{
-		rotating: false,
-	}
-	i.setupSpinner()
-	i.Start(text)
-	return i
+func (i *Indicator) IsActive() bool {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	return i.s != nil && i.s.Active()
 }
 
 func (i *Indicator) Stop() {
-	if i.s.Active() {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if i.s != nil && i.s.Active() {
 		i.s.Stop()
 	}
 }
 
 func (i *Indicator) Start(text string) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
 	if text == "" {
 		i.rotating = true
 		text = GetRandomProcessingWord()

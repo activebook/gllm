@@ -55,7 +55,7 @@ type Agent struct {
 	OutputFile      *FileRenderer       // File renderer
 	Status          StatusStack         // Stack to manage streaming status
 	Convo           ConversationManager // Conversation manager
-	Indicator       *ui.Indicator       // Indicator Spinner
+	ShowIndicator   bool                // Whether to show indicator
 	LastWrittenData string              // Last written data
 
 	// Sub-agent orchestration
@@ -205,11 +205,11 @@ func CallAgent(op *AgentOptions) error {
 	activeDataCh := dataCh
 
 	// Only create StdRenderer if not in quiet mode
-	var indicator *ui.Indicator
+	var showIndicator bool
 	var std *StdRenderer
 	if !op.QuietMode {
 		std = NewStdRenderer()
-		indicator = ui.NewIndicator()
+		showIndicator = true
 	}
 
 	// Need to output a file
@@ -228,15 +228,15 @@ func CallAgent(op *AgentOptions) error {
 	var mc *MCPClient
 	if IsMCPServersEnabled(op.Capabilities) {
 		mc = GetMCPClient() // use the shared instance
-		if !op.QuietMode {
-			indicator.Start(ui.IndicatorLoadingMCP)
+		if showIndicator {
+			ui.GetIndicator().Start(ui.IndicatorLoadingMCP)
 		}
 		err := mc.Init(op.MCPConfig, MCPLoadOption{
 			LoadAll:   false,
 			LoadTools: true, // only load tools
 		}) // Load only allowed servers
-		if !op.QuietMode {
-			indicator.Stop()
+		if showIndicator {
+			ui.GetIndicator().Stop()
 		}
 		if err != nil {
 			return fmt.Errorf("failed to load MCPServers: %v", err)
@@ -323,7 +323,7 @@ func CallAgent(op *AgentOptions) error {
 		Std:           std,
 		OutputFile:    fileRenderer,
 		Status:        StatusStack{},
-		Indicator:     indicator,
+		ShowIndicator: showIndicator,
 		SharedState:   op.SharedState,
 		AgentName:     op.AgentName,
 	}
@@ -724,14 +724,14 @@ func (ag *Agent) WriteEnd() {
 }
 
 func (ag *Agent) StartIndicator(text string) {
-	if ag.Indicator != nil {
-		ag.Indicator.Start(text)
+	if ag.ShowIndicator {
+		ui.GetIndicator().Start(text)
 	}
 }
 
 func (ag *Agent) StopIndicator() {
-	if ag.Indicator != nil {
-		ag.Indicator.Stop()
+	if ag.ShowIndicator {
+		ui.GetIndicator().Stop()
 	}
 }
 

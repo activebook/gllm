@@ -20,7 +20,7 @@ var (
 	debugMode   bool // Flag to enable debug logging
 
 	// Global logger instance, configured by setupLogging
-	logger = service.GetLogger()
+	logger *log.Logger
 
 	agentName   string   // gllm "What is Go?" -agent(-g) plan
 	attachments []string // gllm "Summarize this" --attachment(-a) report.txt
@@ -121,8 +121,8 @@ Configure your API keys and preferred models, then start chatting or executing c
 				prompt = readStdin()
 			}
 
-			// Create an indeterminate progress bar
-			indicator := ui.NewIndicator()
+			// Start indeterminate progress bar
+			ui.GetIndicator().Start("")
 
 			// If conversation flag is provided, find the conversation file
 			if cmd.Flags().Changed("conversation") {
@@ -160,7 +160,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 				files = BatchAttachments(attachments)
 			}
 
-			indicator.Stop()
+			ui.GetIndicator().Stop()
 
 			// Call your LLM service here
 			// Call agent using the shared runner, passing nil for SharedState (single turn)
@@ -322,6 +322,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
 
 	// Set logrus defaults before configuration is loaded
+	logger = service.GetLogger()
 	// This ensures basic logging works even if config fails
 	service.InitLogger()
 }
