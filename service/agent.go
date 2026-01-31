@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
@@ -191,6 +192,12 @@ func CallAgent(op *AgentOptions) error {
 
 	// Set up thinking level
 	thinkingLevel := ParseThinkingLevel(op.ThinkingLevel)
+
+	// Set max recursions to max int if negative
+	if op.MaxRecursions < 0 {
+		op.MaxRecursions = math.MaxInt
+	}
+	Debugf("Max session turns:%d\n", op.MaxRecursions)
 
 	// Create a channel to receive notifications
 	notifyCh := make(chan StreamNotify, 10) // Buffer to prevent blocking(used for status updates)

@@ -15,10 +15,11 @@ import (
 )
 
 const (
-	MaxRecursionsDescription = `[Max recursions]() controls the maximum number of recursive model calls allowed when tools are being used.
-- _Increase for complex multi-step tasks (20-50)_
-- _Decrease for simple tasks (3-5) to save tokens_
-- _For recursive agent ( [RLM]()), set to 50-100 to allow for more complex tasks_`
+	MaxRecursionsDescription = `[Max session turns]() controls the maximum number of user/model/tool turns to keep in a session.
+- _Increase for complex multi-step tasks (100)_
+- _Decrease for simple tasks (20-50) to save tokens_
+- _For recursive agent ( [RLM]()), set to 200 to allow for more complex tasks_
+- _-1 means unlimited, let agent decide when to stop, but will use more tokens_`
 )
 
 var ()
@@ -118,16 +119,14 @@ var agentAddCmd = &cobra.Command{
 
 		// Form variables
 		var (
-			model         string
-			tools         []string
-			think         string
-			template      string
-			sysPrompt     string
-			maxRecursions string
+			model     string
+			tools     []string
+			think     string
+			template  string
+			sysPrompt string
 		)
 
 		// Initial defaults
-		maxRecursions = "10"
 
 		// Get available options from data layer
 		store := data.NewConfigStore()
@@ -257,16 +256,7 @@ var agentAddCmd = &cobra.Command{
 		}
 
 		// Max Recursions
-		err = huh.NewForm(
-			huh.NewGroup(
-				huh.NewInput().
-					Title("Max Recursions").
-					Description("The maximum number of Model calling recursions allowed").
-					Value(&maxRecursions).
-					Validate(ValidateMaxRecursions),
-				ui.GetStaticHuhNote("Why set this", MaxRecursionsDescription),
-			),
-		).Run()
+		recursionVal, err := runMaxRecursionsSelection(10) // Default 10 for new agent
 		if err != nil {
 			return
 		}
@@ -315,12 +305,6 @@ var agentAddCmd = &cobra.Command{
 		if err != nil {
 			fmt.Println("Aborted.")
 			return
-		}
-
-		// Construct typed config
-		var recursionVal int
-		if _, err := fmt.Sscanf(maxRecursions, "%d", &recursionVal); err != nil || recursionVal <= 0 {
-			recursionVal = 10
 		}
 
 		agentConfig := &data.AgentConfig{
@@ -392,13 +376,12 @@ var agentSetCmd = &cobra.Command{
 
 		// Form variables populated with existing config
 		var (
-			model         string
-			tools         []string
-			think         string
-			template      string
-			sysPrompt     string
-			maxRecursions string
-			capabilities  []string
+			model        string
+			tools        []string
+			think        string
+			template     string
+			sysPrompt    string
+			capabilities []string
 		)
 
 		// Access typed struct fields directly - no type assertions needed!
@@ -407,11 +390,6 @@ var agentSetCmd = &cobra.Command{
 		think = agent.Think
 		template = agent.Template
 		sysPrompt = agent.SystemPrompt
-		if agent.MaxRecursions > 0 {
-			maxRecursions = fmt.Sprintf("%d", agent.MaxRecursions)
-		} else {
-			maxRecursions = "10"
-		}
 
 		// Populate capabilities from struct fields
 		capabilities = agent.Capabilities
@@ -527,16 +505,7 @@ var agentSetCmd = &cobra.Command{
 		}
 
 		// Max Recursions
-		err = huh.NewForm(
-			huh.NewGroup(
-				huh.NewInput().
-					Title("Max Recursions").
-					Description("The maximum number of Model calling recursions allowed").
-					Value(&maxRecursions).
-					Validate(ValidateMaxRecursions),
-				ui.GetStaticHuhNote("Why set this", MaxRecursionsDescription),
-			),
-		).Run()
+		recursionVal, err := runMaxRecursionsSelection(agent.MaxRecursions)
 		if err != nil {
 			return
 		}
@@ -586,13 +555,6 @@ var agentSetCmd = &cobra.Command{
 		if err != nil {
 			fmt.Println("Aborted.")
 			return
-		}
-
-		// Reconstruct typed config
-		var recursionVal int
-		fmt.Sscanf(maxRecursions, "%d", &recursionVal)
-		if recursionVal <= 0 {
-			recursionVal = 10
 		}
 
 		// Process capabilities - no conversion needed
@@ -875,4 +837,70 @@ func ValidateMaxRecursions(s string) error {
 		return fmt.Errorf("max recursions must be greater than 0")
 	}
 	return nil
+}
+
+// runMaxRecursionsSelection handles the interactive selection for Max Session Turns
+func runMaxRecursionsSelection(currentVal int) (int, error) {
+	var selection string
+
+	// Define constants for display - sorted numerically
+	const (
+		OptNoLimit  = "No limit (-1)"
+		OptQuick    = "Quick task (20 turns)"
+		OptStandard = "Standard (50 turns) [Default]"
+		OptComplex  = "Complex task (100 turns)"
+		OptExtended = "Extended (200 turns)"
+	)
+
+	// Map generic display name to value
+	valMap := map[string]int{
+		OptNoLimit:  -1,
+		OptQuick:    20,
+		OptStandard: 50,
+		OptComplex:  100,
+		OptExtended: 200,
+	}
+
+	// Determine initial selection based on currentVal
+	initialSelection := OptStandard // Default
+	for k, v := range valMap {
+		if v == currentVal {
+			initialSelection = k
+			break
+		}
+	}
+
+	// Helper to check if option is selected
+	isSelected := func(opt string) bool {
+		return initialSelection == opt
+	}
+
+	options := []huh.Option[string]{
+		huh.NewOption(OptNoLimit, OptNoLimit).Selected(isSelected(OptNoLimit)),
+		huh.NewOption(OptQuick, OptQuick).Selected(isSelected(OptQuick)),
+		huh.NewOption(OptStandard, OptStandard).Selected(isSelected(OptStandard)),
+		huh.NewOption(OptComplex, OptComplex).Selected(isSelected(OptComplex)),
+		huh.NewOption(OptExtended, OptExtended).Selected(isSelected(OptExtended)),
+	}
+	ui.SortOptions(options, initialSelection)
+
+	// Use a single form with conditional visibility for smoother UX
+	err := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Max Session Turns").
+				Description("Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.").
+				Options(options...).
+				Value(&selection),
+
+			// Re-add the description note as requested
+			ui.GetStaticHuhNote("Details", MaxRecursionsDescription),
+		),
+	).Run()
+
+	if err != nil {
+		return 0, err
+	}
+
+	return valMap[selection], nil
 }
