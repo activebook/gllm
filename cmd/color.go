@@ -70,6 +70,14 @@ var colorCmd = &cobra.Command{
 		printColor("PromptColor", data.PromptColor)
 		printColor("MediaColor", data.MediaColor)
 
+		fmt.Println("\n-- Diff --")
+		printColor("DiffAddedColor", data.DiffAddedColor)
+		printColor("DiffRemovedColor", data.DiffRemovedColor)
+		printColor("DiffHeaderColor", data.DiffHeaderColor)
+		printColor("DiffSeparatorColor", data.DiffSeparatorColor)
+		printColor("DiffAddedBgColor", data.DiffAddedBgColor)
+		printColor("DiffRemovedBgColor", data.DiffRemovedBgColor)
+
 		fmt.Println("\n-- UI & Colors --")
 		printColor("BorderColor", data.BorderColor)
 		printColor("SectionColor", data.SectionColor)
