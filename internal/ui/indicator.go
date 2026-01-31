@@ -151,6 +151,7 @@ func (i *Indicator) setupSpinner() {
 		}
 	}
 }
+
 func (i *Indicator) IsActive() bool {
 	i.mu.Lock()
 	defer i.mu.Unlock()
@@ -169,6 +170,14 @@ func (i *Indicator) Start(text string) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
+	// Stop any existing spinner first
+	if i.s.Active() {
+		i.s.Stop()
+		// Give it a moment to actually stop
+		time.Sleep(1 * time.Millisecond)
+	}
+
+	// Determine rotating state and initial text
 	i.stateMu.Lock()
 	if text == "" {
 		i.rotating = true
@@ -180,13 +189,13 @@ func (i *Indicator) Start(text string) {
 	}
 	i.stateMu.Unlock()
 
-	// Always restart to ensure fresh state
-	if i.s.Active() {
-		i.s.Stop()
-	}
-
-	i.s.Lock()
+	// Set the suffix BEFORE starting
 	i.s.Suffix = fmt.Sprintf(" %s", text)
-	i.s.Unlock()
+
+	// Start the spinner
 	i.s.Start()
+
+	// Give the spinner goroutine time to actually start and display
+	// This is crucial - without this, the spinner may not appear
+	time.Sleep(1 * time.Millisecond)
 }
