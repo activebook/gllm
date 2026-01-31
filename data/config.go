@@ -501,7 +501,7 @@ func (c *ConfigStore) parseAgentConfig(name string, config interface{}) *AgentCo
 		Think:         getString(configMap, "think"),
 		Template:      getString(configMap, "template"),
 		SystemPrompt:  getString(configMap, "system_prompt"),
-		MaxRecursions: getInt(configMap, "max_recursions", 10),
+		MaxRecursions: getInt(configMap, "max_recursions", 50),
 		Tools:         getStringSlice(configMap, "tools"),
 		Capabilities:  getStringSlice(configMap, "capabilities"),
 	}

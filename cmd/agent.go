@@ -256,7 +256,7 @@ var agentAddCmd = &cobra.Command{
 		}
 
 		// Max Recursions
-		recursionVal, err := runMaxRecursionsSelection(10) // Default 10 for new agent
+		recursionVal, err := runMaxRecursionsSelection(50) // Default 50 for new agent
 		if err != nil {
 			return
 		}
@@ -847,7 +847,7 @@ func runMaxRecursionsSelection(currentVal int) (int, error) {
 	const (
 		OptNoLimit  = "No limit (-1)"
 		OptQuick    = "Quick task (20 turns)"
-		OptStandard = "Standard (50 turns) [Default]"
+		OptStandard = "Standard (50 turns)"
 		OptComplex  = "Complex task (100 turns)"
 		OptExtended = "Extended (200 turns)"
 	)
