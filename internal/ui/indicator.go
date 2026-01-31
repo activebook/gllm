@@ -103,6 +103,7 @@ func GetRandomProcessingWord() string {
 
 type Indicator struct {
 	mu           sync.Mutex
+	stateMu      sync.Mutex
 	s            *spinner.Spinner
 	rotating     bool
 	lastRotation time.Time
@@ -133,8 +134,8 @@ func (i *Indicator) setupSpinner() {
 
 	// Setup the pre-update hook for word rotation
 	i.s.PreUpdate = func(s *spinner.Spinner) {
-		i.mu.Lock()
-		defer i.mu.Unlock()
+		i.stateMu.Lock()
+		defer i.stateMu.Unlock()
 		if i.rotating {
 			// Change word every 2 seconds for a whimsical feel
 			if time.Since(i.lastRotation) > 2000*time.Millisecond {
@@ -168,6 +169,7 @@ func (i *Indicator) Start(text string) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
+	i.stateMu.Lock()
 	if text == "" {
 		i.rotating = true
 		text = GetRandomProcessingWord()
@@ -176,6 +178,7 @@ func (i *Indicator) Start(text string) {
 	} else {
 		i.rotating = false
 	}
+	i.stateMu.Unlock()
 
 	// Always restart to ensure fresh state
 	if i.s.Active() {
