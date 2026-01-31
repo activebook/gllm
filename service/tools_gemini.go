@@ -660,7 +660,7 @@ func (ga *GeminiAgent) GeminiSpawnSubAgentsToolCall(call *genai.FunctionCall) (*
 		argsMap[k] = v
 	}
 
-	response, err := spawnSubAgentsToolCallImpl(&argsMap, ga.executor)
+	response, err := spawnSubAgentsToolCallImpl(&argsMap, &ga.ToolsUse, ga.executor)
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)

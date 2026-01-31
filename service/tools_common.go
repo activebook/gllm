@@ -2,9 +2,7 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/activebook/gllm/data"
 	"github.com/anthropics/anthropic-sdk-go"
@@ -12,7 +10,6 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/shared/constant"
 	"github.com/sashabaranov/go-openai"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
-	"github.com/volcengine/volcengine-go-sdk/volcengine"
 	"google.golang.org/genai"
 )
 
@@ -469,54 +466,104 @@ func getOpenTools() []*OpenTool {
 
 	// Shell tool
 	shellTool := getOpenShellTool()
-
 	tools = append(tools, shellTool)
 
 	// Web fetch tool
-	webFetchFunc := OpenFunctionDefinition{
-		Name:        "web_fetch",
-		Description: "Fetch content from a URL and extract the main text content.",
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"url": map[string]interface{}{
-					"type":        "string",
-					"description": "The URL to fetch content from.",
-				},
-			},
-			"required": []string{"url"},
-		},
-	}
-	webFetchTool := OpenTool{
-		Type:     ToolTypeFunction,
-		Function: &webFetchFunc,
-	}
-
-	tools = append(tools, &webFetchTool)
+	webFetchTool := getWebFetchTool()
+	tools = append(tools, webFetchTool)
 
 	// Web Search tool
-	webSearchFunc := OpenFunctionDefinition{
-		Name:        "web_search",
-		Description: "Retrieve the most relevant and up-to-date information from the web.",
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"query": map[string]interface{}{
-					"type":        "string",
-					"description": "The search term or question to find information about.",
-				},
-			},
-			"required": []string{"query"},
-		},
-	}
-	webSearchTool := OpenTool{
-		Type:     ToolTypeFunction,
-		Function: &webSearchFunc,
-	}
-
-	tools = append(tools, &webSearchTool)
+	webSearchTool := getWebSearchTool()
+	tools = append(tools, webSearchTool)
 
 	// Read file tool
+	readFileTool := getReadFileTool()
+	tools = append(tools, readFileTool)
+
+	// Write file tool
+	writeFileTool := getWriteFileTool()
+	tools = append(tools, writeFileTool)
+
+	// Create directory tool
+	createDirectoryTool := getCreateDirectoryTool()
+	tools = append(tools, createDirectoryTool)
+
+	// List directory tool
+	listDirectoryTool := getListDirectoryTool()
+	tools = append(tools, listDirectoryTool)
+
+	// Delete file tool
+	deleteFileTool := getDeleteFileTool()
+	tools = append(tools, deleteFileTool)
+
+	// Delete directory tool
+	deleteDirectoryTool := getDeleteDirectoryTool()
+	tools = append(tools, deleteDirectoryTool)
+
+	// Search files tool
+	searchFilesTool := getSearchFilesTool()
+	tools = append(tools, searchFilesTool)
+
+	// Search text in file tool
+	searchTextTool := getSearchTextInFileTool()
+	tools = append(tools, searchTextTool)
+
+	// Read multiple files tool
+	readMultipleFilesTool := getReadMultipleFilesTool()
+	tools = append(tools, readMultipleFilesTool)
+
+	// Edit file tool
+	editFileTool := getEditFileTool()
+	tools = append(tools, editFileTool)
+
+	// Move file/directory tool
+	moveTool := getMoveTool()
+	tools = append(tools, moveTool)
+
+	// Copy file/directory tool
+	copyTool := getCopyTool()
+	tools = append(tools, copyTool)
+
+	// list_memory tool
+	listMemoryTool := getListMemoryTool()
+	tools = append(tools, listMemoryTool)
+
+	// save_memory tool
+	saveMemoryTool := getSaveMemoryTool()
+	tools = append(tools, saveMemoryTool)
+
+	// Switch Agent tool
+	switchAgentTool := getSwitchAgentTool()
+	tools = append(tools, switchAgentTool)
+
+	// list_agent tool - List all available agents
+	listAgentTool := getListAgentTool()
+	tools = append(tools, listAgentTool)
+
+	// spawn_subagents tool - The core orchestration tool
+	spawnSubAgentsTool := getSpawnSubAgentsTool()
+	tools = append(tools, spawnSubAgentsTool)
+
+	// get_state tool - Read from SharedState
+	getStateTool := getGetStateTool()
+	tools = append(tools, getStateTool)
+
+	// set_state tool - Write to SharedState
+	setStateTool := getSetStateTool()
+	tools = append(tools, setStateTool)
+
+	// list_state tool - List all SharedState keys
+	listStateTool := getListStateTool()
+	tools = append(tools, listStateTool)
+
+	// activate_skill tool
+	activateSkillTool := getActivateSkillTool()
+	tools = append(tools, activateSkillTool)
+
+	return tools
+}
+
+func getReadFileTool() *OpenTool {
 	readFileFunc := OpenFunctionDefinition{
 		Name:        "read_file",
 		Description: "Read the contents of a file from the filesystem. Optionally include line numbers for easier referencing.",
@@ -540,10 +587,10 @@ func getOpenTools() []*OpenTool {
 		Type:     ToolTypeFunction,
 		Function: &readFileFunc,
 	}
+	return &readFileTool
+}
 
-	tools = append(tools, &readFileTool)
-
-	// Write file tool
+func getWriteFileTool() *OpenTool {
 	writeFileFunc := OpenFunctionDefinition{
 		Name:        "write_file",
 		Description: "Write content to a file in the filesystem. Creates the file if it doesn't exist, or overwrites it if it does.",
@@ -572,11 +619,11 @@ func getOpenTools() []*OpenTool {
 		Type:     ToolTypeFunction,
 		Function: &writeFileFunc,
 	}
+	return &writeFileTool
+}
 
-	tools = append(tools, &writeFileTool)
-
-	// Create directory tool
-	createDirFunc := OpenFunctionDefinition{
+func getCreateDirectoryTool() *OpenTool {
+	createDirectoryFunc := OpenFunctionDefinition{
 		Name:        "create_directory",
 		Description: "Create a new directory in the filesystem.",
 		Parameters: map[string]interface{}{
@@ -590,15 +637,15 @@ func getOpenTools() []*OpenTool {
 			"required": []string{"path"},
 		},
 	}
-	createDirTool := OpenTool{
+	createDirectoryTool := OpenTool{
 		Type:     ToolTypeFunction,
-		Function: &createDirFunc,
+		Function: &createDirectoryFunc,
 	}
+	return &createDirectoryTool
+}
 
-	tools = append(tools, &createDirTool)
-
-	// List directory tool
-	listDirFunc := OpenFunctionDefinition{
+func getListDirectoryTool() *OpenTool {
+	listDirectoryFunc := OpenFunctionDefinition{
 		Name:        "list_directory",
 		Description: "List the contents of a directory in the filesystem.",
 		Parameters: map[string]interface{}{
@@ -612,23 +659,23 @@ func getOpenTools() []*OpenTool {
 			"required": []string{"path"},
 		},
 	}
-	listDirTool := OpenTool{
+	listDirectoryTool := OpenTool{
 		Type:     ToolTypeFunction,
-		Function: &listDirFunc,
+		Function: &listDirectoryFunc,
 	}
+	return &listDirectoryTool
+}
 
-	tools = append(tools, &listDirTool)
-
-	// Delete file tool
+func getDeleteFileTool() *OpenTool {
 	deleteFileFunc := OpenFunctionDefinition{
 		Name:        "delete_file",
-		Description: "Delete a file from the filesystem.",
+		Description: "Delete a file in the filesystem.",
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"path": map[string]interface{}{
 					"type":        "string",
-					"description": "The path of the file to delete.",
+					"description": "The path to the file to delete.",
 				},
 				"need_confirm": map[string]interface{}{
 					"type": "boolean",
@@ -644,19 +691,19 @@ func getOpenTools() []*OpenTool {
 		Type:     ToolTypeFunction,
 		Function: &deleteFileFunc,
 	}
+	return &deleteFileTool
+}
 
-	tools = append(tools, &deleteFileTool)
-
-	// Delete directory tool
-	deleteDirFunc := OpenFunctionDefinition{
+func getDeleteDirectoryTool() *OpenTool {
+	deleteDirectoryFunc := OpenFunctionDefinition{
 		Name:        "delete_directory",
-		Description: "Delete a directory from the filesystem.",
+		Description: "Delete a directory in the filesystem.",
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"path": map[string]interface{}{
 					"type":        "string",
-					"description": "The path of the directory to delete.",
+					"description": "The path to the directory to delete.",
 				},
 				"need_confirm": map[string]interface{}{
 					"type": "boolean",
@@ -668,46 +715,14 @@ func getOpenTools() []*OpenTool {
 			"required": []string{"path"},
 		},
 	}
-	deleteDirTool := OpenTool{
+	deleteDirectoryTool := OpenTool{
 		Type:     ToolTypeFunction,
-		Function: &deleteDirFunc,
+		Function: &deleteDirectoryFunc,
 	}
+	return &deleteDirectoryTool
+}
 
-	tools = append(tools, &deleteDirTool)
-
-	// Move file/directory tool
-	moveFunc := OpenFunctionDefinition{
-		Name:        "move",
-		Description: "Move or rename a file or directory in the filesystem.",
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"source": map[string]interface{}{
-					"type":        "string",
-					"description": "The current path of the file or directory.",
-				},
-				"destination": map[string]interface{}{
-					"type":        "string",
-					"description": "The new path for the file or directory.",
-				},
-				"need_confirm": map[string]interface{}{
-					"type": "boolean",
-					"description": "Specifies whether to prompt the user for confirmation before moving the file or directory. " +
-						"This should always be true for safety.",
-					"default": true,
-				},
-			},
-			"required": []string{"source", "destination"},
-		},
-	}
-	moveTool := OpenTool{
-		Type:     ToolTypeFunction,
-		Function: &moveFunc,
-	}
-
-	tools = append(tools, &moveTool)
-
-	// Search files tool
+func getSearchFilesTool() *OpenTool {
 	searchFilesFunc := OpenFunctionDefinition{
 		Name:        "search_files",
 		Description: "Search for files in a directory matching a pattern. Supports recursive search through subdirectories.",
@@ -735,11 +750,11 @@ func getOpenTools() []*OpenTool {
 		Type:     ToolTypeFunction,
 		Function: &searchFilesFunc,
 	}
+	return &searchFilesTool
+}
 
-	tools = append(tools, &searchFilesTool)
-
-	// Search text in file tool
-	searchTextFunc := OpenFunctionDefinition{
+func getSearchTextInFileTool() *OpenTool {
+	searchTextInFileFunc := OpenFunctionDefinition{
 		Name:        "search_text_in_file",
 		Description: "Search for specific text within a file and return matching lines with line numbers. Supports case-insensitive and regex search.",
 		Parameters: map[string]interface{}{
@@ -767,24 +782,27 @@ func getOpenTools() []*OpenTool {
 			"required": []string{"path", "text"},
 		},
 	}
-	searchTextTool := OpenTool{
+	searchTextInFileTool := OpenTool{
 		Type:     ToolTypeFunction,
-		Function: &searchTextFunc,
+		Function: &searchTextInFileFunc,
 	}
+	return &searchTextInFileTool
+}
 
-	tools = append(tools, &searchTextTool)
-
-	// Read multiple files tool
+func getReadMultipleFilesTool() *OpenTool {
 	readMultipleFilesFunc := OpenFunctionDefinition{
-		Name:        "read_multiple_files",
-		Description: "Read the contents of multiple files from the filesystem. Optionally include line numbers for easier referencing.",
+		Name: "read_multiple_files",
+		Description: "Read the contents of multiple files. " +
+			"Use this when you need to inspect several files at once to understand the codebase or context.",
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"paths": map[string]interface{}{
-					"type":        "array",
-					"items":       map[string]interface{}{"type": "string"},
-					"description": "An array of file paths to read.",
+					"type": "array",
+					"items": map[string]interface{}{
+						"type": "string",
+					},
+					"description": "Array of file paths to read.",
 				},
 				"line_numbers": map[string]interface{}{
 					"type":        "boolean",
@@ -799,10 +817,10 @@ func getOpenTools() []*OpenTool {
 		Type:     ToolTypeFunction,
 		Function: &readMultipleFilesFunc,
 	}
+	return &readMultipleFilesTool
+}
 
-	tools = append(tools, &readMultipleFilesTool)
-
-	// Edit file tool
+func getEditFileTool() *OpenTool {
 	editFileFunc := OpenFunctionDefinition{
 		Name: "edit_file",
 		Description: "Apply targeted edits to a file using search-replace operations. " +
@@ -848,10 +866,42 @@ func getOpenTools() []*OpenTool {
 		Type:     ToolTypeFunction,
 		Function: &editFileFunc,
 	}
+	return &editFileTool
+}
 
-	tools = append(tools, &editFileTool)
+func getMoveTool() *OpenTool {
+	moveFunc := OpenFunctionDefinition{
+		Name:        "move",
+		Description: "Move a file or directory from one location to another in the filesystem.",
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"source": map[string]interface{}{
+					"type":        "string",
+					"description": "The current path of the file or directory to move.",
+				},
+				"destination": map[string]interface{}{
+					"type":        "string",
+					"description": "The destination path for the file or directory move.",
+				},
+				"need_confirm": map[string]interface{}{
+					"type": "boolean",
+					"description": "Specifies whether to prompt the user for confirmation before moving the file or directory. " +
+						"This should be true for safety if it needs overwrite.",
+					"default": true,
+				},
+			},
+			"required": []string{"source", "destination"},
+		},
+	}
+	moveTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &moveFunc,
+	}
+	return &moveTool
+}
 
-	// Copy file/directory tool
+func getCopyTool() *OpenTool {
 	copyFunc := OpenFunctionDefinition{
 		Name:        "copy",
 		Description: "Copy a file or directory from one location to another in the filesystem.",
@@ -880,27 +930,10 @@ func getOpenTools() []*OpenTool {
 		Type:     ToolTypeFunction,
 		Function: &copyFunc,
 	}
+	return &copyTool
+}
 
-	tools = append(tools, &copyTool)
-
-	// list_memory tool
-	listMemoryFunc := OpenFunctionDefinition{
-		Name:        "list_memory",
-		Description: "List all saved user memories and preferences. Use this to check what the user has asked you to remember before making updates.",
-		Parameters: map[string]interface{}{
-			"type":       "object",
-			"properties": map[string]interface{}{},
-			"required":   []string{},
-		},
-	}
-	listMemoryTool := OpenTool{
-		Type:     ToolTypeFunction,
-		Function: &listMemoryFunc,
-	}
-
-	tools = append(tools, &listMemoryTool)
-
-	// save_memory tool
+func getSaveMemoryTool() *OpenTool {
 	saveMemoryFunc := OpenFunctionDefinition{
 		Name: "save_memory",
 		Description: `Update long-term user memories.
@@ -930,10 +963,27 @@ To clear all memories, pass an empty string.`,
 		Type:     ToolTypeFunction,
 		Function: &saveMemoryFunc,
 	}
+	return &saveMemoryTool
+}
 
-	tools = append(tools, &saveMemoryTool)
+func getListMemoryTool() *OpenTool {
+	listMemoryFunc := OpenFunctionDefinition{
+		Name:        "list_memory",
+		Description: "List all saved user memories and preferences. Use this to check what the user has asked you to remember before making updates.",
+		Parameters: map[string]interface{}{
+			"type":       "object",
+			"properties": map[string]interface{}{},
+			"required":   []string{},
+		},
+	}
+	listMemoryTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &listMemoryFunc,
+	}
+	return &listMemoryTool
+}
 
-	// Switch Agent tool
+func getSwitchAgentTool() *OpenTool {
 	switchAgentFunc := OpenFunctionDefinition{
 		Name: "switch_agent",
 		Description: `Switch the active agent to another agent profile. 
@@ -972,10 +1022,10 @@ When a switch occurs, if an instruction is provided, it replaces the original pr
 		Type:     ToolTypeFunction,
 		Function: &switchAgentFunc,
 	}
+	return &switchAgentTool
+}
 
-	tools = append(tools, &switchAgentTool)
-
-	// list_agent tool - List all available agents
+func getListAgentTool() *OpenTool {
 	listAgentFunc := OpenFunctionDefinition{
 		Name: "list_agent",
 		Description: `List all available agents with their capabilities, models, and configurations.
@@ -990,27 +1040,19 @@ Use this tool to discover which agents are available before using spawn_subagent
 		Type:     ToolTypeFunction,
 		Function: &listAgentFunc,
 	}
-	tools = append(tools, &listAgentTool)
+	return &listAgentTool
+}
 
-	// spawn_subagents tool - The core orchestration tool
+func getSpawnSubAgentsTool() *OpenTool {
 	spawnSubAgentsFunc := OpenFunctionDefinition{
 		Name: "spawn_subagents",
-		Description: `Orchestrate concurrent sub-agents to execute specialized tasks in parallel.
+		Description: `Spawn multiple sub-agents to perform parallel or sequential tasks.
 
-This tool enables sophisticated Map/Reduce workflows by dispatching tasks to isolated agent instances.
-Each sub-agent runs independently with auto-approved tools and returns results via SharedState.
+This tool allows you to delegate work to specialized agents, manage dependencies between tasks,
+and collect results in a structured way. Sub-agents run in isolated contexts (no shared conversation history).
 
-Use this for:
-- Delegating specialized tasks to agents with appropriate capabilities
-- Parallel processing of independent tasks across multiple agent instances
-- Complex multi-stage workflows requiring orchestration
-
-Key operational details:
-- Sub-agents run in isolated contexts (no shared conversation history)
-- Provide complete context in each instruction
-- CRITICAL: Assign a unique, semantic task_key to each task—this is your ONLY mechanism
-  to retrieve results and correlate outputs across the workflow
-- Returns progress summary; use get_state(task_key) for full detailed results
+CRITICAL: Assign a unique, semantic task_key to each task—this is your ONLY mechanism to retrieve results
+and correlate outputs across the workflow. Returns progress summary; use get_state(task_key) for full detailed results.
 
 Differs from switch_agent:
 - spawn_subagents: Sub-agents return results to you; you maintain control
@@ -1052,6 +1094,11 @@ Differs from switch_agent:
 					},
 					"description": "Array of tasks to execute. Each task invokes a sub-agent with the given instruction.",
 				},
+				"need_confirm": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Whether to prompt the user for confirmation before spawning sub-agents. Defaults to true.",
+					"default":     true,
+				},
 				"timeout": map[string]interface{}{
 					"type":        "integer",
 					"description": "Timeout in seconds for all tasks. Default is 300 (5 minutes).",
@@ -1065,15 +1112,16 @@ Differs from switch_agent:
 		Type:     ToolTypeFunction,
 		Function: &spawnSubAgentsFunc,
 	}
-	tools = append(tools, &spawnSubAgentsTool)
+	return &spawnSubAgentsTool
+}
 
-	// get_state tool - Read from SharedState
+func getGetStateTool() *OpenTool {
 	getStateFunc := OpenFunctionDefinition{
 		Name: "get_state",
 		Description: `Retrieve a value from the SharedState memory.
 
 SharedState is a key-value store for communication between the orchestrator and sub-agents.
-Sub-agents store their results in SharedState when you specify an output_key in spawn_subagents.
+Sub-agents store their results in SharedState when you specify a task_key in spawn_subagents.
 Use list_state to see available keys.`,
 		Parameters: map[string]interface{}{
 			"type": "object",
@@ -1090,9 +1138,10 @@ Use list_state to see available keys.`,
 		Type:     ToolTypeFunction,
 		Function: &getStateFunc,
 	}
-	tools = append(tools, &getStateTool)
+	return &getStateTool
+}
 
-	// set_state tool - Write to SharedState
+func getSetStateTool() *OpenTool {
 	setStateFunc := OpenFunctionDefinition{
 		Name: "set_state",
 		Description: `Store a value in the SharedState memory.
@@ -1118,9 +1167,10 @@ SharedState persists for the duration of the current session.`,
 		Type:     ToolTypeFunction,
 		Function: &setStateFunc,
 	}
-	tools = append(tools, &setStateTool)
+	return &setStateTool
+}
 
-	// list_state tool - List all SharedState keys
+func getListStateTool() *OpenTool {
 	listStateFunc := OpenFunctionDefinition{
 		Name: "list_state",
 		Description: `List all keys and their metadata in SharedState.
@@ -1137,9 +1187,90 @@ when it was created/updated, content type, and size.`,
 		Type:     ToolTypeFunction,
 		Function: &listStateFunc,
 	}
-	tools = append(tools, &listStateTool)
+	return &listStateTool
+}
 
-	// activate_skill tool
+func getWebSearchTool() *OpenTool {
+	webSearchFunc := OpenFunctionDefinition{
+		Name: "web_search",
+		Description: `Performs a web search using the Search API.
+
+Use this tool to find relevant information on the web.
+
+IMPORTANT:
+- The query must be a string containing the search terms.
+- The tool will return a list of search results, each with a title, URL, and snippet.
+- This tool is useful for tasks that require finding information on the web, such as:
+  - Finding relevant web pages for analysis
+  - Extracting specific information from web pages
+  - Analyzing web page structure
+  - Processing web page content for other tools
+
+Example:
+User: "Can you find some information about the latest news on AI?"
+LLM should call:
+{
+  "query": "latest news on AI"
+}`,
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"query": map[string]interface{}{
+					"type":        "string",
+					"description": "The search query to use.",
+				},
+			},
+			"required": []string{"query"},
+		},
+	}
+	webSearchTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &webSearchFunc,
+	}
+	return &webSearchTool
+}
+
+func getWebFetchTool() *OpenTool {
+	webFetchFunc := OpenFunctionDefinition{
+		Name: "web_fetch",
+		Description: `Fetches the content of a web page using a URL.
+
+Use this tool to retrieve the full HTML content of a web page for analysis.
+
+IMPORTANT:
+- The URL must be a valid, absolute URL (e.g., https://www.example.com).
+- The tool will fetch the complete page content, which may be large.
+- The content will be returned as a string, including all HTML tags and scripts.
+- This tool is useful for tasks that require deep analysis of web page content, such as:
+  - Extracting specific information from web pages
+  - Analyzing web page structure
+  - Processing web page content for other tools
+
+Example:
+User: "Can you fetch the content of https://www.example.com?"
+LLM should call:
+{
+  "url": "https://www.example.com"
+}`,
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"url": map[string]interface{}{
+					"type":        "string",
+					"description": "The absolute URL of the web page to fetch (e.g., https://www.example.com).",
+				},
+			},
+			"required": []string{"url"},
+		},
+	}
+	webFetchTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &webFetchFunc,
+	}
+	return &webFetchTool
+}
+
+func getActivateSkillTool() *OpenTool {
 	activateSkillFunc := OpenFunctionDefinition{
 		Name: "activate_skill",
 		Description: `Activates a specialized agent skill by name and returns the skill's instructions.
@@ -1161,9 +1292,7 @@ ONLY use names exactly as they appear in the <available_skills> section.`,
 		Type:     ToolTypeFunction,
 		Function: &activateSkillFunc,
 	}
-	tools = append(tools, &activateSkillTool)
-
-	return tools
+	return &activateSkillTool
 }
 
 func getOpenShellTool() *OpenTool {
@@ -1262,878 +1391,4 @@ func (op *OpenProcessor) showDiffConfirm(diff string) {
 func (op *OpenProcessor) closeDiffConfirm() {
 	// Confirm diff is over
 	op.status.ChangeTo(op.notify, StreamNotify{Status: StatusDiffConfirmOver}, op.proceed)
-}
-
-/*
- * OpenAI tool call implements
- *
- */
-
-// OpenAI tool implementations (wrapper functions)
-func (op *OpenProcessor) OpenAIShellToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := shellToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIWebFetchToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := webFetchToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIWebSearchToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := webSearchToolCallImpl(argsMap, &op.queries, &op.references, op.search)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		Content:    response,
-		ToolCallID: toolCall.ID,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIReadFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := readFileToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIWriteFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := writeFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIEditFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := editFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAICreateDirectoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := createDirectoryToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIListDirectoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := listDirectoryToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIDeleteFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := deleteFileToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIDeleteDirectoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := deleteDirectoryToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIMoveToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := moveToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAICopyToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := copyToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAISearchFilesToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := searchFilesToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAISearchTextInFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := searchTextInFileToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIReadMultipleFilesToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := readMultipleFilesToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIMCPToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	if op.mcpClient == nil {
-		err := fmt.Errorf("MCP client not initialized")
-		return openai.ChatCompletionMessage{
-			Role:       openai.ChatMessageRoleTool,
-			ToolCallID: toolCall.ID,
-			Content:    fmt.Sprintf("Error: MCP tool call failed: %v", err),
-		}, err
-	}
-
-	// Call the MCP tool
-	result, err := op.mcpClient.CallTool(toolCall.Function.Name, *argsMap)
-	if err != nil {
-		// Wrap error in response
-		return openai.ChatCompletionMessage{
-			Role:       openai.ChatMessageRoleTool,
-			ToolCallID: toolCall.ID,
-			Content:    fmt.Sprintf("Error: MCP tool call failed: %v", err),
-		}, err
-	}
-
-	// Concatenate all text and image URLs into a single string output
-	// Because currently the tool call response can be only a simple string
-	output := ""
-	for i, content := range result.Contents {
-		switch result.Types[i] {
-		case MCPResponseText:
-			output += content + "\n"
-		case MCPResponseImage:
-			output += content + "\n"
-			output += fmt.Sprintf("![Image](%s)\n", content)
-		case MCPResponseAudio:
-			output += content + "\n"
-			output += fmt.Sprintf("![Audio](%s)\n", content)
-		default:
-			// Unknown file type, skip
-			// Don't deal with pdf, xls
-			// It needs upload to OpenAI's servers first, so we can't include them directly in a message.
-		}
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    output,
-	}, nil
-}
-
-func (op *OpenProcessor) OpenAIListMemoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	// Call shared implementation (no args needed)
-	response, err := listMemoryToolCallImpl()
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		Content:    response,
-		ToolCallID: toolCall.ID,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAISaveMemoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	// Call shared implementation
-	response, err := saveMemoryToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		Content:    response,
-		ToolCallID: toolCall.ID,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAISwitchAgentToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := switchAgentToolCallImpl(argsMap, op.toolsUse)
-
-	// Create the tool message anyway
-	toolMessage := openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}
-
-	if err != nil {
-		if IsSwitchAgentError(err) {
-			return toolMessage, err
-		}
-		// Wrap other errors in response
-		toolMessage.Content = fmt.Sprintf("Error: %v", err)
-	}
-
-	return toolMessage, err
-}
-
-// OpenAI wrappers for new orchestration tools
-
-func (op *OpenProcessor) OpenAIListAgentToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := listAgentToolCallImpl()
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAISpawnSubAgentsToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := spawnSubAgentsToolCallImpl(argsMap, op.executor)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIGetStateToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := getStateToolCallImpl(argsMap, op.sharedState)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAISetStateToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := setStateToolCallImpl(argsMap, op.agentName, op.sharedState)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIListStateToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := listStateToolCallImpl(op.sharedState)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIActivateSkillToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := activateSkillToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-/*
- * OpenChat tool call implements
- *
- */
-
-func (op *OpenProcessor) OpenChatSwitchAgentToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := switchAgentToolCallImpl(argsMap, op.toolsUse)
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		},
-	}
-
-	if err != nil {
-		if IsSwitchAgentError(err) {
-			return &toolMessage, err
-		}
-		return &toolMessage, err
-	}
-
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatMCPToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	if op.mcpClient == nil {
-		err := fmt.Errorf("MCP client not initialized")
-		toolMessage := model.ChatCompletionMessage{
-			Role:       model.ChatMessageRoleTool,
-			ToolCallID: toolCall.ID,
-			Name:       Ptr(""),
-			Content: &model.ChatCompletionMessageContent{
-				StringValue: volcengine.String(fmt.Sprintf("Error: MCP tool call failed: %v", err)),
-			},
-		}
-		return &toolMessage, err
-	}
-
-	// Call the MCP tool
-	result, err := op.mcpClient.CallTool(toolCall.Function.Name, *argsMap)
-	if err != nil {
-		toolMessage := model.ChatCompletionMessage{
-			Role:       model.ChatMessageRoleTool,
-			ToolCallID: toolCall.ID,
-			Name:       Ptr(""),
-			Content: &model.ChatCompletionMessageContent{
-				StringValue: volcengine.String(fmt.Sprintf("Error: MCP tool call failed: %v", err)),
-			},
-		}
-		return &toolMessage, err
-	}
-
-	// OpenChat supports text, image, audio toolcall responses
-	// But to be robust and consistent with OpenAI(which strictly requires string),
-	// We convert all content to a single string value.
-	var mergedText strings.Builder
-	for i, content := range result.Contents {
-		if i > 0 {
-			mergedText.WriteString("\n")
-		}
-		switch result.Types[i] {
-		case MCPResponseText:
-			mergedText.WriteString(content)
-		case MCPResponseImage:
-			mergedText.WriteString(fmt.Sprintf("![Image](%s)", content))
-		case MCPResponseAudio:
-			mergedText.WriteString(fmt.Sprintf("![Audio](%s)", content))
-		default:
-			// Unknown file type, skip
-		}
-	}
-
-	// Bugfix: only return as string value directly
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(mergedText.String()),
-		},
-	}
-
-	Debugf("OpenChatMCPToolCall Response: %s", *toolMessage.Content.StringValue)
-	return &toolMessage, nil
-}
-
-// OpenChat tool implementations (wrapper functions)
-func (op *OpenProcessor) OpenChatReadFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := readFileToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatWriteFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := writeFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatCreateDirectoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := createDirectoryToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatListDirectoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := listDirectoryToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatDeleteFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := deleteFileToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatDeleteDirectoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := deleteDirectoryToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatMoveToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := moveToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatSearchFilesToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := searchFilesToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatSearchTextInFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := searchTextInFileToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatReadMultipleFilesToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := readMultipleFilesToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatShellToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := shellToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatWebFetchToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := webFetchToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatWebSearchToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := webSearchToolCallImpl(argsMap, &op.queries, &op.references, op.search)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	// Create and return the tool response message
-	return &model.ChatCompletionMessage{
-		Role: model.ChatMessageRoleTool,
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		}, Name: Ptr(""),
-		ToolCallID: toolCall.ID,
-	}, err
-}
-
-func (op *OpenProcessor) OpenChatEditFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := editFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatCopyToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := copyToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatListMemoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	// Call shared implementation (no args needed)
-	response, err := listMemoryToolCallImpl()
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(toolCall.Function.Name),
-	}
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatSaveMemoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	// Call shared implementation
-	response, err := saveMemoryToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(toolCall.Function.Name),
-	}
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatListAgentToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := listAgentToolCallImpl()
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		},
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatSpawnSubAgentsToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := spawnSubAgentsToolCallImpl(argsMap, op.executor)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		},
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatGetStateToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := getStateToolCallImpl(argsMap, op.sharedState)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		},
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatSetStateToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := setStateToolCallImpl(argsMap, op.agentName, op.sharedState)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		},
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatListStateToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := listStateToolCallImpl(op.sharedState)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		},
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatActivateSkillToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := activateSkillToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		},
-	}
-	return &toolMessage, err
 }

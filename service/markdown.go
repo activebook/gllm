@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/charmbracelet/glamour"
 )
 
@@ -76,7 +77,7 @@ func (mr *Markdown) Write(args ...interface{}) {
 }
 
 // RenderMarkdown clears the streaming output and re-renders the entire Markdown
-func (mr *Markdown) Render(r Render) {
+func (mr *Markdown) Render(r ui.Render) {
 
 	// When markdown is off, we need to ensure the output ends with a newline
 	// to prevent the shell from displaying % at the end

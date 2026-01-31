@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -35,7 +36,7 @@ func NewTokenUsage() *TokenUsage {
 	}
 }
 
-func (tu *TokenUsage) Render(render Render) {
+func (tu *TokenUsage) Render(render ui.Render) {
 	// Get the token usage
 	// usages := tu.getTokenUsageBox()
 	usage := tu.renderLipgloss()

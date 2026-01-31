@@ -267,7 +267,7 @@ func (op *OpenProcessor) AnthropicListAgentToolCall(toolCall anthropic.ToolUseBl
 }
 
 func (op *OpenProcessor) AnthropicSpawnSubAgentsToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
-	response, err := spawnSubAgentsToolCallImpl(argsMap, op.executor)
+	response, err := spawnSubAgentsToolCallImpl(argsMap, op.toolsUse, op.executor)
 	isError := err != nil
 	if err != nil {
 		response = fmt.Sprintf("Error: %v", err)
