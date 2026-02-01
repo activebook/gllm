@@ -48,6 +48,8 @@ func (ag *Agent) CompleteReasoning() {
 	if ag.Std != nil {
 		if ag.Verbose {
 			ag.Std.Writeln(data.ResetSeq + data.ReasoningActiveColor + "✓" + data.ResetSeq)
+		} else {
+			ag.Std.Writeln()
 		}
 	}
 	if ag.OutputFile != nil {
@@ -192,6 +194,15 @@ func (ag *Agent) WriteFunctionCall(text string) {
 	}
 	if ag.OutputFile != nil {
 		ag.OutputFile.Writef("\n%s\n", text)
+	}
+}
+
+func (ag *Agent) WriteFunctionCallOver() {
+	if ag.Std != nil {
+		if !ag.Verbose {
+			// Add a newline to separate the function call from the output
+			ag.Std.Writeln()
+		}
 	}
 }
 
