@@ -36,7 +36,7 @@ func (ag *Agent) StartReasoning() {
 			ag.Std.Writeln(data.ReasoningActiveColor + "Thinking ↓")
 		} else {
 			// Only output thinking indicator under non-verbose mode
-			ag.Std.Writeln(data.ReasoningActiveColor + "Thinking...")
+			ag.Std.Writeln(data.ReasoningActiveColor + "Thinking..." + data.ResetSeq)
 		}
 	}
 	if ag.OutputFile != nil {
