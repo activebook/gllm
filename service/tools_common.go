@@ -17,6 +17,32 @@ type ToolType string
 
 const (
 	ToolTypeFunction ToolType = "function"
+
+	// Tool Names
+	ToolShell             = "shell"
+	ToolReadFile          = "read_file"
+	ToolWriteFile         = "write_file"
+	ToolEditFile          = "edit_file"
+	ToolDeleteFile        = "delete_file"
+	ToolCreateDirectory   = "create_directory"
+	ToolListDirectory     = "list_directory"
+	ToolDeleteDirectory   = "delete_directory"
+	ToolMove              = "move"
+	ToolCopy              = "copy"
+	ToolSearchFiles       = "search_files"
+	ToolSearchTextInFile  = "search_text_in_file"
+	ToolReadMultipleFiles = "read_multiple_files"
+	ToolWebFetch          = "web_fetch"
+	ToolSwitchAgent       = "switch_agent"
+	ToolWebSearch         = "web_search"
+	ToolActivateSkill     = "activate_skill"
+	ToolListMemory        = "list_memory"
+	ToolSaveMemory        = "save_memory"
+	ToolListAgent         = "list_agent"
+	ToolSpawnSubAgents    = "spawn_subagents"
+	ToolGetState          = "get_state"
+	ToolSetState          = "set_state"
+	ToolListState         = "list_state"
 )
 
 // OpenTool is a generic tool definition that is not tied to any specific model.
@@ -53,46 +79,46 @@ Status:
 var (
 	embeddingTools = []string{
 		// shell tool
-		"shell",
+		ToolShell,
 		// file tools
-		"read_file",
-		"write_file",
-		"edit_file",
-		"delete_file",
-		"create_directory",
-		"list_directory",
-		"delete_directory",
-		"move",
-		"copy",
-		"search_files",
-		"search_text_in_file",
-		"read_multiple_files",
+		ToolReadFile,
+		ToolWriteFile,
+		ToolEditFile,
+		ToolDeleteFile,
+		ToolCreateDirectory,
+		ToolListDirectory,
+		ToolDeleteDirectory,
+		ToolMove,
+		ToolCopy,
+		ToolSearchFiles,
+		ToolSearchTextInFile,
+		ToolReadMultipleFiles,
 		// web tools
-		"web_fetch",
+		ToolWebFetch,
 		// agent tools
-		"switch_agent",
+		ToolSwitchAgent,
 	}
 	searchTools = []string{
 		// web tools
-		"web_search",
+		ToolWebSearch,
 	}
 	skillTools = []string{
 		// skill tools
-		"activate_skill",
+		ToolActivateSkill,
 	}
 	memoryTools = []string{
 		// memory tools
-		"list_memory",
-		"save_memory",
+		ToolListMemory,
+		ToolSaveMemory,
 	}
 	subagentTools = []string{
 		// Sub-agent orchestration tools
-		"list_agent",
-		"spawn_subagents",
+		ToolListAgent,
+		ToolSpawnSubAgents,
 		// shared state tools
-		"get_state",
-		"set_state",
-		"list_state",
+		ToolGetState,
+		ToolSetState,
+		ToolListState,
 	}
 )
 
@@ -565,7 +591,7 @@ func getOpenTools() []*OpenTool {
 
 func getReadFileTool() *OpenTool {
 	readFileFunc := OpenFunctionDefinition{
-		Name:        "read_file",
+		Name:        ToolReadFile,
 		Description: "Read the contents of a file from the filesystem. Optionally include line numbers for easier referencing.",
 		Parameters: map[string]interface{}{
 			"type": "object",
@@ -592,7 +618,7 @@ func getReadFileTool() *OpenTool {
 
 func getWriteFileTool() *OpenTool {
 	writeFileFunc := OpenFunctionDefinition{
-		Name:        "write_file",
+		Name:        ToolWriteFile,
 		Description: "Write content to a file in the filesystem. Creates the file if it doesn't exist, or overwrites it if it does.",
 		Parameters: map[string]interface{}{
 			"type": "object",
@@ -624,7 +650,7 @@ func getWriteFileTool() *OpenTool {
 
 func getCreateDirectoryTool() *OpenTool {
 	createDirectoryFunc := OpenFunctionDefinition{
-		Name:        "create_directory",
+		Name:        ToolCreateDirectory,
 		Description: "Create a new directory in the filesystem.",
 		Parameters: map[string]interface{}{
 			"type": "object",
@@ -646,7 +672,7 @@ func getCreateDirectoryTool() *OpenTool {
 
 func getListDirectoryTool() *OpenTool {
 	listDirectoryFunc := OpenFunctionDefinition{
-		Name:        "list_directory",
+		Name:        ToolListDirectory,
 		Description: "List the contents of a directory in the filesystem.",
 		Parameters: map[string]interface{}{
 			"type": "object",
@@ -668,7 +694,7 @@ func getListDirectoryTool() *OpenTool {
 
 func getDeleteFileTool() *OpenTool {
 	deleteFileFunc := OpenFunctionDefinition{
-		Name:        "delete_file",
+		Name:        ToolDeleteFile,
 		Description: "Delete a file in the filesystem.",
 		Parameters: map[string]interface{}{
 			"type": "object",
@@ -696,7 +722,7 @@ func getDeleteFileTool() *OpenTool {
 
 func getDeleteDirectoryTool() *OpenTool {
 	deleteDirectoryFunc := OpenFunctionDefinition{
-		Name:        "delete_directory",
+		Name:        ToolDeleteDirectory,
 		Description: "Delete a directory in the filesystem.",
 		Parameters: map[string]interface{}{
 			"type": "object",
@@ -724,7 +750,7 @@ func getDeleteDirectoryTool() *OpenTool {
 
 func getSearchFilesTool() *OpenTool {
 	searchFilesFunc := OpenFunctionDefinition{
-		Name:        "search_files",
+		Name:        ToolSearchFiles,
 		Description: "Search for files in a directory matching a pattern. Supports recursive search through subdirectories.",
 		Parameters: map[string]interface{}{
 			"type": "object",
@@ -755,7 +781,7 @@ func getSearchFilesTool() *OpenTool {
 
 func getSearchTextInFileTool() *OpenTool {
 	searchTextInFileFunc := OpenFunctionDefinition{
-		Name:        "search_text_in_file",
+		Name:        ToolSearchTextInFile,
 		Description: "Search for specific text within a file and return matching lines with line numbers. Supports case-insensitive and regex search.",
 		Parameters: map[string]interface{}{
 			"type": "object",
@@ -791,7 +817,7 @@ func getSearchTextInFileTool() *OpenTool {
 
 func getReadMultipleFilesTool() *OpenTool {
 	readMultipleFilesFunc := OpenFunctionDefinition{
-		Name: "read_multiple_files",
+		Name: ToolReadMultipleFiles,
 		Description: "Read the contents of multiple files. " +
 			"Use this when you need to inspect several files at once to understand the codebase or context.",
 		Parameters: map[string]interface{}{
@@ -822,7 +848,7 @@ func getReadMultipleFilesTool() *OpenTool {
 
 func getEditFileTool() *OpenTool {
 	editFileFunc := OpenFunctionDefinition{
-		Name: "edit_file",
+		Name: ToolEditFile,
 		Description: "Apply targeted edits to a file using search-replace operations. " +
 			"Use this for precise code modifications, refactoring, or content updates. " +
 			"Provide search-replace blocks to specify exactly what to change. " +
@@ -871,7 +897,7 @@ func getEditFileTool() *OpenTool {
 
 func getMoveTool() *OpenTool {
 	moveFunc := OpenFunctionDefinition{
-		Name:        "move",
+		Name:        ToolMove,
 		Description: "Move a file or directory from one location to another in the filesystem.",
 		Parameters: map[string]interface{}{
 			"type": "object",
@@ -903,7 +929,7 @@ func getMoveTool() *OpenTool {
 
 func getCopyTool() *OpenTool {
 	copyFunc := OpenFunctionDefinition{
-		Name:        "copy",
+		Name:        ToolCopy,
 		Description: "Copy a file or directory from one location to another in the filesystem.",
 		Parameters: map[string]interface{}{
 			"type": "object",
@@ -935,7 +961,7 @@ func getCopyTool() *OpenTool {
 
 func getSaveMemoryTool() *OpenTool {
 	saveMemoryFunc := OpenFunctionDefinition{
-		Name: "save_memory",
+		Name: ToolSaveMemory,
 		Description: `Update long-term user memories.
 
 CRITICAL: Do NOT use this tool for conversation history, trivial facts, or immediate context.
@@ -968,7 +994,7 @@ To clear all memories, pass an empty string.`,
 
 func getListMemoryTool() *OpenTool {
 	listMemoryFunc := OpenFunctionDefinition{
-		Name:        "list_memory",
+		Name:        ToolListMemory,
 		Description: "List all saved user memories and preferences. Use this to check what the user has asked you to remember before making updates.",
 		Parameters: map[string]interface{}{
 			"type":       "object",
@@ -985,7 +1011,7 @@ func getListMemoryTool() *OpenTool {
 
 func getSwitchAgentTool() *OpenTool {
 	switchAgentFunc := OpenFunctionDefinition{
-		Name: "switch_agent",
+		Name: ToolSwitchAgent,
 		Description: `Switch the active agent to another agent profile. 
 Use this tool when:
 1. The current agent's system prompt or capabilities are not suitable for the user's request.
@@ -1027,7 +1053,7 @@ When a switch occurs, if an instruction is provided, it replaces the original pr
 
 func getListAgentTool() *OpenTool {
 	listAgentFunc := OpenFunctionDefinition{
-		Name: "list_agent",
+		Name: ToolListAgent,
 		Description: `List all available agents with their capabilities, models, and configurations.
 Use this tool to discover which agents are available before using spawn_subagents or switch_agent.`,
 		Parameters: map[string]interface{}{
@@ -1045,7 +1071,7 @@ Use this tool to discover which agents are available before using spawn_subagent
 
 func getSpawnSubAgentsTool() *OpenTool {
 	spawnSubAgentsFunc := OpenFunctionDefinition{
-		Name: "spawn_subagents",
+		Name: ToolSpawnSubAgents,
 		Description: `Spawn multiple sub-agents to perform parallel or sequential tasks.
 
 This tool allows you to delegate work to specialized agents, manage dependencies between tasks,
@@ -1117,7 +1143,7 @@ Differs from switch_agent:
 
 func getGetStateTool() *OpenTool {
 	getStateFunc := OpenFunctionDefinition{
-		Name: "get_state",
+		Name: ToolGetState,
 		Description: `Retrieve a value from the SharedState memory.
 
 SharedState is a key-value store for communication between the orchestrator and sub-agents.
@@ -1143,7 +1169,7 @@ Use list_state to see available keys.`,
 
 func getSetStateTool() *OpenTool {
 	setStateFunc := OpenFunctionDefinition{
-		Name: "set_state",
+		Name: ToolSetState,
 		Description: `Store a value in the SharedState memory.
 
 Use this to save information that other agents or future tool calls can access.
@@ -1172,7 +1198,7 @@ SharedState persists for the duration of the current session.`,
 
 func getListStateTool() *OpenTool {
 	listStateFunc := OpenFunctionDefinition{
-		Name: "list_state",
+		Name: ToolListState,
 		Description: `List all keys and their metadata in SharedState.
 
 Shows what data is available in the shared memory, including who created each entry,
@@ -1192,7 +1218,7 @@ when it was created/updated, content type, and size.`,
 
 func getWebSearchTool() *OpenTool {
 	webSearchFunc := OpenFunctionDefinition{
-		Name: "web_search",
+		Name: ToolWebSearch,
 		Description: `Performs a web search using the Search API.
 
 Use this tool to find relevant information on the web.
@@ -1232,7 +1258,7 @@ LLM should call:
 
 func getWebFetchTool() *OpenTool {
 	webFetchFunc := OpenFunctionDefinition{
-		Name: "web_fetch",
+		Name: ToolWebFetch,
 		Description: `Fetches the content of a web page using a URL.
 
 Use this tool to retrieve the full HTML content of a web page for analysis.
@@ -1272,7 +1298,7 @@ LLM should call:
 
 func getActivateSkillTool() *OpenTool {
 	activateSkillFunc := OpenFunctionDefinition{
-		Name: "activate_skill",
+		Name: ToolActivateSkill,
 		Description: `Activates a specialized agent skill by name and returns the skill's instructions.
 The returned instructions provide specialized guidance for the current task.
 Use this when you identify a task that matches a skill's description.
@@ -1297,7 +1323,7 @@ ONLY use names exactly as they appear in the <available_skills> section.`,
 
 func getOpenShellTool() *OpenTool {
 	shellFunc := OpenFunctionDefinition{
-		Name: "shell",
+		Name: ToolShell,
 		Description: `Executes a shell command on the user's local machine.
 
 IMPORTANT: This function is highly powerful and potentially dangerous.

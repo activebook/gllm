@@ -404,7 +404,7 @@ func (ga *GeminiAgent) processGeminiStream(ctx context.Context,
 func (ga *GeminiAgent) processGeminiToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
 
 	var filteredArgs map[string]interface{}
-	if call.Name == "edit_file" || call.Name == "write_file" {
+	if call.Name == ToolEditFile || call.Name == ToolWriteFile {
 		// Don't show content(the modified content could be too long)
 		filteredArgs = FilterOpenToolArguments(call.Args, []string{"content", "edits"})
 	} else {
@@ -425,29 +425,29 @@ func (ga *GeminiAgent) processGeminiToolCall(call *genai.FunctionCall) (*genai.F
 
 	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
 	toolHandlers := map[string]func(*genai.FunctionCall) (*genai.FunctionResponse, error){
-		"shell":               ga.GeminiShellToolCall,
-		"read_file":           ga.GeminiReadFileToolCall,
-		"write_file":          ga.GeminiWriteFileToolCall,
-		"create_directory":    ga.GeminiCreateDirectoryToolCall,
-		"list_directory":      ga.GeminiListDirectoryToolCall,
-		"delete_file":         ga.GeminiDeleteFileToolCall,
-		"delete_directory":    ga.GeminiDeleteDirectoryToolCall,
-		"move":                ga.GeminiMoveToolCall,
-		"copy":                ga.GeminiCopyToolCall,
-		"search_files":        ga.GeminiSearchFilesToolCall,
-		"search_text_in_file": ga.GeminiSearchTextInFileToolCall,
-		"read_multiple_files": ga.GeminiReadMultipleFilesToolCall,
-		"web_fetch":           ga.GeminiWebFetchToolCall,
-		"edit_file":           ga.GeminiEditFileToolCall,
-		"list_memory":         ga.GeminiListMemoryToolCall,
-		"save_memory":         ga.GeminiSaveMemoryToolCall,
-		"switch_agent":        ga.GeminiSwitchAgentToolCall,
-		"list_agent":          ga.GeminiListAgentToolCall,
-		"spawn_subagents":     ga.GeminiSpawnSubAgentsToolCall,
-		"get_state":           ga.GeminiGetStateToolCall,
-		"set_state":           ga.GeminiSetStateToolCall,
-		"list_state":          ga.GeminiListStateToolCall,
-		"activate_skill":      ga.GeminiActivateSkillToolCall,
+		ToolShell:             ga.GeminiShellToolCall,
+		ToolReadFile:          ga.GeminiReadFileToolCall,
+		ToolWriteFile:         ga.GeminiWriteFileToolCall,
+		ToolCreateDirectory:   ga.GeminiCreateDirectoryToolCall,
+		ToolListDirectory:     ga.GeminiListDirectoryToolCall,
+		ToolDeleteFile:        ga.GeminiDeleteFileToolCall,
+		ToolDeleteDirectory:   ga.GeminiDeleteDirectoryToolCall,
+		ToolMove:              ga.GeminiMoveToolCall,
+		ToolCopy:              ga.GeminiCopyToolCall,
+		ToolSearchFiles:       ga.GeminiSearchFilesToolCall,
+		ToolSearchTextInFile:  ga.GeminiSearchTextInFileToolCall,
+		ToolReadMultipleFiles: ga.GeminiReadMultipleFilesToolCall,
+		ToolWebFetch:          ga.GeminiWebFetchToolCall,
+		ToolEditFile:          ga.GeminiEditFileToolCall,
+		ToolListMemory:        ga.GeminiListMemoryToolCall,
+		ToolSaveMemory:        ga.GeminiSaveMemoryToolCall,
+		ToolSwitchAgent:       ga.GeminiSwitchAgentToolCall,
+		ToolListAgent:         ga.GeminiListAgentToolCall,
+		ToolSpawnSubAgents:    ga.GeminiSpawnSubAgentsToolCall,
+		ToolGetState:          ga.GeminiGetStateToolCall,
+		ToolSetState:          ga.GeminiSetStateToolCall,
+		ToolListState:         ga.GeminiListStateToolCall,
+		ToolActivateSkill:     ga.GeminiActivateSkillToolCall,
 	}
 
 	if handler, ok := toolHandlers[call.Name]; ok {

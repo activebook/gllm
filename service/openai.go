@@ -484,7 +484,7 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 	}
 
 	var filteredArgs map[string]interface{}
-	if toolCall.Function.Name == "edit_file" || toolCall.Function.Name == "write_file" {
+	if toolCall.Function.Name == ToolEditFile || toolCall.Function.Name == ToolWriteFile {
 		// Don't show content(the modified content could be too long)
 		filteredArgs = FilterOpenToolArguments(argsMap, []string{"content", "edits"})
 	} else {
@@ -505,30 +505,30 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 
 	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
 	toolHandlers := map[string]func(openai.ToolCall, *map[string]interface{}) (openai.ChatCompletionMessage, error){
-		"shell":               oa.op.OpenAIShellToolCall,
-		"web_fetch":           oa.op.OpenAIWebFetchToolCall,
-		"web_search":          oa.op.OpenAIWebSearchToolCall,
-		"read_file":           oa.op.OpenAIReadFileToolCall,
-		"write_file":          oa.op.OpenAIWriteFileToolCall,
-		"edit_file":           oa.op.OpenAIEditFileToolCall,
-		"create_directory":    oa.op.OpenAICreateDirectoryToolCall,
-		"list_directory":      oa.op.OpenAIListDirectoryToolCall,
-		"delete_file":         oa.op.OpenAIDeleteFileToolCall,
-		"delete_directory":    oa.op.OpenAIDeleteDirectoryToolCall,
-		"move":                oa.op.OpenAIMoveToolCall,
-		"copy":                oa.op.OpenAICopyToolCall,
-		"search_files":        oa.op.OpenAISearchFilesToolCall,
-		"search_text_in_file": oa.op.OpenAISearchTextInFileToolCall,
-		"read_multiple_files": oa.op.OpenAIReadMultipleFilesToolCall,
-		"list_memory":         oa.op.OpenAIListMemoryToolCall,
-		"save_memory":         oa.op.OpenAISaveMemoryToolCall,
-		"switch_agent":        oa.op.OpenAISwitchAgentToolCall,
-		"list_agent":          oa.op.OpenAIListAgentToolCall,
-		"spawn_subagents":     oa.op.OpenAISpawnSubAgentsToolCall,
-		"get_state":           oa.op.OpenAIGetStateToolCall,
-		"set_state":           oa.op.OpenAISetStateToolCall,
-		"list_state":          oa.op.OpenAIListStateToolCall,
-		"activate_skill":      oa.op.OpenAIActivateSkillToolCall,
+		ToolShell:             oa.op.OpenAIShellToolCall,
+		ToolWebFetch:          oa.op.OpenAIWebFetchToolCall,
+		ToolWebSearch:         oa.op.OpenAIWebSearchToolCall,
+		ToolReadFile:          oa.op.OpenAIReadFileToolCall,
+		ToolWriteFile:         oa.op.OpenAIWriteFileToolCall,
+		ToolEditFile:          oa.op.OpenAIEditFileToolCall,
+		ToolCreateDirectory:   oa.op.OpenAICreateDirectoryToolCall,
+		ToolListDirectory:     oa.op.OpenAIListDirectoryToolCall,
+		ToolDeleteFile:        oa.op.OpenAIDeleteFileToolCall,
+		ToolDeleteDirectory:   oa.op.OpenAIDeleteDirectoryToolCall,
+		ToolMove:              oa.op.OpenAIMoveToolCall,
+		ToolCopy:              oa.op.OpenAICopyToolCall,
+		ToolSearchFiles:       oa.op.OpenAISearchFilesToolCall,
+		ToolSearchTextInFile:  oa.op.OpenAISearchTextInFileToolCall,
+		ToolReadMultipleFiles: oa.op.OpenAIReadMultipleFilesToolCall,
+		ToolListMemory:        oa.op.OpenAIListMemoryToolCall,
+		ToolSaveMemory:        oa.op.OpenAISaveMemoryToolCall,
+		ToolSwitchAgent:       oa.op.OpenAISwitchAgentToolCall,
+		ToolListAgent:         oa.op.OpenAIListAgentToolCall,
+		ToolSpawnSubAgents:    oa.op.OpenAISpawnSubAgentsToolCall,
+		ToolGetState:          oa.op.OpenAIGetStateToolCall,
+		ToolSetState:          oa.op.OpenAISetStateToolCall,
+		ToolListState:         oa.op.OpenAIListStateToolCall,
+		ToolActivateSkill:     oa.op.OpenAIActivateSkillToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {
