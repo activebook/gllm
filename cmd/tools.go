@@ -37,7 +37,7 @@ Use 'gllm tools sw' to select which tools to enable for the current agent.`,
 	// Add completion support
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
-			return []string{"list", "switch", "enable", "disable", "config", "--help"}, cobra.ShellCompDirectiveNoFileComp
+			return []string{"list", "switch", "--help"}, cobra.ShellCompDirectiveNoFileComp
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},

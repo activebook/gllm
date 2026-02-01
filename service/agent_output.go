@@ -36,7 +36,11 @@ func (ag *Agent) StartReasoning() {
 			ag.Std.Writeln(data.ReasoningActiveColor + "Thinking ↓")
 		} else {
 			// Only output thinking indicator under non-verbose mode
-			ag.Std.Writeln(data.ReasoningActiveColor + "Thinking..." + data.ResetSeq)
+			// ag.Std.Writeln(data.ReasoningActiveColor + "Thinking..." + data.ResetSeq)
+
+			// bug: we cannot use indicator, because some models would generate tool calls
+			// inside reasoning, before reasoning end
+			ui.GetIndicator().Start(ui.IndicatorThinking)
 		}
 	}
 	if ag.OutputFile != nil {
@@ -48,6 +52,10 @@ func (ag *Agent) CompleteReasoning() {
 	if ag.Std != nil {
 		if ag.Verbose {
 			ag.Std.Writeln(data.ResetSeq + data.ReasoningActiveColor + "✓" + data.ResetSeq)
+		} else {
+			// bugfix: some models such as gemini, would do tool calls before reasoning end
+			ui.GetIndicator().Stop()
+			// ag.Std.Writeln()
 		}
 	}
 	if ag.OutputFile != nil {
@@ -64,6 +72,12 @@ func (ag *Agent) WriteReasoning(text string) {
 		if ag.Verbose {
 			ag.Std.Writef("%s%s", data.ReasoningDoneColor, text)
 			ag.LastWrittenData = text
+		} else {
+			// bugfix: reasoning maybe continue after tool calls
+			if !ui.GetIndicator().IsActive() {
+				// Restart thinking indicator
+				ui.GetIndicator().Start(ui.IndicatorThinking)
+			}
 		}
 	}
 	if ag.OutputFile != nil {
@@ -115,27 +129,27 @@ func (ag *Agent) WriteFunctionCall(text string) {
 			output = data.ToolCallColor + text + data.ResetSeq
 		}
 
+		// Use lipgloss to render
+		style := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color(data.BorderHex)). // Tool Border
+			Padding(0, 1).
+			Margin(0, 0)
+
+		// Make sure we have enough space for the border
+		tcol := ui.GetTerminalWidth() - 8
+
+		// Structured data available
+		titleStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(data.SectionHex)). // Tool Title
+			Bold(true)
+
+		argsStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(data.DetailHex)).Width(tcol) // Tool Args
+
+		var content string
 		// Render logic based on Verbose flag
 		if ag.Verbose {
-			// Make sure we have enough space for the border
-			tcol := ui.GetTerminalWidth() - 8
-
-			// Structured data available
-			// Use lipgloss to render
-			style := lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color(data.BorderHex)). // Tool Border
-				Padding(0, 1).
-				Margin(0, 0)
-
-			titleStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color(data.SectionHex)). // Tool Title
-				Bold(true)
-
-			argsStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color(data.DetailHex)).Width(tcol) // Tool Args
-
-			var content string
 			// For built-in tools, we have a map of args
 			// We will try to extract purpose/description and command separately
 			if argsMap, ok := toolData.Args.(map[string]interface{}); ok {
@@ -180,18 +194,33 @@ func (ag *Agent) WriteFunctionCall(text string) {
 		} else {
 			// Simple layout for non-verbose: tool_name :detail
 			detail := extractFirstArg(toolData.Args)
-			if detail != "" {
-				detail = ": " + detail
+			if detail == "" {
+				content = fmt.Sprintf("%s", titleStyle.Render(toolData.Function))
 			} else {
-				detail = ""
+				content = fmt.Sprintf("%s\n%s", titleStyle.Render(toolData.Function), argsStyle.Render(detail))
 			}
-			output = data.ToolCallColor + toolData.Function + data.ResetSeq + detail
+			output = style.Render(content)
+
+			// Bugfix: tool call could be inside reasoning block
+			if ui.GetIndicator().IsActive() {
+				// Stop thinking indicator
+				ui.GetIndicator().Stop()
+			}
 		}
 
 		ag.Std.Writeln(output)
 	}
 	if ag.OutputFile != nil {
 		ag.OutputFile.Writef("\n%s\n", text)
+	}
+}
+
+func (ag *Agent) WriteFunctionCallOver() {
+	if ag.Std != nil {
+		if !ag.Verbose {
+			// Add a newline to separate the function call from the output
+			// ag.Std.Writeln()
+		}
 	}
 }
 

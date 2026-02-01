@@ -19,13 +19,6 @@ var configCmd = &cobra.Command{
 	Short:   "Manage gllm configuration/settings",
 	Long: `View and manage settings for gllm.
 use 'config path' to see where the settings file is located.`,
-	// Add completion support
-	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			return []string{"list", "set", "get", "edit", "path", "export", "import", "--help"}, cobra.ShellCompDirectiveNoFileComp
-		}
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	},
 	// Run: func(cmd *cobra.Command, args []string) {
 	// 	fmt.Println("Use 'gllm config [subcommand] --help' for more information.")
 	// },

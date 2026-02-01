@@ -32,6 +32,12 @@ var verboseSwitchCmd = &cobra.Command{
 	Aliases: []string{"sw"},
 	Short:   "Toggle or set verbose mode",
 	Args:    cobra.MaximumNArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return []string{"true", "false", "on", "off", "enable", "disable"}, cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		settings := data.GetSettingsStore()
 		current := settings.GetVerboseEnabled()

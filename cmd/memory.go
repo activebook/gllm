@@ -24,7 +24,7 @@ or use 'memory path' to see where the memory file is located.`,
 	// Add completion support
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
-			return []string{"list", "add", "clear", "export", "import", "search", "path", "--help"}, cobra.ShellCompDirectiveNoFileComp
+			return []string{"list", "add", "clear", "path", "--help"}, cobra.ShellCompDirectiveNoFileComp
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},

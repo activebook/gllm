@@ -34,7 +34,7 @@ different AI assistant setups with different models, tools, and settings.`,
 	// Add completion support
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
-			return []string{"list", "create", "edit", "delete", "switch", "info", "--help"}, cobra.ShellCompDirectiveNoFileComp
+			return []string{"list", "add", "set", "remove", "switch", "info", "--help"}, cobra.ShellCompDirectiveNoFileComp
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},

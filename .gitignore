@@ -33,6 +33,7 @@ gllm.7z
 .roo/
 .kilocode/
 .codebuddy/
+.agent/
 *.swp
 *~
 
