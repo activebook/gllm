@@ -565,17 +565,26 @@ The LLM will detect relevant MCP tools and use them to enhance its responses wit
   gllm search --help
   ```
 
-- **Manage editor, themes, and verbose mode:**
+- **Verbose mode:**
 
   ```sh
-  gllm config editor --help
-  gllm config theme --help
   gllm config verbose
   ```
+  
+When in verbose mode, you would see the thinking content and tool call parameters. For example:
 
----
-
-## 🏗 Contributing
+```
+Thinking...
+{
+  "thought": "I need to find the latest information about the golang version. I will use the search tool to find the latest information about the golang version.",
+  "tool_calls": [
+    {
+      "function": "search",
+      "args": "latest golang version"
+    }
+  ]
+}
+```
 
 Contributions are welcome! Please feel free to submit a pull request or open an issue.
 
