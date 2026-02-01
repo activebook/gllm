@@ -288,12 +288,13 @@ func extractFirstArg(args interface{}) string {
 			// Use this value as the detail
 			return formatArgValue(v)
 		}
+		return ""
 	case []interface{}, []string:
 		return formatArgValue(m)
 	case string:
 		return m
 	}
-	return fmt.Sprintf("%v", args)
+	return ""
 }
 
 // formatArgValue converts an argument value to a concise string representation.
