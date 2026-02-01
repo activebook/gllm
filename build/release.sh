@@ -100,26 +100,32 @@ version_lt() {
 
 # Cleanup Mode
 if [ "$1" == "--cleanup" ]; then
-  read -p "Enter the version to cleanup (e.g., v1.13.0): " VERSION
-  if [ -z "$VERSION" ]; then
-    echo "Error: Version is required."
+  # Get the latest local tag
+  LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null)
+
+  if [ -z "$LATEST_TAG" ]; then
+    echo "Error: No tags found in the local repository."
     exit 1
   fi
 
   echo "--------------------------------------------------"
-  echo "🔥 Automated Cleanup for version: $VERSION"
+  echo "🔥 Automated Cleanup"
   echo "--------------------------------------------------"
+  echo "Latest local tag detected: $LATEST_TAG"
+  echo ""
   echo "WARNING: This will permanently delete the release and tag"
   echo "         from both GitHub and your local repository."
   echo "--------------------------------------------------"
 
-  read -p "To confirm, please type the version ('$VERSION'): " CONFIRMATION
-  if [ "$CONFIRMATION" != "$VERSION" ]; then
-    echo "Confirmation failed. Cleanup cancelled."
+  read -p "Do you want to cleanup version '$LATEST_TAG'? (y/n) " -n 1 -r
+  echo # Move to a new line
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Cleanup cancelled."
     exit 1
   fi
 
-  echo "Confirmation accepted. Proceeding with deletion..."
+  VERSION="$LATEST_TAG"
+  echo "Proceeding with deletion of $VERSION..."
 
   # --- GitHub API Deletion ---
   echo "Attempting to delete via GitHub API..."
