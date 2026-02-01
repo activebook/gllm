@@ -115,109 +115,77 @@ func (ag *Agent) WriteFunctionCall(text string) {
 			output = data.ToolCallColor + text + data.ResetSeq
 		}
 
-		// Make sure we have enough space for the border
-		tcol := ui.GetTerminalWidth() - 8
-
-		// Structured data available
-		// Use lipgloss to render
-		style := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color(data.BorderHex)). // Tool Border
-			Padding(0, 1).
-			Margin(0, 0)
-
-		titleStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color(data.SectionHex)). // Tool Title
-			Bold(true)
-
-		argsStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color(data.DetailHex)).Width(tcol) // Tool Args
-
-		var content string
-		var purposeVal string
-
-		// For built-in tools, we have a map of args
-		// We will try to extract purpose/description and command separately
-		if argsMap, ok := toolData.Args.(map[string]interface{}); ok {
-			// 1. Identify Purpose
-			// MCP tool calls may not have purpose/description
-			if v, ok := argsMap["purpose"].(string); ok {
-				purposeVal = v
-			}
-
-			// 2. Identify Command (everything else)
-			var commandParts []string
-
-			// Then grab any args that look like command parts
-			// keep the k=v pairs format for command
-			for k, v := range argsMap {
-				if k == "purpose" {
-					continue
-				} else if k == "need_confirm" {
-					continue
-				}
-				var val string
-				switch v.(type) {
-				case map[string]interface{}, []interface{}, []map[string]interface{}:
-					// Pretty print complex types
-					bytes, _ := json.MarshalIndent(v, "      ", "  ")
-					val = fmt.Sprintf("%s = %s", k, string(bytes))
-				default:
-					// Simple types
-					val = fmt.Sprintf("%s = %v", k, v)
-				}
-				commandParts = append(commandParts, val)
-			}
-
-			commandVal := strings.Join(commandParts, "\n")
-
-			// Render logic
-			// Title (Function Name) -> Cyan Bold
-			// Command -> White (With keys)
-			// Purpose -> Gray, Dim, Wrapped
-
-			cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.LabelHex)).Width(tcol)      // Cmd Label
-			purposeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.DetailHex)).Width(tcol) // Cmd Purpose
-
-			var parts []string
-			parts = append(parts, titleStyle.Render(toolData.Function))
-
-			if commandVal != "" {
-				parts = append(parts, cmdStyle.Render(commandVal))
-			}
-
-			if purposeVal != "" {
-				parts = append(parts, purposeStyle.Render(purposeVal))
-			}
-
-			content = strings.Join(parts, "\n")
-		}
-
-		// Fallback if content is still empty
-		if content == "" {
-			// Convert Args back to string for display
-			var argsStr string
-			if s, ok := toolData.Args.(string); ok {
-				argsStr = s
-			} else {
-				bytes, _ := json.MarshalIndent(toolData.Args, "", "  ")
-				argsStr = string(bytes)
-			}
-			content = fmt.Sprintf("%s\n%s", titleStyle.Render(toolData.Function), argsStyle.Render(argsStr))
-		}
-
 		// Render logic based on Verbose flag
 		if ag.Verbose {
+			// Make sure we have enough space for the border
+			tcol := ui.GetTerminalWidth() - 8
+
+			// Structured data available
+			// Use lipgloss to render
+			style := lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color(data.BorderHex)). // Tool Border
+				Padding(0, 1).
+				Margin(0, 0)
+
+			titleStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color(data.SectionHex)). // Tool Title
+				Bold(true)
+
+			argsStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color(data.DetailHex)).Width(tcol) // Tool Args
+
+			var content string
+			// For built-in tools, we have a map of args
+			// We will try to extract purpose/description and command separately
+			if argsMap, ok := toolData.Args.(map[string]interface{}); ok {
+				commandVal, purposeVal := formatVerboseArgs(argsMap)
+
+				// Render logic
+				// Title (Function Name) -> Cyan Bold
+				// Command -> White (With keys)
+				// Purpose -> Gray, Dim, Wrapped
+
+				cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.LabelHex)).Width(tcol)      // Cmd Label
+				purposeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.DetailHex)).Width(tcol) // Cmd Purpose
+
+				var parts []string
+				parts = append(parts, titleStyle.Render(toolData.Function))
+
+				if commandVal != "" {
+					parts = append(parts, cmdStyle.Render(commandVal))
+				}
+
+				if purposeVal != "" {
+					parts = append(parts, purposeStyle.Render(purposeVal))
+				}
+
+				content = strings.Join(parts, "\n")
+			}
+
+			// Fallback if content is still empty
+			if content == "" {
+				// Convert Args back to string for display
+				var argsStr string
+				if s, ok := toolData.Args.(string); ok {
+					argsStr = s
+				} else {
+					bytes, _ := json.MarshalIndent(toolData.Args, "", "  ")
+					argsStr = string(bytes)
+				}
+				content = fmt.Sprintf("%s\n%s", titleStyle.Render(toolData.Function), argsStyle.Render(argsStr))
+			}
 			// Render with border and style and details
 			output = style.Render(content)
 		} else {
-			// Simple layout for non-verbose: [call tool: tool_name]
-			if purposeVal != "" {
-				content = fmt.Sprintf("%s:%s", toolData.Function, purposeVal)
+			// Simple layout for non-verbose: tool_name :detail
+			detail := extractFirstArg(toolData.Args)
+			if detail != "" {
+				detail = " :" + detail
 			} else {
-				content = fmt.Sprintf("%s...", toolData.Function)
+				detail = " ..."
 			}
-			output = data.ToolCallColor + content + data.ResetSeq
+			output = data.ToolCallColor + toolData.Function + data.ResetSeq + detail
 		}
 
 		ag.Std.Writeln(output)
@@ -269,4 +237,85 @@ func (ag *Agent) Warn(text string) {
 	if ag.OutputFile != nil {
 		ag.OutputFile.Writef("\n%s\n", text)
 	}
+}
+
+// formatVerboseArgs extracts purpose and command parts from a map of arguments.
+func formatVerboseArgs(args map[string]interface{}) (string, string) {
+	var purpose string
+	if v, ok := args["purpose"].(string); ok {
+		purpose = v
+	}
+
+	var commandParts []string
+	for k, v := range args {
+		if k == "purpose" || k == "need_confirm" {
+			continue
+		}
+		var val string
+		switch v.(type) {
+		case map[string]interface{}, []interface{}, []map[string]interface{}:
+			// Pretty print complex types
+			bytes, _ := json.MarshalIndent(v, "      ", "  ")
+			val = fmt.Sprintf("%s = %s", k, string(bytes))
+		default:
+			// Simple types
+			val = fmt.Sprintf("%s = %v", k, v)
+		}
+		commandParts = append(commandParts, val)
+	}
+
+	return strings.Join(commandParts, "\n"), purpose
+}
+
+// extractFirstArg extracts a concise detail string from the function arguments for non-verbose display.
+func extractFirstArg(args interface{}) string {
+	if args == nil {
+		return ""
+	}
+
+	switch m := args.(type) {
+	case map[string]interface{}:
+		// 1. Check for purpose first
+		if p, ok := m["purpose"].(string); ok && p != "" {
+			return p
+		}
+
+		// 2. Otherwise find the first key that isn't purpose or need_confirm
+		for k, v := range m {
+			if k == "purpose" || k == "need_confirm" {
+				continue
+			}
+			// Use this value as the detail
+			return formatArgValue(v)
+		}
+	case []interface{}, []string:
+		return formatArgValue(m)
+	case string:
+		return m
+	}
+	return fmt.Sprintf("%v", args)
+}
+
+// formatArgValue converts an argument value to a concise string representation.
+func formatArgValue(v interface{}) string {
+	switch val := v.(type) {
+	case []interface{}:
+		var strs []string
+		for _, item := range val {
+			strs = append(strs, fmt.Sprintf("%v", item))
+		}
+		return strings.Join(strs, ", ")
+	case []string:
+		return strings.Join(val, ", ")
+	case map[string]interface{}:
+		// If it's a map, recursively format the first key's value
+		for _, subV := range val {
+			return formatArgValue(subV)
+		}
+	case string:
+		return val
+	default:
+		return fmt.Sprintf("%v", val)
+	}
+	return ""
 }

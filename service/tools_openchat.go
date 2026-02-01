@@ -141,7 +141,7 @@ func (op *OpenProcessor) OpenChatCreateDirectoryToolCall(toolCall *model.ToolCal
 		Name:       Ptr(""),
 	}
 
-	response, err := createDirectoryToolCallImpl(argsMap)
+	response, err := createDirectoryToolCallImpl(argsMap, op.toolsUse)
 	if err != nil {
 		response = fmt.Sprintf("Error: %v", err)
 	}

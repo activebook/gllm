@@ -91,7 +91,7 @@ func (op *OpenProcessor) OpenAIEditFileToolCall(toolCall openai.ToolCall, argsMa
 }
 
 func (op *OpenProcessor) OpenAICreateDirectoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := createDirectoryToolCallImpl(argsMap)
+	response, err := createDirectoryToolCallImpl(argsMap, op.toolsUse)
 	if err != nil {
 		response = fmt.Sprintf("Error: %v", err)
 	}

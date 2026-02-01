@@ -109,8 +109,14 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, 
 		diff := ui.Diff(currentContent, content, "", "", 3)
 		showDiff(diff)
 
+		// Get purpose if provided
+		purpose, _ := (*argsMap)["purpose"].(string)
+		if purpose == "" {
+			purpose = fmt.Sprintf("write content to the file at path: %s", path)
+		}
+
 		// Directly prompt user for confirmation
-		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("write content to the file at path: %s", path), ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
 		if err != nil {
 			return "", err
 		}
@@ -134,10 +140,34 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, 
 	return fmt.Sprintf("Successfully wrote to file %s", path), nil
 }
 
-func createDirectoryToolCallImpl(argsMap *map[string]interface{}) (string, error) {
+func createDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
+	}
+
+	// Check if confirmation is needed
+	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
+	if !ok {
+		// Default to true for safety
+		needConfirm = true
+	}
+
+	if needConfirm && !toolsUse.AutoApprove {
+		// Get purpose if provided
+		purpose, _ := (*argsMap)["purpose"].(string)
+		if purpose == "" {
+			purpose = fmt.Sprintf("create the directory at path: %s", path)
+		}
+
+		// Directly prompt user for confirmation
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
+		if err != nil {
+			return "", err
+		}
+		if !confirm {
+			return fmt.Sprintf("Operation cancelled by user: create directory %s", path), nil
+		}
 	}
 
 	// Create the directory
@@ -213,8 +243,14 @@ func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse)
 	}
 
 	if needConfirm && !toolsUse.AutoApprove {
+		// Get purpose if provided
+		purpose, _ := (*argsMap)["purpose"].(string)
+		if purpose == "" {
+			purpose = fmt.Sprintf("delete the file at path: %s", path)
+		}
+
 		// Directly prompt user for confirmation
-		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("delete the file at path: %s", path), ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
 		if err != nil {
 			return "", err
 		}
@@ -246,8 +282,14 @@ func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *Tool
 	}
 
 	if needConfirm && !toolsUse.AutoApprove {
+		// Get purpose if provided
+		purpose, _ := (*argsMap)["purpose"].(string)
+		if purpose == "" {
+			purpose = fmt.Sprintf("delete the directory at path: %s and all its contents", path)
+		}
+
 		// Directly prompt user for confirmation
-		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("delete the directory at path: %s and all its contents", path), ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
 		if err != nil {
 			return "", err
 		}
@@ -284,8 +326,14 @@ func moveToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (stri
 	}
 
 	if needConfirm && !toolsUse.AutoApprove {
+		// Get purpose if provided
+		purpose, _ := (*argsMap)["purpose"].(string)
+		if purpose == "" {
+			purpose = fmt.Sprintf("move the file or directory from %s to %s", source, destination)
+		}
+
 		// Directly prompt user for confirmation
-		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("move the file or directory from %s to %s", source, destination), ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
 		if err != nil {
 			return "", err
 		}
@@ -769,8 +817,14 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, s
 		diff := ui.Diff(content, modifiedContent, "", "", 3)
 		showDiff(diff)
 
+		// Get purpose if provided
+		purpose, _ := (*argsMap)["purpose"].(string)
+		if purpose == "" {
+			purpose = fmt.Sprintf("edit the file at path: %s", path)
+		}
+
 		// Response with a prompt to let user confirm
-		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
 		closeDiff() // Close the diff
 		if err != nil {
 			return "", err
@@ -817,8 +871,14 @@ func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (stri
 	}
 
 	if needConfirm && !toolsUse.AutoApprove {
+		// Get purpose if provided
+		purpose, _ := (*argsMap)["purpose"].(string)
+		if purpose == "" {
+			purpose = fmt.Sprintf("copy the file or directory from %s to %s", source, destination)
+		}
+
 		// Directly prompt user for confirmation
-		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("copy the file or directory from %s to %s", source, destination), ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
 		if err != nil {
 			return "", err
 		}
@@ -1030,7 +1090,8 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse
 	}
 
 	if needConfirm && !toolsUse.AutoApprove {
-		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("switch to agent '%s'", name), ToolUserConfirmPrompt, "")
+		purpose := fmt.Sprintf("switch to agent '%s'", name)
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
 		if err != nil {
 			return "", err
 		}
@@ -1146,19 +1207,16 @@ func spawnSubAgentsToolCallImpl(
 
 	if needConfirm && !toolsUse.AutoApprove {
 		// Build brief description of tasks
-		/*
-			var taskDesc strings.Builder
-			for i, task := range tasksInterface {
-				if i > 0 {
-					taskDesc.WriteString("\n")
-				}
-				if tm, ok := task.(map[string]interface{}); ok {
-					taskDesc.WriteString(fmt.Sprintf("- Task %d: %s (Agent: %s)", i+1, tm["task_key"], tm["agent"]))
-				}
+		var taskDesc strings.Builder
+		for i, task := range tasksInterface {
+			if i > 0 {
+				taskDesc.WriteString("\n")
 			}
-			confirm, err := ui.NeedUserConfirm(fmt.Sprintf("spawn %d sub-agents", len(tasksInterface)), ToolUserConfirmPrompt, taskDesc.String())
-		*/
-		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, "")
+			if tm, ok := task.(map[string]interface{}); ok {
+				taskDesc.WriteString(fmt.Sprintf("- Task %d: %s (Agent: %s)", i+1, tm["task_key"], tm["agent"]))
+			}
+		}
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, taskDesc.String())
 		if err != nil {
 			return "", err
 		}
@@ -1319,8 +1377,8 @@ func activateSkillToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsU
 
 	// Check if confirmation is needed (default logic: always confirm unless AutoApprove is true)
 	if !toolsUse.AutoApprove {
-		description := "Description:\n" + desc + "\n\nResources:\n" + tree
-		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("activate skill '%s'", name), ToolUserConfirmPrompt, description)
+		description := "Activate Skill:\n" + name + "\n\nDescription:\n" + desc + "\n\nResources:\n" + tree
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, description)
 		if err != nil {
 			return "", err
 		}

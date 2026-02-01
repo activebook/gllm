@@ -631,6 +631,10 @@ func getWriteFileTool() *OpenTool {
 					"type":        "string",
 					"description": "The content to write to the file.",
 				},
+				"purpose": map[string]interface{}{
+					"type":        "string",
+					"description": "A terse explanation of why this file is being written.",
+				},
 				"need_confirm": map[string]interface{}{
 					"type": "boolean",
 					"description": "Specifies whether to prompt the user for confirmation before writing to the file. " +
@@ -638,7 +642,7 @@ func getWriteFileTool() *OpenTool {
 					"default": true,
 				},
 			},
-			"required": []string{"path", "content"},
+			"required": []string{"path", "content", "purpose"},
 		},
 	}
 	writeFileTool := OpenTool{
@@ -659,8 +663,18 @@ func getCreateDirectoryTool() *OpenTool {
 					"type":        "string",
 					"description": "The path of the directory to create.",
 				},
+				"purpose": map[string]interface{}{
+					"type":        "string",
+					"description": "A terse explanation of why this directory is being created.",
+				},
+				"need_confirm": map[string]interface{}{
+					"type": "boolean",
+					"description": "Specifies whether to prompt the user for confirmation before creating the directory. " +
+						"Default is true.",
+					"default": true,
+				},
 			},
-			"required": []string{"path"},
+			"required": []string{"path", "purpose"},
 		},
 	}
 	createDirectoryTool := OpenTool{
@@ -703,6 +717,10 @@ func getDeleteFileTool() *OpenTool {
 					"type":        "string",
 					"description": "The path to the file to delete.",
 				},
+				"purpose": map[string]interface{}{
+					"type":        "string",
+					"description": "A terse explanation of why this file is being deleted.",
+				},
 				"need_confirm": map[string]interface{}{
 					"type": "boolean",
 					"description": "Specifies whether to prompt the user for confirmation before deleting the file. " +
@@ -710,7 +728,7 @@ func getDeleteFileTool() *OpenTool {
 					"default": true,
 				},
 			},
-			"required": []string{"path"},
+			"required": []string{"path", "purpose"},
 		},
 	}
 	deleteFileTool := OpenTool{
@@ -731,6 +749,10 @@ func getDeleteDirectoryTool() *OpenTool {
 					"type":        "string",
 					"description": "The path to the directory to delete.",
 				},
+				"purpose": map[string]interface{}{
+					"type":        "string",
+					"description": "A terse explanation of why this directory is being deleted.",
+				},
 				"need_confirm": map[string]interface{}{
 					"type": "boolean",
 					"description": "Specifies whether to prompt the user for confirmation before deleting the directory. " +
@@ -738,7 +760,7 @@ func getDeleteDirectoryTool() *OpenTool {
 					"default": true,
 				},
 			},
-			"required": []string{"path"},
+			"required": []string{"path", "purpose"},
 		},
 	}
 	deleteDirectoryTool := OpenTool{
@@ -878,6 +900,10 @@ func getEditFileTool() *OpenTool {
 					},
 					"description": "Array of search-replace operations to apply to the file.",
 				},
+				"purpose": map[string]interface{}{
+					"type":        "string",
+					"description": "A terse explanation of why this file is being edited.",
+				},
 				"need_confirm": map[string]interface{}{
 					"type": "boolean",
 					"description": "Specifies whether to show diff and prompt for confirmation before editing the file. " +
@@ -885,7 +911,7 @@ func getEditFileTool() *OpenTool {
 					"default": true,
 				},
 			},
-			"required": []string{"path", "edits"},
+			"required": []string{"path", "edits", "purpose"},
 		},
 	}
 	editFileTool := OpenTool{
@@ -910,6 +936,10 @@ func getMoveTool() *OpenTool {
 					"type":        "string",
 					"description": "The destination path for the file or directory move.",
 				},
+				"purpose": map[string]interface{}{
+					"type":        "string",
+					"description": "A terse explanation of why this file/directory is being moved.",
+				},
 				"need_confirm": map[string]interface{}{
 					"type": "boolean",
 					"description": "Specifies whether to prompt the user for confirmation before moving the file or directory. " +
@@ -917,7 +947,7 @@ func getMoveTool() *OpenTool {
 					"default": true,
 				},
 			},
-			"required": []string{"source", "destination"},
+			"required": []string{"source", "destination", "purpose"},
 		},
 	}
 	moveTool := OpenTool{
@@ -942,6 +972,10 @@ func getCopyTool() *OpenTool {
 					"type":        "string",
 					"description": "The destination path for the file or directory copy.",
 				},
+				"purpose": map[string]interface{}{
+					"type":        "string",
+					"description": "A terse explanation of why this file/directory is being copied.",
+				},
 				"need_confirm": map[string]interface{}{
 					"type": "boolean",
 					"description": "Specifies whether to prompt the user for confirmation before copying the file or directory. " +
@@ -949,7 +983,7 @@ func getCopyTool() *OpenTool {
 					"default": true,
 				},
 			},
-			"required": []string{"source", "destination"},
+			"required": []string{"source", "destination", "purpose"},
 		},
 	}
 	copyTool := OpenTool{

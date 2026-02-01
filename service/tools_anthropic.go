@@ -53,7 +53,7 @@ func (op *OpenProcessor) AnthropicEditFileToolCall(toolCall anthropic.ToolUseBlo
 }
 
 func (op *OpenProcessor) AnthropicCreateDirectoryToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
-	response, err := createDirectoryToolCallImpl(argsMap)
+	response, err := createDirectoryToolCallImpl(argsMap, op.toolsUse)
 	isError := err != nil
 	if err != nil {
 		response = fmt.Sprintf("Error: %v", err)
