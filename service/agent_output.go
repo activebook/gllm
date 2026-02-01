@@ -272,7 +272,6 @@ func extractFirstArg(args interface{}) string {
 	if args == nil {
 		return ""
 	}
-
 	switch m := args.(type) {
 	case map[string]interface{}:
 		// 1. Check for purpose first
@@ -280,7 +279,15 @@ func extractFirstArg(args interface{}) string {
 			return p
 		}
 
-		// 2. Otherwise find the first key that isn't purpose or need_confirm
+		// 2. Prioritize certain keys for better UX in non-verbose mode
+		priorityKeys := []string{"tasks", "command", "query", "url", "path", "name", "key"}
+		for _, k := range priorityKeys {
+			if v, ok := m[k]; ok {
+				return formatArgValue(v)
+			}
+		}
+
+		// 3. Otherwise find the first key that isn't purpose or need_confirm
 		for k, v := range m {
 			if k == "purpose" || k == "need_confirm" {
 				continue
@@ -299,18 +306,39 @@ func extractFirstArg(args interface{}) string {
 
 // formatArgValue converts an argument value to a concise string representation.
 func formatArgValue(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+
 	switch val := v.(type) {
 	case []interface{}:
 		var strs []string
 		for _, item := range val {
-			strs = append(strs, fmt.Sprintf("%v", item))
+			s := formatArgValue(item)
+			if s != "" {
+				strs = append(strs, s)
+			}
+		}
+		// Truncate if too many items for summary
+		if len(strs) > 3 {
+			strs = append(strs[:3], "...")
 		}
 		return strings.Join(strs, ", ")
 	case []string:
 		return strings.Join(val, ", ")
 	case map[string]interface{}:
-		// If it's a map, recursively format the first key's value
-		for _, subV := range val {
+		// Special handling for sub-agent tasks
+		agent, ok1 := val["agent"].(string)
+		instruction, ok2 := val["instruction"].(string)
+		if ok1 && ok2 {
+			return fmt.Sprintf("[%s] %s", agent, instruction)
+		}
+
+		// If it's a map, recursively format the first key's value that isn't metadata
+		for k, subV := range val {
+			if k == "purpose" || k == "need_confirm" {
+				continue
+			}
 			return formatArgValue(subV)
 		}
 	case string:
