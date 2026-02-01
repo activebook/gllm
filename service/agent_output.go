@@ -181,9 +181,9 @@ func (ag *Agent) WriteFunctionCall(text string) {
 			// Simple layout for non-verbose: tool_name :detail
 			detail := extractFirstArg(toolData.Args)
 			if detail != "" {
-				detail = " :" + detail
+				detail = ": " + detail
 			} else {
-				detail = " ..."
+				detail = ""
 			}
 			output = data.ToolCallColor + toolData.Function + data.ResetSeq + detail
 		}
