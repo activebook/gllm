@@ -53,12 +53,12 @@ type Agent struct {
 	OutputFile      *ui.FileRenderer    // File renderer
 	Status          StatusStack         // Stack to manage streaming status
 	Convo           ConversationManager // Conversation manager
-	ShowIndicator   bool                // Whether to show indicator
 	LastWrittenData string              // Last written data
 
 	// Sub-agent orchestration
 	SharedState *data.SharedState // Shared state for inter-agent communication
 	AgentName   string            // Current agent name for metadata tracking
+	Verbose     bool              // Whether verbose output mode is enabled
 }
 
 func constructModelInfo(model *data.Model) *ModelInfo {
@@ -190,6 +190,10 @@ func CallAgent(op *AgentOptions) error {
 	// Set up code tool settings
 	exeCode := IsCodeExecutionEnabled()
 
+	// Get verbose setting
+	settingsStore := data.GetSettingsStore()
+	verboseMode := settingsStore.GetVerboseEnabled()
+
 	// Set up thinking level
 	thinkingLevel := ParseThinkingLevel(op.ThinkingLevel)
 
@@ -209,11 +213,9 @@ func CallAgent(op *AgentOptions) error {
 	activeDataCh := dataCh
 
 	// Only create StdRenderer if not in quiet mode
-	var showIndicator bool
 	var std *ui.StdRenderer
 	if !op.QuietMode {
 		std = ui.NewStdRenderer()
-		showIndicator = true
 	}
 
 	// Need to output a file
@@ -232,14 +234,14 @@ func CallAgent(op *AgentOptions) error {
 	var mc *MCPClient
 	if IsMCPServersEnabled(op.Capabilities) {
 		mc = GetMCPClient() // use the shared instance
-		if showIndicator {
+		if !op.QuietMode {
 			ui.GetIndicator().Start(ui.IndicatorLoadingMCP)
 		}
 		err := mc.Init(op.MCPConfig, MCPLoadOption{
 			LoadAll:   false,
 			LoadTools: true, // only load tools
 		}) // Load only allowed servers
-		if showIndicator {
+		if !op.QuietMode {
 			ui.GetIndicator().Stop()
 		}
 		if err != nil {
@@ -327,9 +329,9 @@ func CallAgent(op *AgentOptions) error {
 		Std:           std,
 		OutputFile:    fileRenderer,
 		Status:        StatusStack{},
-		ShowIndicator: showIndicator,
 		SharedState:   op.SharedState,
 		AgentName:     op.AgentName,
+		Verbose:       verboseMode,
 	}
 
 	// Construct conversation manager

@@ -30,6 +30,7 @@ func FormatEnabledIndicator(enabled bool) string {
 // For long-running operations, we can use a spinner indicator
 
 const (
+	IndicatorThinking   = "Thinking..."
 	IndicatorLoadingMCP = "Loading MCP servers..."
 )
 
@@ -129,18 +130,21 @@ func GetIndicator() *Indicator {
 func (i *Indicator) setupSpinner() {
 	i.s = spinner.New(spinner.CharSets[14],
 		100*time.Millisecond,
-		spinner.WithWriter(os.Stderr))
+		spinner.WithWriterFile(os.Stderr)) // <-- MUST be WithWriterFile, not WithWriter
 	i.s.Color("fgHiMagenta", "bold")
+
+	// If stderr isn't a terminal (piped, IDE, CI, etc.), force-enable anyway
+	// so the spinner actually starts. The library silently bails in Start()
+	// if it thinks it's not in a terminal.
+	i.s.Enable()
 
 	// Setup the pre-update hook for word rotation
 	i.s.PreUpdate = func(s *spinner.Spinner) {
 		i.stateMu.Lock()
 		defer i.stateMu.Unlock()
 		if i.rotating {
-			// Change word every 2 seconds for a whimsical feel
 			if time.Since(i.lastRotation) > 2000*time.Millisecond {
 				newWord := GetRandomProcessingWord()
-				// Try to avoid repeating the same word
 				for newWord == i.lastWord && len(WhimsicalProcessingWords) > 1 {
 					newWord = GetRandomProcessingWord()
 				}
@@ -163,6 +167,7 @@ func (i *Indicator) Stop() {
 	defer i.mu.Unlock()
 	if i.s != nil && i.s.Active() {
 		i.s.Stop()
+		// fmt.Println("Stop Indicator")
 	}
 }
 
@@ -172,9 +177,10 @@ func (i *Indicator) Start(text string) {
 
 	// Stop any existing spinner first
 	if i.s.Active() {
-		i.s.Stop()
-		// Give it a moment to actually stop
-		time.Sleep(1 * time.Millisecond)
+		// i.s.Stop()
+		// // Give it a moment to actually stop
+		// time.Sleep(1 * time.Millisecond)
+		return
 	}
 
 	// Determine rotating state and initial text
@@ -194,6 +200,7 @@ func (i *Indicator) Start(text string) {
 
 	// Start the spinner
 	i.s.Start()
+	// fmt.Println("Start Indicator")
 
 	// Give the spinner goroutine time to actually start and display
 	// This is crucial - without this, the spinner may not appear

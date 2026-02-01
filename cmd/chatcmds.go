@@ -161,6 +161,20 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	case "/theme":
 		runCommand(themeCmd, parts[1:])
 
+	case "/verbose":
+		settings := data.GetSettingsStore()
+		current := settings.GetVerboseEnabled()
+		err := settings.SetVerboseEnabled(!current)
+		if err != nil {
+			fmt.Printf("Failed to toggle verbose mode: %v\n", err)
+		} else {
+			status := "enabled"
+			if !current {
+				status = "disabled"
+			}
+			fmt.Printf("Verbose mode: %s\n", status)
+		}
+
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
 	}
@@ -191,6 +205,7 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("  /attach, /a <file> - Attach a file")
 	fmt.Println("  /detach, /d <file|all> - Detach a file")
 	fmt.Println("  /theme [subcmd] - Manage and switch themes")
+	fmt.Println("  /verbose - Toggle verbose mode")
 	fmt.Println("  !<command> - Execute a shell command")
 }
 

@@ -37,6 +37,7 @@ func BeforeLog() {
 	if logger != nil {
 		// Stop indicator to avoid overlap
 		indicatorActive = ui.GetIndicator().IsActive()
+		// fmt.Println("logger before log")
 		ui.GetIndicator().Stop()
 	}
 }
@@ -45,6 +46,7 @@ func AfterLog() {
 	if logger != nil {
 		// Restart indicator if it was active
 		if indicatorActive {
+			// fmt.Println("logger after log")
 			ui.GetIndicator().Start("")
 		}
 	}
@@ -84,17 +86,25 @@ func Successln(args ...interface{}) {
 
 func Debugf(format string, args ...interface{}) {
 	if logger != nil {
-		BeforeLog()
+		if logger.Level == log.DebugLevel {
+			BeforeLog()
+		}
 		logger.Debugf(format, args...)
-		AfterLog()
+		if logger.Level == log.DebugLevel {
+			AfterLog()
+		}
 	}
 }
 
 func Debugln(args ...interface{}) {
 	if logger != nil {
-		BeforeLog()
+		if logger.Level == log.DebugLevel {
+			BeforeLog()
+		}
 		logger.Debugln(args...)
-		AfterLog()
+		if logger.Level == log.DebugLevel {
+			AfterLog()
+		}
 	}
 }
 

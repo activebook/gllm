@@ -25,11 +25,17 @@ type SearchSettings struct {
 	Allowed string `json:"allowed"` // The allowed search engine name (e.g., "google", "bing", "tavily")
 }
 
+// VerboseSettings holds verbosity-related settings.
+type VerboseSettings struct {
+	Enabled bool `json:"enabled"` // Whether verbose output is enabled
+}
+
 // Settings represents the structure of settings.json.
 type Settings struct {
-	MCP    MCPSettings    `json:"mcp"`
-	Skills SkillsSettings `json:"skills"`
-	Search SearchSettings `json:"search"`
+	MCP     MCPSettings     `json:"mcp"`
+	Skills  SkillsSettings  `json:"skills"`
+	Search  SearchSettings  `json:"search"`
+	Verbose VerboseSettings `json:"verbose"`
 }
 
 // SettingsStore provides access to settings.json.
@@ -66,6 +72,9 @@ func NewSettingsStore() *SettingsStore {
 			},
 			Search: SearchSettings{
 				Allowed: "", // Default to empty (use first configured engine)
+			},
+			Verbose: VerboseSettings{
+				Enabled: false, // Default to false (minimal output)
 			},
 		},
 	}
@@ -229,6 +238,21 @@ func (s *SettingsStore) GetAllowedSearchEngine() string {
 func (s *SettingsStore) SetAllowedSearchEngine(name string) error {
 	s.mu.Lock()
 	s.settings.Search.Allowed = name
+	s.mu.Unlock()
+	return s.Save()
+}
+
+// GetVerboseEnabled returns whether verbose mode is enabled.
+func (s *SettingsStore) GetVerboseEnabled() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.settings.Verbose.Enabled
+}
+
+// SetVerboseEnabled sets the verbose mode.
+func (s *SettingsStore) SetVerboseEnabled(enabled bool) error {
+	s.mu.Lock()
+	s.settings.Verbose.Enabled = enabled
 	s.mu.Unlock()
 	return s.Save()
 }
