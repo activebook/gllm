@@ -118,17 +118,6 @@ func (c *ConfigStore) Import(path string) error {
 	return c.Save()
 }
 
-// GetEditor returns the configured editor.
-func (c *ConfigStore) GetEditor() string {
-	return c.v.GetString("chat.editor")
-}
-
-// SetEditor sets the configured editor.
-func (c *ConfigStore) SetEditor(editor string) error {
-	c.v.Set("chat.editor", editor)
-	return c.Save()
-}
-
 // SetConfigFile sets the configuration file path.
 func (c *ConfigStore) SetConfigFile(path string) error {
 	c.v.SetConfigFile(path) // Set the config file path

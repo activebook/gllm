@@ -5,12 +5,11 @@ import (
 	"sort"
 
 	"github.com/muesli/termenv"
-	"github.com/spf13/viper"
 	goghthemes "github.com/willyv3/gogh-themes"
 )
 
 const (
-	DefaultThemeName string = "Google Dark"
+	DefaultThemeName string = "Dracula"
 
 	// Formatting Utilities
 	BoldSeq      string = "\033[1m"
@@ -246,12 +245,12 @@ func ListThemes() []string {
 
 // SaveThemeConfig persists the theme selection to the configuration file.
 func SaveThemeConfig(name string) error {
-	viper.Set("theme", name)
-	// We assume viper has been initialized with a config file path elsewhere (in root.go)
-	return viper.WriteConfig()
+	store := GetSettingsStore()
+	return store.SetTheme(name)
 }
 
 // GetThemeFromConfig retrieves the configured theme name.
 func GetThemeFromConfig() string {
-	return viper.GetString("theme")
+	store := GetSettingsStore()
+	return store.GetTheme()
 }

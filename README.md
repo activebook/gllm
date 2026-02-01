@@ -175,13 +175,13 @@ For longer messages or code snippets, use your preferred text editor directly in
 
 ```sh
 # Set your preferred editor (vim, nano, code, etc.)
-gllm editor vim
+gllm config editor switch vim
 
 # List available editors
-gllm editor list
+gllm config editor
 
 # Check current editor
-gllm editor
+gllm config editor
 ```
 
 ### Multi-turn Conversations
@@ -405,13 +405,13 @@ You can also include a `scripts/` directory for helper scripts and a `resources/
 - **Show current theme and samples:**
 
   ```sh
-  gllm theme
+  gllm config theme
   ```
 
 - **Switch to a different theme:**
 
   ```sh
-  gllm theme switch
+  gllm config theme switch
   ```
 
 | Light mode VSCode Theme | Dark mode Dracula Theme |
@@ -563,6 +563,14 @@ The LLM will detect relevant MCP tools and use them to enhance its responses wit
   gllm template --help
   gllm system --help
   gllm search --help
+  ```
+
+- **Manage editor, themes, and verbose mode:**
+
+  ```sh
+  gllm config editor --help
+  gllm config theme --help
+  gllm config verbose
   ```
 
 ---

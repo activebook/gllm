@@ -36,6 +36,8 @@ type Settings struct {
 	Skills  SkillsSettings  `json:"skills"`
 	Search  SearchSettings  `json:"search"`
 	Verbose VerboseSettings `json:"verbose"`
+	Theme   string          `json:"theme"`
+	Editor  string          `json:"editor"`
 }
 
 // SettingsStore provides access to settings.json.
@@ -76,6 +78,8 @@ func NewSettingsStore() *SettingsStore {
 			Verbose: VerboseSettings{
 				Enabled: false, // Default to false (minimal output)
 			},
+			Theme:  "", // Default empty, will fall back to DefaultThemeName
+			Editor: "", // Default empty, will use auto-detection
 		},
 	}
 }
@@ -253,6 +257,36 @@ func (s *SettingsStore) GetVerboseEnabled() bool {
 func (s *SettingsStore) SetVerboseEnabled(enabled bool) error {
 	s.mu.Lock()
 	s.settings.Verbose.Enabled = enabled
+	s.mu.Unlock()
+	return s.Save()
+}
+
+// GetTheme returns the configured theme name.
+func (s *SettingsStore) GetTheme() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.settings.Theme
+}
+
+// SetTheme sets the configured theme name.
+func (s *SettingsStore) SetTheme(name string) error {
+	s.mu.Lock()
+	s.settings.Theme = name
+	s.mu.Unlock()
+	return s.Save()
+}
+
+// GetEditor returns the configured editor.
+func (s *SettingsStore) GetEditor() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.settings.Editor
+}
+
+// SetEditor sets the configured editor.
+func (s *SettingsStore) SetEditor(editor string) error {
+	s.mu.Lock()
+	s.settings.Editor = editor
 	s.mu.Unlock()
 	return s.Save()
 }
