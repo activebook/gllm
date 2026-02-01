@@ -109,8 +109,14 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, 
 		diff := ui.Diff(currentContent, content, "", "", 3)
 		showDiff(diff)
 
+		// Get purpose if provided
+		purpose, _ := (*argsMap)["purpose"].(string)
+		if purpose == "" {
+			purpose = fmt.Sprintf("write content to the file at path: %s", path)
+		}
+
 		// Directly prompt user for confirmation
-		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("write content to the file at path: %s", path), ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
 		if err != nil {
 			return "", err
 		}
@@ -134,10 +140,34 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, 
 	return fmt.Sprintf("Successfully wrote to file %s", path), nil
 }
 
-func createDirectoryToolCallImpl(argsMap *map[string]interface{}) (string, error) {
+func createDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
+	}
+
+	// Check if confirmation is needed
+	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
+	if !ok {
+		// Default to true for safety
+		needConfirm = true
+	}
+
+	if needConfirm && !toolsUse.AutoApprove {
+		// Get purpose if provided
+		purpose, _ := (*argsMap)["purpose"].(string)
+		if purpose == "" {
+			purpose = fmt.Sprintf("create the directory at path: %s", path)
+		}
+
+		// Directly prompt user for confirmation
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
+		if err != nil {
+			return "", err
+		}
+		if !confirm {
+			return fmt.Sprintf("Operation cancelled by user: create directory %s", path), nil
+		}
 	}
 
 	// Create the directory
@@ -213,8 +243,14 @@ func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse)
 	}
 
 	if needConfirm && !toolsUse.AutoApprove {
+		// Get purpose if provided
+		purpose, _ := (*argsMap)["purpose"].(string)
+		if purpose == "" {
+			purpose = fmt.Sprintf("delete the file at path: %s", path)
+		}
+
 		// Directly prompt user for confirmation
-		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("delete the file at path: %s", path), ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
 		if err != nil {
 			return "", err
 		}
@@ -246,8 +282,14 @@ func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *Tool
 	}
 
 	if needConfirm && !toolsUse.AutoApprove {
+		// Get purpose if provided
+		purpose, _ := (*argsMap)["purpose"].(string)
+		if purpose == "" {
+			purpose = fmt.Sprintf("delete the directory at path: %s and all its contents", path)
+		}
+
 		// Directly prompt user for confirmation
-		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("delete the directory at path: %s and all its contents", path), ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
 		if err != nil {
 			return "", err
 		}
@@ -284,8 +326,14 @@ func moveToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (stri
 	}
 
 	if needConfirm && !toolsUse.AutoApprove {
+		// Get purpose if provided
+		purpose, _ := (*argsMap)["purpose"].(string)
+		if purpose == "" {
+			purpose = fmt.Sprintf("move the file or directory from %s to %s", source, destination)
+		}
+
 		// Directly prompt user for confirmation
-		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("move the file or directory from %s to %s", source, destination), ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
 		if err != nil {
 			return "", err
 		}
@@ -544,8 +592,8 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (str
 	}
 	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
 	if !ok {
-		// there is no need_confirm parameter, so we assume it's false
-		needConfirm = false
+		// Default to true for safety
+		needConfirm = true
 	}
 
 	// Get timeout from arguments, default to DefaultShellTimeout
@@ -563,7 +611,7 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (str
 			//return "", fmt.Errorf("purpose not found in arguments")
 			descStr = ""
 		}
-		// Don't expose shell details too much
+		// Use the command string as the info for confirmation
 		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, descStr)
 		if err != nil {
 			return "", err
@@ -688,157 +736,6 @@ func webSearchToolCallImpl(argsMap *map[string]interface{}, queries *[]string, r
 	return string(resultsJSON), nil
 }
 
-// func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
-// 	path, ok := (*argsMap)["path"].(string)
-// 	if !ok {
-// 		return "", fmt.Errorf("path not found in arguments")
-// 	}
-
-// 	// Check if confirmation is needed
-// 	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
-// 	if !ok {
-// 		// Default to true for safety
-// 		needConfirm = true
-// 	}
-
-// 	// Get the edits to apply
-// 	editsInterface, ok := (*argsMap)["edits"].([]interface{})
-// 	if !ok {
-// 		return "", fmt.Errorf("edits not found in arguments or not an array")
-// 	}
-
-// 	// If confirmation is needed, ask the user before proceeding
-// 	if needConfirm && !toolsUse.AutoApprove {
-// 		var editsDescription strings.Builder
-// 		editsDescription.WriteString("The following edits will be applied to the file:\n")
-// 		for _, editInterface := range editsInterface {
-// 			editMap, ok := editInterface.(map[string]interface{})
-// 			if !ok {
-// 				continue
-// 			}
-
-// 			line, _ := editMap["line"].(float64) // JSON numbers are float64
-// 			content, _ := editMap["content"].(string)
-// 			operation, _ := editMap["operation"].(string)
-
-// 			if operation == "add" {
-// 				editsDescription.WriteString(fmt.Sprintf("  - Insert at line %d: %s\n", int(line), content))
-// 			} else if operation == "delete" || content == "" {
-// 				editsDescription.WriteString(fmt.Sprintf("  - Delete line %d\n", int(line)))
-// 			} else {
-// 				editsDescription.WriteString(fmt.Sprintf("  - Replace line %d with: %s\n", int(line), content))
-// 			}
-// 		}
-
-// 		outStr := fmt.Sprintf(ToolRespConfirmFileOp, fmt.Sprintf("edit file %s", path), editsDescription.String())
-// 		return outStr, nil
-// 	}
-
-// 	// Convert edits to a structured format
-// 	type Edit struct {
-// 		Line      int
-// 		Content   string
-// 		Operation string // "add", "delete", or "replace"
-// 	}
-
-// 	var edits []Edit
-// 	for _, editInterface := range editsInterface {
-// 		editMap, ok := editInterface.(map[string]interface{})
-// 		if !ok {
-// 			continue
-// 		}
-
-// 		line, _ := editMap["line"].(float64) // JSON numbers are float64
-// 		content, _ := editMap["content"].(string)
-// 		operation, hasOp := editMap["operation"].(string)
-
-// 		// Determine operation if not explicitly provided
-// 		if !hasOp {
-// 			if content == "" {
-// 				operation = "delete"
-// 			} else {
-// 				operation = "replace"
-// 			}
-// 		}
-
-// 		edits = append(edits, Edit{
-// 			Line:      int(line),
-// 			Content:   content,
-// 			Operation: operation,
-// 		})
-// 	}
-
-// 	// Sort edits by line number in descending order to avoid line number shifts during editing
-// 	// For add operations, we want to add at the specified line position
-// 	// For delete/replace operations, we work with existing line positions
-// 	sort.Slice(edits, func(i, j int) bool {
-// 		// If both are add operations, sort by line descending
-// 		if edits[i].Operation == "add" && edits[j].Operation == "add" {
-// 			return edits[i].Line > edits[j].Line
-// 		}
-// 		// If one is add and one isn't, add operations should happen first (higher line numbers)
-// 		if edits[i].Operation == "add" && edits[j].Operation != "add" {
-// 			return true
-// 		}
-// 		if edits[i].Operation != "add" && edits[j].Operation == "add" {
-// 			return false
-// 		}
-// 		// If neither is add, sort by line descending
-// 		return edits[i].Line > edits[j].Line
-// 	})
-
-// 	// Read the file
-// 	content, err := os.ReadFile(path)
-// 	if err != nil {
-// 		return fmt.Sprintf("Error reading file %s: %v", path, err), nil
-// 	}
-
-// 	// Split content into lines
-// 	lines := strings.Split(string(content), "\n")
-
-// 	// Apply edits
-// 	for _, edit := range edits {
-// 		lineIndex := edit.Line - 1 // Convert to 0-indexed
-
-// 		switch edit.Operation {
-// 		case "add", "++":
-// 			// Insert new content at the specified line position
-// 			// This works for inserting at the beginning (line 1), middle, or end(-1 or more than last line)
-// 			if lineIndex < 0 || lineIndex > len(lines) {
-// 				lineIndex = len(lines)
-// 			}
-// 			// Insert the new line at the specified position
-// 			lines = append(lines[:lineIndex], append([]string{edit.Content}, lines[lineIndex:]...)...)
-
-// 		case "delete", "--":
-// 			// Delete line (only if within range)
-// 			if lineIndex >= 0 && lineIndex < len(lines) {
-// 				lines = append(lines[:lineIndex], lines[lineIndex+1:]...)
-// 			}
-
-// 		case "replace", "==":
-// 			// Replace or append line
-// 			if lineIndex >= 0 && lineIndex < len(lines) {
-// 				lines[lineIndex] = edit.Content
-// 			} else if lineIndex == len(lines) {
-// 				// Append new line at the end
-// 				lines = append(lines, edit.Content)
-// 			}
-// 		}
-// 	}
-
-// 	// Join lines back together
-// 	newContent := strings.Join(lines, "\n")
-
-// 	// Write the modified content back to the file
-// 	err = os.WriteFile(path, []byte(newContent), 0644)
-// 	if err != nil {
-// 		return fmt.Sprintf("Error writing file %s: %v", path, err), nil
-// 	}
-
-// 	return fmt.Sprintf("Successfully edited file %s", path), nil
-// }
-
 func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, showDiff func(diff string), closeDiff func()) (string, error) {
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
@@ -920,8 +817,14 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, s
 		diff := ui.Diff(content, modifiedContent, "", "", 3)
 		showDiff(diff)
 
+		// Get purpose if provided
+		purpose, _ := (*argsMap)["purpose"].(string)
+		if purpose == "" {
+			purpose = fmt.Sprintf("edit the file at path: %s", path)
+		}
+
 		// Response with a prompt to let user confirm
-		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
 		closeDiff() // Close the diff
 		if err != nil {
 			return "", err
@@ -968,8 +871,14 @@ func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (stri
 	}
 
 	if needConfirm && !toolsUse.AutoApprove {
+		// Get purpose if provided
+		purpose, _ := (*argsMap)["purpose"].(string)
+		if purpose == "" {
+			purpose = fmt.Sprintf("copy the file or directory from %s to %s", source, destination)
+		}
+
 		// Directly prompt user for confirmation
-		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("copy the file or directory from %s to %s", source, destination), ToolUserConfirmPrompt, "")
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
 		if err != nil {
 			return "", err
 		}
@@ -1181,7 +1090,8 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse
 	}
 
 	if needConfirm && !toolsUse.AutoApprove {
-		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("switch to agent '%s'", name), ToolUserConfirmPrompt, "")
+		purpose := fmt.Sprintf("switch to agent '%s'", name)
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
 		if err != nil {
 			return "", err
 		}
@@ -1265,6 +1175,7 @@ func listAgentToolCallImpl() (string, error) {
 // Invokes one or more sub-agents and returns progress summary
 func spawnSubAgentsToolCallImpl(
 	argsMap *map[string]interface{},
+	toolsUse *ToolsUse,
 	executor *SubAgentExecutor,
 ) (string, error) {
 	if executor == nil {
@@ -1285,6 +1196,32 @@ func spawnSubAgentsToolCallImpl(
 	if timeoutVal, exists := (*argsMap)["timeout"]; exists {
 		if timeoutFloat, ok := timeoutVal.(float64); ok && timeoutFloat > 0 {
 			timeout = time.Duration(timeoutFloat) * time.Second
+		}
+	}
+
+	// Check if confirmation is needed
+	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
+	if !ok {
+		needConfirm = true // Default to true for safety
+	}
+
+	if needConfirm && !toolsUse.AutoApprove {
+		// Build brief description of tasks
+		var taskDesc strings.Builder
+		for i, task := range tasksInterface {
+			if i > 0 {
+				taskDesc.WriteString("\n")
+			}
+			if tm, ok := task.(map[string]interface{}); ok {
+				taskDesc.WriteString(fmt.Sprintf("- Task %d: %s (Agent: %s)", i+1, tm["task_key"], tm["agent"]))
+			}
+		}
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, taskDesc.String())
+		if err != nil {
+			return "", err
+		}
+		if !confirm {
+			return "Operation cancelled by user: spawn sub-agents", nil
 		}
 	}
 
@@ -1440,8 +1377,8 @@ func activateSkillToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsU
 
 	// Check if confirmation is needed (default logic: always confirm unless AutoApprove is true)
 	if !toolsUse.AutoApprove {
-		description := "Description:\n" + desc + "\n\nResources:\n" + tree
-		confirm, err := ui.NeedUserConfirm(fmt.Sprintf("activate skill '%s'", name), ToolUserConfirmPrompt, description)
+		description := "Activate Skill:\n" + name + "\n\nDescription:\n" + desc + "\n\nResources:\n" + tree
+		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, description)
 		if err != nil {
 			return "", err
 		}

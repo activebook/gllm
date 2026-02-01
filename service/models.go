@@ -74,8 +74,9 @@ var DefaultModelLimits = map[string]ModelLimits{
 	/*
 	 * Minimax Models
 	 */
-	"minimax-m2": {ContextWindow: 200000, MaxOutputTokens: 8192},
-	"minimax-m1": {ContextWindow: 1000000, MaxOutputTokens: 8192},
+	"minimax-m2.1": {ContextWindow: 200000, MaxOutputTokens: 16384},
+	"minimax-m2":   {ContextWindow: 200000, MaxOutputTokens: 16384},
+	"minimax-m1":   {ContextWindow: 1000000, MaxOutputTokens: 8192},
 
 	/*
 	 * Moonshot-Kimi Models
@@ -94,9 +95,10 @@ var DefaultModelLimits = map[string]ModelLimits{
 	/*
 	 * xAI Models
 	 */
-	"grok-code-fast-1": {ContextWindow: 256000, MaxOutputTokens: 8192},
-	"grok-4-1-fast":    {ContextWindow: 2000000, MaxOutputTokens: 8192},
-	"grok-4-fast":      {ContextWindow: 2000000, MaxOutputTokens: 8192},
+	"grok-code-fast-1": {ContextWindow: 256000, MaxOutputTokens: 10000},
+	"grok-4-1-fast":    {ContextWindow: 2000000, MaxOutputTokens: 30000},
+	"grok-4.1-fast":    {ContextWindow: 2000000, MaxOutputTokens: 30000},
+	"grok-4-fast":      {ContextWindow: 2000000, MaxOutputTokens: 30000},
 	"grok-4":           {ContextWindow: 256000, MaxOutputTokens: 8192},
 
 	/*
@@ -112,6 +114,7 @@ var DefaultModelLimits = map[string]ModelLimits{
 	/*
 	 * zAI Models
 	 */
+	"glm-4.7":     {ContextWindow: 200000, MaxOutputTokens: 16384},
 	"glm-4.6":     {ContextWindow: 200000, MaxOutputTokens: 16384},
 	"glm-4.5":     {ContextWindow: 131000, MaxOutputTokens: 16384},
 	"glm-4.5-air": {ContextWindow: 131000, MaxOutputTokens: 16384},

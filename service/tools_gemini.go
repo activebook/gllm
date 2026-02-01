@@ -151,7 +151,7 @@ func (ga *GeminiAgent) GeminiCreateDirectoryToolCall(call *genai.FunctionCall) (
 	}
 
 	// Call shared implementation
-	response, err := createDirectoryToolCallImpl(&argsMap)
+	response, err := createDirectoryToolCallImpl(&argsMap, &ga.ToolsUse)
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)
@@ -660,7 +660,7 @@ func (ga *GeminiAgent) GeminiSpawnSubAgentsToolCall(call *genai.FunctionCall) (*
 		argsMap[k] = v
 	}
 
-	response, err := spawnSubAgentsToolCallImpl(&argsMap, ga.executor)
+	response, err := spawnSubAgentsToolCallImpl(&argsMap, &ga.ToolsUse, ga.executor)
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)

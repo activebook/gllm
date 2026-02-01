@@ -25,11 +25,19 @@ type SearchSettings struct {
 	Allowed string `json:"allowed"` // The allowed search engine name (e.g., "google", "bing", "tavily")
 }
 
+// VerboseSettings holds verbosity-related settings.
+type VerboseSettings struct {
+	Enabled bool `json:"enabled"` // Whether verbose output is enabled
+}
+
 // Settings represents the structure of settings.json.
 type Settings struct {
-	MCP    MCPSettings    `json:"mcp"`
-	Skills SkillsSettings `json:"skills"`
-	Search SearchSettings `json:"search"`
+	MCP     MCPSettings     `json:"mcp"`
+	Skills  SkillsSettings  `json:"skills"`
+	Search  SearchSettings  `json:"search"`
+	Verbose VerboseSettings `json:"verbose"`
+	Theme   string          `json:"theme"`
+	Editor  string          `json:"editor"`
 }
 
 // SettingsStore provides access to settings.json.
@@ -67,6 +75,11 @@ func NewSettingsStore() *SettingsStore {
 			Search: SearchSettings{
 				Allowed: "", // Default to empty (use first configured engine)
 			},
+			Verbose: VerboseSettings{
+				Enabled: false, // Default to false (minimal output)
+			},
+			Theme:  "", // Default empty, will fall back to DefaultThemeName
+			Editor: "", // Default empty, will use auto-detection
 		},
 	}
 }
@@ -229,6 +242,51 @@ func (s *SettingsStore) GetAllowedSearchEngine() string {
 func (s *SettingsStore) SetAllowedSearchEngine(name string) error {
 	s.mu.Lock()
 	s.settings.Search.Allowed = name
+	s.mu.Unlock()
+	return s.Save()
+}
+
+// GetVerboseEnabled returns whether verbose mode is enabled.
+func (s *SettingsStore) GetVerboseEnabled() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.settings.Verbose.Enabled
+}
+
+// SetVerboseEnabled sets the verbose mode.
+func (s *SettingsStore) SetVerboseEnabled(enabled bool) error {
+	s.mu.Lock()
+	s.settings.Verbose.Enabled = enabled
+	s.mu.Unlock()
+	return s.Save()
+}
+
+// GetTheme returns the configured theme name.
+func (s *SettingsStore) GetTheme() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.settings.Theme
+}
+
+// SetTheme sets the configured theme name.
+func (s *SettingsStore) SetTheme(name string) error {
+	s.mu.Lock()
+	s.settings.Theme = name
+	s.mu.Unlock()
+	return s.Save()
+}
+
+// GetEditor returns the configured editor.
+func (s *SettingsStore) GetEditor() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.settings.Editor
+}
+
+// SetEditor sets the configured editor.
+func (s *SettingsStore) SetEditor(editor string) error {
+	s.mu.Lock()
+	s.settings.Editor = editor
 	s.mu.Unlock()
 	return s.Save()
 }

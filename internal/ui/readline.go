@@ -18,7 +18,7 @@ func NeedUserConfirm(info string, prompt string, description string) (bool, erro
 	var fields []huh.Field
 
 	description = strings.TrimSpace(description)
-	isLong := len(description) > 300
+	isLong := len(description) > 400
 
 	// If description is too long, use a Note before the Confirm field
 	if isLong {

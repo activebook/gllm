@@ -16,30 +16,8 @@ import (
 var editorCmd = &cobra.Command{
 	Use:   "editor [NAME]",
 	Short: "Manage preferred text editor for multi-line input",
-	Long: `Manage the preferred text editor used for multi-line input editing.
-This allows you to set, check, and list available text editors for use
-with the /editor command in chat sessions.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) == 0 {
-			editorListCmd.Run(cmd, args)
-			return
-		}
-
-		// Fallback for script compatibility
-		arg := args[0]
-		switch arg {
-		case "list", "ls", "pr":
-			editorListCmd.Run(cmd, args)
-		case "switch", "sw", "select", "sel":
-			// Handle error if switch fails
-			if err := editorSwitchCmd.RunE(cmd, args[1:]); err != nil {
-				fmt.Printf("Error switching editor: %v\n", err)
-			}
-		default:
-			if err := setPreferredEditor(arg); err != nil {
-				fmt.Printf("Error setting preferred editor: %v\n", err)
-			}
-		}
+		listAvailableEditors()
 	},
 }
 
@@ -50,7 +28,7 @@ var editorSwitchCmd = &cobra.Command{
 	Short:   "Switch to a different text editor",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name string
-		store := data.NewConfigStore()
+		store := data.GetSettingsStore()
 
 		if len(args) > 0 {
 			name = args[0]
@@ -90,26 +68,14 @@ var editorSwitchCmd = &cobra.Command{
 	},
 }
 
-// editorListCmd represents the editor list subcommand
-var editorListCmd = &cobra.Command{
-	Use:     "list",
-	Aliases: []string{"ls", "pr"},
-	Short:   "List all available text editors",
-	Long:    `List all available text editors on the system with their installation status.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		listAvailableEditors()
-	},
-}
-
 func init() {
-	rootCmd.AddCommand(editorCmd)
-	editorCmd.AddCommand(editorListCmd)
+	configCmd.AddCommand(editorCmd)
 	editorCmd.AddCommand(editorSwitchCmd)
 }
 
 // getPreferredEditor gets the user's preferred editor from config or detects it
 func getPreferredEditor() string {
-	store := data.NewConfigStore()
+	store := data.GetSettingsStore()
 
 	// Check config first
 	editor := store.GetEditor()
@@ -136,7 +102,7 @@ func getPreferredEditor() string {
 
 // setPreferredEditor sets the user's preferred editor in config
 func setPreferredEditor(editor string) error {
-	store := data.NewConfigStore()
+	store := data.GetSettingsStore()
 
 	// Check if editor exists
 	if _, err := exec.LookPath(editor); err != nil {
@@ -190,7 +156,7 @@ func listAvailableEditors() {
 	fmt.Println()
 
 	commonEditors := []string{"vim", "vi", "nvim", "neovim", "nano", "pico", "emacs", "emacsclient", "code", "code-insiders", "subl", "sublime_text", "atom", "gedit", "pluma", "kate", "kwrite", "notepad.exe", "notepad++", "textedit"}
-	store := data.NewConfigStore()
+	store := data.GetSettingsStore()
 	current := store.GetEditor()
 
 	for _, editor := range commonEditors {

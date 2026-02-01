@@ -1,13 +1,11 @@
 package service
 
 import (
-	"encoding/json"
 	"fmt"
-	"strings"
+	"math"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
-	"github.com/charmbracelet/lipgloss"
 )
 
 type StreamDataType int
@@ -51,16 +49,16 @@ type Agent struct {
 	MaxRecursions   int                 // Maximum number of recursions for model calls
 	Markdown        *Markdown           // Markdown renderer
 	TokenUsage      *TokenUsage         // Token usage metainfo
-	Std             *StdRenderer        // Standard renderer
-	OutputFile      *FileRenderer       // File renderer
+	Std             *ui.StdRenderer     // Standard renderer
+	OutputFile      *ui.FileRenderer    // File renderer
 	Status          StatusStack         // Stack to manage streaming status
 	Convo           ConversationManager // Conversation manager
-	Indicator       *ui.Indicator       // Indicator Spinner
 	LastWrittenData string              // Last written data
 
 	// Sub-agent orchestration
 	SharedState *data.SharedState // Shared state for inter-agent communication
 	AgentName   string            // Current agent name for metadata tracking
+	Verbose     bool              // Whether verbose output mode is enabled
 }
 
 func constructModelInfo(model *data.Model) *ModelInfo {
@@ -192,8 +190,18 @@ func CallAgent(op *AgentOptions) error {
 	// Set up code tool settings
 	exeCode := IsCodeExecutionEnabled()
 
+	// Get verbose setting
+	settingsStore := data.GetSettingsStore()
+	verboseMode := settingsStore.GetVerboseEnabled()
+
 	// Set up thinking level
 	thinkingLevel := ParseThinkingLevel(op.ThinkingLevel)
+
+	// Set max recursions to max int if negative
+	if op.MaxRecursions < 0 {
+		op.MaxRecursions = math.MaxInt
+	}
+	Debugf("Max session turns:%d\n", op.MaxRecursions)
 
 	// Create a channel to receive notifications
 	notifyCh := make(chan StreamNotify, 10) // Buffer to prevent blocking(used for status updates)
@@ -205,18 +213,16 @@ func CallAgent(op *AgentOptions) error {
 	activeDataCh := dataCh
 
 	// Only create StdRenderer if not in quiet mode
-	var indicator *ui.Indicator
-	var std *StdRenderer
+	var std *ui.StdRenderer
 	if !op.QuietMode {
-		std = NewStdRenderer()
-		indicator = ui.NewIndicator()
+		std = ui.NewStdRenderer()
 	}
 
 	// Need to output a file
-	var fileRenderer *FileRenderer
+	var fileRenderer *ui.FileRenderer
 	if op.OutputFile != "" {
 		var err error
-		fileRenderer, err = NewFileRenderer(op.OutputFile)
+		fileRenderer, err = ui.NewFileRenderer(op.OutputFile)
 		if err != nil {
 			err := fmt.Errorf("failed to create output file %s: %v", op.OutputFile, err)
 			return err
@@ -229,14 +235,14 @@ func CallAgent(op *AgentOptions) error {
 	if IsMCPServersEnabled(op.Capabilities) {
 		mc = GetMCPClient() // use the shared instance
 		if !op.QuietMode {
-			indicator.Start(ui.IndicatorLoadingMCP)
+			ui.GetIndicator().Start(ui.IndicatorLoadingMCP)
 		}
 		err := mc.Init(op.MCPConfig, MCPLoadOption{
 			LoadAll:   false,
 			LoadTools: true, // only load tools
 		}) // Load only allowed servers
 		if !op.QuietMode {
-			indicator.Stop()
+			ui.GetIndicator().Stop()
 		}
 		if err != nil {
 			return fmt.Errorf("failed to load MCPServers: %v", err)
@@ -323,9 +329,9 @@ func CallAgent(op *AgentOptions) error {
 		Std:           std,
 		OutputFile:    fileRenderer,
 		Status:        StatusStack{},
-		Indicator:     indicator,
 		SharedState:   op.SharedState,
 		AgentName:     op.AgentName,
+		Verbose:       verboseMode,
 	}
 
 	// Construct conversation manager
@@ -513,243 +519,5 @@ func CallAgent(op *AgentOptions) error {
 			//default:
 			// Dont' do it!!!
 		}
-	}
-}
-
-/*
-WriteText writes the given text to the Agent's Std, Markdown, and OutputFile writers if they are set.
-*/
-func (ag *Agent) WriteText(text string) {
-	if ag.Std != nil {
-		ag.Std.Writef("%s", text)
-		ag.LastWrittenData = text
-	}
-	if ag.Markdown != nil {
-		ag.Markdown.Writef("%s", text)
-	}
-	if ag.OutputFile != nil {
-		ag.OutputFile.Writef("%s", text)
-	}
-}
-
-/*
-StartReasoning notifies the user and logs to file that the agent has started thinking.
-It writes a status message to both Std and OutputFile if they are available.
-*/
-func (ag *Agent) StartReasoning() {
-	if ag.Std != nil {
-		ag.Std.Writeln(data.ReasoningActiveColor + "Thinking ↓")
-	}
-	if ag.OutputFile != nil {
-		ag.OutputFile.Writeln("Thinking ↓")
-	}
-}
-
-func (ag *Agent) CompleteReasoning() {
-	if ag.Std != nil {
-		ag.Std.Writeln(data.ResetSeq + data.ReasoningActiveColor + "✓" + data.ResetSeq)
-	}
-	if ag.OutputFile != nil {
-		ag.OutputFile.Writeln("✓")
-	}
-}
-
-/*
-WriteReasoning writes the provided reasoning text to both the standard output and an output file, applying specific formatting to each if they are available.
-*/
-func (ag *Agent) WriteReasoning(text string) {
-	if ag.Std != nil {
-		ag.Std.Writef("%s%s", data.ReasoningDoneColor, text)
-		ag.LastWrittenData = text
-	}
-	if ag.OutputFile != nil {
-		ag.OutputFile.Writef("%s", text)
-	}
-}
-
-func (ag *Agent) WriteMarkdown() {
-	// Render the markdown
-	if ag.Markdown != nil {
-		if ag.Std != nil {
-			ag.Markdown.Render(ag.Std)
-		}
-	}
-}
-
-func (ag *Agent) WriteUsage() {
-	// Render the token usage
-	if ag.TokenUsage != nil {
-		if ag.Std != nil {
-			ag.TokenUsage.Render(ag.Std)
-		}
-	}
-}
-
-func (ag *Agent) WriteDiffConfirm(text string) {
-	// Only write to stdout
-	if ag.Std != nil {
-		ag.Std.Writeln(text)
-	}
-}
-
-func (ag *Agent) WriteFunctionCall(text string) {
-	if ag.Std != nil {
-		// Attempt to parse text as JSON
-		// The text is expected to be in format "function_name(arguments)" or just raw text
-		// But in our new implementation, we will pass a JSON string: {"function": name, "args": args}
-
-		type ToolCallData struct {
-			Function string      `json:"function"`
-			Args     interface{} `json:"args"`
-		}
-
-		var toolData ToolCallData
-		err := json.Unmarshal([]byte(text), &toolData)
-
-		var output string
-		if err == nil {
-			// Make sure we have enough space for the border
-			tcol := ui.GetTerminalWidth() - 8
-
-			// Structured data available
-			// Use lipgloss to render
-			style := lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color(data.BorderHex)). // Tool Border
-				Padding(0, 1).
-				Margin(0, 0)
-
-			titleStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color(data.SectionHex)). // Tool Title
-				Bold(true)
-
-			argsStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color(data.DetailHex)).Width(tcol) // Tool Args
-
-			var content string
-
-			// For built-in tools, we have a map of args
-			// We will try to extract purpose/description and command separately
-			if argsMap, ok := toolData.Args.(map[string]interface{}); ok {
-				// 1. Identify Purpose
-				// MCP tool calls may not have purpose/description
-				var purposeVal string
-				if v, ok := argsMap["purpose"].(string); ok {
-					purposeVal = v
-				}
-
-				// 2. Identify Command (everything else)
-				var commandParts []string
-
-				// Then grab any args that look like command parts
-				// keep the k=v pairs format for command
-				for k, v := range argsMap {
-					if k == "purpose" {
-						continue
-					} else if k == "need_confirm" {
-						continue
-					}
-					var val string
-					switch v.(type) {
-					case map[string]interface{}, []interface{}, []map[string]interface{}:
-						// Pretty print complex types
-						bytes, _ := json.MarshalIndent(v, "      ", "  ")
-						val = fmt.Sprintf("%s = %s", k, string(bytes))
-					default:
-						// Simple types
-						val = fmt.Sprintf("%s = %v", k, v)
-					}
-					commandParts = append(commandParts, val)
-				}
-
-				commandVal := strings.Join(commandParts, "\n")
-
-				// Render logic
-				// Title (Function Name) -> Cyan Bold
-				// Command -> White (With keys)
-				// Purpose -> Gray, Dim, Wrapped
-
-				cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.LabelHex)).Width(tcol)      // Cmd Label
-				purposeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.DetailHex)).Width(tcol) // Cmd Purpose
-
-				var parts []string
-				parts = append(parts, titleStyle.Render(toolData.Function))
-
-				if commandVal != "" {
-					parts = append(parts, cmdStyle.Render(commandVal))
-				}
-
-				if purposeVal != "" {
-					parts = append(parts, purposeStyle.Render(purposeVal))
-				}
-
-				content = strings.Join(parts, "\n")
-			}
-
-			// Fallback if content is still empty
-			if content == "" {
-				// Convert Args back to string for display
-				var argsStr string
-				if s, ok := toolData.Args.(string); ok {
-					argsStr = s
-				} else {
-					bytes, _ := json.MarshalIndent(toolData.Args, "", "  ")
-					argsStr = string(bytes)
-				}
-				content = fmt.Sprintf("%s\n%s", titleStyle.Render(toolData.Function), argsStyle.Render(argsStr))
-			}
-
-			output = style.Render(content)
-		} else {
-			// Fallback to original text if not JSON
-			output = data.ToolCallColor + text + data.ResetSeq
-		}
-
-		ag.Std.Writeln(output)
-	}
-	if ag.OutputFile != nil {
-		ag.OutputFile.Writef("\n%s\n", text)
-	}
-}
-
-func (ag *Agent) WriteEnd() {
-	// Ensure output ends with a newline to prevent shell from displaying %
-	// the % character in shells like zsh when output doesn't end with newline
-	//if ag.Std != nil && ag.Markdown == nil && ag.TokenUsage == nil {
-	if ag.Std != nil {
-		if !EndWithNewline(ag.LastWrittenData) {
-			ag.Std.Writeln(data.ResetSeq)
-		}
-	}
-}
-
-func (ag *Agent) StartIndicator(text string) {
-	if ag.Indicator != nil {
-		ag.Indicator.Start(text)
-	}
-}
-
-func (ag *Agent) StopIndicator() {
-	if ag.Indicator != nil {
-		ag.Indicator.Stop()
-	}
-}
-
-func (ag *Agent) Error(text string) {
-	// ignore stdout, because CallAgent will return the error
-	// if ag.Std != nil {
-	// 	Errorf("Agent: %v\n", text)
-	// }
-	if ag.OutputFile != nil {
-		ag.OutputFile.Writef("\n%s\n", text)
-	}
-}
-
-func (ag *Agent) Warn(text string) {
-	if ag.Std != nil {
-		Warnf("%s", text)
-	}
-	if ag.OutputFile != nil {
-		ag.OutputFile.Writef("\n%s\n", text)
 	}
 }

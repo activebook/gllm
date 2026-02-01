@@ -11,14 +11,13 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(themeCmd)
+	configCmd.AddCommand(themeCmd)
 	themeCmd.AddCommand(themeSwitchCmd)
 }
 
 var themeCmd = &cobra.Command{
 	Use:   "theme",
 	Short: "Manage and switch themes",
-	Long:  "Manage and switch themes, you can use switch command to switch to a different theme.",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("\nCurrent Theme: %s%s%s\n\n", data.HighlightColor, data.CurrentThemeName, data.ResetSeq)
 
@@ -70,7 +69,7 @@ var themeSwitchCmd = &cobra.Command{
 	Use:     "switch [name]",
 	Aliases: []string{"sw"},
 	Short:   "Switch to a different theme",
-	Long:    "Switch to a different theme, you can use fuzzy search to find the theme you want to switch to.",
+	Long:    "Switch to a different theme. You can use fuzzy search to find the theme you want to switch to.",
 	Args:    cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		var name string

@@ -545,7 +545,7 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	}
 
 	var filteredArgs map[string]interface{}
-	if toolCall.Function.Name == "edit_file" || toolCall.Function.Name == "write_file" {
+	if toolCall.Function.Name == ToolEditFile || toolCall.Function.Name == ToolWriteFile {
 		// Don't show content(the modified content could be too long)
 		filteredArgs = FilterOpenToolArguments(argsMap, []string{"content", "edits"})
 	} else {
@@ -566,30 +566,30 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 
 	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
 	toolHandlers := map[string]func(*model.ToolCall, *map[string]interface{}) (*model.ChatCompletionMessage, error){
-		"shell":               c.op.OpenChatShellToolCall,
-		"web_fetch":           c.op.OpenChatWebFetchToolCall,
-		"web_search":          c.op.OpenChatWebSearchToolCall,
-		"read_file":           c.op.OpenChatReadFileToolCall,
-		"write_file":          c.op.OpenChatWriteFileToolCall,
-		"edit_file":           c.op.OpenChatEditFileToolCall,
-		"create_directory":    c.op.OpenChatCreateDirectoryToolCall,
-		"list_directory":      c.op.OpenChatListDirectoryToolCall,
-		"delete_file":         c.op.OpenChatDeleteFileToolCall,
-		"delete_directory":    c.op.OpenChatDeleteDirectoryToolCall,
-		"move":                c.op.OpenChatMoveToolCall,
-		"copy":                c.op.OpenChatCopyToolCall,
-		"search_files":        c.op.OpenChatSearchFilesToolCall,
-		"search_text_in_file": c.op.OpenChatSearchTextInFileToolCall,
-		"read_multiple_files": c.op.OpenChatReadMultipleFilesToolCall,
-		"list_memory":         c.op.OpenChatListMemoryToolCall,
-		"save_memory":         c.op.OpenChatSaveMemoryToolCall,
-		"switch_agent":        c.op.OpenChatSwitchAgentToolCall,
-		"list_agent":          c.op.OpenChatListAgentToolCall,
-		"spawn_subagents":     c.op.OpenChatSpawnSubAgentsToolCall,
-		"get_state":           c.op.OpenChatGetStateToolCall,
-		"set_state":           c.op.OpenChatSetStateToolCall,
-		"list_state":          c.op.OpenChatListStateToolCall,
-		"activate_skill":      c.op.OpenChatActivateSkillToolCall,
+		ToolShell:             c.op.OpenChatShellToolCall,
+		ToolWebFetch:          c.op.OpenChatWebFetchToolCall,
+		ToolWebSearch:         c.op.OpenChatWebSearchToolCall,
+		ToolReadFile:          c.op.OpenChatReadFileToolCall,
+		ToolWriteFile:         c.op.OpenChatWriteFileToolCall,
+		ToolEditFile:          c.op.OpenChatEditFileToolCall,
+		ToolCreateDirectory:   c.op.OpenChatCreateDirectoryToolCall,
+		ToolListDirectory:     c.op.OpenChatListDirectoryToolCall,
+		ToolDeleteFile:        c.op.OpenChatDeleteFileToolCall,
+		ToolDeleteDirectory:   c.op.OpenChatDeleteDirectoryToolCall,
+		ToolMove:              c.op.OpenChatMoveToolCall,
+		ToolCopy:              c.op.OpenChatCopyToolCall,
+		ToolSearchFiles:       c.op.OpenChatSearchFilesToolCall,
+		ToolSearchTextInFile:  c.op.OpenChatSearchTextInFileToolCall,
+		ToolReadMultipleFiles: c.op.OpenChatReadMultipleFilesToolCall,
+		ToolListMemory:        c.op.OpenChatListMemoryToolCall,
+		ToolSaveMemory:        c.op.OpenChatSaveMemoryToolCall,
+		ToolSwitchAgent:       c.op.OpenChatSwitchAgentToolCall,
+		ToolListAgent:         c.op.OpenChatListAgentToolCall,
+		ToolSpawnSubAgents:    c.op.OpenChatSpawnSubAgentsToolCall,
+		ToolGetState:          c.op.OpenChatGetStateToolCall,
+		ToolSetState:          c.op.OpenChatSetStateToolCall,
+		ToolListState:         c.op.OpenChatListStateToolCall,
+		ToolActivateSkill:     c.op.OpenChatActivateSkillToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {

@@ -409,7 +409,7 @@ func (a *Anthropic) processToolCall(toolCall anthropic.ToolUseBlockParam) (anthr
 	}
 
 	var filteredArgs map[string]interface{}
-	if toolCall.Name == "edit_file" || toolCall.Name == "write_file" {
+	if toolCall.Name == ToolEditFile || toolCall.Name == ToolWriteFile {
 		// Don't show content(the modified content could be too long)
 		filteredArgs = FilterOpenToolArguments(argsMap, []string{"content", "edits"})
 	} else {
@@ -429,30 +429,30 @@ func (a *Anthropic) processToolCall(toolCall anthropic.ToolUseBlockParam) (anthr
 
 	// Define tool handlers map
 	toolHandlers := map[string]func(anthropic.ToolUseBlockParam, *map[string]interface{}) (anthropic.MessageParam, error){
-		"shell":               a.op.AnthropicShellToolCall,
-		"web_fetch":           a.op.AnthropicWebFetchToolCall,
-		"web_search":          a.op.AnthropicWebSearchToolCall,
-		"read_file":           a.op.AnthropicReadFileToolCall,
-		"write_file":          a.op.AnthropicWriteFileToolCall,
-		"edit_file":           a.op.AnthropicEditFileToolCall,
-		"create_directory":    a.op.AnthropicCreateDirectoryToolCall,
-		"list_directory":      a.op.AnthropicListDirectoryToolCall,
-		"delete_file":         a.op.AnthropicDeleteFileToolCall,
-		"delete_directory":    a.op.AnthropicDeleteDirectoryToolCall,
-		"move":                a.op.AnthropicMoveToolCall,
-		"copy":                a.op.AnthropicCopyToolCall,
-		"search_files":        a.op.AnthropicSearchFilesToolCall,
-		"search_text_in_file": a.op.AnthropicSearchTextInFileToolCall,
-		"read_multiple_files": a.op.AnthropicReadMultipleFilesToolCall,
-		"list_memory":         a.op.AnthropicListMemoryToolCall,
-		"save_memory":         a.op.AnthropicSaveMemoryToolCall,
-		"switch_agent":        a.op.AnthropicSwitchAgentToolCall,
-		"list_agent":          a.op.AnthropicListAgentToolCall,
-		"spawn_subagents":     a.op.AnthropicSpawnSubAgentsToolCall,
-		"get_state":           a.op.AnthropicGetStateToolCall,
-		"set_state":           a.op.AnthropicSetStateToolCall,
-		"list_state":          a.op.AnthropicListStateToolCall,
-		"activate_skill":      a.op.AnthropicActivateSkillToolCall,
+		ToolShell:             a.op.AnthropicShellToolCall,
+		ToolWebFetch:          a.op.AnthropicWebFetchToolCall,
+		ToolWebSearch:         a.op.AnthropicWebSearchToolCall,
+		ToolReadFile:          a.op.AnthropicReadFileToolCall,
+		ToolWriteFile:         a.op.AnthropicWriteFileToolCall,
+		ToolEditFile:          a.op.AnthropicEditFileToolCall,
+		ToolCreateDirectory:   a.op.AnthropicCreateDirectoryToolCall,
+		ToolListDirectory:     a.op.AnthropicListDirectoryToolCall,
+		ToolDeleteFile:        a.op.AnthropicDeleteFileToolCall,
+		ToolDeleteDirectory:   a.op.AnthropicDeleteDirectoryToolCall,
+		ToolMove:              a.op.AnthropicMoveToolCall,
+		ToolCopy:              a.op.AnthropicCopyToolCall,
+		ToolSearchFiles:       a.op.AnthropicSearchFilesToolCall,
+		ToolSearchTextInFile:  a.op.AnthropicSearchTextInFileToolCall,
+		ToolReadMultipleFiles: a.op.AnthropicReadMultipleFilesToolCall,
+		ToolListMemory:        a.op.AnthropicListMemoryToolCall,
+		ToolSaveMemory:        a.op.AnthropicSaveMemoryToolCall,
+		ToolSwitchAgent:       a.op.AnthropicSwitchAgentToolCall,
+		ToolListAgent:         a.op.AnthropicListAgentToolCall,
+		ToolSpawnSubAgents:    a.op.AnthropicSpawnSubAgentsToolCall,
+		ToolGetState:          a.op.AnthropicGetStateToolCall,
+		ToolSetState:          a.op.AnthropicSetStateToolCall,
+		ToolListState:         a.op.AnthropicListStateToolCall,
+		ToolActivateSkill:     a.op.AnthropicActivateSkillToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Name]; ok {

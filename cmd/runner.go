@@ -54,8 +54,8 @@ func RunAgent(prompt string, files []*service.FileData, convoName string, yolo b
 	}
 
 	for {
-		// Create an indeterminate progress bar
-		indicator := ui.NewIndicator()
+		// Start indeterminate progress bar
+		ui.GetIndicator().Start("")
 
 		// Ensure Active Agent
 		agent, err := EnsureActiveAgent()
@@ -85,7 +85,7 @@ func RunAgent(prompt string, files []*service.FileData, convoName string, yolo b
 		}
 
 		// Stop indicator
-		indicator.Stop()
+		ui.GetIndicator().Stop()
 
 		// Prepare Agent Options
 		op := service.AgentOptions{

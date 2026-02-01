@@ -59,6 +59,11 @@ func RunInitWizard() error {
 		selectedThinkingLevel string
 	)
 
+	store := data.NewConfigStore()
+	if store.ConfigFileUsed() != "" {
+		fmt.Printf("Note: Updating existing configuration at %s\n\n", store.ConfigFileUsed())
+	}
+
 	// Group 1: Provider selection
 	err := huh.NewForm(
 		huh.NewGroup(
@@ -182,6 +187,30 @@ func RunInitWizard() error {
 		defaultProvider = service.ModelProviderOpenAICompatible
 	}
 
+	// Pre-populate with defaults or existing values
+	endpoint = defaultEndpoint
+	model = defaultModelName
+	if existing := store.GetAgent(agentName); existing != nil {
+		if existing.Model.Endpoint != "" {
+			endpoint = existing.Model.Endpoint
+		}
+		if existing.Model.Key != "" {
+			apiKey = existing.Model.Key
+		}
+		if existing.Model.Model != "" {
+			model = existing.Model.Model
+		}
+		if len(existing.Tools) > 0 {
+			selectedTools = existing.Tools
+		}
+		if existing.Think != "" {
+			selectedThinkingLevel = existing.Think
+		}
+		if len(existing.Capabilities) > 0 {
+			selectedFeatures = existing.Capabilities
+		}
+	}
+
 	// Features/Capabilities Group
 	msfeatures := huh.NewMultiSelect[string]().
 		Title("Agent Capabilities").
@@ -298,17 +327,25 @@ func RunInitWizard() error {
 	}
 
 	// Save Model via data layer
-	store := data.NewConfigStore()
 	if err := store.SetModel(newModel.Name, &newModel); err != nil {
 		return fmt.Errorf("failed to save model: %w", err)
 	}
 
 	// Setup agent config
-	agentConfig := &data.AgentConfig{
-		Model:        newModel,
-		Tools:        selectedTools,
-		Think:        selectedThinkingLevel,
-		Capabilities: selectedFeatures,
+	var agentConfig *data.AgentConfig
+	if existing := store.GetAgent(agentName); existing != nil {
+		agentConfig = existing
+		agentConfig.Model = newModel
+		agentConfig.Tools = selectedTools
+		agentConfig.Think = selectedThinkingLevel
+		agentConfig.Capabilities = selectedFeatures
+	} else {
+		agentConfig = &data.AgentConfig{
+			Model:        newModel,
+			Tools:        selectedTools,
+			Think:        selectedThinkingLevel,
+			Capabilities: selectedFeatures,
+		}
 	}
 
 	// Save Agent via data layer

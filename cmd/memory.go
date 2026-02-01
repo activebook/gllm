@@ -30,28 +30,9 @@ or use 'memory path' to see where the memory file is located.`,
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		// Show current memory status
-		store := data.NewMemoryStore()
-		memories, err := store.Load()
-		if err != nil {
-			service.Errorf("Error loading memory: %v\n", err)
-			return
-		}
-
 		fmt.Println(cmd.Long)
 		fmt.Println()
-		fmt.Printf("Saved memories: %s%s%s\n", data.SectionColor, fmt.Sprintf("%d", len(memories)), data.ResetSeq)
-
-		if len(memories) > 0 {
-			fmt.Println("\nRecent memories:")
-			// Show up to 3 recent memories
-			showCount := min(3, len(memories))
-			for i := 0; i < showCount; i++ {
-				fmt.Printf("  • %s%s%s\n", data.SwitchOnColor, memories[i], data.ResetSeq)
-			}
-			if len(memories) > 3 {
-				fmt.Printf("  ... and %d more (use 'gllm memory list' to see all)\n", len(memories)-3)
-			}
-		}
+		memoryListCmd.Run(cmd, args)
 	},
 }
 
@@ -80,12 +61,12 @@ Example:
 
 		verbose, _ := cmd.Flags().GetBool("verbose")
 
-		fmt.Printf("%s%s%s (%d items):\n", data.SectionColor, "Saved Memories", data.ResetSeq, len(memories))
+		fmt.Printf("%s%s%s (%d)\n", data.SectionColor, "Saved Memories", data.ResetSeq, len(memories))
 		fmt.Println()
 
 		for i, memory := range memories {
 			if verbose {
-				fmt.Printf("%d. %s%s%s\n", i+1, data.SwitchOnColor, memory, data.ResetSeq)
+				fmt.Printf("%d. %s%s%s\n", i+1, data.LabelColor, memory, data.ResetSeq)
 			} else {
 				// Truncate long memories for display
 				displayMemory := memory
@@ -94,7 +75,7 @@ Example:
 				} else {
 					displayMemory = memory
 				}
-				fmt.Printf("%d. %s%s%s\n", i+1, data.SwitchOnColor, displayMemory, data.ResetSeq)
+				fmt.Printf("%d. %s%s%s\n", i+1, data.LabelColor, displayMemory, data.ResetSeq)
 			}
 		}
 	},

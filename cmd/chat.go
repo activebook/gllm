@@ -31,8 +31,8 @@ have a continuous conversation with the model.`,
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Create an indeterminate progress bar
-		indicator := ui.NewIndicator()
+		// Start indeterminate progress bar
+		ui.GetIndicator().Start("")
 
 		var chatInfo *ChatInfo
 		store := data.NewConfigStore()
@@ -70,7 +70,7 @@ have a continuous conversation with the model.`,
 			QuitFlag: false,
 		}
 
-		indicator.Stop()
+		ui.GetIndicator().Stop()
 
 		// Start the REPL
 		chatInfo.startREPL()

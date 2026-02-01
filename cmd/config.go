@@ -15,12 +15,10 @@ import (
 // configCmd represents the base command when called without any subcommands
 var configCmd = &cobra.Command{
 	Use:     "config",
-	Aliases: []string{"cfg"}, // Optional alias
-	Short:   "Manage gllm configuration",
+	Aliases: []string{"cfg", "settings", "set"}, // Optional alias
+	Short:   "Manage gllm configuration/settings",
 	Long: `View and manage settings for gllm.
-
-Use subcommands to target specific configuration areas like models or prompts,
-or use 'config path' to see where the configuration file is located.`,
+use 'config path' to see where the settings file is located.`,
 	// Add completion support
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
@@ -61,7 +59,9 @@ var configPathCmd = &cobra.Command{
 
 // configExportCmd represents the config export command
 var configExportCmd = &cobra.Command{
-	Use: "export [file]",
+	Use:     "export [file]",
+	Aliases: []string{"exp", "e"},
+	Short:   "Export current configuration to a file or directory",
 	Long: `Export current configuration to a file or directory.
 
 If a directory is specified, the configuration will be exported as 'gllm.yaml' 
@@ -190,6 +190,4 @@ func init() {
 	configCmd.AddCommand(configPrintCmd)
 	configCmd.AddCommand(configExportCmd) // Register theconfig export command
 	configCmd.AddCommand(configImportCmd) // Register the config import command
-
-	// Add flags for other prompt commands if needed in the future
 }

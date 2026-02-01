@@ -5,12 +5,11 @@ import (
 	"sort"
 
 	"github.com/muesli/termenv"
-	"github.com/spf13/viper"
 	goghthemes "github.com/willyv3/gogh-themes"
 )
 
 const (
-	DefaultThemeName string = "Google Dark"
+	DefaultThemeName string = "Dracula"
 
 	// Formatting Utilities
 	BoldSeq      string = "\033[1m"
@@ -77,6 +76,14 @@ var (
 	DetailColor      string
 	ShellOutputColor string
 
+	// Diff Colors
+	DiffAddedColor     string
+	DiffRemovedColor   string
+	DiffHeaderColor    string
+	DiffSeparatorColor string
+	DiffAddedBgColor   string
+	DiffRemovedBgColor string
+
 	// Hex Codes (for lipgloss or other UI libs)
 	BorderHex  string
 	SectionHex string
@@ -129,6 +136,26 @@ func applyTheme(t goghthemes.Theme) {
 		}
 		c := p.Color(hex)
 		return fmt.Sprintf("%s%sm", termenv.CSI, c.Sequence(false))
+	}
+	toAnsiBg := func(hex string) string {
+		if hex == "" {
+			return ""
+		}
+		c := p.Color(hex)
+		return fmt.Sprintf("%s%sm", termenv.CSI, c.Sequence(true)) // true for background
+	}
+
+	// blend mixes two hex colors with a given ratio (0.0 to 1.0)
+	blend := func(hex1, hex2 string, ratio float64) string {
+		var r1, g1, b1, r2, g2, b2 int
+		fmt.Sscanf(hex1, "#%02x%02x%02x", &r1, &g1, &b1)
+		fmt.Sscanf(hex2, "#%02x%02x%02x", &r2, &g2, &b2)
+
+		r := int(float64(r1)*ratio + float64(r2)*(1-ratio))
+		g := int(float64(g1)*ratio + float64(g2)*(1-ratio))
+		b := int(float64(b1)*ratio + float64(b2)*(1-ratio))
+
+		return fmt.Sprintf("#%02x%02x%02x", r, g, b)
 	}
 
 	// 1. Roles
@@ -185,7 +212,17 @@ func applyTheme(t goghthemes.Theme) {
 	DetailColor = toAnsi(t.BrightBlack)
 	ShellOutputColor = toAnsi(t.BrightBlack)
 
-	// Hex Codes
+	// 7. Diff
+	DiffAddedColor = toAnsi(t.Green)
+	DiffRemovedColor = toAnsi(t.Red)
+	DiffHeaderColor = toAnsi(t.BrightCyan)
+	DiffSeparatorColor = toAnsi(t.BrightBlack)
+
+	// Use blending to create faint backgrounds (approx 15% opacity)
+	DiffAddedBgColor = toAnsiBg(blend(t.Green, t.Background, 0.15))
+	DiffRemovedBgColor = toAnsiBg(blend(t.Red, t.Background, 0.15))
+
+	// 8. Hex Codes
 	BorderHex = t.Foreground
 	SectionHex = t.BrightCyan
 	KeyHex = t.BrightMagenta
@@ -208,12 +245,12 @@ func ListThemes() []string {
 
 // SaveThemeConfig persists the theme selection to the configuration file.
 func SaveThemeConfig(name string) error {
-	viper.Set("theme", name)
-	// We assume viper has been initialized with a config file path elsewhere (in root.go)
-	return viper.WriteConfig()
+	store := GetSettingsStore()
+	return store.SetTheme(name)
 }
 
 // GetThemeFromConfig retrieves the configured theme name.
 func GetThemeFromConfig() string {
-	return viper.GetString("theme")
+	store := GetSettingsStore()
+	return store.GetTheme()
 }

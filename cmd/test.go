@@ -38,6 +38,8 @@ func runTests(testName string) {
 		// test.TestAnthropic()
 	case "home":
 		// test.TestHomeDirs()
+	case "spinner":
+		// test.TestSpinner()
 	case "all":
 		fmt.Println("Running all tests...")
 	default:
@@ -48,5 +50,5 @@ func runTests(testName string) {
 
 func init() {
 	// After testing, comment out this line, and all test package to prevent compile test package
-	// rootCmd.AddCommand(testCmd)
+	rootCmd.AddCommand(testCmd)
 }

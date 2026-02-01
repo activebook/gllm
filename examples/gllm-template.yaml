@@ -1,6 +1,6 @@
 agent:
     markdown: true
-    max_recursions: 10
+    max_recursions: 50
     model: qwen-v31
     search: ""
     think: false

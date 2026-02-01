@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/fatih/color"
+	"github.com/activebook/gllm/data"
 	"github.com/pmezard/go-difflib/difflib"
 )
 
@@ -13,26 +13,10 @@ func Diff(content1, content2, file1, file2 string, contextLines int) string {
 	// Colors
 	var red, green, cyan, dim func(string) string
 
-	if TerminalSupportsTrueColor() {
-		// True color: use slim background colors like VSCode
-
-		// Slight darker
-		// red = func(s string) string { return color.BgRGB(60, 20, 20).Sprint(s) }
-		// green = func(s string) string { return color.BgRGB(20, 60, 20).Sprint(s) }
-
-		// Slight lighter
-		red = func(s string) string { return color.BgRGB(75, 24, 24).Sprint(s) }
-		green = func(s string) string { return color.BgRGB(27, 75, 27).Sprint(s) }
-
-		cyan = func(s string) string { return color.New(color.FgCyan, color.Bold).Sprint(s) }
-		dim = func(s string) string { return color.New(color.Faint).Sprint(s) }
-	} else {
-		// 256-color fallback: use text colors
-		red = func(s string) string { return color.New(color.FgRed).Sprint(s) }
-		green = func(s string) string { return color.New(color.FgGreen).Sprint(s) }
-		cyan = func(s string) string { return color.New(color.FgCyan, color.Bold).Sprint(s) }
-		dim = func(s string) string { return color.New(color.Faint).Sprint(s) }
-	}
+	red = func(s string) string { return data.DiffRemovedBgColor + data.DiffRemovedColor + s + data.ResetSeq }
+	green = func(s string) string { return data.DiffAddedBgColor + data.DiffAddedColor + s + data.ResetSeq }
+	cyan = func(s string) string { return data.DiffHeaderColor + s + data.ResetSeq }
+	dim = func(s string) string { return data.DiffSeparatorColor + s + data.ResetSeq }
 
 	diff := difflib.UnifiedDiff{
 		A:        difflib.SplitLines(content1),
