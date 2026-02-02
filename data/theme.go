@@ -85,12 +85,13 @@ var (
 	DiffRemovedBgColor string
 
 	// Hex Codes (for lipgloss or other UI libs)
-	BorderHex  string
-	SectionHex string
-	KeyHex     string
-	LabelHex   string
-	DetailHex  string
-	SpinnerHex string
+	BorderHex     string
+	SectionHex    string
+	KeyHex        string
+	LabelHex      string
+	DetailHex     string
+	SpinnerHex    string
+	BackgroundHex string
 
 	HighCachedHex string
 	MedCachedHex  string
@@ -229,6 +230,7 @@ func applyTheme(t goghthemes.Theme) {
 	LabelHex = t.Foreground
 	DetailHex = t.BrightBlack
 	SpinnerHex = t.BrightMagenta
+	BackgroundHex = t.Background
 
 	HighCachedHex = t.Green
 	MedCachedHex = t.Yellow

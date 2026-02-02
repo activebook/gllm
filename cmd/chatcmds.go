@@ -162,18 +162,7 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		runCommand(themeCmd, parts[1:])
 
 	case "/verbose":
-		settings := data.GetSettingsStore()
-		current := settings.GetVerboseEnabled()
-		err := settings.SetVerboseEnabled(!current)
-		if err != nil {
-			fmt.Printf("Failed to toggle verbose mode: %v\n", err)
-		} else {
-			status := "enabled"
-			if !current {
-				status = "disabled"
-			}
-			fmt.Printf("Verbose mode: %s\n", status)
-		}
+		runCommand(verboseCmd, parts[1:])
 
 	default:
 		fmt.Printf("Unknown command: %s\n", command)

@@ -148,7 +148,8 @@ func (ci *ChatInfo) printWelcome() {
 	fmt.Println()
 }
 
-func (ci *ChatInfo) awaitChat() (string, error) {
+// This is the legacy awaitChat function, which uses huh, don't support auto-complete
+func (ci *ChatInfo) awaitChat_legacy() (string, error) {
 	var input string
 
 	form := huh.NewForm(
@@ -165,6 +166,31 @@ func (ci *ChatInfo) awaitChat() (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(input), nil
+}
+
+// This is the new awaitChat function, which uses bubbletea, support auto-complete
+func (ci *ChatInfo) awaitChat() (string, error) {
+	commands := []string{
+		"/exit", "/quit", "/help", "/?", "/history", "/h",
+		"/clear", "/reset", "/model", "/m", "/agent", "/g",
+		"/template", "/p", "/system", "/S", "/search", "/s",
+		"/tools", "/t", "/mcp", "/skills", "/memory", "/r",
+		"/yolo", "/y", "/convo", "/c", "/think", "/T",
+		"/features", "/f", "/capabilities", "/caps",
+		"/editor", "/e", "/attach", "/a", "/detach", "/d",
+		"/info", "/i", "/theme", "/verbose",
+	}
+	// TODO: Load dynamic workflow commands from user directory and append to commands list
+
+	result, err := ui.RunChatInput(commands, ci.EditorInput)
+	if err != nil {
+		return "", err
+	}
+	if result.Canceled {
+		return "", fmt.Errorf("user canceled")
+	}
+
+	return result.Value, nil
 }
 
 func (ci *ChatInfo) startREPL() {
