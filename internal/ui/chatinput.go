@@ -29,23 +29,29 @@ type ChatInputResult struct {
 	Canceled bool
 }
 
+// Suggestion represents a suggestion item
+type Suggestion struct {
+	Command     string
+	Description string
+}
+
 // ChatInputModel is the Bubble Tea model for the chat input with autocomplete
 type ChatInputModel struct {
 	textarea         textarea.Model
-	allCommands      []string // all /commands
-	filteredCommands []string // filtered /commands and file paths
-	suggestionIndex  int      // index of the current suggestion
-	showSuggestions  bool     // whether suggestions are shown
-	width            int      // terminal width
-	height           int      // terminal height
-	canceled         bool     // whether the input was canceled
-	submitted        bool     // whether the input was submitted
-	suggestionType   int      // type of suggestion
-	suggestionStart  int      // start index of the suggestion(cursor position)
+	allCommands      []Suggestion // all /commands
+	filteredCommands []Suggestion // filtered /commands and file paths
+	suggestionIndex  int          // index of the current suggestion
+	showSuggestions  bool         // whether suggestions are shown
+	width            int          // terminal width
+	height           int          // terminal height
+	canceled         bool         // whether the input was canceled
+	submitted        bool         // whether the input was submitted
+	suggestionType   int          // type of suggestion
+	suggestionStart  int          // start index of the suggestion(cursor position)
 }
 
 // NewChatInputModel creates a new chat input model
-func NewChatInputModel(commands []string, initialValue string) ChatInputModel {
+func NewChatInputModel(commands []Suggestion, initialValue string) ChatInputModel {
 	ta := textarea.New()
 	ta.KeyMap.InsertNewline = GetNewLineKeyBinding()
 	ta.Placeholder = "Type your message... (Use / for commands, @ for files, Enter to send)"
@@ -102,6 +108,10 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyCtrlC:
 			m.canceled = true
 			return m, tea.Quit
+
+		case tea.KeyCtrlD:
+			m.textarea.SetValue("")
+			return m, nil
 
 		case tea.KeyEnter:
 			// If suggestions are shown, select the command
@@ -178,13 +188,16 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// substring* as glob pattern
 		pattern := wordSoFar[1:]
 		matches := getFileSuggestions(pattern)
-		m.filteredCommands = matches
+		m.filteredCommands = []Suggestion{}
+		for _, match := range matches {
+			m.filteredCommands = append(m.filteredCommands, Suggestion{Command: match})
+		}
 
 		// Show suggestions if there are any
-		if len(matches) > 0 {
+		if len(m.filteredCommands) > 0 {
 			m.showSuggestions = true
 			// Check whether last suggestion index is valid
-			if m.suggestionIndex >= len(matches) {
+			if m.suggestionIndex >= len(m.filteredCommands) {
 				m.suggestionIndex = 0
 			}
 		}
@@ -194,14 +207,14 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.suggestionStart = 0
 
 		// Filter commands
-		var matches []string
+		var matches []Suggestion
 		for _, c := range m.allCommands {
-			if strings.HasPrefix(c, wordSoFar) {
+			if strings.HasPrefix(c.Command, wordSoFar) {
 				matches = append(matches, c)
 			}
 		}
 
-		if len(matches) == 1 && matches[0] == wordSoFar {
+		if len(matches) == 1 && matches[0].Command == wordSoFar {
 			// Only one match, no need to show suggestions
 			m.showSuggestions = false
 		} else if len(matches) > 0 {
@@ -226,7 +239,7 @@ func (m *ChatInputModel) selectSuggestion() {
 		return
 	}
 
-	selected := m.filteredCommands[m.suggestionIndex]
+	selected := m.filteredCommands[m.suggestionIndex].Command
 	val := m.textarea.Value()
 	cursor := getCursorIndex(m.textarea)
 
@@ -347,6 +360,7 @@ func (m ChatInputModel) View() string {
 	style := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(data.BorderHex)).
+		Width(GetTerminalWidth()-2).
 		Padding(0, 1)
 
 	var listItems []string
@@ -367,19 +381,38 @@ func (m ChatInputModel) View() string {
 		}
 	}
 
+	// Calculate max width for alignment
+	maxLen := 0
+	for i := start; i < end; i++ {
+		if len(m.filteredCommands[i].Command) > maxLen {
+			maxLen = len(m.filteredCommands[i].Command)
+		}
+	}
+
 	// Render suggestions one by one, highlight the selected one
 	for i := start; i < end; i++ {
-		cmd := m.filteredCommands[i]
-		itemStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.DetailHex))
+		s := m.filteredCommands[i]
+
+		// Base styles
+		textStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.DetailHex))
+		descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.DetailHex)).Faint(true)
 		prefix := "  "
 
+		// Selected styles
 		if i == m.suggestionIndex {
-			itemStyle = lipgloss.NewStyle().
+			textStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color(data.KeyHex)).
 				Bold(true)
+			descStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color(data.LabelHex)) // Brighter description when selected
 			prefix = "> "
 		}
-		listItems = append(listItems, itemStyle.Render(fmt.Sprintf("%s%s", prefix, cmd)))
+
+		// Pad the command text
+		paddedText := fmt.Sprintf("%-*s", maxLen, s.Command)
+
+		line := fmt.Sprintf("%s%s   %s", prefix, textStyle.Render(paddedText), descStyle.Render(s.Description))
+		listItems = append(listItems, line)
 	}
 
 	suggestionsView := style.Render(strings.Join(listItems, "\n"))
@@ -389,7 +422,7 @@ func (m ChatInputModel) View() string {
 }
 
 // RunChatInput runs the chat input program
-func RunChatInput(commands []string, initialValue string) (ChatInputResult, error) {
+func RunChatInput(commands []Suggestion, initialValue string) (ChatInputResult, error) {
 	model := NewChatInputModel(commands, initialValue)
 	p := tea.NewProgram(model)
 

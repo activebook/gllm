@@ -4,12 +4,52 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"sync"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+)
+
+var (
+	chatCommandMap = map[string]string{
+		"/exit":     "Exit the chat session",
+		"/quit":     "Exit the chat session",
+		"/help":     "Show this help message",
+		"/history":  "Show recent conversation history",
+		"/clear":    "Clear conversation history",
+		"/reset":    "Clear conversation history",
+		"/model":    "Manage models (list, switch, add, etc.)",
+		"/agent":    "Manage agents (list, switch, add, etc.)",
+		"/template": "Manage templates (list, switch, add, etc.)",
+		"/system":   "Manage system prompts (list, switch, add, etc.)",
+		"/search":   "Manage search engines (list, switch, etc.)",
+		"/tools":    "Switch embedding tools",
+		"/mcp":      "Manage MCP servers (list, switch, etc.)",
+		"/skills":   "Manage agent skills (list, switch, install, etc.)",
+		"/memory":   "Manage memory (list, add, clear)",
+		"/yolo":     "Toggle YOLO mode",
+		"/convo":    "Manage conversations (list, info, remove, etc.)",
+		"/think":    "Set thinking level",
+		"/features": "Switch agent features",
+		"/editor":   "Manage editor or open for multi-line input",
+		"/attach":   "Attach a file",
+		"/detach":   "Detach a file",
+		"/info":     "Show current settings",
+		"/theme":    "Manage and switch themes",
+		"/verbose":  "Toggle verbose mode",
+	}
+
+	chatSpecMap = map[string]string{
+		"@path":  "Reference to files and folders",
+		"!bash":  "Execute local shell commands",
+		"Ctrl+C": "Cancel current generation or exit session",
+		"Ctrl+D": "Delete all input",
+	}
 )
 
 // contains checks if a slice contains a string
@@ -171,32 +211,55 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 
 // showHelp displays available chat commands
 func (ci *ChatInfo) showHelp() {
-	fmt.Println("Available commands:")
-	fmt.Println("  /exit, /quit - Exit the chat session")
-	fmt.Println("  /clear, /reset - Clear conversation history")
-	fmt.Println("  /help - Show this help message")
-	fmt.Println("  /info - Show current settings")
-	fmt.Println("  /history - Show recent conversation history")
-	fmt.Println("  /model [subcmd] - Manage models (list, switch, add, etc.)")
-	fmt.Println("  /agent [subcmd] - Manage agents (list, switch, add, etc.)")
-	fmt.Println("  /template [subcmd] - Manage templates (list, switch, add, etc.)")
-	fmt.Println("  /system [subcmd] - Manage system prompts (list, switch, add, etc.)")
-	fmt.Println("  /search [subcmd] - Manage search engines (list, switch, etc.)")
-	fmt.Println("  /memory [subcmd] - Manage memory (list, add, clear)")
-	fmt.Println("  /think [off|low|medium|high|sw] - Set thinking level (sw for interactive)")
-	fmt.Println("  /tools [switch] - Switch embedding tools")
-	fmt.Println("  /mcp [subcmd] - Manage MCP servers (list, switch, etc.)")
-	fmt.Println("  /skills [subcmd] - Manage agent skills (list, switch, install, etc.)")
-	fmt.Println("  /features [switch] - Switch agent features and capabilities (usage, markdown, etc.)")
-	fmt.Println("  /yolo - Toggle YOLO mode (non-interactive tool execution)")
-	fmt.Println("  /convo [subcmd] - Manage conversations (list, info, remove, etc.)")
-	fmt.Println("  /editor [subcmd] - Manage editor or open for multi-line input")
-	fmt.Println("  /attach <file> - Attach a file")
-	fmt.Println("  /detach <file|all> - Detach a file")
-	fmt.Println("  /theme [subcmd] - Manage and switch themes")
-	fmt.Println("  /verbose [switch] - Toggle verbose mode")
-	fmt.Println("  /@ [path] - Reference a file or directory")
-	fmt.Println("  !<command> - Execute a shell command")
+	// Extract keys into a slice
+	commands := make([]string, 0, len(chatCommandMap)+len(chatSpecMap))
+	for cmd := range chatCommandMap {
+		commands = append(commands, cmd)
+	}
+	for cmd := range chatSpecMap {
+		commands = append(commands, cmd)
+	}
+
+	// Sort the keys
+	sort.Strings(commands)
+
+	style := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(data.BorderHex)).
+		Width(ui.GetTerminalWidth()-2).
+		Padding(0, 1)
+
+	var listItems []string
+
+	// Calculate max width for alignment
+	maxLen := 0
+	for _, cmd := range commands {
+		if len(cmd) > maxLen {
+			maxLen = len(cmd)
+		}
+	}
+
+	// Render suggestions one by one, highlight the selected one
+	for _, cmd := range commands {
+		// Base styles
+		textStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.LabelHex))
+		descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.LabelHex)).Faint(true)
+
+		// Pad the command text
+		paddedText := fmt.Sprintf("%-*s", maxLen, cmd)
+
+		// Get description
+		desc := chatCommandMap[cmd]
+		if desc == "" {
+			desc = chatSpecMap[cmd]
+		}
+
+		line := fmt.Sprintf("%s   %s", textStyle.Render(paddedText), descStyle.Render(desc))
+		listItems = append(listItems, line)
+	}
+
+	suggestionsView := style.Render(strings.Join(listItems, "\n"))
+	fmt.Println(suggestionsView)
 }
 
 // showInfo displays current chat settings and information

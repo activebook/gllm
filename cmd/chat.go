@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/activebook/gllm/service"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
+
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
@@ -109,31 +111,38 @@ func (ci *ChatInfo) printWelcome() {
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color(data.KeyHex)).
+		Width(ui.GetTerminalWidth()-4).
+		Align(lipgloss.Center).
 		MarginTop(1).
 		MarginBottom(1).
 		Padding(0, 0)
 
 	contentStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(data.LabelHex)).
+		Width(ui.GetTerminalWidth()-4).
+		Align(lipgloss.Left).
 		Padding(0, 2)
 
 	hintStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(data.DetailHex)).
+		Width(ui.GetTerminalWidth() - 4).
+		Align(lipgloss.Center).
 		Italic(true)
 
 	borderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(data.BorderHex)).
+		Width(ui.GetTerminalWidth()-4).
+		Margin(0, 1).
 		Padding(1)
 
 	welcomeText := "Welcome to GLLM Interactive Chat"
 	instructions := []string{
-		"• Type '/exit' or '/quit' to end the session",
-		"• Type '/help' for a list of available commands",
-		"• Use '/' for commands",
-		"• Use '!' for local shell commands",
-		"• Use '@' for files and folders",
-		"• Use Ctrl+C to exit at any time",
+		"• '/help' lists all available commands",
+		"• '/exit', '/quit' to end current chat session",
+		"• Ctrl+C to cancel, Ctrl+D to clear the input",
+		"• '/' for commands, '!' for local shell commands",
+		"• '@' for files and folders",
 	}
 
 	header := headerStyle.Render(welcomeText)
@@ -172,17 +181,15 @@ func (ci *ChatInfo) awaitChat_legacy() (string, error) {
 
 // This is the new awaitChat function, which uses bubbletea, support auto-complete
 func (ci *ChatInfo) awaitChat() (string, error) {
-	commands := []string{
-		"/exit", "/quit", "/help", "/history",
-		"/clear", "/reset", "/model", "/agent",
-		"/template", "/system", "/search",
-		"/tools", "/mcp", "/skills", "/memory",
-		"/yolo", "/convo", "/think",
-		"/features", "/capabilities",
-		"/editor", "/attach", "/detach",
-		"/info", "/theme", "/verbose",
+	var commands []ui.Suggestion
+	for cmd, desc := range chatCommandMap {
+		commands = append(commands, ui.Suggestion{Command: cmd, Description: desc})
 	}
-	// TODO: Load dynamic workflow commands from user directory and append to commands list
+
+	// Sort commands by text
+	sort.Slice(commands, func(i, j int) bool {
+		return commands[i].Command < commands[j].Command
+	})
 
 	result, err := ui.RunChatInput(commands, ci.EditorInput)
 	if err != nil {
