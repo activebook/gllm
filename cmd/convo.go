@@ -52,7 +52,7 @@ var convoListCmd = &cobra.Command{
 			return nil
 		}
 
-		convos, err := service.ListSortedConvos(convoDir)
+		convos, err := service.ListSortedConvos(convoDir, false, true)
 		if err != nil {
 			fmt.Println(err)
 			return nil
@@ -98,7 +98,7 @@ gllm convo remove "2 - 5" --force`,
 			pattern = args[0]
 		} else {
 			// Select conversations to remove
-			convos, err := service.ListSortedConvos(convoDir)
+			convos, err := service.ListSortedConvos(convoDir, false, true)
 			if err != nil || len(convos) == 0 {
 				fmt.Println("No conversations found.")
 				return nil
@@ -169,7 +169,7 @@ gllm convo remove "2 - 5" --force`,
 			end, err2 := strconv.Atoi(rangeParts[1])
 
 			if err1 == nil && err2 == nil {
-				convos, err := service.ListSortedConvos(convoDir)
+				convos, err := service.ListSortedConvos(convoDir, false, true)
 				if err != nil {
 					fmt.Println(err)
 					return nil
@@ -245,7 +245,7 @@ func handleAsPattern(pattern string, convoDir string) []string {
 	// Try to parse as index
 	index, err := strconv.Atoi(pattern)
 	if err == nil {
-		convos, err := service.ListSortedConvos(convoDir)
+		convos, err := service.ListSortedConvos(convoDir, false, true)
 		if err != nil {
 			fmt.Println(err)
 			return matches
@@ -341,7 +341,7 @@ Using the --message-chars (-c) flag, set the maximum length of each message's co
 			convoName = args[0]
 		} else {
 			// Select conversation
-			convos, err := service.ListSortedConvos(convoDir)
+			convos, err := service.ListSortedConvos(convoDir, false, true)
 			if err != nil || len(convos) == 0 {
 				fmt.Println("No conversations found.")
 				return nil
@@ -373,7 +373,7 @@ Using the --message-chars (-c) flag, set the maximum length of each message's co
 		// If convoName is a number, treat it as an index
 		index, err := strconv.Atoi(convoName)
 		if err == nil {
-			convos, err := service.ListSortedConvos(convoDir)
+			convos, err := service.ListSortedConvos(convoDir, false, true)
 			if err != nil {
 				fmt.Println(err)
 				return nil
@@ -451,7 +451,7 @@ var convoRenameCmd = &cobra.Command{
 			newName = args[1]
 		} else {
 			// Select conversation to rename
-			convos, err := service.ListSortedConvos(convoDir)
+			convos, err := service.ListSortedConvos(convoDir, false, true)
 			if err != nil || len(convos) == 0 {
 				fmt.Println("No conversations found.")
 				return nil
@@ -503,7 +503,7 @@ var convoRenameCmd = &cobra.Command{
 		// If oldName is a number, treat it as an index
 		index, err := strconv.Atoi(oldName)
 		if err == nil {
-			convos, err := service.ListSortedConvos(convoDir)
+			convos, err := service.ListSortedConvos(convoDir, false, true)
 			if err != nil {
 				fmt.Println(err)
 				return nil

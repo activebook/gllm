@@ -73,6 +73,12 @@ func (g *GeminiConversation) Load() error {
 		return err
 	}
 
+	// Handle empty files
+	if len(data) == 0 {
+		g.Messages = []*genai.Content{}
+		return nil
+	}
+
 	err = json.Unmarshal(data, &g.Messages)
 	if err != nil {
 		return fmt.Errorf("failed to deserialize conversation: %w", err)

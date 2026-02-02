@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"sort"
@@ -35,6 +36,9 @@ have a continuous conversation with the model.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Start indeterminate progress bar
 		ui.GetIndicator().Start("")
+
+		// Clear empty conversations in background
+		// service.ClearEmptyConvosAsync()
 
 		var chatInfo *ChatInfo
 		store := data.NewConfigStore()
@@ -317,6 +321,10 @@ func (ci *ChatInfo) showHistory() {
 	// Get conversation data
 	convoData, convoName, err := GetConvoData(convoName, agent.Model.Provider)
 	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("No available conversation yet.")
+			return
+		}
 		service.Errorf("%v", err)
 		return
 	}

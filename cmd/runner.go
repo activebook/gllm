@@ -214,8 +214,7 @@ func EnsureConversationCompatibility(agent *data.AgentConfig, convoName string) 
 	convoData, _, err := GetConvoData(convoName, agent.Model.Provider)
 	if err != nil {
 		// If conversation doesn't exist, that's fine, nothing to check/convert
-		// We should differentiate "not found" from other errors
-		if strings.Contains(err.Error(), "not found") {
+		if os.IsNotExist(err) {
 			return nil
 		}
 		return err
@@ -251,7 +250,7 @@ func GetConvoData(convoName string, provider string) (data []byte, name string, 
 
 	convoPath := cm.GetPath()
 	if _, err := os.Stat(convoPath); os.IsNotExist(err) {
-		return nil, "", fmt.Errorf("conversation '%s' not found", convoPath)
+		return nil, "", err
 	}
 
 	data, err = os.ReadFile(convoPath)

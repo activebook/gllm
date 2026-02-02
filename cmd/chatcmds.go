@@ -22,7 +22,6 @@ var (
 		"/help":     "Show this help message",
 		"/history":  "Show recent conversation history",
 		"/clear":    "Clear conversation history",
-		"/reset":    "Clear conversation history",
 		"/model":    "Manage models (list, switch, add, etc.)",
 		"/agent":    "Manage agents (list, switch, add, etc.)",
 		"/template": "Manage templates (list, switch, add, etc.)",
@@ -132,7 +131,7 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		// We could implement "--raw" here later
 		ci.showHistory()
 
-	case "/clear", "/reset":
+	case "/clear":
 		ci.clearContext()
 
 	case "/model":
