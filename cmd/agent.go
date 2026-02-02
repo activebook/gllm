@@ -681,10 +681,12 @@ tools, search settings, and other preferences to match the selected agent.`,
 			}
 			// Sort names alphabetically and keep selected agent at top if exists
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent").
 				Options(options...).
+				Height(height).
 				Value(&name).
 				Run()
 

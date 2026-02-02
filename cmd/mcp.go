@@ -318,10 +318,12 @@ var mcpSwitchCmd = &cobra.Command{
 
 		// Sort options by name alphabetically and keep selected ones at top
 		ui.SortMultiOptions(options, selected)
+		height := ui.GetTermFitHeight(len(options))
 
 		err = huh.NewMultiSelect[string]().
 			Title("Select MCP servers to allow").
 			Description("Use space to toggle, enter to confirm.").
+			Height(height).
 			Options(options...).
 			Value(&selected).
 			Run()

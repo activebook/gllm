@@ -377,9 +377,11 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 				options = append(options, huh.NewOption(m, m))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Edit").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -558,9 +560,11 @@ var modelInfoCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Check").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -629,9 +633,11 @@ gllm model remove gpt4 --force`,
 				options = append(options, huh.NewOption(m, m))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Remove").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -747,10 +753,11 @@ to the specified one for all subsequent operations.`,
 				options = append(options, huh.NewOption(m, m))
 			}
 			ui.SortOptions(options, name)
-
+			height := ui.GetTermFitHeight(len(options))
 			err := huh.NewSelect[string]().
 				Title("Select Model").
 				Options(options...).
+				Height(height).
 				Value(&name).
 				Run()
 			if err != nil {

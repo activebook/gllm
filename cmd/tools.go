@@ -84,6 +84,7 @@ var toolsSwCmd = &cobra.Command{
 		}
 		// Sort: selected items first, then alphabetically within each group
 		ui.SortMultiOptions(options, enabledTools)
+		height := ui.GetTermFitHeight(len(options))
 
 		var selectedTools []string
 		err := huh.NewForm(
@@ -94,7 +95,7 @@ var toolsSwCmd = &cobra.Command{
 					Options(options...).
 					Value(&selectedTools),
 				ui.GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
-			),
+			).WithHeight(height),
 		).Run()
 
 		if err != nil {

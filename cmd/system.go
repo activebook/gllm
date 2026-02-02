@@ -193,9 +193,11 @@ Example:
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select System Prompt to Edit").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -259,9 +261,11 @@ var systemInfoCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select System Prompt to Check").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -306,9 +310,11 @@ var systemRemoveCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select System Prompt to Remove").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -395,12 +401,14 @@ var systemSwitchCmd = &cobra.Command{
 			}
 
 			ui.SortOptions(options, currentName)
+			height := ui.GetTermFitHeight(len(options))
 
 			name = currentName // Pre-fill with current
 
 			err := huh.NewSelect[string]().
 				Title("Select System Prompt").
 				Options(options...).
+				Height(height).
 				Value(&name).
 				Run()
 			if err != nil {

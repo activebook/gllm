@@ -316,11 +316,13 @@ var skillsSwCmd = &cobra.Command{
 		}
 
 		ui.SortMultiOptions(options, enabledSkills)
+		height := ui.GetTermFitHeight(len(options))
 
 		var selectedSkills []string
 		multiSelect := huh.NewMultiSelect[string]().
 			Title("Select Skills").
 			Description("Choose which skills to enable. Press space to toggle, enter to confirm.").
+			Height(height).
 			Options(options...).
 			Value(&selectedSkills)
 		note := ui.GetDynamicHuhNote("Skill Description", multiSelect, func(name string) string {

@@ -189,9 +189,11 @@ Example:
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Template to Edit").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -254,9 +256,11 @@ var templateInfoCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Template to Check").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -299,9 +303,11 @@ var templateRemoveCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Template to Remove").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -384,11 +390,13 @@ var templateSwitchCmd = &cobra.Command{
 				options = append(options, huh.NewOption("None", " "))
 			}
 			ui.SortOptions(options, currentName)
+			height := ui.GetTermFitHeight(len(options))
 
 			name = currentName
 
 			err := huh.NewSelect[string]().
 				Title("Select Template").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
