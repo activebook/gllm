@@ -193,6 +193,7 @@ Example:
 
 			err := huh.NewSelect[string]().
 				Title("Select Template to Edit").
+				Description("Choose an existing template prompt to modify its content").
 				Height(height).
 				Options(options...).
 				Value(&name).
@@ -260,6 +261,7 @@ var templateInfoCmd = &cobra.Command{
 
 			err := huh.NewSelect[string]().
 				Title("Select Template to Check").
+				Description("Choose a template prompt to view its full text").
 				Height(height).
 				Options(options...).
 				Value(&name).
@@ -307,6 +309,7 @@ var templateRemoveCmd = &cobra.Command{
 
 			err := huh.NewSelect[string]().
 				Title("Select Template to Remove").
+				Description("Choose the template prompt configuration you want to delete").
 				Height(height).
 				Options(options...).
 				Value(&name).
@@ -396,6 +399,7 @@ var templateSwitchCmd = &cobra.Command{
 
 			err := huh.NewSelect[string]().
 				Title("Select Template").
+				Description("Choose the active template prompt for the current agent").
 				Height(height).
 				Options(options...).
 				Value(&name).

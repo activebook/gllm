@@ -204,6 +204,7 @@ var agentAddCmd = &cobra.Command{
 			huh.NewGroup(
 				huh.NewSelect[string]().
 					Title("Model").
+					Description("Select the AI model for this agent").
 					Options(modelOptions...).
 					Value(&model),
 			),
@@ -355,9 +356,12 @@ var agentSetCmd = &cobra.Command{
 			}
 			// Sort names alphabetically and keep selected agent at top if exists
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent to Edit").
+				Description("Choose an existing agent configuration to modify").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -452,6 +456,7 @@ var agentSetCmd = &cobra.Command{
 			huh.NewGroup(
 				huh.NewSelect[string]().
 					Title("Model").
+					Description("Select the AI model for this agent").
 					Options(modelOptions...).
 					Value(&model),
 			),
@@ -611,9 +616,12 @@ var agentRemoveCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent to Remove").
+				Description("Choose the agent configuration you want to delete").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -685,6 +693,7 @@ tools, search settings, and other preferences to match the selected agent.`,
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent").
+				Description("Switch to a different agent profile").
 				Options(options...).
 				Height(height).
 				Value(&name).
@@ -730,9 +739,12 @@ var agentInfoCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent to Check").
+				Description("Choose an agent to view its detailed configuration").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()

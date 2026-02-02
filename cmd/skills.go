@@ -224,9 +224,12 @@ var skillsUninstallCmd = &cobra.Command{
 				options = append(options, huh.NewOption(s.Name, s.Name))
 			}
 			ui.SortOptions(options, "")
+			height := ui.GetTermFitHeight(len(options))
 
 			err = huh.NewSelect[string]().
 				Title("Select skill to uninstall").
+				Description("Choose the skill you wish to remove from your system").
+				Height(height).
 				Options(options...).
 				Value(&skillName).
 				Run()

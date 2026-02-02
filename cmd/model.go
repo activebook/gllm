@@ -381,6 +381,7 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Edit").
+				Description("Choose a model configuration to modify").
 				Height(height).
 				Options(options...).
 				Value(&name).
@@ -419,6 +420,7 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 				huh.NewGroup(
 					huh.NewSelect[string]().
 						Title("Provider").
+						Description("Select the provider for this model").
 						Options(
 							huh.NewOption("OpenAI", service.ModelProviderOpenAI),
 							huh.NewOption("Anthropic", service.ModelProviderAnthropic),
@@ -564,6 +566,7 @@ var modelInfoCmd = &cobra.Command{
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Check").
+				Description("Choose a model to view its detailed settings").
 				Height(height).
 				Options(options...).
 				Value(&name).
@@ -637,6 +640,7 @@ gllm model remove gpt4 --force`,
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Remove").
+				Description("Choose a model configuration to delete permanently").
 				Height(height).
 				Options(options...).
 				Value(&name).
@@ -756,6 +760,7 @@ to the specified one for all subsequent operations.`,
 			height := ui.GetTermFitHeight(len(options))
 			err := huh.NewSelect[string]().
 				Title("Select Model").
+				Description("Choose which model to use for subsequent operations").
 				Options(options...).
 				Height(height).
 				Value(&name).

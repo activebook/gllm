@@ -57,7 +57,7 @@ var editorSwitchCmd = &cobra.Command{
 
 			err := huh.NewSelect[string]().
 				Title("Select Preferred Editor").
-				Description("").
+				Description("Choose your preferred text editor for multi-line input").
 				Height(height).
 				Options(options...).
 				Value(&name).

@@ -197,6 +197,7 @@ Example:
 
 			err := huh.NewSelect[string]().
 				Title("Select System Prompt to Edit").
+				Description("Choose an existing system prompt to modify its content").
 				Height(height).
 				Options(options...).
 				Value(&name).
@@ -265,6 +266,7 @@ var systemInfoCmd = &cobra.Command{
 
 			err := huh.NewSelect[string]().
 				Title("Select System Prompt to Check").
+				Description("Choose a system prompt to view its full text").
 				Height(height).
 				Options(options...).
 				Value(&name).
@@ -314,6 +316,7 @@ var systemRemoveCmd = &cobra.Command{
 
 			err := huh.NewSelect[string]().
 				Title("Select System Prompt to Remove").
+				Description("Choose the system prompt configuration you want to delete").
 				Height(height).
 				Options(options...).
 				Value(&name).
@@ -407,6 +410,7 @@ var systemSwitchCmd = &cobra.Command{
 
 			err := huh.NewSelect[string]().
 				Title("Select System Prompt").
+				Description("Choose the active system prompt for the current agent").
 				Options(options...).
 				Height(height).
 				Value(&name).

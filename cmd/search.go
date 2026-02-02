@@ -130,6 +130,7 @@ var searchSetCmd = &cobra.Command{
 
 			err := huh.NewSelect[string]().
 				Title("Select Search Engine to Configure").
+				Description("Choose a search engine to set up its API keys and settings").
 				Options(options...).
 				Value(&engine).
 				Run()
