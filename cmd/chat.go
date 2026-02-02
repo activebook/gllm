@@ -171,14 +171,14 @@ func (ci *ChatInfo) awaitChat_legacy() (string, error) {
 // This is the new awaitChat function, which uses bubbletea, support auto-complete
 func (ci *ChatInfo) awaitChat() (string, error) {
 	commands := []string{
-		"/exit", "/quit", "/help", "/?", "/history", "/h",
-		"/clear", "/reset", "/model", "/m", "/agent", "/g",
-		"/template", "/p", "/system", "/S", "/search", "/s",
-		"/tools", "/t", "/mcp", "/skills", "/memory", "/r",
-		"/yolo", "/y", "/convo", "/c", "/think", "/T",
-		"/features", "/f", "/capabilities", "/caps",
-		"/editor", "/e", "/attach", "/a", "/detach", "/d",
-		"/info", "/i", "/theme", "/verbose",
+		"/exit", "/quit", "/help", "/history",
+		"/clear", "/reset", "/model", "/agent",
+		"/template", "/system", "/search",
+		"/tools", "/mcp", "/skills", "/memory",
+		"/yolo", "/convo", "/think",
+		"/features", "/capabilities",
+		"/editor", "/attach", "/detach",
+		"/info", "/theme", "/verbose",
 	}
 	// TODO: Load dynamic workflow commands from user directory and append to commands list
 

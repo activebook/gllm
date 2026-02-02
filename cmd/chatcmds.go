@@ -84,10 +84,10 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		fmt.Println("Session Ended")
 		return
 
-	case "/help", "/?":
+	case "/help":
 		ci.showHelp()
 
-	case "/history", "/h":
+	case "/history":
 		// Arguments (num, chars) are deprecated/ignored in viewport mode
 		// We could implement "--raw" here later
 		ci.showHistory()
@@ -95,22 +95,22 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	case "/clear", "/reset":
 		ci.clearContext()
 
-	case "/model", "/m":
+	case "/model":
 		runCommand(modelCmd, parts[1:])
 
-	case "/agent", "/g":
+	case "/agent":
 		runCommand(agentCmd, parts[1:])
 
-	case "/template", "/p":
+	case "/template":
 		runCommand(templateCmd, parts[1:])
 
-	case "/system", "/S":
+	case "/system":
 		runCommand(systemCmd, parts[1:])
 
-	case "/search", "/s":
+	case "/search":
 		runCommand(searchCmd, parts[1:])
 
-	case "/tools", "/t":
+	case "/tools":
 		runCommand(toolsCmd, parts[1:])
 
 	case "/mcp":
@@ -119,43 +119,43 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	case "/skills":
 		runCommand(skillsCmd, parts[1:])
 
-	case "/memory", "/r":
+	case "/memory":
 		runCommand(memoryCmd, parts[1:])
 
-	case "/yolo", "/y":
+	case "/yolo":
 		switchYoloMode()
 
-	case "/convo", "/c":
+	case "/convo":
 		runCommand(convoCmd, parts[1:])
 
-	case "/think", "/T":
+	case "/think":
 		runCommand(thinkCmd, parts[1:])
 
-	case "/features", "/feats", "/f", "/capabilities", "/caps":
+	case "/features", "/capabilities":
 		runCommand(capsCmd, parts[1:])
 
-	case "/editor", "/e":
+	case "/editor":
 		if len(parts) < 2 {
 			ci.handleEditor()
 			return
 		}
 		runCommand(editorCmd, parts[1:])
 
-	case "/attach", "/a":
+	case "/attach":
 		if len(parts) < 2 {
 			fmt.Println("Please specify a file path")
 			return
 		}
 		ci.addAttachFiles(cmd)
 
-	case "/detach", "/d":
+	case "/detach":
 		if len(parts) < 2 {
 			fmt.Println("Please specify a file path")
 			return
 		}
 		ci.detachFiles(cmd)
 
-	case "/info", "/i":
+	case "/info":
 		ci.showInfo()
 
 	case "/theme":
@@ -174,27 +174,28 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println("Available commands:")
 	fmt.Println("  /exit, /quit - Exit the chat session")
 	fmt.Println("  /clear, /reset - Clear conversation history")
-	fmt.Println("  /help, /? - Show this help message")
-	fmt.Println("  /info, /i - Show current settings")
-	fmt.Println("  /history, /h - Show recent conversation history")
-	fmt.Println("  /model, /m [subcmd] - Manage models (list, switch, add, etc.)")
-	fmt.Println("  /agent, /g [subcmd] - Manage agents (list, switch, add, etc.)")
-	fmt.Println("  /template, /p [subcmd] - Manage templates (list, switch, add, etc.)")
-	fmt.Println("  /system, /S [subcmd] - Manage system prompts (list, switch, add, etc.)")
-	fmt.Println("  /search, /s [subcmd] - Manage search engines (list, switch, etc.)")
-	fmt.Println("  /memory, /r [subcmd] - Manage memory (list, add, clear)")
-	fmt.Println("  /think, /T [off|low|medium|high|sw] - Set thinking level (sw for interactive)")
-	fmt.Println("  /tools, /t [on|off] - Manage embedding tools")
+	fmt.Println("  /help - Show this help message")
+	fmt.Println("  /info - Show current settings")
+	fmt.Println("  /history - Show recent conversation history")
+	fmt.Println("  /model [subcmd] - Manage models (list, switch, add, etc.)")
+	fmt.Println("  /agent [subcmd] - Manage agents (list, switch, add, etc.)")
+	fmt.Println("  /template [subcmd] - Manage templates (list, switch, add, etc.)")
+	fmt.Println("  /system [subcmd] - Manage system prompts (list, switch, add, etc.)")
+	fmt.Println("  /search [subcmd] - Manage search engines (list, switch, etc.)")
+	fmt.Println("  /memory [subcmd] - Manage memory (list, add, clear)")
+	fmt.Println("  /think [off|low|medium|high|sw] - Set thinking level (sw for interactive)")
+	fmt.Println("  /tools [switch] - Switch embedding tools")
 	fmt.Println("  /mcp [subcmd] - Manage MCP servers (list, switch, etc.)")
 	fmt.Println("  /skills [subcmd] - Manage agent skills (list, switch, install, etc.)")
-	fmt.Println("  /features, /f [switch] - Switch agent features and capabilities (usage, markdown, etc.)")
-	fmt.Println("  /yolo, /y - Toggle YOLO mode (non-interactive tool execution)")
-	fmt.Println("  /convo, /c [subcmd] - Manage conversations (list, info, remove, etc.)")
-	fmt.Println("  /editor, /e [subcmd] - Manage editor or open for multi-line input")
-	fmt.Println("  /attach, /a <file> - Attach a file")
-	fmt.Println("  /detach, /d <file|all> - Detach a file")
+	fmt.Println("  /features [switch] - Switch agent features and capabilities (usage, markdown, etc.)")
+	fmt.Println("  /yolo - Toggle YOLO mode (non-interactive tool execution)")
+	fmt.Println("  /convo [subcmd] - Manage conversations (list, info, remove, etc.)")
+	fmt.Println("  /editor [subcmd] - Manage editor or open for multi-line input")
+	fmt.Println("  /attach <file> - Attach a file")
+	fmt.Println("  /detach <file|all> - Detach a file")
 	fmt.Println("  /theme [subcmd] - Manage and switch themes")
-	fmt.Println("  /verbose - Toggle verbose mode")
+	fmt.Println("  /verbose [switch] - Toggle verbose mode")
+	fmt.Println("  /@ [path] - Reference a file or directory")
 	fmt.Println("  !<command> - Execute a shell command")
 }
 
@@ -299,18 +300,15 @@ func (ci *ChatInfo) handleEditorCommand() {
 }
 
 func (ci *ChatInfo) addAttachFiles(input string) {
-	// Normalize input by replacing /attach with /a
-	input = strings.ReplaceAll(input, "/attach ", "/a ")
-
 	// Split input into tokens
 	tokens := strings.Fields(input)
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	for i := 0; i < len(tokens); i++ {
-		if tokens[i] == "/a" {
+		if tokens[i] == "/attach" {
 			if i+1 < len(tokens) {
-				// Check if there's a file path after /a
+				// Check if there's a file path after /attach
 				filePath := tokens[i+1]
 				i++ // Skip the file path token
 
@@ -364,7 +362,7 @@ func (ci *ChatInfo) addAttachFiles(input string) {
 					fmt.Printf("Attachment loaded: %s\n", filePath)
 				}(filePath)
 			} else {
-				fmt.Println("Please specify a file path after /a")
+				fmt.Println("Please specify a file path after /attach")
 			}
 		}
 		// Ignore other tokens
@@ -377,11 +375,8 @@ func (ci *ChatInfo) addAttachFiles(input string) {
 }
 
 func (ci *ChatInfo) detachFiles(input string) {
-	// Normalize input by replacing /detach with /d
-	input = strings.ReplaceAll(input, "/detach ", "/d ")
-
 	// Handle "all" case
-	if strings.Contains(input, "/d all") || strings.Contains(input, "/detach all") {
+	if strings.Contains(input, "/detach all") {
 		if len(ci.Files) == 0 {
 			fmt.Println("No attachments to detach")
 			return
@@ -397,10 +392,10 @@ func (ci *ChatInfo) detachFiles(input string) {
 	// Process detach commands
 	detachedAny := false
 	for i := 0; i < len(tokens); i++ {
-		if tokens[i] == "/d" {
-			// Check if there's a file path after /d
+		if tokens[i] == "/detach" {
+			// Check if there's a file path after /detach
 			if i+1 >= len(tokens) {
-				fmt.Println("Please specify a file path after /d")
+				fmt.Println("Please specify a file path after /detach")
 				continue
 			}
 
