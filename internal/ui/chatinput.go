@@ -2,12 +2,25 @@ package ui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/activebook/gllm/data"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+)
+
+const (
+	suggestionTypeNone = iota
+	suggestionTypeCommand
+	suggestionTypeFile
+)
+
+const (
+	defaultHeight  = 5 // Default height of the chat input
+	maxSuggestions = 8 // Max suggestions to show
 )
 
 // ChatInputResult holds the result of the chat input
@@ -19,25 +32,27 @@ type ChatInputResult struct {
 // ChatInputModel is the Bubble Tea model for the chat input with autocomplete
 type ChatInputModel struct {
 	textarea         textarea.Model
-	allCommands      []string
-	filteredCommands []string
-	suggestionIndex  int
-	showSuggestions  bool
-	width            int
-	height           int
-	canceled         bool
-	submitted        bool
+	allCommands      []string // all /commands
+	filteredCommands []string // filtered /commands and file paths
+	suggestionIndex  int      // index of the current suggestion
+	showSuggestions  bool     // whether suggestions are shown
+	width            int      // terminal width
+	height           int      // terminal height
+	canceled         bool     // whether the input was canceled
+	submitted        bool     // whether the input was submitted
+	suggestionType   int      // type of suggestion
+	suggestionStart  int      // start index of the suggestion(cursor position)
 }
 
 // NewChatInputModel creates a new chat input model
 func NewChatInputModel(commands []string, initialValue string) ChatInputModel {
 	ta := textarea.New()
 	ta.KeyMap.InsertNewline = GetNewLineKeyBinding()
-	ta.Placeholder = "Type your message... (Use / for commands, Enter to send)"
+	ta.Placeholder = "Type your message... (Use / for commands, @ for files, Enter to send)"
 	ta.Focus()
 	ta.Prompt = "┃ "
-	ta.CharLimit = 0 // Unlimited
-	ta.SetHeight(5)  // Start with a reasonable height
+	ta.CharLimit = 0            // Unlimited
+	ta.SetHeight(defaultHeight) // Start with a reasonable height
 	ta.ShowLineNumbers = false
 	ta.SetValue(initialValue)
 
@@ -71,6 +86,7 @@ func (m ChatInputModel) Init() tea.Cmd {
 	return textarea.Blink
 }
 
+// User input, move cursor, type text, all trigger Update
 func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
@@ -131,82 +147,189 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Handle character input and suggestions logic
 	m.textarea, cmd = m.textarea.Update(msg)
 
-	// Check for command prefix
+	// Detect suggestions
 	val := m.textarea.Value()
-	trimmedVal := strings.TrimSpace(val)
+	cursor := getCursorIndex(m.textarea)
 
-	// Only trigger suggestions if input starts with / AND we're still typing the command
-	if strings.HasPrefix(trimmedVal, "/") {
-		parts := strings.Fields(trimmedVal)
+	// Find word start
+	start := 0
+	// Bounds check
+	if cursor > len(val) {
+		cursor = len(val)
+	}
 
-		// Only show suggestions if:
-		// 1. We only have the command part (no space yet, or just one word)
-		// 2. The command is not complete (not in allCommands list)
-
-		if len(parts) == 0 {
-			// Just "/" typed
-			m.showSuggestions = true
-			m.filteredCommands = m.allCommands
-			m.suggestionIndex = 0
-		} else if len(parts) == 1 {
-			// Only one word, could be incomplete command
-			typedCommand := parts[0]
-
-			// Check if this is an exact match to a known command
-			isExactMatch := false
-			for _, cmd := range m.allCommands {
-				if cmd == typedCommand {
-					isExactMatch = true
-					break
-				}
-			}
-
-			// If exact match AND there's a space after, user is typing args
-			if isExactMatch && strings.HasSuffix(val, " ") {
-				m.showSuggestions = false
-			} else {
-				// Still typing the command, show suggestions
-				m.showSuggestions = true
-
-				var matches []string
-				for _, c := range m.allCommands {
-					if strings.HasPrefix(c, typedCommand) {
-						matches = append(matches, c)
-					}
-				}
-
-				m.filteredCommands = matches
-
-				if len(matches) == 0 {
-					m.showSuggestions = false
-				}
-
-				// Reset index if out of bounds
-				if m.suggestionIndex >= len(m.filteredCommands) {
-					m.suggestionIndex = 0
-				}
-			}
-		} else {
-			// Multiple words means user is typing subcommands/arguments
-			// Don't show autocomplete for the main command anymore
-			m.showSuggestions = false
+	// Find the start of the word from backward(start from cursor position)
+	for i := cursor - 1; i >= 0; i-- {
+		if val[i] == ' ' || val[i] == '\n' {
+			start = i + 1
+			break
 		}
-	} else {
-		m.showSuggestions = false
+	}
+
+	wordSoFar := val[start:cursor]
+	m.showSuggestions = false
+
+	if strings.HasPrefix(wordSoFar, "@") {
+		// File mode
+		m.suggestionType = suggestionTypeFile
+		m.suggestionStart = start
+
+		// Use the substring after @ as the pattern
+		// substring* as glob pattern
+		pattern := wordSoFar[1:]
+		matches := getFileSuggestions(pattern)
+		m.filteredCommands = matches
+
+		// Show suggestions if there are any
+		if len(matches) > 0 {
+			m.showSuggestions = true
+			// Check whether last suggestion index is valid
+			if m.suggestionIndex >= len(matches) {
+				m.suggestionIndex = 0
+			}
+		}
+	} else if start == 0 && strings.HasPrefix(wordSoFar, "/") {
+		// Command mode (only at start of line)
+		m.suggestionType = suggestionTypeCommand
+		m.suggestionStart = 0
+
+		// Filter commands
+		var matches []string
+		for _, c := range m.allCommands {
+			if strings.HasPrefix(c, wordSoFar) {
+				matches = append(matches, c)
+			}
+		}
+
+		if len(matches) == 1 && matches[0] == wordSoFar {
+			// Only one match, no need to show suggestions
+			m.showSuggestions = false
+		} else if len(matches) > 0 {
+			// Multiple matches, show suggestions
+			m.showSuggestions = true
+			m.filteredCommands = matches
+			// Check whether last suggestion index is valid
+			if m.suggestionIndex >= len(matches) {
+				m.suggestionIndex = 0
+			}
+		}
 	}
 
 	return m, cmd
 }
 
+// selectSuggestion selects the current suggestion
+// It replaces the current word with the selected suggestion
+// and updates the cursor position
 func (m *ChatInputModel) selectSuggestion() {
-	if len(m.filteredCommands) > 0 && m.suggestionIndex < len(m.filteredCommands) {
-		selected := m.filteredCommands[m.suggestionIndex]
+	if !m.showSuggestions || len(m.filteredCommands) == 0 {
+		return
+	}
+
+	selected := m.filteredCommands[m.suggestionIndex]
+	val := m.textarea.Value()
+	cursor := getCursorIndex(m.textarea)
+
+	switch m.suggestionType {
+	case suggestionTypeCommand:
+		// Replace everything (since it's start of line) with command + space
 		m.textarea.SetValue(selected + " ")
 		m.textarea.SetCursor(len(selected) + 1)
-		m.showSuggestions = false
+	case suggestionTypeFile:
+		// Replace @word with @selected
+
+		// Safety check
+		if m.suggestionStart > len(val) {
+			m.suggestionStart = len(val)
+		}
+		if cursor > len(val) {
+			cursor = len(val)
+		}
+
+		prefix := val[:m.suggestionStart]
+		suffix := val[cursor:]
+
+		// Note: selected file path doesn't include @
+		newValue := prefix + "@" + selected
+
+		// If it is a directory, don't add space, because it will be followed by a slash
+		// And suggestion still needs to be triggered by slash again
+		// If it is a file, add space, because the suggestion is already done
+		if !strings.HasSuffix(selected, string(os.PathSeparator)) {
+			newValue += " "
+		}
+
+		m.textarea.SetValue(newValue + suffix)
+		m.textarea.SetCursor(len(newValue))
 	}
+
+	m.showSuggestions = false
 }
 
+// Helper to get absolute cursor index
+func getCursorIndex(ta textarea.Model) int {
+	val := ta.Value()
+
+	// We assume Line() and LineInfo() exist on textarea.Model.
+	line := ta.Line()
+	col := ta.LineInfo().CharOffset
+
+	lines := strings.Split(val, "\n")
+
+	pos := 0
+	for i := 0; i < line && i < len(lines); i++ {
+		pos += len(lines[i]) + 1 // +1 for newline
+	}
+
+	if line < len(lines) {
+		currentLineLen := len(lines[line])
+		if col > currentLineLen {
+			col = currentLineLen
+		}
+		pos += col
+	}
+
+	return pos
+}
+
+// getFileSuggestions returns a list of file suggestions based on the prefix
+// It uses filepath.Glob to find matching files and directories
+// It returns a list of file paths, with directories appended with a path separator
+func getFileSuggestions(prefix string) []string {
+	search := prefix + "*"
+	// Handle empty prefix or current dir
+	if prefix == "" {
+		search = "*"
+	}
+
+	matches, err := filepath.Glob(search)
+	if err != nil {
+		return []string{}
+	}
+
+	var suggestions []string
+	for _, m := range matches {
+		info, err := os.Stat(m)
+		if err == nil {
+			if info.IsDir() {
+				suggestions = append(suggestions, m+string(os.PathSeparator))
+			} else {
+				suggestions = append(suggestions, m)
+			}
+		}
+	}
+
+	// Simple limit
+	if len(suggestions) > 20 {
+		suggestions = suggestions[:20]
+	}
+	return suggestions
+}
+
+// View renders the chat input
+// Whether to show suggestions or not is determined by the model
+// View renders the program's UI, which is just a string. The view is
+// rendered after every Update.
 func (m ChatInputModel) View() string {
 	// If input is hidden (user typed /exit), show nothing or a message
 	// or if user submitted the input or use /commands
@@ -214,40 +337,37 @@ func (m ChatInputModel) View() string {
 		return ""
 	}
 
-	textAreaView := m.textarea.View()
+	teaView := m.textarea.View()
 
 	if !m.showSuggestions || len(m.filteredCommands) == 0 {
-		return textAreaView
+		return teaView
 	}
 
 	// Render suggestions
-	// We'll render them *above* the text area
-
 	style := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(data.BorderHex)).
-		// Background(lipgloss.Color(data.BackgroundHex)).
 		Padding(0, 1)
 
 	var listItems []string
-	maxItems := 5 // Max suggestions to show
 
 	start := 0
 	end := len(m.filteredCommands)
 
-	// Simple scrolling if many items (centering selection)
-	if end > maxItems {
-		start = m.suggestionIndex - (maxItems / 2)
+	// Simple scrolling
+	if end > maxSuggestions {
+		start = m.suggestionIndex - (maxSuggestions / 2)
 		if start < 0 {
 			start = 0
 		}
-		end = start + maxItems
+		end = start + maxSuggestions
 		if end > len(m.filteredCommands) {
 			end = len(m.filteredCommands)
-			start = end - maxItems
+			start = end - maxSuggestions
 		}
 	}
 
+	// Render suggestions one by one, highlight the selected one
 	for i := start; i < end; i++ {
 		cmd := m.filteredCommands[i]
 		itemStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.DetailHex))
@@ -256,7 +376,6 @@ func (m ChatInputModel) View() string {
 		if i == m.suggestionIndex {
 			itemStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color(data.KeyHex)).
-				// Background(lipgloss.Color(data.BackgroundHex)).
 				Bold(true)
 			prefix = "> "
 		}
@@ -265,8 +384,8 @@ func (m ChatInputModel) View() string {
 
 	suggestionsView := style.Render(strings.Join(listItems, "\n"))
 
-	// Join vertical: suggestions on top
-	return lipgloss.JoinVertical(lipgloss.Left, suggestionsView, textAreaView)
+	// Join vertical: suggestions on bottom
+	return lipgloss.JoinVertical(lipgloss.Left, teaView, suggestionsView)
 }
 
 // RunChatInput runs the chat input program

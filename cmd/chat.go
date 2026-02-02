@@ -130,7 +130,9 @@ func (ci *ChatInfo) printWelcome() {
 	instructions := []string{
 		"• Type '/exit' or '/quit' to end the session",
 		"• Type '/help' for a list of available commands",
-		"• Use '/' for commands and '!' for local shell commands",
+		"• Use '/' for commands",
+		"• Use '!' for local shell commands",
+		"• Use '@' for files and folders",
 		"• Use Ctrl+C to exit at any time",
 	}
 
