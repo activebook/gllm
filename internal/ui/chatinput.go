@@ -28,6 +28,7 @@ const (
 type ChatInputResult struct {
 	Value    string
 	Canceled bool
+	History  []string
 }
 
 // Suggestion represents a suggestion item
@@ -54,7 +55,7 @@ type ChatInputModel struct {
 }
 
 // NewChatInputModel creates a new chat input model
-func NewChatInputModel(commands []Suggestion, initialValue string) ChatInputModel {
+func NewChatInputModel(commands []Suggestion, initialValue string, history []string) ChatInputModel {
 	ta := textarea.New()
 	ta.KeyMap.InsertNewline = GetNewLineKeyBinding()
 	ta.Placeholder = "Type your message... (Use / for commands, @ for files, Enter to send)"
@@ -87,6 +88,7 @@ func NewChatInputModel(commands []Suggestion, initialValue string) ChatInputMode
 	return ChatInputModel{
 		textarea:    ta,
 		allCommands: commands,
+		history:     history,
 		width:       width,
 	}
 }
@@ -488,8 +490,8 @@ func (m ChatInputModel) View() string {
 }
 
 // RunChatInput runs the chat input program
-func RunChatInput(commands []Suggestion, initialValue string) (ChatInputResult, error) {
-	model := NewChatInputModel(commands, initialValue)
+func RunChatInput(commands []Suggestion, initialValue string, history []string) (ChatInputResult, error) {
+	model := NewChatInputModel(commands, initialValue, history)
 	p := tea.NewProgram(model)
 
 	finalModel, err := p.Run()
@@ -506,5 +508,5 @@ func RunChatInput(commands []Suggestion, initialValue string) (ChatInputResult, 
 	text := strings.TrimSpace(m.textarea.Value())
 	m.updateHistory(text)
 
-	return ChatInputResult{Value: text, Canceled: false}, nil
+	return ChatInputResult{Value: text, Canceled: false, History: m.history}, nil
 }
