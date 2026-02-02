@@ -123,23 +123,26 @@ func (m *ChatInputModel) updateHistory(value string) {
 }
 
 // updateSuggestionsSelection updates the suggestions index based on the key type
-func (m ChatInputModel) updateSuggestionsSelection(keyType tea.KeyType) {
+func (m ChatInputModel) updateSuggestionsSelection(keyType tea.KeyType) (tea.Model, tea.Cmd) {
 	switch keyType {
 	case tea.KeyUp:
 		m.suggestionIndex--
 		if m.suggestionIndex < 0 {
 			m.suggestionIndex = len(m.filteredCommands) - 1
 		}
+		return m, nil
 	case tea.KeyDown:
 		m.suggestionIndex++
 		if m.suggestionIndex >= len(m.filteredCommands) {
 			m.suggestionIndex = 0
 		}
+		return m, nil
 	}
+	return nil, nil
 }
 
 // updateHistorySelection updates the history selection based on the key type
-func (m *ChatInputModel) updateHistorySelection(keyType tea.KeyType) {
+func (m *ChatInputModel) updateHistorySelection(keyType tea.KeyType) (tea.Model, tea.Cmd) {
 	switch keyType {
 	case tea.KeyUp:
 		if m.textarea.Line() == 0 {
@@ -149,6 +152,7 @@ func (m *ChatInputModel) updateHistorySelection(keyType tea.KeyType) {
 				// Move cursor to end
 				m.textarea.SetCursor(len(m.history[m.historyIndex]))
 			}
+			return m, nil
 		}
 	case tea.KeyDown:
 		if m.textarea.Line() == m.textarea.LineCount()-1 {
@@ -161,12 +165,15 @@ func (m *ChatInputModel) updateHistorySelection(keyType tea.KeyType) {
 					m.textarea.SetCursor(len(m.history[m.historyIndex]))
 				}
 			}
+			return m, nil
 		}
 	}
+	return nil, nil
 }
 
 // User input, move cursor, type text, all trigger Update
 func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var model tea.Model
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -200,13 +207,14 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyUp, tea.KeyDown:
 			if m.showSuggestions {
 				// Suggestion navigation
-				m.updateSuggestionsSelection(msg.Type)
+				model, cmd = m.updateSuggestionsSelection(msg.Type)
 			} else {
 				// History navigation
-				m.updateHistorySelection(msg.Type)
+				model, cmd = m.updateHistorySelection(msg.Type)
 			}
-
-			return m, nil
+			if model != nil {
+				return model, cmd
+			}
 
 		case tea.KeyTab:
 			if m.showSuggestions {
