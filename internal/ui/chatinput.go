@@ -19,8 +19,9 @@ const (
 )
 
 const (
-	defaultHeight  = 5 // Default height of the chat input
-	maxSuggestions = 8 // Max suggestions to show
+	defaultHeight  = 5  // Default height of the chat input
+	maxSuggestions = 8  // Max suggestions to show
+	maxHistory     = 20 // Max history to keep
 )
 
 // ChatInputResult holds the result of the chat input
@@ -48,6 +49,8 @@ type ChatInputModel struct {
 	submitted        bool         // whether the input was submitted
 	suggestionType   int          // type of suggestion
 	suggestionStart  int          // start index of the suggestion(cursor position)
+	history          []string     // input history
+	historyIndex     int          // current history index
 }
 
 // NewChatInputModel creates a new chat input model
@@ -92,6 +95,74 @@ func (m ChatInputModel) Init() tea.Cmd {
 	return textarea.Blink
 }
 
+// updateHistory updates the history with the given value
+// It removes duplicates and keeps the history size limited to maxHistory
+func (m *ChatInputModel) updateHistory(value string) {
+	if value == "" {
+		return
+	}
+
+	// Remove duplicate
+	for i, h := range m.history {
+		if h == value {
+			m.history = append(m.history[:i], m.history[i+1:]...)
+			break
+		}
+	}
+
+	// Add to history
+	m.history = append(m.history, value)
+
+	// Limit history to maxHistory items
+	if len(m.history) > maxHistory {
+		m.history = m.history[1:]
+	}
+	m.historyIndex = len(m.history)
+}
+
+// updateSuggestionsSelection updates the suggestions index based on the key type
+func (m ChatInputModel) updateSuggestionsSelection(keyType tea.KeyType) {
+	switch keyType {
+	case tea.KeyUp:
+		m.suggestionIndex--
+		if m.suggestionIndex < 0 {
+			m.suggestionIndex = len(m.filteredCommands) - 1
+		}
+	case tea.KeyDown:
+		m.suggestionIndex++
+		if m.suggestionIndex >= len(m.filteredCommands) {
+			m.suggestionIndex = 0
+		}
+	}
+}
+
+// updateHistorySelection updates the history selection based on the key type
+func (m *ChatInputModel) updateHistorySelection(keyType tea.KeyType) {
+	switch keyType {
+	case tea.KeyUp:
+		if m.textarea.Line() == 0 {
+			if m.historyIndex > 0 {
+				m.historyIndex--
+				m.textarea.SetValue(m.history[m.historyIndex])
+				// Move cursor to end
+				m.textarea.SetCursor(len(m.history[m.historyIndex]))
+			}
+		}
+	case tea.KeyDown:
+		if m.textarea.Line() == m.textarea.LineCount()-1 {
+			if m.historyIndex < len(m.history) {
+				m.historyIndex++
+				if m.historyIndex == len(m.history) {
+					m.textarea.SetValue("")
+				} else {
+					m.textarea.SetValue(m.history[m.historyIndex])
+					m.textarea.SetCursor(len(m.history[m.historyIndex]))
+				}
+			}
+		}
+	}
+}
+
 // User input, move cursor, type text, all trigger Update
 func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -126,19 +197,14 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case tea.KeyUp, tea.KeyDown:
 			if m.showSuggestions {
-				if msg.Type == tea.KeyUp {
-					m.suggestionIndex--
-					if m.suggestionIndex < 0 {
-						m.suggestionIndex = len(m.filteredCommands) - 1
-					}
-				} else {
-					m.suggestionIndex++
-					if m.suggestionIndex >= len(m.filteredCommands) {
-						m.suggestionIndex = 0
-					}
-				}
-				return m, nil
+				// Suggestion navigation
+				m.updateSuggestionsSelection(msg.Type)
+			} else {
+				// History navigation
+				m.updateHistorySelection(msg.Type)
 			}
+
+			return m, nil
 
 		case tea.KeyTab:
 			if m.showSuggestions {
@@ -436,5 +502,9 @@ func RunChatInput(commands []Suggestion, initialValue string) (ChatInputResult, 
 		return ChatInputResult{Canceled: true}, nil
 	}
 
-	return ChatInputResult{Value: strings.TrimSpace(m.textarea.Value()), Canceled: false}, nil
+	// Update history
+	text := strings.TrimSpace(m.textarea.Value())
+	m.updateHistory(text)
+
+	return ChatInputResult{Value: text, Canceled: false}, nil
 }
