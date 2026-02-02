@@ -4,12 +4,51 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"sync"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+)
+
+var (
+	chatCommandMap = map[string]string{
+		"/exit":     "Exit the chat session",
+		"/quit":     "Exit the chat session",
+		"/help":     "Show this help message",
+		"/history":  "Show recent conversation history",
+		"/clear":    "Clear conversation history",
+		"/model":    "Manage models (list, switch, add, etc.)",
+		"/agent":    "Manage agents (list, switch, add, etc.)",
+		"/template": "Manage templates (list, switch, add, etc.)",
+		"/system":   "Manage system prompts (list, switch, add, etc.)",
+		"/search":   "Manage search engines (list, switch, etc.)",
+		"/tools":    "Switch embedding tools",
+		"/mcp":      "Manage MCP servers (list, switch, etc.)",
+		"/skills":   "Manage agent skills (list, switch, install, etc.)",
+		"/memory":   "Manage memory (list, add, clear)",
+		"/yolo":     "Toggle YOLO mode",
+		"/convo":    "Manage conversations (list, info, remove, etc.)",
+		"/think":    "Set thinking level",
+		"/features": "Switch agent features",
+		"/editor":   "Manage editor or open for multi-line input",
+		"/attach":   "Attach a file",
+		"/detach":   "Detach a file",
+		"/info":     "Show current settings",
+		"/theme":    "Manage and switch themes",
+		"/verbose":  "Toggle verbose mode",
+	}
+
+	chatSpecMap = map[string]string{
+		"@path":  "Reference to files and folders",
+		"!bash":  "Execute local shell commands",
+		"Ctrl+C": "Cancel current generation or exit session",
+		"Ctrl+D": "Delete all input",
+	}
 )
 
 // contains checks if a slice contains a string
@@ -84,33 +123,33 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		fmt.Println("Session Ended")
 		return
 
-	case "/help", "/?":
+	case "/help":
 		ci.showHelp()
 
-	case "/history", "/h":
+	case "/history":
 		// Arguments (num, chars) are deprecated/ignored in viewport mode
 		// We could implement "--raw" here later
 		ci.showHistory()
 
-	case "/clear", "/reset":
+	case "/clear":
 		ci.clearContext()
 
-	case "/model", "/m":
+	case "/model":
 		runCommand(modelCmd, parts[1:])
 
-	case "/agent", "/g":
+	case "/agent":
 		runCommand(agentCmd, parts[1:])
 
-	case "/template", "/p":
+	case "/template":
 		runCommand(templateCmd, parts[1:])
 
-	case "/system", "/S":
+	case "/system":
 		runCommand(systemCmd, parts[1:])
 
-	case "/search", "/s":
+	case "/search":
 		runCommand(searchCmd, parts[1:])
 
-	case "/tools", "/t":
+	case "/tools":
 		runCommand(toolsCmd, parts[1:])
 
 	case "/mcp":
@@ -119,61 +158,50 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	case "/skills":
 		runCommand(skillsCmd, parts[1:])
 
-	case "/memory", "/r":
+	case "/memory":
 		runCommand(memoryCmd, parts[1:])
 
-	case "/yolo", "/y":
+	case "/yolo":
 		switchYoloMode()
 
-	case "/convo", "/c":
+	case "/convo":
 		runCommand(convoCmd, parts[1:])
 
-	case "/think", "/T":
+	case "/think":
 		runCommand(thinkCmd, parts[1:])
 
-	case "/features", "/feats", "/f", "/capabilities", "/caps":
+	case "/features", "/capabilities":
 		runCommand(capsCmd, parts[1:])
 
-	case "/editor", "/e":
+	case "/editor":
 		if len(parts) < 2 {
 			ci.handleEditor()
 			return
 		}
 		runCommand(editorCmd, parts[1:])
 
-	case "/attach", "/a":
+	case "/attach":
 		if len(parts) < 2 {
 			fmt.Println("Please specify a file path")
 			return
 		}
 		ci.addAttachFiles(cmd)
 
-	case "/detach", "/d":
+	case "/detach":
 		if len(parts) < 2 {
 			fmt.Println("Please specify a file path")
 			return
 		}
 		ci.detachFiles(cmd)
 
-	case "/info", "/i":
+	case "/info":
 		ci.showInfo()
 
 	case "/theme":
 		runCommand(themeCmd, parts[1:])
 
 	case "/verbose":
-		settings := data.GetSettingsStore()
-		current := settings.GetVerboseEnabled()
-		err := settings.SetVerboseEnabled(!current)
-		if err != nil {
-			fmt.Printf("Failed to toggle verbose mode: %v\n", err)
-		} else {
-			status := "enabled"
-			if !current {
-				status = "disabled"
-			}
-			fmt.Printf("Verbose mode: %s\n", status)
-		}
+		runCommand(verboseCmd, parts[1:])
 
 	default:
 		fmt.Printf("Unknown command: %s\n", command)
@@ -182,31 +210,55 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 
 // showHelp displays available chat commands
 func (ci *ChatInfo) showHelp() {
-	fmt.Println("Available commands:")
-	fmt.Println("  /exit, /quit - Exit the chat session")
-	fmt.Println("  /clear, /reset - Clear conversation history")
-	fmt.Println("  /help, /? - Show this help message")
-	fmt.Println("  /info, /i - Show current settings")
-	fmt.Println("  /history, /h - Show recent conversation history")
-	fmt.Println("  /model, /m [subcmd] - Manage models (list, switch, add, etc.)")
-	fmt.Println("  /agent, /g [subcmd] - Manage agents (list, switch, add, etc.)")
-	fmt.Println("  /template, /p [subcmd] - Manage templates (list, switch, add, etc.)")
-	fmt.Println("  /system, /S [subcmd] - Manage system prompts (list, switch, add, etc.)")
-	fmt.Println("  /search, /s [subcmd] - Manage search engines (list, switch, etc.)")
-	fmt.Println("  /memory, /r [subcmd] - Manage memory (list, add, clear)")
-	fmt.Println("  /think, /T [off|low|medium|high|sw] - Set thinking level (sw for interactive)")
-	fmt.Println("  /tools, /t [on|off] - Manage embedding tools")
-	fmt.Println("  /mcp [subcmd] - Manage MCP servers (list, switch, etc.)")
-	fmt.Println("  /skills [subcmd] - Manage agent skills (list, switch, install, etc.)")
-	fmt.Println("  /features, /f [switch] - Switch agent features and capabilities (usage, markdown, etc.)")
-	fmt.Println("  /yolo, /y - Toggle YOLO mode (non-interactive tool execution)")
-	fmt.Println("  /convo, /c [subcmd] - Manage conversations (list, info, remove, etc.)")
-	fmt.Println("  /editor, /e [subcmd] - Manage editor or open for multi-line input")
-	fmt.Println("  /attach, /a <file> - Attach a file")
-	fmt.Println("  /detach, /d <file|all> - Detach a file")
-	fmt.Println("  /theme [subcmd] - Manage and switch themes")
-	fmt.Println("  /verbose - Toggle verbose mode")
-	fmt.Println("  !<command> - Execute a shell command")
+	// Extract keys into a slice
+	commands := make([]string, 0, len(chatCommandMap)+len(chatSpecMap))
+	for cmd := range chatCommandMap {
+		commands = append(commands, cmd)
+	}
+	for cmd := range chatSpecMap {
+		commands = append(commands, cmd)
+	}
+
+	// Sort the keys
+	sort.Strings(commands)
+
+	style := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(data.BorderHex)).
+		Width(ui.GetTerminalWidth()-2).
+		Padding(0, 1)
+
+	var listItems []string
+
+	// Calculate max width for alignment
+	maxLen := 0
+	for _, cmd := range commands {
+		if len(cmd) > maxLen {
+			maxLen = len(cmd)
+		}
+	}
+
+	// Render suggestions one by one, highlight the selected one
+	for _, cmd := range commands {
+		// Base styles
+		textStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.LabelHex))
+		descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.LabelHex)).Faint(true)
+
+		// Pad the command text
+		paddedText := fmt.Sprintf("%-*s", maxLen, cmd)
+
+		// Get description
+		desc := chatCommandMap[cmd]
+		if desc == "" {
+			desc = chatSpecMap[cmd]
+		}
+
+		line := fmt.Sprintf("%s   %s", textStyle.Render(paddedText), descStyle.Render(desc))
+		listItems = append(listItems, line)
+	}
+
+	suggestionsView := style.Render(strings.Join(listItems, "\n"))
+	fmt.Println(suggestionsView)
 }
 
 // showInfo displays current chat settings and information
@@ -310,18 +362,15 @@ func (ci *ChatInfo) handleEditorCommand() {
 }
 
 func (ci *ChatInfo) addAttachFiles(input string) {
-	// Normalize input by replacing /attach with /a
-	input = strings.ReplaceAll(input, "/attach ", "/a ")
-
 	// Split input into tokens
 	tokens := strings.Fields(input)
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	for i := 0; i < len(tokens); i++ {
-		if tokens[i] == "/a" {
+		if tokens[i] == "/attach" {
 			if i+1 < len(tokens) {
-				// Check if there's a file path after /a
+				// Check if there's a file path after /attach
 				filePath := tokens[i+1]
 				i++ // Skip the file path token
 
@@ -375,7 +424,7 @@ func (ci *ChatInfo) addAttachFiles(input string) {
 					fmt.Printf("Attachment loaded: %s\n", filePath)
 				}(filePath)
 			} else {
-				fmt.Println("Please specify a file path after /a")
+				fmt.Println("Please specify a file path after /attach")
 			}
 		}
 		// Ignore other tokens
@@ -388,11 +437,8 @@ func (ci *ChatInfo) addAttachFiles(input string) {
 }
 
 func (ci *ChatInfo) detachFiles(input string) {
-	// Normalize input by replacing /detach with /d
-	input = strings.ReplaceAll(input, "/detach ", "/d ")
-
 	// Handle "all" case
-	if strings.Contains(input, "/d all") || strings.Contains(input, "/detach all") {
+	if strings.Contains(input, "/detach all") {
 		if len(ci.Files) == 0 {
 			fmt.Println("No attachments to detach")
 			return
@@ -408,10 +454,10 @@ func (ci *ChatInfo) detachFiles(input string) {
 	// Process detach commands
 	detachedAny := false
 	for i := 0; i < len(tokens); i++ {
-		if tokens[i] == "/d" {
-			// Check if there's a file path after /d
+		if tokens[i] == "/detach" {
+			// Check if there's a file path after /detach
 			if i+1 >= len(tokens) {
-				fmt.Println("Please specify a file path after /d")
+				fmt.Println("Please specify a file path after /detach")
 				continue
 			}
 

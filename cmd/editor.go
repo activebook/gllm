@@ -53,9 +53,12 @@ var editorSwitchCmd = &cobra.Command{
 				options = append(options, huh.NewOption(ed, ed))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Preferred Editor").
+				Description("Choose your preferred text editor for multi-line input").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()

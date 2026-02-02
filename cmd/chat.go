@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/activebook/gllm/service"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
+
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
@@ -33,6 +36,9 @@ have a continuous conversation with the model.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Start indeterminate progress bar
 		ui.GetIndicator().Start("")
+
+		// Clear empty conversations in background
+		// service.ClearEmptyConvosAsync()
 
 		var chatInfo *ChatInfo
 		store := data.NewConfigStore()
@@ -109,29 +115,38 @@ func (ci *ChatInfo) printWelcome() {
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color(data.KeyHex)).
+		Width(ui.GetTerminalWidth()-4).
+		Align(lipgloss.Center).
 		MarginTop(1).
 		MarginBottom(1).
 		Padding(0, 0)
 
 	contentStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(data.LabelHex)).
+		Width(ui.GetTerminalWidth()-4).
+		Align(lipgloss.Left).
 		Padding(0, 2)
 
 	hintStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(data.DetailHex)).
+		Width(ui.GetTerminalWidth() - 4).
+		Align(lipgloss.Center).
 		Italic(true)
 
 	borderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(data.BorderHex)).
+		Width(ui.GetTerminalWidth()-4).
+		Margin(0, 1).
 		Padding(1)
 
 	welcomeText := "Welcome to GLLM Interactive Chat"
 	instructions := []string{
-		"• Type '/exit' or '/quit' to end the session",
-		"• Type '/help' for a list of available commands",
-		"• Use '/' for commands and '!' for local shell commands",
-		"• Use Ctrl+C to exit at any time",
+		"• '/help' lists all available commands",
+		"• '/exit', '/quit' to end current chat session",
+		"• Ctrl+C to cancel, Ctrl+D to clear the input",
+		"• '/' for commands, '!' for local shell commands",
+		"• '@' for files and folders",
 	}
 
 	header := headerStyle.Render(welcomeText)
@@ -148,7 +163,8 @@ func (ci *ChatInfo) printWelcome() {
 	fmt.Println()
 }
 
-func (ci *ChatInfo) awaitChat() (string, error) {
+// This is the legacy awaitChat function, which uses huh, don't support auto-complete
+func (ci *ChatInfo) awaitChat_legacy() (string, error) {
 	var input string
 
 	form := huh.NewForm(
@@ -165,6 +181,29 @@ func (ci *ChatInfo) awaitChat() (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(input), nil
+}
+
+// This is the new awaitChat function, which uses bubbletea, support auto-complete
+func (ci *ChatInfo) awaitChat() (string, error) {
+	var commands []ui.Suggestion
+	for cmd, desc := range chatCommandMap {
+		commands = append(commands, ui.Suggestion{Command: cmd, Description: desc})
+	}
+
+	// Sort commands by text
+	sort.Slice(commands, func(i, j int) bool {
+		return commands[i].Command < commands[j].Command
+	})
+
+	result, err := ui.RunChatInput(commands, ci.EditorInput)
+	if err != nil {
+		return "", err
+	}
+	if result.Canceled {
+		return "", fmt.Errorf("user canceled")
+	}
+
+	return result.Value, nil
 }
 
 func (ci *ChatInfo) startREPL() {
@@ -282,6 +321,10 @@ func (ci *ChatInfo) showHistory() {
 	// Get conversation data
 	convoData, convoName, err := GetConvoData(convoName, agent.Model.Provider)
 	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("No available conversation yet.")
+			return
+		}
 		service.Errorf("%v", err)
 		return
 	}

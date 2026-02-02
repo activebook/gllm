@@ -89,6 +89,7 @@ var thinkSwitchCmd = &cobra.Command{
 			huh.NewGroup(
 				huh.NewSelect[string]().
 					Title("Select thinking level").
+					Description("Choose the level of reasoning effort for agent responses").
 					Options(options...).
 					Value(&selected),
 			),

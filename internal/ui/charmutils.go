@@ -56,6 +56,11 @@ func GetHuhKeyMap() *huh.KeyMap {
 	return keyMap
 }
 
+// GetNewLineKeyBinding returns a key binding for inserting a newline
+func GetNewLineKeyBinding() key.Binding {
+	return key.NewBinding(key.WithKeys("ctrl+j"), key.WithHelp("ctrl+j", "insert newline"))
+}
+
 // Custom type to track cursor updates
 type onCursorUpdate struct {
 	Field interface{ Hovered() (string, bool) }

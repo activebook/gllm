@@ -189,9 +189,12 @@ Example:
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Template to Edit").
+				Description("Choose an existing template prompt to modify its content").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -254,9 +257,12 @@ var templateInfoCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Template to Check").
+				Description("Choose a template prompt to view its full text").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -299,9 +305,12 @@ var templateRemoveCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Template to Remove").
+				Description("Choose the template prompt configuration you want to delete").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -384,11 +393,14 @@ var templateSwitchCmd = &cobra.Command{
 				options = append(options, huh.NewOption("None", " "))
 			}
 			ui.SortOptions(options, currentName)
+			height := ui.GetTermFitHeight(len(options))
 
 			name = currentName
 
 			err := huh.NewSelect[string]().
 				Title("Select Template").
+				Description("Choose the active template prompt for the current agent").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()

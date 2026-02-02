@@ -127,6 +127,7 @@ var agentAddCmd = &cobra.Command{
 		)
 
 		// Initial defaults
+		height := ui.GetTermFitHeight(100) // algo would use term height/2
 
 		// Get available options from data layer
 		store := data.NewConfigStore()
@@ -192,7 +193,7 @@ var agentAddCmd = &cobra.Command{
 						}
 						return nil
 					}),
-			),
+			).WithHeight(height),
 		).Run()
 		if err != nil {
 			fmt.Println("Aborted.")
@@ -204,9 +205,10 @@ var agentAddCmd = &cobra.Command{
 			huh.NewGroup(
 				huh.NewSelect[string]().
 					Title("Model").
+					Description("Select the AI model for this agent").
 					Options(modelOptions...).
 					Value(&model),
-			),
+			).WithHeight(height),
 		).Run()
 		if err != nil {
 			return
@@ -220,7 +222,7 @@ var agentAddCmd = &cobra.Command{
 					Description("The system prompt to use for agent responses").
 					Options(sysPromptOptions...).
 					Value(&sysPrompt),
-			),
+			).WithHeight(height),
 		).Run()
 		if err != nil {
 			return
@@ -234,7 +236,7 @@ var agentAddCmd = &cobra.Command{
 					Description("The template to use for agent responses").
 					Options(templateOptions...).
 					Value(&template),
-			),
+			).WithHeight(height),
 		).Run()
 		if err != nil {
 			return
@@ -249,7 +251,7 @@ var agentAddCmd = &cobra.Command{
 					Options(toolsOptions...).
 					Value(&tools),
 				ui.GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
-			),
+			).WithHeight(height),
 		).Run()
 		if err != nil {
 			return
@@ -274,7 +276,7 @@ var agentAddCmd = &cobra.Command{
 						huh.NewOption("High - Maximum reasoning", "high").Selected(false),
 					).
 					Value(&think),
-			),
+			).WithHeight(height),
 		).Run()
 		if err != nil {
 			return
@@ -300,7 +302,7 @@ var agentAddCmd = &cobra.Command{
 			huh.NewGroup(
 				msfeatures,
 				featureNote,
-			),
+			).WithHeight(height),
 		).Run()
 		if err != nil {
 			fmt.Println("Aborted.")
@@ -355,9 +357,12 @@ var agentSetCmd = &cobra.Command{
 			}
 			// Sort names alphabetically and keep selected agent at top if exists
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent to Edit").
+				Description("Choose an existing agent configuration to modify").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -452,6 +457,7 @@ var agentSetCmd = &cobra.Command{
 			huh.NewGroup(
 				huh.NewSelect[string]().
 					Title("Model").
+					Description("Select the AI model for this agent").
 					Options(modelOptions...).
 					Value(&model),
 			),
@@ -611,9 +617,12 @@ var agentRemoveCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent to Remove").
+				Description("Choose the agent configuration you want to delete").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -681,10 +690,13 @@ tools, search settings, and other preferences to match the selected agent.`,
 			}
 			// Sort names alphabetically and keep selected agent at top if exists
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent").
+				Description("Switch to a different agent profile").
 				Options(options...).
+				Height(height).
 				Value(&name).
 				Run()
 
@@ -728,9 +740,12 @@ var agentInfoCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent to Check").
+				Description("Choose an agent to view its detailed configuration").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()

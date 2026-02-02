@@ -193,9 +193,12 @@ Example:
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select System Prompt to Edit").
+				Description("Choose an existing system prompt to modify its content").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -259,9 +262,12 @@ var systemInfoCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select System Prompt to Check").
+				Description("Choose a system prompt to view its full text").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -306,9 +312,12 @@ var systemRemoveCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select System Prompt to Remove").
+				Description("Choose the system prompt configuration you want to delete").
+				Height(height).
 				Options(options...).
 				Value(&name).
 				Run()
@@ -395,12 +404,15 @@ var systemSwitchCmd = &cobra.Command{
 			}
 
 			ui.SortOptions(options, currentName)
+			height := ui.GetTermFitHeight(len(options))
 
 			name = currentName // Pre-fill with current
 
 			err := huh.NewSelect[string]().
 				Title("Select System Prompt").
+				Description("Choose the active system prompt for the current agent").
 				Options(options...).
+				Height(height).
 				Value(&name).
 				Run()
 			if err != nil {

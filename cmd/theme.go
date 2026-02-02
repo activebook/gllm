@@ -83,10 +83,12 @@ var themeSwitchCmd = &cobra.Command{
 				options[i] = huh.NewOption(t, t)
 			}
 			ui.SortOptions(options, data.CurrentThemeName)
+			height := ui.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Theme").
 				Description("Search through 300+ themes using / to filter").
+				Height(height).
 				Options(options...).
 				Filtering(true).
 				Value(&name).

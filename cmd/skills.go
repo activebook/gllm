@@ -224,9 +224,12 @@ var skillsUninstallCmd = &cobra.Command{
 				options = append(options, huh.NewOption(s.Name, s.Name))
 			}
 			ui.SortOptions(options, "")
+			height := ui.GetTermFitHeight(len(options))
 
 			err = huh.NewSelect[string]().
 				Title("Select skill to uninstall").
+				Description("Choose the skill you wish to remove from your system").
+				Height(height).
 				Options(options...).
 				Value(&skillName).
 				Run()
@@ -316,11 +319,13 @@ var skillsSwCmd = &cobra.Command{
 		}
 
 		ui.SortMultiOptions(options, enabledSkills)
+		height := ui.GetTermFitHeight(len(options))
 
 		var selectedSkills []string
 		multiSelect := huh.NewMultiSelect[string]().
 			Title("Select Skills").
 			Description("Choose which skills to enable. Press space to toggle, enter to confirm.").
+			Height(height).
 			Options(options...).
 			Value(&selectedSkills)
 		note := ui.GetDynamicHuhNote("Skill Description", multiSelect, func(name string) string {
