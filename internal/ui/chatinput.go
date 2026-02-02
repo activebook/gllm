@@ -133,49 +133,63 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Check for command prefix
 	val := m.textarea.Value()
-
-	// Only trigger suggestions if the *entire* input starts with /
-	// (or potentially if current line starts with /)
-	// For simplicity in CLI chat, usually commands are at the very start.
 	trimmedVal := strings.TrimSpace(val)
+
+	// Only trigger suggestions if input starts with / AND we're still typing the command
 	if strings.HasPrefix(trimmedVal, "/") {
-		// Filter commands
-		m.showSuggestions = true
-
-		// Extract the current typed command part
-		// We assume the command is the first word
 		parts := strings.Fields(trimmedVal)
-		if len(parts) > 0 {
-			typedCommand := parts[0] // e.g., "/he"
 
-			// If user typed space, they might be typing args, so hide suggestions?
-			// Or if they are exactly on a command?
-			// Let's filter based on prefix
+		// Only show suggestions if:
+		// 1. We only have the command part (no space yet, or just one word)
+		// 2. The command is not complete (not in allCommands list)
 
-			var matches []string
-			for _, cmd := range m.allCommands {
-				if strings.HasPrefix(cmd, typedCommand) {
-					matches = append(matches, cmd)
-				}
-			}
-			m.filteredCommands = matches
-
-			// If no matches, or exact match and space typed, hide
-			if len(matches) == 0 {
-				m.showSuggestions = false
-			} else if len(matches) == 1 && matches[0] == typedCommand && strings.HasSuffix(val, " ") {
-				// User finished typing command
-				m.showSuggestions = false
-			}
-
-			// Reset index if out of bounds
-			if m.suggestionIndex >= len(m.filteredCommands) {
-				m.suggestionIndex = 0
-			}
-		} else {
-			// Just "/"
+		if len(parts) == 0 {
+			// Just "/" typed
+			m.showSuggestions = true
 			m.filteredCommands = m.allCommands
 			m.suggestionIndex = 0
+		} else if len(parts) == 1 {
+			// Only one word, could be incomplete command
+			typedCommand := parts[0]
+
+			// Check if this is an exact match to a known command
+			isExactMatch := false
+			for _, cmd := range m.allCommands {
+				if cmd == typedCommand {
+					isExactMatch = true
+					break
+				}
+			}
+
+			// If exact match AND there's a space after, user is typing args
+			if isExactMatch && strings.HasSuffix(val, " ") {
+				m.showSuggestions = false
+			} else {
+				// Still typing the command, show suggestions
+				m.showSuggestions = true
+
+				var matches []string
+				for _, c := range m.allCommands {
+					if strings.HasPrefix(c, typedCommand) {
+						matches = append(matches, c)
+					}
+				}
+
+				m.filteredCommands = matches
+
+				if len(matches) == 0 {
+					m.showSuggestions = false
+				}
+
+				// Reset index if out of bounds
+				if m.suggestionIndex >= len(m.filteredCommands) {
+					m.suggestionIndex = 0
+				}
+			}
+		} else {
+			// Multiple words means user is typing subcommands/arguments
+			// Don't show autocomplete for the main command anymore
+			m.showSuggestions = false
 		}
 	} else {
 		m.showSuggestions = false
@@ -195,8 +209,9 @@ func (m *ChatInputModel) selectSuggestion() {
 
 func (m ChatInputModel) View() string {
 	// If input is hidden (user typed /exit), show nothing or a message
-	if m.canceled {
-		return "" // Or return a goodbye message: return "Exiting...\n"
+	// or if user submitted the input or use /commands
+	if m.canceled || m.submitted {
+		return ""
 	}
 
 	textAreaView := m.textarea.View()
