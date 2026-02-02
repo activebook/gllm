@@ -59,6 +59,8 @@ func RunInitWizard() error {
 		selectedThinkingLevel string
 	)
 
+	height := ui.GetTermFitHeight(100) // algo would use term height/2
+
 	store := data.NewConfigStore()
 	if store.ConfigFileUsed() != "" {
 		fmt.Printf("Note: Updating existing configuration at %s\n\n", store.ConfigFileUsed())
@@ -105,7 +107,7 @@ func RunInitWizard() error {
 					huh.NewOption("Other (OpenAI Compatible)", "other"),
 				).
 				Value(&provider),
-		),
+		).WithHeight(height),
 	).Run()
 
 	if err != nil {
@@ -268,7 +270,7 @@ func RunInitWizard() error {
 					}
 					return nil
 				}),
-		),
+		).WithHeight(height),
 		// Group 3: Tools Selection
 		huh.NewGroup(
 			huh.NewMultiSelect[string]().
@@ -281,7 +283,7 @@ func RunInitWizard() error {
 				}()...).
 				Value(&selectedTools),
 			ui.GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
-		),
+		).WithHeight(height),
 		// Group 4: Thinking Level
 		huh.NewGroup(
 			huh.NewSelect[string]().
@@ -294,16 +296,17 @@ func RunInitWizard() error {
 					huh.NewOption("High - Maximum reasoning", "high").Selected(false),
 				).
 				Value(&selectedThinkingLevel),
-		),
+		).WithHeight(height),
 		// Group 5: Capabilities
 		huh.NewGroup(
 			msfeatures, featureNote,
-		),
+		).WithHeight(height),
 		huh.NewGroup(
 			huh.NewConfirm().
 				Title("Save Configuration?").
+				Description("You can modify this agent thereafter").
 				Value(&confirm),
-		),
+		).WithHeight(height),
 	).Run()
 
 	if err != nil {

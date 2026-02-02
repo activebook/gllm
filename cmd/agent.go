@@ -127,6 +127,7 @@ var agentAddCmd = &cobra.Command{
 		)
 
 		// Initial defaults
+		height := ui.GetTermFitHeight(100) // algo would use term height/2
 
 		// Get available options from data layer
 		store := data.NewConfigStore()
@@ -192,7 +193,7 @@ var agentAddCmd = &cobra.Command{
 						}
 						return nil
 					}),
-			),
+			).WithHeight(height),
 		).Run()
 		if err != nil {
 			fmt.Println("Aborted.")
@@ -207,7 +208,7 @@ var agentAddCmd = &cobra.Command{
 					Description("Select the AI model for this agent").
 					Options(modelOptions...).
 					Value(&model),
-			),
+			).WithHeight(height),
 		).Run()
 		if err != nil {
 			return
@@ -221,7 +222,7 @@ var agentAddCmd = &cobra.Command{
 					Description("The system prompt to use for agent responses").
 					Options(sysPromptOptions...).
 					Value(&sysPrompt),
-			),
+			).WithHeight(height),
 		).Run()
 		if err != nil {
 			return
@@ -235,7 +236,7 @@ var agentAddCmd = &cobra.Command{
 					Description("The template to use for agent responses").
 					Options(templateOptions...).
 					Value(&template),
-			),
+			).WithHeight(height),
 		).Run()
 		if err != nil {
 			return
@@ -250,7 +251,7 @@ var agentAddCmd = &cobra.Command{
 					Options(toolsOptions...).
 					Value(&tools),
 				ui.GetStaticHuhNote("Tools Details", EmbeddingToolsDescription),
-			),
+			).WithHeight(height),
 		).Run()
 		if err != nil {
 			return
@@ -275,7 +276,7 @@ var agentAddCmd = &cobra.Command{
 						huh.NewOption("High - Maximum reasoning", "high").Selected(false),
 					).
 					Value(&think),
-			),
+			).WithHeight(height),
 		).Run()
 		if err != nil {
 			return
@@ -301,7 +302,7 @@ var agentAddCmd = &cobra.Command{
 			huh.NewGroup(
 				msfeatures,
 				featureNote,
-			),
+			).WithHeight(height),
 		).Run()
 		if err != nil {
 			fmt.Println("Aborted.")
