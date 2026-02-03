@@ -19,6 +19,7 @@ func init() {
 	modelCmd.AddCommand(modelListCmd)
 	modelCmd.AddCommand(modelAddCmd)
 	modelCmd.AddCommand(modelSetCmd)
+	modelCmd.AddCommand(modelRenameCmd)
 	modelCmd.AddCommand(modelInfoCmd)
 	modelCmd.AddCommand(modelRemoveCmd)
 	modelCmd.AddCommand(modelClearCmd)
@@ -790,6 +791,98 @@ to the specified one for all subsequent operations.`,
 		fmt.Printf("Switched to model '%s' successfully.\n", name)
 		fmt.Println("This model will be used for all subsequent operations.")
 		return nil
+	},
+}
+
+var modelRenameCmd = &cobra.Command{
+	Use:     "rename [OLD_NAME] [NEW_NAME]",
+	Aliases: []string{"mv", "rn"},
+	Short:   "Rename an existing model",
+	Long:    `Rename an existing model configuration to a new name.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		store := data.NewConfigStore()
+		var oldName, newName string
+
+		// Argument handling
+		if len(args) >= 1 {
+			oldName = args[0]
+		}
+		if len(args) >= 2 {
+			newName = args[1]
+		}
+
+		// Interactive selection for old name
+		if oldName == "" {
+			modelsMap := store.GetModels()
+			if len(modelsMap) == 0 {
+				fmt.Println("No models found.")
+				return
+			}
+			var options []huh.Option[string]
+			for n := range modelsMap {
+				options = append(options, huh.NewOption(n, n))
+			}
+			// Default to current model if possible
+			currentName := ""
+			activeAgent := store.GetActiveAgent()
+			if activeAgent != nil {
+				currentName = activeAgent.Model.Name
+			}
+			ui.SortOptions(options, currentName)
+			height := ui.GetTermFitHeight(len(options))
+
+			err := huh.NewSelect[string]().
+				Title("Select Model to Rename").
+				Description("Choose the model configuration you want to rename").
+				Height(height).
+				Options(options...).
+				Value(&oldName).
+				Run()
+			if err != nil {
+				fmt.Println("Aborted.")
+				return
+			}
+		}
+
+		// Check if old model exists
+		if store.GetModel(oldName) == nil {
+			fmt.Printf("Model '%s' not found.\n", oldName)
+			return
+		}
+
+		// Interactive input for new name
+		if newName == "" {
+			newName = oldName
+			err := huh.NewInput().
+				Title("New Model Name").
+				Description(fmt.Sprintf("Enter new name for model '%s'", oldName)).
+				Value(&newName).
+				Validate(func(s string) error {
+					if strings.TrimSpace(s) == "" {
+						return fmt.Errorf("name cannot be empty")
+					}
+					if err := CheckModelName(s); err != nil {
+						return err
+					}
+					if store.GetModel(s) != nil {
+						return fmt.Errorf("model '%s' already exists", s)
+					}
+					return nil
+				}).
+				Run()
+			if err != nil {
+				fmt.Println("Aborted.")
+				return
+			}
+		}
+
+		// Perform rename
+		if err := store.RenameModel(oldName, newName); err != nil {
+			service.Errorf("Failed to rename model: %v\n", err)
+			return
+		}
+
+		fmt.Printf("Model '%s' successfully renamed to '%s'.\n", oldName, newName)
 	},
 }
 

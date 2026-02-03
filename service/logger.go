@@ -128,7 +128,8 @@ func Errorf(format string, args ...interface{}) {
 	if logger != nil {
 		BeforeLog()
 		logger.Errorf(format, args...)
-		AfterLog()
+		// Error stop here
+		// AfterLog()
 	}
 }
 
@@ -136,6 +137,7 @@ func Errorln(args ...interface{}) {
 	if logger != nil {
 		BeforeLog()
 		logger.Errorln(args...)
-		AfterLog()
+		// Error stop here
+		// AfterLog()
 	}
 }

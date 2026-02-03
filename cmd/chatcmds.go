@@ -41,6 +41,7 @@ var (
 		"/info":     "Show current settings",
 		"/theme":    "Manage and switch themes",
 		"/verbose":  "Toggle verbose mode",
+		"/workflow": "Manage workflow commands",
 	}
 
 	chatSpecMap = map[string]string{
@@ -203,7 +204,14 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	case "/verbose":
 		runCommand(verboseCmd, parts[1:])
 
+	case "/workflow":
+		runCommand(workflowCmd, parts[1:])
+
 	default:
+		// Try to execute as workflow command
+		if ci.executeWorkflow(command, parts) {
+			return
+		}
 		fmt.Printf("Unknown command: %s\n", command)
 	}
 }
@@ -324,7 +332,7 @@ func (ci *ChatInfo) handleEditor() {
 
 func (ci *ChatInfo) handleEditorCommand() {
 	editor := getPreferredEditor()
-	tempFile, err := createTempFile(_gllmTempFile)
+	tempFile, err := createTempFile(chatEidtTempFile)
 	if err != nil {
 		service.Errorf("Failed to create temp file: %v", err)
 		return
@@ -486,4 +494,23 @@ func (ci *ChatInfo) detachFiles(input string) {
 	if !detachedAny {
 		fmt.Println("No valid detachment")
 	}
+}
+
+// executeWorkflow checks if command is a workflow and executes it
+// Returns true if it was a workflow command
+func (ci *ChatInfo) executeWorkflow(command string, parts []string) bool {
+	// Strip leading /
+	name := strings.TrimPrefix(command, "/")
+
+	wm := service.GetWorkflowManager()
+
+	// Check if workflow exists
+	content, _, err := wm.GetWorkflowByName(name)
+	if err != nil {
+		return false // Not a workflow command
+	}
+
+	// Set the content as input to be processed by the agent
+	ci.EditorInput = content
+	return true
 }

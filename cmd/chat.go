@@ -87,7 +87,7 @@ have a continuous conversation with the model.`,
 var ()
 
 const (
-	_gllmTempFile = ".gllm-edit-*.tmp"
+	chatEidtTempFile = ".gllm-edit-*.tmp"
 )
 
 // Load when package is initialized
@@ -191,6 +191,19 @@ func (ci *ChatInfo) awaitChat() (string, error) {
 		commands = append(commands, ui.Suggestion{Command: cmd, Description: desc})
 	}
 
+	// Load workflow commands
+	_ = service.GetWorkflowManager().LoadMetadata(chatCommandMap)
+
+	// Add workflow commands
+	wm := service.GetWorkflowManager()
+	for cmd, desc := range wm.GetCommands() {
+		// Skip if the command already exists in chatCommandMap
+		if _, ok := chatCommandMap[cmd]; ok {
+			continue
+		}
+		commands = append(commands, ui.Suggestion{Command: cmd, Description: desc})
+	}
+
 	// Sort commands by text
 	sort.Slice(commands, func(i, j int) bool {
 		return commands[i].Command < commands[j].Command
@@ -257,6 +270,8 @@ func (ci *ChatInfo) startREPL() {
 			// If editor input is not empty, use it as input
 			if ci.EditorInput != "" {
 				input = ci.EditorInput
+				// Reset editor input
+				ci.EditorInput = ""
 			} else {
 				continue
 			}
