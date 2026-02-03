@@ -155,7 +155,6 @@ func (m *ChatInputModel) updateHistorySelection(keyType tea.KeyType) (tea.Model,
 			if m.historyIndex > 0 {
 				m.historyIndex--
 				m.textarea.SetValue(m.history[m.historyIndex])
-				// Move cursor to end
 				m.textarea.SetCursor(len(m.history[m.historyIndex]))
 			}
 			return m, nil
@@ -177,6 +176,85 @@ func (m *ChatInputModel) updateHistorySelection(keyType tea.KeyType) (tea.Model,
 		}
 	}
 	return nil, nil
+}
+
+// UpdateSuggestions updates the suggestions based on the current input
+func (m ChatInputModel) UpdateSuggestions(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.textarea, cmd = m.textarea.Update(msg)
+
+	// Detect suggestions
+	val := m.textarea.Value()
+	cursor := getCursorIndex(m.textarea)
+
+	// Find word start
+	start := 0
+	// Bounds check
+	if cursor > len(val) {
+		cursor = len(val)
+	}
+
+	// Find the start of the word from backward(start from cursor position)
+	for i := cursor - 1; i >= 0; i-- {
+		if val[i] == ' ' || val[i] == '\n' {
+			start = i + 1
+			break
+		}
+	}
+
+	wordSoFar := val[start:cursor]
+	m.showSuggestions = false
+
+	if strings.HasPrefix(wordSoFar, "@") {
+		// @ can appear in the middle of the line
+		// File mode
+		m.suggestionType = suggestionTypeFile
+		m.suggestionStart = start
+
+		// Use the substring after @ as the pattern
+		// substring* as glob pattern
+		pattern := wordSoFar[1:]
+		matches := getFileSuggestions(pattern)
+		m.filteredCommands = []Suggestion{}
+		for _, match := range matches {
+			m.filteredCommands = append(m.filteredCommands, Suggestion{Command: match})
+		}
+
+		// Show suggestions if there are any
+		if len(m.filteredCommands) > 0 {
+			m.showSuggestions = true
+			// Check whether last suggestion index is valid
+			if m.suggestionIndex >= len(m.filteredCommands) {
+				m.suggestionIndex = 0
+			}
+		}
+	} else if start == 0 && strings.HasPrefix(wordSoFar, "/") {
+		// Command mode (only at start of line)
+		m.suggestionType = suggestionTypeCommand
+		m.suggestionStart = 0
+
+		// Filter commands
+		var matches []Suggestion
+		for _, c := range m.allCommands {
+			if strings.HasPrefix(c.Command, wordSoFar) {
+				matches = append(matches, c)
+			}
+		}
+
+		if len(matches) == 1 && matches[0].Command == wordSoFar {
+			// Only one match, no need to show suggestions
+			m.showSuggestions = false
+		} else if len(matches) > 0 {
+			// Multiple matches, show suggestions
+			m.showSuggestions = true
+			m.filteredCommands = matches
+			// Check whether last suggestion index is valid
+			if m.suggestionIndex >= len(matches) {
+				m.suggestionIndex = 0
+			}
+		}
+	}
+	return m, cmd
 }
 
 // User input, move cursor, type text, all trigger Update
@@ -239,80 +317,8 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// Handle character input and suggestions logic
-	m.textarea, cmd = m.textarea.Update(msg)
-
-	// Detect suggestions
-	val := m.textarea.Value()
-	cursor := getCursorIndex(m.textarea)
-
-	// Find word start
-	start := 0
-	// Bounds check
-	if cursor > len(val) {
-		cursor = len(val)
-	}
-
-	// Find the start of the word from backward(start from cursor position)
-	for i := cursor - 1; i >= 0; i-- {
-		if val[i] == ' ' || val[i] == '\n' {
-			start = i + 1
-			break
-		}
-	}
-
-	wordSoFar := val[start:cursor]
-	m.showSuggestions = false
-
-	if strings.HasPrefix(wordSoFar, "@") {
-		// File mode
-		m.suggestionType = suggestionTypeFile
-		m.suggestionStart = start
-
-		// Use the substring after @ as the pattern
-		// substring* as glob pattern
-		pattern := wordSoFar[1:]
-		matches := getFileSuggestions(pattern)
-		m.filteredCommands = []Suggestion{}
-		for _, match := range matches {
-			m.filteredCommands = append(m.filteredCommands, Suggestion{Command: match})
-		}
-
-		// Show suggestions if there are any
-		if len(m.filteredCommands) > 0 {
-			m.showSuggestions = true
-			// Check whether last suggestion index is valid
-			if m.suggestionIndex >= len(m.filteredCommands) {
-				m.suggestionIndex = 0
-			}
-		}
-	} else if start == 0 && strings.HasPrefix(wordSoFar, "/") {
-		// Command mode (only at start of line)
-		m.suggestionType = suggestionTypeCommand
-		m.suggestionStart = 0
-
-		// Filter commands
-		var matches []Suggestion
-		for _, c := range m.allCommands {
-			if strings.HasPrefix(c.Command, wordSoFar) {
-				matches = append(matches, c)
-			}
-		}
-
-		if len(matches) == 1 && matches[0].Command == wordSoFar {
-			// Only one match, no need to show suggestions
-			m.showSuggestions = false
-		} else if len(matches) > 0 {
-			// Multiple matches, show suggestions
-			m.showSuggestions = true
-			m.filteredCommands = matches
-			// Check whether last suggestion index is valid
-			if m.suggestionIndex >= len(matches) {
-				m.suggestionIndex = 0
-			}
-		}
-	}
-
-	return m, cmd
+	model, cmd = m.UpdateSuggestions(msg)
+	return model, cmd
 }
 
 // selectSuggestion selects the current suggestion
