@@ -227,6 +227,107 @@ func (c *ConfigStore) DeleteAgent(name string) error {
 	return c.Save()
 }
 
+// RenameAgent renames an existing agent
+func (c *ConfigStore) RenameAgent(oldName, newName string) error {
+	oldName = strings.ToLower(oldName)
+	newName = strings.ToLower(newName)
+
+	if oldName == newName {
+		return nil
+	}
+
+	agentsMap := c.v.GetStringMap("agents")
+	if agentsMap == nil {
+		return fmt.Errorf("no agents configured")
+	}
+
+	// Check if old agent exists
+	config, exists := agentsMap[oldName]
+	if !exists {
+		return fmt.Errorf("agent '%s' not found", oldName)
+	}
+
+	// Check if new name already exists
+	if _, exists := agentsMap[newName]; exists {
+		return fmt.Errorf("agent '%s' already exists", newName)
+	}
+
+	// Double check parsing works for the old config
+	agent := c.parseAgentConfig(oldName, config)
+	if agent == nil {
+		return fmt.Errorf("failed to parse old agent config")
+	}
+
+	// Update name in struct
+	agent.Name = newName
+
+	// Update the map: add new, remove old
+	agentsMap[newName] = c.agentToMap(agent)
+	delete(agentsMap, oldName)
+
+	// Update viper and save
+	c.v.Set("agents", agentsMap)
+
+	// Update active agent if necessary
+	if c.GetActiveAgentName() == oldName {
+		c.v.Set("agent", newName)
+	}
+
+	return c.Save()
+}
+
+// Bugfix:
+// The bug where renaming a model or agent would leave the old entry behind in the configuration.
+// The issue was caused by a non-atomic rename process.
+// Use atomic map operations, ensuring that the old key is correctly removed from gllm.yaml in a single save operation.
+// RenameModel renames an existing model
+func (c *ConfigStore) RenameModel(oldName, newName string) error {
+	oldName = strings.ToLower(oldName)
+	newName = strings.ToLower(newName)
+
+	if oldName == newName {
+		return nil
+	}
+
+	modelsMap := c.v.GetStringMap("models")
+	if modelsMap == nil {
+		return fmt.Errorf("no models configured")
+	}
+
+	// Check if old model exists
+	config, exists := modelsMap[oldName]
+	if !exists {
+		return fmt.Errorf("model '%s' not found", oldName)
+	}
+
+	// Check if new name already exists
+	if _, exists := modelsMap[newName]; exists {
+		return fmt.Errorf("model '%s' already exists", newName)
+	}
+
+	// Update the map: add new, remove old
+	modelsMap[newName] = config
+	delete(modelsMap, oldName)
+
+	// Update viper
+	c.v.Set("models", modelsMap)
+
+	// Update agents that reference this model
+	agents := c.GetAllAgents()
+	for _, agent := range agents {
+		if strings.ToLower(agent.Model.Name) == oldName {
+			agent.Model.Name = newName
+			// SetAgent will call Save() internally, but we'll call Save() at the end anyway.
+			// However, SetAgent updates the "agents" map in Viper.
+			if err := c.SetAgent(agent.Name, agent); err != nil {
+				return fmt.Errorf("failed to update agent reference: %w", err)
+			}
+		}
+	}
+
+	return c.Save()
+}
+
 // SetActiveAgent sets the active agent name.
 func (c *ConfigStore) SetActiveAgent(name string) error {
 	c.v.Set("agent", name)

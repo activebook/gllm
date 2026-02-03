@@ -766,6 +766,92 @@ var agentInfoCmd = &cobra.Command{
 	},
 }
 
+var agentRenameCmd = &cobra.Command{
+	Use:     "rename [OLD_NAME] [NEW_NAME]",
+	Aliases: []string{"mv", "rn"},
+	Short:   "Rename an existing agent",
+	Long:    `Rename an existing agent configuration to a new name.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		store := data.NewConfigStore()
+		var oldName, newName string
+
+		// Argument handling
+		if len(args) >= 1 {
+			oldName = args[0]
+		}
+		if len(args) >= 2 {
+			newName = args[1]
+		}
+
+		// Interactive selection for old name
+		if oldName == "" {
+			agents := store.GetAllAgents()
+			if len(agents) == 0 {
+				fmt.Println("No agents found.")
+				return
+			}
+			var options []huh.Option[string]
+			for n := range agents {
+				options = append(options, huh.NewOption(n, n))
+			}
+			ui.SortOptions(options, store.GetActiveAgentName())
+			height := ui.GetTermFitHeight(len(options))
+
+			err := huh.NewSelect[string]().
+				Title("Select Agent to Rename").
+				Description("Choose the agent you want to rename").
+				Height(height).
+				Options(options...).
+				Value(&oldName).
+				Run()
+			if err != nil {
+				fmt.Println("Aborted.")
+				return
+			}
+		}
+
+		// Check if old agent exists
+		if store.GetAgent(oldName) == nil {
+			fmt.Printf("Agent '%s' not found.\n", oldName)
+			return
+		}
+
+		// Interactive input for new name
+		if newName == "" {
+			newName = oldName
+			err := huh.NewInput().
+				Title("New Agent Name").
+				Description(fmt.Sprintf("Enter new name for agent '%s'", oldName)).
+				Value(&newName).
+				Validate(func(s string) error {
+					if strings.TrimSpace(s) == "" {
+						return fmt.Errorf("name cannot be empty")
+					}
+					if err := CheckAgentName(s); err != nil {
+						return err
+					}
+					if store.GetAgent(s) != nil {
+						return fmt.Errorf("agent '%s' already exists", s)
+					}
+					return nil
+				}).
+				Run()
+			if err != nil {
+				fmt.Println("Aborted.")
+				return
+			}
+		}
+
+		// Perform rename
+		if err := store.RenameAgent(oldName, newName); err != nil {
+			service.Errorf("Failed to rename agent: %v\n", err)
+			return
+		}
+
+		fmt.Printf("Agent '%s' successfully renamed to '%s'.\n", oldName, newName)
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(agentCmd)
 
@@ -774,6 +860,7 @@ func init() {
 	agentCmd.AddCommand(agentAddCmd)
 	agentCmd.AddCommand(agentSetCmd)
 	agentCmd.AddCommand(agentRemoveCmd)
+	agentCmd.AddCommand(agentRenameCmd)
 	agentCmd.AddCommand(agentSwitchCmd)
 	agentCmd.AddCommand(agentInfoCmd)
 }

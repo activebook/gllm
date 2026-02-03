@@ -217,7 +217,7 @@ var workflowRemoveCmd = &cobra.Command{
 
 var workflowRenameCmd = &cobra.Command{
 	Use:     "rename [old] [new]",
-	Aliases: []string{"mv"},
+	Aliases: []string{"mv", "rn"},
 	Short:   "Rename a workflow",
 	Args:    cobra.MaximumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -260,10 +260,10 @@ var workflowRenameCmd = &cobra.Command{
 		}
 
 		if newName == "" {
+			newName = oldName
 			err := huh.NewInput().
 				Title("New Name").
 				Description(fmt.Sprintf("Enter new name for '/%s'", oldName)).
-				Placeholder(oldName).
 				Value(&newName).
 				Validate(func(s string) error {
 					if strings.TrimSpace(s) == "" {
