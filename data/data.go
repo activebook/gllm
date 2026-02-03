@@ -55,6 +55,11 @@ func GetSkillsDirPath() string {
 	return filepath.Join(GetConfigDir(), "skills")
 }
 
+// GetWorkflowsDirPath returns the path to the workflows directory.
+func GetWorkflowsDirPath() string {
+	return filepath.Join(GetConfigDir(), "workflows")
+}
+
 // GetSettingsFilePath returns the path to the settings file.
 func GetSettingsFilePath() string {
 	return filepath.Join(GetConfigDir(), "settings.json")
