@@ -25,6 +25,7 @@
 - **Agentic Workflow**: Orchestrate sophisticated multi-agent behaviors using state-of-the-art models for parallel task execution and save context window.
 - **Agent Skills**: Support agent skills, switch skills on and off, and install from git or local path.
 - **@ Reference Support**: Reference files and directories directly in prompts using @ syntax for seamless context inclusion.
+- **Workflow Commands**: Define and execute workflows as commands for streamlined operations.
 - **Colorful Themes**: Supports hundreds of popular themes, compatible with light and dark modes, ANSI-color, and full true-color.
 - **Cross-platform Support**: gllm is available for macOS, Windows, and Linux, and easy to install and update.
 
@@ -150,6 +151,15 @@ Within the chat, you can use various commands:
 - `/system <prompt>`: Change the system prompt.
 - `/attach <file>`: Attach a file to the conversation.
 - `! <command>`: Execute a shell command.
+- `@ path`: Reference a file or directory in your prompt.
+
+### Workflow Commands
+
+Workflow commands are predefined sequences of actions that can be executed with a single command. They are stored as markdown files in the `workflows` directory. 
+
+| Use debug command | Workflow commands |
+|:-------------------:|:--------------:|
+| ![Debug command](screenshots/cmd_workflow_1.png) | ![Workflow commands](screenshots/cmd_workflow_2.png) |
 
 ### Multi-Line Input with Editor
 
