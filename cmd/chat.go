@@ -87,7 +87,7 @@ have a continuous conversation with the model.`,
 var ()
 
 const (
-	_gllmTempFile = ".gllm-edit-*.tmp"
+	chatEidtTempFile = ".gllm-edit-*.tmp"
 )
 
 // Load when package is initialized

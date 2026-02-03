@@ -139,6 +139,34 @@ func (wm *WorkflowManager) CreateWorkflow(name, description, content string) err
 	return wm.LoadMetadata(wm.reservedCommands)
 }
 
+// UpdateWorkflow updates an existing workflow file
+func (wm *WorkflowManager) UpdateWorkflow(name, description, content string) error {
+	wm.mu.RLock()
+	var path string
+	lowerName := strings.ToLower(name)
+	for _, w := range wm.workflows {
+		if strings.ToLower(w.Name) == lowerName {
+			path = w.Location
+			break
+		}
+	}
+	wm.mu.RUnlock()
+
+	if path == "" {
+		return fmt.Errorf("workflow '%s' not found", name)
+	}
+
+	// Prepare content with frontmatter
+	fullContent := fmt.Sprintf("---\nname: %s\ndescription: %s\n---\n\n%s", name, description, content)
+
+	if err := os.WriteFile(path, []byte(fullContent), 0644); err != nil {
+		return fmt.Errorf("failed to update workflow file: %w", err)
+	}
+
+	// Reload metadata
+	return wm.LoadMetadata(wm.reservedCommands)
+}
+
 // RemoveWorkflow removes a workflow
 func (wm *WorkflowManager) RemoveWorkflow(name string) error {
 	wm.mu.RLock()

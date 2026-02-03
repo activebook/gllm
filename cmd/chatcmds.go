@@ -332,7 +332,7 @@ func (ci *ChatInfo) handleEditor() {
 
 func (ci *ChatInfo) handleEditorCommand() {
 	editor := getPreferredEditor()
-	tempFile, err := createTempFile(_gllmTempFile)
+	tempFile, err := createTempFile(chatEidtTempFile)
 	if err != nil {
 		service.Errorf("Failed to create temp file: %v", err)
 		return
