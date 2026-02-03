@@ -263,10 +263,14 @@ var workflowRenameCmd = &cobra.Command{
 			err := huh.NewInput().
 				Title("New Name").
 				Description(fmt.Sprintf("Enter new name for '/%s'", oldName)).
+				Placeholder(oldName).
 				Value(&newName).
 				Validate(func(s string) error {
 					if strings.TrimSpace(s) == "" {
 						return fmt.Errorf("name cannot be empty")
+					}
+					if strings.TrimSpace(s) == oldName {
+						return fmt.Errorf("name cannot be the same as old name")
 					}
 					if wm.IsReservedCommand(s) {
 						return fmt.Errorf("name '%s' is a reserved command", s)
