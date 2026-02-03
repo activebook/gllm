@@ -105,8 +105,9 @@ func init() {
 
 type ChatInfo struct {
 	Files       []*service.FileData
-	QuitFlag    bool   // for cmd /quit or /exit
-	EditorInput string // for /e editor edit
+	QuitFlag    bool     // for cmd /quit or /exit
+	EditorInput string   // for /e editor edit
+	History     []string // for chat input history
 	outputFile  string
 	sharedState *data.SharedState // Persistent SharedState for the session
 }
@@ -195,13 +196,17 @@ func (ci *ChatInfo) awaitChat() (string, error) {
 		return commands[i].Command < commands[j].Command
 	})
 
-	result, err := ui.RunChatInput(commands, ci.EditorInput)
+	// Run chat input
+	result, err := ui.RunChatInput(commands, ci.EditorInput, ci.History)
 	if err != nil {
 		return "", err
 	}
 	if result.Canceled {
 		return "", fmt.Errorf("user canceled")
 	}
+
+	// Update history
+	ci.History = result.History
 
 	return result.Value, nil
 }
