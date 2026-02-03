@@ -52,6 +52,7 @@ type ChatInputModel struct {
 	suggestionStart  int          // start index of the suggestion(cursor position)
 	history          []string     // input history
 	historyIndex     int          // current history index
+	currentInput     string       // current input value
 }
 
 // NewChatInputModel creates a new chat input model
@@ -86,10 +87,11 @@ func NewChatInputModel(commands []Suggestion, initialValue string, history []str
 
 	width := GetTerminalWidth()
 	return ChatInputModel{
-		textarea:    ta,
-		allCommands: commands,
-		history:     history,
-		width:       width,
+		textarea:     ta,
+		allCommands:  commands,
+		history:      history,
+		historyIndex: len(history),
+		width:        width,
 	}
 }
 
@@ -146,6 +148,10 @@ func (m *ChatInputModel) updateHistorySelection(keyType tea.KeyType) (tea.Model,
 	switch keyType {
 	case tea.KeyUp:
 		if m.textarea.Line() == 0 {
+			// Save current input BEFORE entering history navigation
+			if m.historyIndex == len(m.history) {
+				m.currentInput = m.textarea.Value()
+			}
 			if m.historyIndex > 0 {
 				m.historyIndex--
 				m.textarea.SetValue(m.history[m.historyIndex])
@@ -159,7 +165,9 @@ func (m *ChatInputModel) updateHistorySelection(keyType tea.KeyType) (tea.Model,
 			if m.historyIndex < len(m.history) {
 				m.historyIndex++
 				if m.historyIndex == len(m.history) {
-					m.textarea.SetValue("")
+					// Restore the saved input
+					m.textarea.SetValue(m.currentInput)
+					m.textarea.SetCursor(len(m.currentInput))
 				} else {
 					m.textarea.SetValue(m.history[m.historyIndex])
 					m.textarea.SetCursor(len(m.history[m.historyIndex]))
