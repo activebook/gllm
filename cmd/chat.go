@@ -118,7 +118,7 @@ func (ci *ChatInfo) printWelcome() {
 		Foreground(lipgloss.Color(data.KeyHex)).
 		Width(ui.GetTerminalWidth()-4).
 		Align(lipgloss.Center).
-		MarginTop(1).
+		MarginTop(0).
 		MarginBottom(1).
 		Padding(0, 0)
 
@@ -141,7 +141,8 @@ func (ci *ChatInfo) printWelcome() {
 		Margin(0, 1).
 		Padding(1)
 
-	welcomeText := "Welcome to GLLM Interactive Chat"
+	logo := ui.GetLogo(data.KeyHex, data.LabelHex, 0.5)
+	welcomeText := logo + "\nWelcome to Chat Mode" + " (v" + version + ")"
 	instructions := []string{
 		"• '/help' lists all available commands",
 		"• '/exit', '/quit' to end current chat session",
