@@ -21,6 +21,17 @@ var themeCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("\nCurrent Theme: %s%s%s\n\n", data.HighlightColor, data.CurrentThemeName, data.ResetSeq)
 
+		headerStyle := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color(data.KeyHex)).
+			Align(lipgloss.Center).
+			MarginTop(0).
+			MarginBottom(0).
+			Padding(0, 0)
+
+		logo := ui.GetLogo(data.KeyHex, data.LabelHex, 0.5)
+		header := headerStyle.Render(logo)
+
 		var samples []string
 
 		// 1. Enable/Disable
@@ -53,7 +64,9 @@ var themeCmd = &cobra.Command{
 		// 5. Tool Call
 		samples = append(samples, fmt.Sprintf("%-20s: %s[TOOL] execute_command()%s", "Tool Call", data.ToolCallColor, data.ResetSeq))
 
-		block := lipgloss.JoinVertical(lipgloss.Left, samples...)
+		smps := lipgloss.JoinVertical(lipgloss.Left, samples...)
+
+		block := lipgloss.JoinVertical(lipgloss.Center, header, smps)
 
 		style := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).

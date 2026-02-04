@@ -41,7 +41,7 @@ type Agent struct {
 	DataChan        chan<- StreamData   // Sub Channel to receive streamed text data
 	ProceedChan     <-chan bool         // Sub Channel to receive proceed signal
 	SearchEngine    *SearchEngine       // Search engine name
-	ToolsUse        ToolsUse            // Use tools
+	ToolsUse        data.ToolsUse       // Use tools
 	EnabledTools    []string            // List of enabled embedding tools
 	UseCodeTool     bool                // Use code tool
 	ThinkingLevel   ThinkingLevel       // Thinking level: off, low, medium, high
@@ -185,7 +185,7 @@ func CallAgent(op *AgentOptions) error {
 
 	// Set up search engine settings based on capabilities
 	se := constructSearchEngine(op.Capabilities)
-	toolsUse := ToolsUse{AutoApprove: op.YoloMode}
+	toolsUse := data.ToolsUse{AutoApprove: op.YoloMode}
 
 	// Set up code tool settings
 	exeCode := IsCodeExecutionEnabled()
