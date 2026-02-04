@@ -112,7 +112,6 @@ gllm convo remove "2 - 5" --force`,
 				}
 				options = append(options, huh.NewOption(label, c.Name))
 			}
-			ui.SortOptions(options, "")
 			height := ui.GetTermFitHeight(len(options))
 
 			var selected []string
@@ -132,7 +131,9 @@ gllm convo remove "2 - 5" --force`,
 
 			// We treat selected names as specific matches
 			var matches []string
+			var names []string
 			for _, s := range selected {
+				names = append(names, s+".json")
 				matches = append(matches, filepath.Join(convoDir, s+".json"))
 			}
 
@@ -142,6 +143,7 @@ gllm convo remove "2 - 5" --force`,
 				var confirm bool
 				err = huh.NewConfirm().
 					Title(fmt.Sprintf("Are you sure you want to remove %d conversations?", len(matches))).
+					Description(strings.Join(names, "\n")).
 					Value(&confirm).
 					Run()
 				if err != nil || !confirm {
@@ -355,7 +357,6 @@ Using the --message-chars (-c) flag, set the maximum length of each message's co
 				}
 				options = append(options, huh.NewOption(label, c.Name))
 			}
-			ui.SortOptions(options, "")
 			height := ui.GetTermFitHeight(len(options))
 
 			err = huh.NewSelect[string]().
@@ -468,7 +469,6 @@ var convoRenameCmd = &cobra.Command{
 					}
 					options = append(options, huh.NewOption(label, c.Name))
 				}
-				ui.SortOptions(options, "")
 				height := ui.GetTermFitHeight(len(options))
 
 				err = huh.NewSelect[string]().
