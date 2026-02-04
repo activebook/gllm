@@ -82,9 +82,10 @@ func NeedUserConfirmToolUse(info string, prompt string, description string, tool
 	confirmField := huh.NewSelect[string]().
 		Title(prompt).
 		Options(
-			huh.NewOption("Yes, once", "Yes"),
-			huh.NewOption("No, cancel it", "No"),
-			huh.NewOption("Allow for this session", "All"),
+			huh.NewOption("Yes, allow once", "Yes"),
+			huh.NewOption("Yes, allow for this session", "All"),
+			// huh.NewOption("Yes, allow always", "Always"),
+			huh.NewOption("No, suggest changes", "No"),
 		).
 		Value(&choice)
 
