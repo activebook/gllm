@@ -122,10 +122,6 @@ var (
 	}
 )
 
-type ToolsUse struct {
-	AutoApprove bool // Whether tools can be used without user confirmation
-}
-
 func GetAllEmbeddingTools() []string {
 	return embeddingTools
 }
@@ -1427,7 +1423,7 @@ type OpenProcessor struct {
 	data       chan<- StreamData        // Sub Channel to send data
 	proceed    <-chan bool              // Main Channel to receive proceed signal
 	search     *SearchEngine            // Search engine
-	toolsUse   *ToolsUse                // Use tools
+	toolsUse   *data.ToolsUse           // Use tools
 	queries    []string                 // List of queries to be sent to the AI assistant
 	references []map[string]interface{} // keep track of the references
 	status     *StatusStack             // Stack to manage streaming status

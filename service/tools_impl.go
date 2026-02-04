@@ -76,7 +76,7 @@ func readFileToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	return response, nil
 }
 
-func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, showDiff func(diff string), closeDiff func()) (string, error) {
+func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse, showDiff func(diff string), closeDiff func()) (string, error) {
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
@@ -115,8 +115,9 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, 
 			purpose = fmt.Sprintf("write content to the file at path: %s", path)
 		}
 
-		// Directly prompt user for confirmation
-		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
+		// Prompt user for confirmation
+		confirm, err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
+		closeDiff() // Close the diff
 		if err != nil {
 			return "", err
 		}
@@ -140,7 +141,7 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, 
 	return fmt.Sprintf("Successfully wrote to file %s", path), nil
 }
 
-func createDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
+func createDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
@@ -160,8 +161,8 @@ func createDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *Tool
 			purpose = fmt.Sprintf("create the directory at path: %s", path)
 		}
 
-		// Directly prompt user for confirmation
-		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
+		// Prompt user for confirmation
+		confirm, err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
 		if err != nil {
 			return "", err
 		}
@@ -229,7 +230,7 @@ func listDirectoryToolCallImpl(argsMap *map[string]interface{}) (string, error) 
 	return result.String(), nil
 }
 
-func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
+func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
@@ -249,8 +250,8 @@ func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse)
 			purpose = fmt.Sprintf("delete the file at path: %s", path)
 		}
 
-		// Directly prompt user for confirmation
-		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
+		// Prompt user for confirmation
+		confirm, err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
 		if err != nil {
 			return "", err
 		}
@@ -268,7 +269,7 @@ func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse)
 	return fmt.Sprintf("Successfully deleted file %s", path), nil
 }
 
-func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
+func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
@@ -288,8 +289,8 @@ func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *Tool
 			purpose = fmt.Sprintf("delete the directory at path: %s and all its contents", path)
 		}
 
-		// Directly prompt user for confirmation
-		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
+		// Prompt user for confirmation
+		confirm, err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
 		if err != nil {
 			return "", err
 		}
@@ -307,7 +308,7 @@ func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *Tool
 	return fmt.Sprintf("Successfully deleted directory %s", path), nil
 }
 
-func moveToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
+func moveToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
 	source, ok := (*argsMap)["source"].(string)
 	if !ok {
 		return "", fmt.Errorf("source not found in arguments")
@@ -332,8 +333,8 @@ func moveToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (stri
 			purpose = fmt.Sprintf("move the file or directory from %s to %s", source, destination)
 		}
 
-		// Directly prompt user for confirmation
-		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
+		// Prompt user for confirmation
+		confirm, err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
 		if err != nil {
 			return "", err
 		}
@@ -585,7 +586,7 @@ func readMultipleFilesToolCallImpl(argsMap *map[string]interface{}) (string, err
 	return result.String(), nil
 }
 
-func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
+func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
 	cmdStr, ok := (*argsMap)["command"].(string)
 	if !ok {
 		return "", fmt.Errorf("command not found in arguments")
@@ -612,7 +613,7 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (str
 			descStr = ""
 		}
 		// Use the command string as the info for confirmation
-		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, descStr)
+		confirm, err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, descStr, toolsUse)
 		if err != nil {
 			return "", err
 		}
@@ -736,7 +737,7 @@ func webSearchToolCallImpl(argsMap *map[string]interface{}, queries *[]string, r
 	return string(resultsJSON), nil
 }
 
-func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, showDiff func(diff string), closeDiff func()) (string, error) {
+func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse, showDiff func(diff string), closeDiff func()) (string, error) {
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
@@ -824,7 +825,7 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, s
 		}
 
 		// Response with a prompt to let user confirm
-		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
+		confirm, err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
 		closeDiff() // Close the diff
 		if err != nil {
 			return "", err
@@ -852,7 +853,7 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse, s
 	return result.String(), nil
 }
 
-func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
+func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
 	source, ok := (*argsMap)["source"].(string)
 	if !ok {
 		return "", fmt.Errorf("source not found in arguments")
@@ -877,8 +878,8 @@ func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (stri
 			purpose = fmt.Sprintf("copy the file or directory from %s to %s", source, destination)
 		}
 
-		// Directly prompt user for confirmation
-		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
+		// Prompt user for confirmation
+		confirm, err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
 		if err != nil {
 			return "", err
 		}
@@ -1033,7 +1034,7 @@ func saveMemoryToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 }
 
 // switchAgentToolCallImpl handles the switch_agent tool call
-func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
+func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
 	name, ok := (*argsMap)["name"].(string)
 	if !ok {
 		return "", fmt.Errorf("agent name is required")
@@ -1091,7 +1092,7 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse
 
 	if needConfirm && !toolsUse.AutoApprove {
 		purpose := fmt.Sprintf("switch to agent '%s'", name)
-		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, purpose)
+		confirm, err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
 		if err != nil {
 			return "", err
 		}
@@ -1175,7 +1176,7 @@ func listAgentToolCallImpl() (string, error) {
 // Invokes one or more sub-agents and returns progress summary
 func spawnSubAgentsToolCallImpl(
 	argsMap *map[string]interface{},
-	toolsUse *ToolsUse,
+	toolsUse *data.ToolsUse,
 	executor *SubAgentExecutor,
 ) (string, error) {
 	if executor == nil {
@@ -1216,7 +1217,7 @@ func spawnSubAgentsToolCallImpl(
 				taskDesc.WriteString(fmt.Sprintf("- Task %d: %s (Agent: %s)", i+1, tm["task_key"], tm["agent"]))
 			}
 		}
-		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, taskDesc.String())
+		confirm, err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, taskDesc.String(), toolsUse)
 		if err != nil {
 			return "", err
 		}
@@ -1361,7 +1362,7 @@ func listStateToolCallImpl(state *data.SharedState) (string, error) {
 }
 
 // activateSkillToolCallImpl handles the activate_skill tool call.
-func activateSkillToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsUse) (string, error) {
+func activateSkillToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
 	name, ok := (*argsMap)["name"].(string)
 	if !ok {
 		return "", fmt.Errorf("skill name not found in arguments")
@@ -1378,7 +1379,7 @@ func activateSkillToolCallImpl(argsMap *map[string]interface{}, toolsUse *ToolsU
 	// Check if confirmation is needed (default logic: always confirm unless AutoApprove is true)
 	if !toolsUse.AutoApprove {
 		description := "Activate Skill:\n" + name + "\n\nDescription:\n" + desc + "\n\nResources:\n" + tree
-		confirm, err := ui.NeedUserConfirm("", ToolUserConfirmPrompt, description)
+		confirm, err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, description, toolsUse)
 		if err != nil {
 			return "", err
 		}
