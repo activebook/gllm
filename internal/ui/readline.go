@@ -55,17 +55,18 @@ func NeedUserConfirm(info string, prompt string, description string) (bool, erro
 // For tools use confirmation
 // If toolsUse.AutoApprove is true, return true
 // If toolsUse.AutoApprove is false, prompt the user for confirmation
-// If the user choose "All", set toolsUse.AutoApprove to true and return true
-// If the user choose "Yes", return true
-// If the user choose "No", return false
-func NeedUserConfirmToolUse(info string, prompt string, description string, toolsUse *data.ToolsUse) (bool, error) {
+// If the user choose "All", set toolsUse.AutoApprove to true and toolsUse.Confirm to data.ToolConfirmYes
+// If the user choose "Yes", set toolsUse.Confirm to data.ToolConfirmYes
+// If the user choose "No", set toolsUse.Confirm to data.ToolConfirmCancel
+func NeedUserConfirmToolUse(info string, prompt string, description string, toolsUse *data.ToolsUse) error {
 	// Output the info message if provided
 	if len(strings.TrimSpace(info)) > 0 {
 		fmt.Println(info)
 	}
 
 	if toolsUse.AutoApprove {
-		return true, nil
+		toolsUse.Confirm = data.ToolConfirmYes
+		return nil
 	}
 
 	var fields []huh.Field
@@ -82,9 +83,10 @@ func NeedUserConfirmToolUse(info string, prompt string, description string, tool
 	confirmField := huh.NewSelect[string]().
 		Title(prompt).
 		Options(
-			huh.NewOption("Yes, once", "Yes"),
-			huh.NewOption("No, cancel it", "No"),
-			huh.NewOption("Allow for this session", "All"),
+			huh.NewOption("Yes, allow once", "Yes"),
+			huh.NewOption("Yes, allow for this session", "All"),
+			// huh.NewOption("Yes, allow always", "Always"),
+			huh.NewOption("No, suggest changes", "No"),
 		).
 		Value(&choice)
 
@@ -102,19 +104,18 @@ func NeedUserConfirmToolUse(info string, prompt string, description string, tool
 
 	err := form.Run()
 	if err != nil {
-		return false, fmt.Errorf("error in confirmation prompt: %v", err)
+		return fmt.Errorf("error in confirmation prompt: %v", err)
 	}
 
-	var confirm bool
 	switch choice {
 	case "All":
-		toolsUse.AutoApprove = true
-		confirm = true
+		toolsUse.ConfirmAlways()
+		data.SetToolCallAutoApproveInSession(true)
 	case "Yes":
-		confirm = true
+		toolsUse.ConfirmOnce()
 	default:
-		confirm = false
+		toolsUse.ConfirmCancel()
 	}
 
-	return confirm, nil
+	return nil
 }

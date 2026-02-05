@@ -72,6 +72,46 @@ func (ag *Agent) initGeminiAgent() (*GeminiAgent, error) {
 	}, nil
 }
 
+func (ag *Agent) SortGeminiMessagesByOrder() error {
+	// Load previous messages if any
+	err := ag.Convo.Load()
+	if err != nil {
+		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}, nil)
+		return err
+	}
+
+	messages, _ := ag.Convo.GetMessages().([]*genai.Content)
+
+	var parts []*genai.Part
+
+	if ag.UserPrompt != "" {
+		parts = append(parts, &genai.Part{Text: ag.UserPrompt})
+	}
+	for _, file := range ag.Files {
+		// Check if the file data is empty
+		if file != nil {
+			// Convert the file data to a blob
+			part := ag.getGeminiFilePart(file)
+			if part.Text != "" || part.InlineData != nil {
+				parts = append(parts, &part)
+			}
+		}
+	}
+
+	if len(parts) > 0 {
+		// Construct Input Content from streamParts
+		content := &genai.Content{
+			Role:  genai.RoleUser,
+			Parts: parts,
+		}
+		messages = append(messages, content)
+	}
+
+	// Save messages to conversation
+	ag.Convo.SetMessages(messages)
+	return nil
+}
+
 func (ag *Agent) GenerateGeminiStream() error {
 	var err error
 	// Check the setup of Gemini client
@@ -80,31 +120,9 @@ func (ag *Agent) GenerateGeminiStream() error {
 		return err
 	}
 
-	var parts []genai.Part
 	// Initialize sub-agent executor if SharedState is available
 	if ag.SharedState != nil {
 		ga.executor = NewSubAgentExecutor(ag.SharedState, MaxWorkersParalleled)
-	}
-
-	if ag.UserPrompt != "" {
-		parts = append(parts, genai.Part{Text: ag.UserPrompt})
-	}
-	for _, file := range ag.Files {
-		// Check if the file data is empty
-		if file != nil {
-			// Convert the file data to a blob
-			part := ag.getGeminiFilePart(file)
-			if part.Text != "" || part.InlineData != nil {
-				parts = append(parts, part)
-			}
-		}
-	}
-
-	// Load previous messages if any
-	err = ag.Convo.Load()
-	if err != nil {
-		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}, nil)
-		return err
 	}
 
 	// Configure Model Parameters
@@ -169,10 +187,33 @@ func (ag *Agent) GenerateGeminiStream() error {
 				"Please disable tools if you want to use Google Search.")}, nil)
 	}
 
-	// Create a chat session - this is the important part
-	// it will only consume tokens on new input
-	messages, _ := ag.Convo.GetMessages().([]*genai.Content)
+	// Prepare the Messages for Chat Completion
+	err = ag.SortGeminiMessagesByOrder()
+	if err != nil {
+		return fmt.Errorf("error sorting messages: %v", err)
+	}
 
+	// Signal that streaming has started
+	// Wait for the main goroutine to tell sub-goroutine to proceed
+	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusStarted}, ag.ProceedChan)
+
+	// Process the chat with recursive tool call handling
+	err = ga.process(ag, &config)
+	if err != nil {
+		// Switch agent signal
+		if IsSwitchAgentError(err) {
+			return err
+		}
+		// User cancel signal
+		if IsUserCancelError(err) {
+			return err
+		}
+		return fmt.Errorf("error processing chat: %v", err)
+	}
+	return nil
+}
+
+func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) error {
 	// Context Management
 	truncated := false
 	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
@@ -184,46 +225,14 @@ func (ag *Agent) GenerateGeminiStream() error {
 	// Stream the responses
 	references := make([]map[string]interface{}, 0, 1)
 	queries := make([]string, 0, 1)
-	streamParts := &parts
 
 	// Use maxRecursions from LangLogic
 	maxRecursions := ag.MaxRecursions
 	for i := 0; i < maxRecursions; i++ {
-		// Skip turn if no parts to send
-		if len(*streamParts) == 0 {
-			break
-		}
-		// Construct Input Content from streamParts
-		inputParts := make([]*genai.Part, len(*streamParts))
-		hasFuncResponse := false
-		for idx, p := range *streamParts {
-			partCopy := p
-			inputParts[idx] = &partCopy
-			if p.FunctionResponse != nil {
-				hasFuncResponse = true
-			}
-		}
 
-		role := genai.RoleUser
-		if hasFuncResponse {
-			// function response
-			// This is the crucial part
-			// there is no function role, but it's a function response
-			// The producer of the content.
-			// Must be either 'user' or 'model'.
-			// Useful to set for multi-turn conversations,
-			// otherwise can be left blank or unset.
-			role = genai.RoleUser
-		}
-
-		inputContent := &genai.Content{
-			Role:  role,
-			Parts: inputParts,
-		}
-
-		// Prepare messages for this call
-		// We need to pass the full history including the current input
-		messages = append(messages, inputContent)
+		// Create a chat session - this is the important part
+		// Get all history messages - MUST be inside loop to pick up newly pushed messages
+		messages, _ := ag.Convo.GetMessages().([]*genai.Content)
 
 		// Context Management
 		// Directly truncate on the messages
@@ -233,19 +242,23 @@ func (ag *Agent) GenerateGeminiStream() error {
 			// Notify user or log that truncation happened
 			ag.Warn("Context trimmed to fit model limits")
 			Debugf("Context messages after truncation: [%d]", len(messages))
+			ag.Convo.SetMessages(messages)
 		}
 
 		// Call API
-		modelContent, resp, err := ga.processGeminiStream(ga.ctx, ga.client, &config, messages, &references, &queries)
+		modelContent, resp, err := ga.processGeminiStream(ga.ctx, ga.client, config, messages, &references, &queries)
 		if err != nil {
 			return err
 		}
-		// Record token usage
-		ga.addUpGeminiTokenUsage(resp)
 
 		// Update History
-		// messages already has inputContent from pre-API append
-		messages = append(messages, modelContent)
+		err = ga.processConvoSave(ag, modelContent)
+		if err != nil {
+			return err
+		}
+
+		// Record token usage
+		ga.addUpGeminiTokenUsage(resp)
 
 		// Check for function calls in the model content
 		funcCalls := []*genai.FunctionCall{}
@@ -260,37 +273,29 @@ func (ag *Agent) GenerateGeminiStream() error {
 			break
 		}
 
-		streamParts = &[]genai.Part{}
 		for _, funcCall := range funcCalls {
-
-			// Skip if not our expected function
-			// Because some model made up function name
-			if funcCall.Name != "" && !IsAvailableOpenTool(funcCall.Name) && !IsAvailableMCPTool(funcCall.Name, ag.MCPClient) {
-				Warnf("Skipping tool call with unknown function name: %s", funcCall.Name)
-				continue
-			}
 			// Handle tool call
 			funcResp, err := ga.processGeminiToolCall(funcCall)
 			if err != nil {
 				// Switch agent signal, pop up
 				if IsSwitchAgentError(err) {
 					// Add the response part to satisfy history integrity
-					respPart := genai.Part{FunctionResponse: funcResp}
-					inputContent := &genai.Content{
-						Role:  genai.RoleUser, // In Gemini, tool responses are sent as 'user' role
-						Parts: []*genai.Part{&respPart},
-					}
-					messages = append(messages, inputContent)
-					ag.Convo.SetMessages(messages)
-					ag.Convo.Save()
+					ga.processConvoSave(ag, funcResp)
+					return err
+				}
+				if IsUserCancelError(err) {
+					// Add the response part to satisfy history integrity
+					ga.processConvoSave(ag, funcResp)
 					return err
 				}
 				ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
 			}
 			// Bugfix: Even error happened, we still need to send the function response back through the chat session
 			// Send function response back through the chat session
-			respPart := genai.Part{FunctionResponse: funcResp}
-			*streamParts = append(*streamParts, respPart)
+			err = ga.processConvoSave(ag, funcResp)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -306,19 +311,22 @@ func (ag *Agent) GenerateGeminiStream() error {
 		ag.DataChan <- StreamData{Text: refs, Type: DataTypeNormal}
 	}
 
-	// Save the conversation history(curated)
-	ag.Convo.SetMessages(messages)
-	err = ag.Convo.Save()
-	if err != nil {
-		return fmt.Errorf("failed to save conversation: %v", err)
-	}
-
 	// Flush all data to the channel
 	ag.DataChan <- StreamData{Type: DataTypeFinished}
 	<-ag.ProceedChan
 	// Signal that streaming is finished
 	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusFinished}, nil)
-	return err
+	return nil
+}
+
+func (ga *GeminiAgent) processConvoSave(ag *Agent, content *genai.Content) error {
+	// Save the conversation history(curated)
+	ag.Convo.Push(content)
+	err := ag.Convo.Save()
+	if err != nil {
+		return fmt.Errorf("failed to save conversation: %v", err)
+	}
+	return nil
 }
 
 func (ga *GeminiAgent) processGeminiStream(ctx context.Context,
@@ -357,6 +365,17 @@ func (ga *GeminiAgent) processGeminiStream(ctx context.Context,
 				if part.Text != "" || part.FunctionCall != nil || part.FunctionResponse != nil ||
 					part.InlineData != nil || part.FileData != nil ||
 					part.ExecutableCode != nil || part.CodeExecutionResult != nil {
+
+					// Check for unknown tools BEFORE saving to history to prevent "orphan" tool calls (calls with no response)
+					if part.FunctionCall != nil {
+						funcName := part.FunctionCall.Name
+						if funcName != "" && !IsAvailableOpenTool(funcName) && !IsAvailableMCPTool(funcName, ga.MCPClient) {
+							// Skip unknown tools so they don't pollute history and cause 400 errors (Missing function response)
+							Warnf("Skipping tool call with unknown function name: %s", funcName)
+							continue
+						}
+					}
+
 					modelContent.Parts = append(modelContent.Parts, part)
 				}
 
@@ -401,7 +420,7 @@ func (ga *GeminiAgent) processGeminiStream(ctx context.Context,
 	return modelContent, finalResp, nil
 }
 
-func (ga *GeminiAgent) processGeminiToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *GeminiAgent) processGeminiToolCall(call *genai.FunctionCall) (*genai.Content, error) {
 
 	var filteredArgs map[string]interface{}
 	if call.Name == ToolEditFile || call.Name == ToolWriteFile {
@@ -469,9 +488,16 @@ func (ga *GeminiAgent) processGeminiToolCall(call *genai.FunctionCall) (*genai.F
 		ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", call.Name)}, nil)
 	}
 
+	// Function response only has one part
+	respPart := genai.Part{FunctionResponse: resp}
+	respContent := &genai.Content{
+		Role:  genai.RoleUser, // In Gemini, tool responses are sent as 'user' role
+		Parts: []*genai.Part{&respPart},
+	}
+
 	// Function call is done
 	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusFunctionCallingOver}, ga.ProceedChan)
-	return resp, err
+	return respContent, err
 }
 
 // In an agentic workflow with multi-turn interactions:

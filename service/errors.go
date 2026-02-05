@@ -27,3 +27,33 @@ func IsSwitchAgentError(err error) bool {
 		return false
 	}
 }
+
+const (
+	UserCancelCommon        = "[Operation Cancelled]"
+	UserCancelReasonUnknown = "Unknown"
+	UserCancelReasonTimeout = "Timeout"
+	UserCancelReasonDeny    = "User denied execution."
+)
+
+// UserCancelError is a sentinel error used to signal that the user has cancelled an operation.
+// This error is returned by the tool calls and handled by the agent execution loop.
+
+type UserCancelError struct {
+	Reason string
+}
+
+func (e *UserCancelError) Error() string {
+	if e.Reason != "" {
+		return fmt.Sprintf("%s Reason: %s", UserCancelCommon, e.Reason)
+	}
+	return UserCancelCommon
+}
+
+func IsUserCancelError(err error) bool {
+	switch err.(type) {
+	case *UserCancelError:
+		return true
+	default:
+		return false
+	}
+}

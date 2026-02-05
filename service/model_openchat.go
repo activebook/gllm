@@ -216,6 +216,10 @@ func (ag *Agent) GenerateOpenChatStream() error {
 		if IsSwitchAgentError(err) {
 			return err
 		}
+		// User cancel signal, pop up
+		if IsUserCancelError(err) {
+			return err
+		}
 		return fmt.Errorf("error processing chat: %v", err)
 	}
 	return nil
@@ -318,7 +322,10 @@ func (c *OpenChat) process(ag *Agent) error {
 		ag.addUpOpenChatTokenUsage(resp)
 
 		// Add the assistant's message to the conversation
-		ag.Convo.Push(assistantMessage)
+		err = c.processConvoSave(ag, assistantMessage)
+		if err != nil {
+			return err
+		}
 
 		// If there are tool calls, process them
 		if len(*toolCalls) > 0 {
@@ -330,7 +337,12 @@ func (c *OpenChat) process(ag *Agent) error {
 					if IsSwitchAgentError(err) {
 						// Bugfix: left an "orphan" tool_call that had no matching tool result.
 						// Add tool message to conversation to fix this.
-						ag.Convo.Push(toolMessage)
+						c.processConvoSave(ag, toolMessage)
+						return err
+					}
+					if IsUserCancelError(err) {
+						// User cancelled tool call, pop up
+						c.processConvoSave(ag, toolMessage)
 						return err
 					}
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
@@ -338,7 +350,10 @@ func (c *OpenChat) process(ag *Agent) error {
 				// IMPORTANT: Even error happened still add an error response message to maintain conversation integrity
 				// The API requires every tool_call to have a corresponding tool response
 				// Add the tool response to the conversation
-				ag.Convo.Push(toolMessage)
+				err = c.processConvoSave(ag, toolMessage)
+				if err != nil {
+					return err
+				}
 			}
 			// Continue the conversation recursively
 		} else {
@@ -364,18 +379,27 @@ func (c *OpenChat) process(ag *Agent) error {
 		c.op.data <- StreamData{Text: refs, Type: DataTypeNormal}
 	}
 
-	// No more message
-	// Save the conversation
-	err := ag.Convo.Save()
-	if err != nil {
-		return fmt.Errorf("failed to save conversation: %v", err)
-	}
-
 	// Flush all data to the channel
 	c.op.data <- StreamData{Type: DataTypeFinished}
 	<-c.op.proceed
 	// Notify that the stream is finished
 	c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusFinished}, nil)
+	return nil
+}
+
+// processConvoSave processes the conversation save
+// We need to save the conversation after each message is sent to the client
+// Because model supports interleaved tool calls and responses, aka ReAct
+// If error happened or user cancelled, in order to maintain conversation integrity, we need to save the conversation
+// So that we can resume the conversation from the last saved state
+func (c *OpenChat) processConvoSave(ag *Agent, message *model.ChatCompletionMessage) error {
+	// Add the assistant's message to the conversation
+	ag.Convo.Push(message)
+	// Save the conversation
+	err := ag.Convo.Save()
+	if err != nil {
+		return fmt.Errorf("failed to save conversation: %v", err)
+	}
 	return nil
 }
 

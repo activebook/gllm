@@ -230,6 +230,9 @@ func (ci *ChatInfo) startREPL() {
 	ci.sharedState = data.NewSharedState()
 	defer ci.sharedState.Clear()
 
+	// Set auto approve for the session
+	data.SetToolCallAutoApproveInSession(yoloFlag)
+
 	// Start the REPL
 	ci.printWelcome()
 
@@ -375,7 +378,10 @@ func (ci *ChatInfo) showHistory() {
 	m := ui.NewViewportModel(provider, content, func() string {
 		return fmt.Sprintf("Conversation: %s", convoName)
 	})
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	// Bugfix: we don't need to run history in alt screen
+	// because it will break the ChatInput view
+	// p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
 		service.Errorf("Error running viewport: %v", err)
 	}
@@ -383,7 +389,7 @@ func (ci *ChatInfo) showHistory() {
 
 func (ci *ChatInfo) callAgent(input string) {
 	// Call agent using the shared runner, passing persisted SharedState
-	err := RunAgent(input, ci.Files, convoName, yoloFlag, ci.outputFile, ci.sharedState)
+	err := RunAgent(input, ci.Files, convoName, ci.outputFile, ci.sharedState)
 	if err != nil {
 		service.Errorf("%v", err)
 		return

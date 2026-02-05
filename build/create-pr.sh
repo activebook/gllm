@@ -70,14 +70,14 @@ check_branch_exists() {
 
 ensure_branch_updated() {
     local branch=$1
-    print_step "Fetching latest changes from remote..."
-    git fetch origin
+    print_step "Fetching latest changes for '$branch' branch from remote..."
+    git fetch origin "$branch"
     
     local local_commit=$(git rev-parse "$branch")
     local remote_commit=$(git rev-parse "origin/$branch")
     
     if [ "$local_commit" != "$remote_commit" ]; then
-        print_warning "Local '$branch' is not up to date with remote"
+        print_warning "Local '$branch' is not up to date with 'origin/$branch'"
         echo "Please pull the latest changes first:"
         echo "  git checkout $branch && git pull origin $branch"
         exit 1

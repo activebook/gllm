@@ -5,6 +5,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/activebook/gllm/data"
 	"github.com/superstarryeyes/bit/ansifonts"
 )
 
@@ -19,13 +20,21 @@ func GetLogo(textColor string, gradientColor string, scale float64) string {
 		return ""
 	}
 
+	// Only use gradient if terminal supports TrueColor
+	useGradient := TerminalSupportsTrueColor()
+	if !useGradient {
+		textColor = data.ForegroundColor
+		gradientColor = textColor
+	}
+	// fmt.Printf("[DEBUG GetLogo] TerminalSupportsTrueColor: %v, useGradient: %v\n", TerminalSupportsTrueColor(), useGradient)
+
 	options := ansifonts.RenderOptions{
 		CharSpacing:            2,
 		WordSpacing:            2,
 		LineSpacing:            1,
 		TextColor:              textColor,
 		GradientColor:          gradientColor,
-		UseGradient:            true,
+		UseGradient:            useGradient,
 		GradientDirection:      ansifonts.LeftRight,
 		Alignment:              ansifonts.LeftAlign,
 		ScaleFactor:            scale,
@@ -50,13 +59,21 @@ func PrintLogo(textColor string, gradientColor string, scale float64) {
 		return
 	}
 
+	// Only use gradient if terminal supports TrueColor
+	useGradient := TerminalSupportsTrueColor()
+	if !useGradient {
+		textColor = data.ForegroundColor
+		gradientColor = textColor
+	}
+	// fmt.Printf("[DEBUG PrintLogo] TerminalSupportsTrueColor: %v, useGradient: %v\n", TerminalSupportsTrueColor(), useGradient)
+
 	options := ansifonts.RenderOptions{
 		CharSpacing:            2,
 		WordSpacing:            2,
 		LineSpacing:            1,
 		TextColor:              textColor,
 		GradientColor:          gradientColor,
-		UseGradient:            true,
+		UseGradient:            useGradient,
 		GradientDirection:      ansifonts.LeftRight,
 		Alignment:              ansifonts.LeftAlign,
 		ScaleFactor:            scale,

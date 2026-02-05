@@ -107,6 +107,10 @@ func (ag *Agent) GenerateAnthropicStream() error {
 		if IsSwitchAgentError(err) {
 			return err
 		}
+		// User cancel signal, pop up
+		if IsUserCancelError(err) {
+			return err
+		}
 		return fmt.Errorf("error processing chat: %v", err)
 	}
 
@@ -120,48 +124,31 @@ type Anthropic struct {
 }
 
 func (a *Anthropic) process(ag *Agent) error {
+	// Context Management
+	truncated := false
+	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
+
 	// Recursion loop
 	i := 0
 	for range ag.MaxRecursions {
 		i++
 		a.op.status.ChangeTo(a.op.notify, StreamNotify{Status: StatusProcessing}, a.op.proceed)
 
-		// Context Management
-		cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
-
 		messages, _ := ag.Convo.GetMessages().([]anthropic.MessageParam)
 
-		// Bugfix:
-		// Filter out thinking blocks from history as they might cause 400 errors or are not needed for context
-		// especially if the provider (like DashScope) doesn't support receiving them back.
-		var cleanMessages []anthropic.MessageParam
-		for _, msg := range messages {
-			var cleanContent []anthropic.ContentBlockParamUnion
-			for _, block := range msg.Content {
-				// Check if the block is a thinking block using SDK's union fields
-				if block.OfThinking == nil && block.OfRedactedThinking == nil {
-					cleanContent = append(cleanContent, block)
-				}
-			}
-			// Only add message if it has content left (or if it's allowed to be empty? Tool result can be empty?)
-			// While tool result usually has OfToolResult which is not filtered.
-			if len(cleanContent) > 0 {
-				msg.Content = cleanContent
-				cleanMessages = append(cleanMessages, msg)
-			}
-		}
-
 		// Apply context window management
-		truncated := false
-		cleanMessages, truncated = cm.PrepareAnthropicMessages(cleanMessages, ag.SystemPrompt, a.tools)
+		messages, truncated = cm.PrepareAnthropicMessages(messages, ag.SystemPrompt, a.tools)
 		if truncated {
 			ag.Warn("Context trimmed to fit model limits")
+			Debugf("Context messages after truncation: [%d]", len(messages))
+			// Update the conversation with truncated messages
+			ag.Convo.SetMessages(messages)
 		}
 
 		// Create params
 		params := anthropic.MessageNewParams{
 			Model:     anthropic.Model(ag.Model.ModelName),
-			Messages:  cleanMessages,
+			Messages:  messages,
 			MaxTokens: int64(cm.MaxOutputTokens), // Use ContextManager limit
 			System: []anthropic.TextBlockParam{{
 				Text: ag.SystemPrompt,
@@ -194,7 +181,10 @@ func (a *Anthropic) process(ag *Agent) error {
 		addUpAnthropicTokenUsage(ag, usage)
 
 		// Push assistant message
-		ag.Convo.Push(msg)
+		err = a.processConvoSave(ag, msg)
+		if err != nil {
+			return err
+		}
 
 		if len(toolCalls) > 0 {
 			// Process tool calls
@@ -206,14 +196,22 @@ func (a *Anthropic) process(ag *Agent) error {
 					if IsSwitchAgentError(err) {
 						// Bugfix: left an "orphan" tool_call that had no matching tool result.
 						// Add tool message to conversation to fix this.
-						ag.Convo.Push(toolMsg)
+						a.processConvoSave(ag, toolMsg)
+						return err
+					}
+					if IsUserCancelError(err) {
+						// User cancel signal, pop up
+						a.processConvoSave(ag, toolMsg)
 						return err
 					}
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Tool call failed: %v", err)}, nil)
 				}
 				// IMPORTANT: Even error happened still add an error response message to maintain conversation integrity
 				// The API requires every tool_call to have a corresponding tool response
-				ag.Convo.Push(toolMsg)
+				err = a.processConvoSave(ag, toolMsg)
+				if err != nil {
+					return err
+				}
 			}
 		} else {
 			break
@@ -230,16 +228,26 @@ func (a *Anthropic) process(ag *Agent) error {
 		a.op.data <- StreamData{Text: refs, Type: DataTypeNormal}
 	}
 
-	// Save
-	err := ag.Convo.Save()
-	if err != nil {
-		return fmt.Errorf("failed to save conversation: %v", err)
-	}
-
 	a.op.data <- StreamData{Type: DataTypeFinished}
 	<-a.op.proceed
 	a.op.status.ChangeTo(a.op.notify, StreamNotify{Status: StatusFinished}, nil)
 
+	return nil
+}
+
+// processConvoSave processes the conversation save
+// We need to save the conversation after each message is sent to the client
+// Because model supports interleaved tool calls and responses, aka ReAct
+// If error happened or user cancelled, in order to maintain conversation integrity, we need to save the conversation
+// So that we can resume the conversation from the last saved state
+func (a *Anthropic) processConvoSave(ag *Agent, message anthropic.MessageParam) error {
+	// Add the assistant's message to the conversation
+	ag.Convo.Push(message)
+	// Save the conversation
+	err := ag.Convo.Save()
+	if err != nil {
+		return fmt.Errorf("failed to save conversation: %v", err)
+	}
 	return nil
 }
 
@@ -303,15 +311,14 @@ func (a *Anthropic) processStream(stream *ssestream.Stream[anthropic.MessageStre
 
 			case "text":
 			case "thinking":
-				// Start Thinking
-				thinkingSignature = block.Signature
+				// Start Thinking (signature is typically empty at start)
 				a.op.status.ChangeTo(a.op.notify, StreamNotify{Status: StatusReasoning}, a.op.proceed)
 			}
 
 		case "content_block_delta":
 			evt := event.AsContentBlockDelta()
 			delta := evt.Delta
-			// Delta types: "text_delta", "input_json_delta"
+			// Delta types: "text_delta", "input_json_delta", "thinking_delta", "signature_delta"
 			switch delta.Type {
 			case "text_delta":
 				text := delta.Text
@@ -321,6 +328,13 @@ func (a *Anthropic) processStream(stream *ssestream.Stream[anthropic.MessageStre
 				text := delta.Thinking
 				thinkingBuilder.WriteString(text)
 				a.op.data <- StreamData{Text: text, Type: DataTypeReasoning}
+			case "signature_delta":
+				// Bugfix: messages.1.content.0.thinking.signature.str: Input should be a valid string
+				// CRITICAL: This is where the signature is actually streamed!
+				// Anthropic require thinking signature!
+				signature := delta.Signature
+				thinkingSignature = thinkingSignature + signature
+				// Debugf("Signature delta received: [%s], accumulated: [%s]", signature, thinkingSignature)
 			case "input_json_delta":
 				currentInputBuilder.WriteString(delta.PartialJSON)
 			}
@@ -329,7 +343,6 @@ func (a *Anthropic) processStream(stream *ssestream.Stream[anthropic.MessageStre
 			if currentBlockType == "thinking" {
 				a.op.status.ChangeTo(a.op.notify, StreamNotify{Status: StatusReasoningOver}, a.op.proceed)
 			}
-			// evt := event.AsContentBlockStop()
 			if currentToolUse != nil {
 				var input interface{}
 				if err := json.Unmarshal([]byte(currentInputBuilder.String()), &input); err == nil {
@@ -379,6 +392,7 @@ func (a *Anthropic) processStream(stream *ssestream.Stream[anthropic.MessageStre
 
 	// 1. Add Thinking Block first if present
 	if thinkingContent != "" {
+		// Debugf("Creating thinking block with signature: [%s], content length: %d", thinkingSignature, len(thinkingContent))
 		thinkingBlock := anthropic.NewThinkingBlock(thinkingSignature, thinkingContent)
 		finalBlocks = append(finalBlocks, thinkingBlock)
 	}

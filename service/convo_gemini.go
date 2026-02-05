@@ -16,6 +16,38 @@ type GeminiConversation struct {
 	Messages []*genai.Content
 }
 
+// consolidateTextParts merges consecutive text parts to reduce fragmentation
+// from streaming responses while preserving non-text parts (function calls, etc.)
+func (g *GeminiConversation) consolidateTextParts(parts []*genai.Part) []*genai.Part {
+	if len(parts) == 0 {
+		return parts
+	}
+
+	consolidated := make([]*genai.Part, 0, len(parts))
+	var textBuffer string
+
+	for _, part := range parts {
+		if part.Text != "" {
+			// Accumulate consecutive text parts
+			textBuffer += part.Text
+		} else {
+			// Non-text part encountered: flush accumulated text, then add the part
+			if textBuffer != "" {
+				consolidated = append(consolidated, &genai.Part{Text: textBuffer})
+				textBuffer = ""
+			}
+			consolidated = append(consolidated, part)
+		}
+	}
+
+	// Flush any remaining text
+	if textBuffer != "" {
+		consolidated = append(consolidated, &genai.Part{Text: textBuffer})
+	}
+
+	return consolidated
+}
+
 // Open initializes a GeminiConversation with the provided title
 // PushContents adds multiple content items to the history
 func (g *GeminiConversation) Push(messages ...interface{}) {
@@ -45,16 +77,53 @@ func (g *GeminiConversation) Save() error {
 		return nil
 	}
 
-	// Remove any model messages with nil Parts before saving
-	filtered := make([]*genai.Content, 0, len(g.Messages))
-	for _, content := range g.Messages {
-		if content.Role == genai.RoleModel && content.Parts == nil {
-			continue // skip invalid model messages
+	// Consolidate text parts and filter out function response to save tokens
+	formatMessages := make([]*genai.Content, len(g.Messages))
+	for i, content := range g.Messages {
+		// First, consolidate consecutive text parts from streaming
+		consolidatedParts := g.consolidateTextParts(content.Parts)
+
+		// Check if this message has any function responses that need clearing
+		hasFunctionResponse := false
+		for _, part := range consolidatedParts {
+			if part.FunctionResponse != nil {
+				hasFunctionResponse = true
+				break
+			}
 		}
-		filtered = append(filtered, content)
+
+		// Create new Content with consolidated parts
+		if hasFunctionResponse {
+			// Deep copy with empty function responses
+			contentCopy := &genai.Content{
+				Role:  content.Role,
+				Parts: make([]*genai.Part, len(consolidatedParts)),
+			}
+			for j, part := range consolidatedParts {
+				if part.FunctionResponse != nil {
+					// Create new Part with empty FunctionResponse
+					contentCopy.Parts[j] = &genai.Part{
+						FunctionResponse: &genai.FunctionResponse{
+							Name:     part.FunctionResponse.Name,
+							Response: map[string]any{}, // Empty response to save tokens
+						},
+					}
+				} else {
+					// Shallow copy non-function-response parts
+					contentCopy.Parts[j] = part
+				}
+			}
+			formatMessages[i] = contentCopy
+		} else {
+			// No function responses, just use consolidated parts
+			formatMessages[i] = &genai.Content{
+				Role:  content.Role,
+				Parts: consolidatedParts,
+			}
+		}
 	}
 
-	data, err := json.MarshalIndent(filtered, "", "  ")
+	data, err := json.MarshalIndent(formatMessages, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to serialize conversation: %w", err)
 	}

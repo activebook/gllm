@@ -124,6 +124,9 @@ Configure your API keys and preferred models, then start chatting or executing c
 			// Start indeterminate progress bar
 			ui.GetIndicator().Start("")
 
+			// Set auto approve for the session
+			data.SetToolCallAutoApproveInSession(yoloFlag)
+
 			// If conversation flag is provided, find the conversation file
 			if cmd.Flags().Changed("conversation") {
 				// Bugfix: When convoName is an index number, and use it to find convo file
@@ -164,7 +167,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 
 			// Call your LLM service here
 			// Call agent using the shared runner, passing nil for SharedState (single turn)
-			err := RunAgent(prompt, files, convoName, yoloFlag, "", nil)
+			err := RunAgent(prompt, files, convoName, "", nil)
 			if err != nil {
 				service.Errorf("%v", err)
 				return
