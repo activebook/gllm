@@ -124,14 +124,15 @@ type Anthropic struct {
 }
 
 func (a *Anthropic) process(ag *Agent) error {
+	// Context Management
+	truncated := false
+	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
+
 	// Recursion loop
 	i := 0
 	for range ag.MaxRecursions {
 		i++
 		a.op.status.ChangeTo(a.op.notify, StreamNotify{Status: StatusProcessing}, a.op.proceed)
-
-		// Context Management
-		cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
 
 		messages, _ := ag.Convo.GetMessages().([]anthropic.MessageParam)
 
@@ -156,10 +157,12 @@ func (a *Anthropic) process(ag *Agent) error {
 		}
 
 		// Apply context window management
-		truncated := false
 		cleanMessages, truncated = cm.PrepareAnthropicMessages(cleanMessages, ag.SystemPrompt, a.tools)
 		if truncated {
 			ag.Warn("Context trimmed to fit model limits")
+			Debugf("Context messages after truncation: [%d]", len(cleanMessages))
+			// Update the conversation with truncated messages
+			ag.Convo.SetMessages(cleanMessages)
 		}
 
 		// Create params

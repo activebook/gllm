@@ -16,6 +16,38 @@ type GeminiConversation struct {
 	Messages []*genai.Content
 }
 
+// consolidateTextParts merges consecutive text parts to reduce fragmentation
+// from streaming responses while preserving non-text parts (function calls, etc.)
+func (g *GeminiConversation) consolidateTextParts(parts []*genai.Part) []*genai.Part {
+	if len(parts) == 0 {
+		return parts
+	}
+
+	consolidated := make([]*genai.Part, 0, len(parts))
+	var textBuffer string
+
+	for _, part := range parts {
+		if part.Text != "" {
+			// Accumulate consecutive text parts
+			textBuffer += part.Text
+		} else {
+			// Non-text part encountered: flush accumulated text, then add the part
+			if textBuffer != "" {
+				consolidated = append(consolidated, &genai.Part{Text: textBuffer})
+				textBuffer = ""
+			}
+			consolidated = append(consolidated, part)
+		}
+	}
+
+	// Flush any remaining text
+	if textBuffer != "" {
+		consolidated = append(consolidated, &genai.Part{Text: textBuffer})
+	}
+
+	return consolidated
+}
+
 // Open initializes a GeminiConversation with the provided title
 // PushContents adds multiple content items to the history
 func (g *GeminiConversation) Push(messages ...interface{}) {
@@ -45,26 +77,29 @@ func (g *GeminiConversation) Save() error {
 		return nil
 	}
 
-	// Filter out function response to save tokens (only deep copy if needed)
+	// Consolidate text parts and filter out function response to save tokens
 	formatMessages := make([]*genai.Content, len(g.Messages))
 	for i, content := range g.Messages {
+		// First, consolidate consecutive text parts from streaming
+		consolidatedParts := g.consolidateTextParts(content.Parts)
+
 		// Check if this message has any function responses that need clearing
 		hasFunctionResponse := false
-		for _, part := range content.Parts {
+		for _, part := range consolidatedParts {
 			if part.FunctionResponse != nil {
 				hasFunctionResponse = true
 				break
 			}
 		}
 
-		// Only deep copy if we need to modify function responses
+		// Create new Content with consolidated parts
 		if hasFunctionResponse {
-			// Create new Content with deep copy of Parts
+			// Deep copy with empty function responses
 			contentCopy := &genai.Content{
-				Role: content.Role,
+				Role:  content.Role,
+				Parts: make([]*genai.Part, len(consolidatedParts)),
 			}
-			contentCopy.Parts = make([]*genai.Part, len(content.Parts))
-			for j, part := range content.Parts {
+			for j, part := range consolidatedParts {
 				if part.FunctionResponse != nil {
 					// Create new Part with empty FunctionResponse
 					contentCopy.Parts[j] = &genai.Part{
@@ -80,8 +115,11 @@ func (g *GeminiConversation) Save() error {
 			}
 			formatMessages[i] = contentCopy
 		} else {
-			// No modification needed, shallow copy the pointer
-			formatMessages[i] = content
+			// No function responses, just use consolidated parts
+			formatMessages[i] = &genai.Content{
+				Role:  content.Role,
+				Parts: consolidatedParts,
+			}
 		}
 	}
 
