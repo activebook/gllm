@@ -311,15 +311,14 @@ func (a *Anthropic) processStream(stream *ssestream.Stream[anthropic.MessageStre
 
 			case "text":
 			case "thinking":
-				// Start Thinking
-				thinkingSignature = block.Signature
+				// Start Thinking (signature is typically empty at start)
 				a.op.status.ChangeTo(a.op.notify, StreamNotify{Status: StatusReasoning}, a.op.proceed)
 			}
 
 		case "content_block_delta":
 			evt := event.AsContentBlockDelta()
 			delta := evt.Delta
-			// Delta types: "text_delta", "input_json_delta"
+			// Delta types: "text_delta", "input_json_delta", "thinking_delta", "signature_delta"
 			switch delta.Type {
 			case "text_delta":
 				text := delta.Text
@@ -329,6 +328,13 @@ func (a *Anthropic) processStream(stream *ssestream.Stream[anthropic.MessageStre
 				text := delta.Thinking
 				thinkingBuilder.WriteString(text)
 				a.op.data <- StreamData{Text: text, Type: DataTypeReasoning}
+			case "signature_delta":
+				// Bugfix: messages.1.content.0.thinking.signature.str: Input should be a valid string
+				// CRITICAL: This is where the signature is actually streamed!
+				// Anthropic require thinking signature!
+				signature := delta.Signature
+				thinkingSignature = thinkingSignature + signature
+				// Debugf("Signature delta received: [%s], accumulated: [%s]", signature, thinkingSignature)
 			case "input_json_delta":
 				currentInputBuilder.WriteString(delta.PartialJSON)
 			}
@@ -337,7 +343,6 @@ func (a *Anthropic) processStream(stream *ssestream.Stream[anthropic.MessageStre
 			if currentBlockType == "thinking" {
 				a.op.status.ChangeTo(a.op.notify, StreamNotify{Status: StatusReasoningOver}, a.op.proceed)
 			}
-			// evt := event.AsContentBlockStop()
 			if currentToolUse != nil {
 				var input interface{}
 				if err := json.Unmarshal([]byte(currentInputBuilder.String()), &input); err == nil {
@@ -387,6 +392,7 @@ func (a *Anthropic) processStream(stream *ssestream.Stream[anthropic.MessageStre
 
 	// 1. Add Thinking Block first if present
 	if thinkingContent != "" {
+		// Debugf("Creating thinking block with signature: [%s], content length: %d", thinkingSignature, len(thinkingContent))
 		thinkingBlock := anthropic.NewThinkingBlock(thinkingSignature, thinkingContent)
 		finalBlocks = append(finalBlocks, thinkingBlock)
 	}
