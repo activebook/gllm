@@ -136,39 +136,19 @@ func (a *Anthropic) process(ag *Agent) error {
 
 		messages, _ := ag.Convo.GetMessages().([]anthropic.MessageParam)
 
-		// Bugfix:
-		// Filter out thinking blocks from history as they might cause 400 errors or are not needed for context
-		// especially if the provider (like DashScope) doesn't support receiving them back.
-		var cleanMessages []anthropic.MessageParam
-		for _, msg := range messages {
-			var cleanContent []anthropic.ContentBlockParamUnion
-			for _, block := range msg.Content {
-				// Check if the block is a thinking block using SDK's union fields
-				if block.OfThinking == nil && block.OfRedactedThinking == nil {
-					cleanContent = append(cleanContent, block)
-				}
-			}
-			// Only add message if it has content left (or if it's allowed to be empty? Tool result can be empty?)
-			// While tool result usually has OfToolResult which is not filtered.
-			if len(cleanContent) > 0 {
-				msg.Content = cleanContent
-				cleanMessages = append(cleanMessages, msg)
-			}
-		}
-
 		// Apply context window management
-		cleanMessages, truncated = cm.PrepareAnthropicMessages(cleanMessages, ag.SystemPrompt, a.tools)
+		messages, truncated = cm.PrepareAnthropicMessages(messages, ag.SystemPrompt, a.tools)
 		if truncated {
 			ag.Warn("Context trimmed to fit model limits")
-			Debugf("Context messages after truncation: [%d]", len(cleanMessages))
+			Debugf("Context messages after truncation: [%d]", len(messages))
 			// Update the conversation with truncated messages
-			ag.Convo.SetMessages(cleanMessages)
+			ag.Convo.SetMessages(messages)
 		}
 
 		// Create params
 		params := anthropic.MessageNewParams{
 			Model:     anthropic.Model(ag.Model.ModelName),
-			Messages:  cleanMessages,
+			Messages:  messages,
 			MaxTokens: int64(cm.MaxOutputTokens), // Use ContextManager limit
 			System: []anthropic.TextBlockParam{{
 				Text: ag.SystemPrompt,
