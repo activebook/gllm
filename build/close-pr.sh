@@ -69,6 +69,14 @@ check_gh_cli() {
     fi
 }
 
+check_jq() {
+    if ! command -v jq &> /dev/null; then
+        print_error "jq is not installed (required for JSON parsing)"
+        echo "Please install it with: brew install jq (on macOS) or apt-get install jq (on Ubuntu/Debian)"
+        exit 1
+    fi
+}
+
 find_pr_for_branch() {
     local branch=$1
     local pr=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
@@ -125,9 +133,10 @@ close_pr() {
     fi
     
     # Confirmation prompt
-    read -p "Are you sure you want to close PR #$pr_number? (y/N): " -n 1 -r
+    local close_confirmation=""
+    read -p "Are you sure you want to close PR #$pr_number? (y/N): " -n 1 -r close_confirmation
     echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    if [[ ! $close_confirmation =~ ^[Yy]$ ]]; then
         echo "Aborted."
         exit 0
     fi
@@ -143,11 +152,21 @@ close_pr() {
         echo ""
         
         # Optional: Clean up local branch
-        read -p "Do you want to delete the local branch '$head_branch'? (y/N): " -n 1 -r
+        local delete_confirmation=""
+        read -p "Do you want to delete the local branch '$head_branch'? (y/N): " -n 1 -r delete_confirmation
         echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            print_step "Deleting local branch '$head_branch'..."
-            git branch -d "$head_branch" 2>/dev/null || print_warning "Could not delete branch (may have uncommitted changes)"
+        if [[ $delete_confirmation =~ ^[Yy]$ ]]; then
+            # Second confirmation for safety
+            local delete_confirmation2=""
+            read -p "Are you REALLY sure you want to delete the local branch '$head_branch'? This cannot be undone! (y/N): " -n 1 -r delete_confirmation2
+            echo
+            if [[ $delete_confirmation2 =~ ^[Yy]$ ]]; then
+                print_step "Deleting local branch '$head_branch'..."
+                # Use -D instead of -d to force deletion if needed
+                git branch -D "$head_branch" 2>/dev/null || print_warning "Could not delete branch (may have uncommitted changes)"
+            else
+                print_info "Branch deletion cancelled."
+            fi
         fi
     else
         print_error "Failed to close pull request"
@@ -189,6 +208,10 @@ done
 # Verify GitHub CLI is installed
 print_step "Checking GitHub CLI installation..."
 check_gh_cli
+
+# Verify jq is installed
+print_step "Checking jq installation..."
+check_jq
 
 # Verify we're in a git repository
 print_step "Verifying git repository..."
