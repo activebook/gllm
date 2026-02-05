@@ -185,6 +185,8 @@ func CallAgent(op *AgentOptions) error {
 
 	// Set up search engine settings based on capabilities
 	se := constructSearchEngine(op.Capabilities)
+
+	// Set up tools use settings
 	toolsUse := data.ToolsUse{AutoApprove: op.YoloMode}
 
 	// Set up code tool settings

@@ -109,12 +109,12 @@ func NeedUserConfirmToolUse(info string, prompt string, description string, tool
 
 	switch choice {
 	case "All":
-		toolsUse.AutoApprove = true
-		toolsUse.Confirm = data.ToolConfirmYes
+		toolsUse.ConfirmAlways()
+		data.SetToolCallAutoApproveInSession(true)
 	case "Yes":
-		toolsUse.Confirm = data.ToolConfirmYes
+		toolsUse.ConfirmOnce()
 	default:
-		toolsUse.Confirm = data.ToolConfirmCancel
+		toolsUse.ConfirmCancel()
 	}
 
 	return nil

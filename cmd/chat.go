@@ -230,6 +230,9 @@ func (ci *ChatInfo) startREPL() {
 	ci.sharedState = data.NewSharedState()
 	defer ci.sharedState.Clear()
 
+	// Set auto approve for the session
+	data.SetToolCallAutoApproveInSession(yoloFlag)
+
 	// Start the REPL
 	ci.printWelcome()
 
@@ -386,7 +389,7 @@ func (ci *ChatInfo) showHistory() {
 
 func (ci *ChatInfo) callAgent(input string) {
 	// Call agent using the shared runner, passing persisted SharedState
-	err := RunAgent(input, ci.Files, convoName, yoloFlag, ci.outputFile, ci.sharedState)
+	err := RunAgent(input, ci.Files, convoName, ci.outputFile, ci.sharedState)
 	if err != nil {
 		service.Errorf("%v", err)
 		return

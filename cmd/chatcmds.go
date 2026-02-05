@@ -63,11 +63,13 @@ func contains(slice []string, item string) bool {
 }
 
 func switchYoloMode() {
-	yoloFlag = !yoloFlag
-	if yoloFlag {
-		fmt.Printf("YOLO mode: %s\n", data.SwitchOnColor+"on"+data.ResetSeq)
+	yolo := data.GetToolCallAutoApproveInSession()
+	if yolo {
+		fmt.Printf("YOLO mode: %s -> %s\n", data.SwitchOnColor+"on"+data.ResetSeq, data.SwitchOffColor+"off"+data.ResetSeq)
+		data.SetToolCallAutoApproveInSession(false)
 	} else {
-		fmt.Printf("YOLO mode: %s\n", data.SwitchOffColor+"off"+data.ResetSeq)
+		fmt.Printf("YOLO mode: %s -> %s\n", data.SwitchOffColor+"off"+data.ResetSeq, data.SwitchOnColor+"on"+data.ResetSeq)
+		data.SetToolCallAutoApproveInSession(true)
 	}
 }
 
