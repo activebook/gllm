@@ -274,13 +274,6 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 		}
 
 		for _, funcCall := range funcCalls {
-
-			// Skip if not our expected function
-			// Because some model made up function name
-			if funcCall.Name != "" && !IsAvailableOpenTool(funcCall.Name) && !IsAvailableMCPTool(funcCall.Name, ag.MCPClient) {
-				Warnf("Skipping tool call with unknown function name: %s", funcCall.Name)
-				continue
-			}
 			// Handle tool call
 			funcResp, err := ga.processGeminiToolCall(funcCall)
 			if err != nil {
@@ -372,6 +365,17 @@ func (ga *GeminiAgent) processGeminiStream(ctx context.Context,
 				if part.Text != "" || part.FunctionCall != nil || part.FunctionResponse != nil ||
 					part.InlineData != nil || part.FileData != nil ||
 					part.ExecutableCode != nil || part.CodeExecutionResult != nil {
+
+					// Check for unknown tools BEFORE saving to history to prevent "orphan" tool calls (calls with no response)
+					if part.FunctionCall != nil {
+						funcName := part.FunctionCall.Name
+						if funcName != "" && !IsAvailableOpenTool(funcName) && !IsAvailableMCPTool(funcName, ga.MCPClient) {
+							// Skip unknown tools so they don't pollute history and cause 400 errors (Missing function response)
+							Warnf("Skipping tool call with unknown function name: %s", funcName)
+							continue
+						}
+					}
+
 					modelContent.Parts = append(modelContent.Parts, part)
 				}
 
