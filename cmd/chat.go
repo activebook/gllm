@@ -283,6 +283,9 @@ func (ci *ChatInfo) startREPL() {
 
 		// Handle shell commands
 		if ci.startWithLocalCommand(input) {
+			// here there is a nuance bug: the ui.RunChatInput still not update its view
+			// so we need to call it again to update the view forcely
+			// otherwise, in /history /editor situations, the view would be broken
 			ci.executeShellCommand(input[1:])
 			continue
 		}

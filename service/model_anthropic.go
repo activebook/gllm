@@ -107,6 +107,10 @@ func (ag *Agent) GenerateAnthropicStream() error {
 		if IsSwitchAgentError(err) {
 			return err
 		}
+		// User cancel signal, pop up
+		if IsUserCancelError(err) {
+			return err
+		}
 		return fmt.Errorf("error processing chat: %v", err)
 	}
 
@@ -194,7 +198,10 @@ func (a *Anthropic) process(ag *Agent) error {
 		addUpAnthropicTokenUsage(ag, usage)
 
 		// Push assistant message
-		ag.Convo.Push(msg)
+		err = a.processConvoSave(ag, msg)
+		if err != nil {
+			return err
+		}
 
 		if len(toolCalls) > 0 {
 			// Process tool calls
@@ -206,14 +213,22 @@ func (a *Anthropic) process(ag *Agent) error {
 					if IsSwitchAgentError(err) {
 						// Bugfix: left an "orphan" tool_call that had no matching tool result.
 						// Add tool message to conversation to fix this.
-						ag.Convo.Push(toolMsg)
+						a.processConvoSave(ag, toolMsg)
+						return err
+					}
+					if IsUserCancelError(err) {
+						// User cancel signal, pop up
+						a.processConvoSave(ag, toolMsg)
 						return err
 					}
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Tool call failed: %v", err)}, nil)
 				}
 				// IMPORTANT: Even error happened still add an error response message to maintain conversation integrity
 				// The API requires every tool_call to have a corresponding tool response
-				ag.Convo.Push(toolMsg)
+				err = a.processConvoSave(ag, toolMsg)
+				if err != nil {
+					return err
+				}
 			}
 		} else {
 			break
@@ -230,16 +245,26 @@ func (a *Anthropic) process(ag *Agent) error {
 		a.op.data <- StreamData{Text: refs, Type: DataTypeNormal}
 	}
 
-	// Save
-	err := ag.Convo.Save()
-	if err != nil {
-		return fmt.Errorf("failed to save conversation: %v", err)
-	}
-
 	a.op.data <- StreamData{Type: DataTypeFinished}
 	<-a.op.proceed
 	a.op.status.ChangeTo(a.op.notify, StreamNotify{Status: StatusFinished}, nil)
 
+	return nil
+}
+
+// processConvoSave processes the conversation save
+// We need to save the conversation after each message is sent to the client
+// Because model supports interleaved tool calls and responses, aka ReAct
+// If error happened or user cancelled, in order to maintain conversation integrity, we need to save the conversation
+// So that we can resume the conversation from the last saved state
+func (a *Anthropic) processConvoSave(ag *Agent, message anthropic.MessageParam) error {
+	// Add the assistant's message to the conversation
+	ag.Convo.Push(message)
+	// Save the conversation
+	err := ag.Convo.Save()
+	if err != nil {
+		return fmt.Errorf("failed to save conversation: %v", err)
+	}
 	return nil
 }
 

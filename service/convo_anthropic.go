@@ -45,11 +45,34 @@ func (c *AnthropicConversation) Save() error {
 		return nil
 	}
 
-	// For Anthropic, we also want to clear possibly large tool results if we want to save space,
-	// but the SDK structure is different. For now, let's just save.
-	// Optimizing storage can be a future task if needed.
+	// Important: We need to copy the message, otherwise it will modify the original message
+	// model need complete original message, which includes tool content to generate assistant response
+	// but we don't need tool content in conversation file to save tokens
+	empty := ""
+	formatMessages := make([]anthropic.MessageParam, len(c.Messages))
+	for i, msg := range c.Messages {
+		// Copy message
+		msgCopy := msg
+		// Clear content if it contains tool_result
+		for j, block := range msgCopy.Content {
+			if block.OfToolResult != nil {
+				// Create a new tool result with empty content
+				toolResult := anthropic.ToolResultBlockParamContentUnion{
+					OfText: &anthropic.TextBlockParam{
+						Text: empty,
+					},
+				}
+				block.OfToolResult.Content = []anthropic.ToolResultBlockParamContentUnion{
+					toolResult,
+				}
+				// Replace the tool result in the copied message
+				msgCopy.Content[j] = anthropic.ContentBlockParamUnion{OfToolResult: block.OfToolResult}
+			}
+		}
+		formatMessages[i] = msgCopy
+	}
 
-	data, err := json.MarshalIndent(c.Messages, "", "  ")
+	data, err := json.MarshalIndent(formatMessages, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to serialize conversation: %w", err)
 	}

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"sort"
 	"strings"
 )
 
@@ -74,8 +75,8 @@ var DefaultModelLimits = map[string]ModelLimits{
 	/*
 	 * Minimax Models
 	 */
-	"minimax-m2.1": {ContextWindow: 200000, MaxOutputTokens: 16384},
-	"minimax-m2":   {ContextWindow: 200000, MaxOutputTokens: 16384},
+	"minimax-m2.1": {ContextWindow: 200000, MaxOutputTokens: 65536},
+	"minimax-m2":   {ContextWindow: 200000, MaxOutputTokens: 65536},
 	"minimax-m1":   {ContextWindow: 1000000, MaxOutputTokens: 8192},
 
 	/*
@@ -249,10 +250,19 @@ func GetModelLimits(modelName string) ModelLimits {
 		return limits
 	}
 
-	// Try pattern matching (model name contains key)
-	for pattern, limits := range DefaultModelLimits {
+	// Collect and sort patterns by length (longest first)
+	var patterns []string
+	for pattern := range DefaultModelLimits {
+		patterns = append(patterns, pattern)
+	}
+	sort.Slice(patterns, func(i, j int) bool {
+		return len(patterns[i]) > len(patterns[j])
+	})
+
+	// Try pattern matching with longest patterns first
+	for _, pattern := range patterns {
 		if strings.Contains(modelNameLower, pattern) {
-			return limits
+			return DefaultModelLimits[pattern]
 		}
 	}
 

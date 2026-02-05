@@ -358,6 +358,8 @@ func CallAgent(op *AgentOptions) error {
 				// Send error through channel instead of returning
 				if IsSwitchAgentError(err) {
 					notifyCh <- StreamNotify{Status: StatusSwitchAgent, Extra: err}
+				} else if IsUserCancelError(err) {
+					notifyCh <- StreamNotify{Status: StatusUserCancel, Extra: err}
 				} else {
 					notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 				}
@@ -368,6 +370,8 @@ func CallAgent(op *AgentOptions) error {
 				// Send error through channel instead of returning
 				if IsSwitchAgentError(err) {
 					notifyCh <- StreamNotify{Status: StatusSwitchAgent, Extra: err}
+				} else if IsUserCancelError(err) {
+					notifyCh <- StreamNotify{Status: StatusUserCancel, Extra: err}
 				} else {
 					notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 				}
@@ -386,6 +390,8 @@ func CallAgent(op *AgentOptions) error {
 				// Send error through channel instead of returning
 				if IsSwitchAgentError(err) {
 					notifyCh <- StreamNotify{Status: StatusSwitchAgent, Extra: err}
+				} else if IsUserCancelError(err) {
+					notifyCh <- StreamNotify{Status: StatusUserCancel, Extra: err}
 				} else {
 					notifyCh <- StreamNotify{Status: StatusError, Data: fmt.Sprintf("%v", err)}
 				}
@@ -474,6 +480,12 @@ func CallAgent(op *AgentOptions) error {
 				// Convert notify.Extra to SwitchAgentError
 				switchErr := notify.Extra.(*SwitchAgentError)
 				return switchErr
+			case StatusUserCancel:
+				ag.StopIndicator()
+				ag.WriteEnd()
+				// Convert notify.Extra to UserCancelError
+				userCancelErr := notify.Extra.(*UserCancelError)
+				return userCancelErr
 			case StatusFinished:
 				ag.StopIndicator()
 				// Render the markdown

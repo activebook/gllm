@@ -48,15 +48,21 @@ func (c *OpenChatConversation) Save() error {
 	// Most major systems (including ChatGPT and Google's Gemini) discard search results between turns
 	// Always clear content for tool messages before saving to save tokens
 	// Keep the "record" of the tool call (e.g., call_id: 123, tool: google_search) but drop the "body" of the result.
+	// Important: We need to copy the message, otherwise it will modify the original message
+	// model need complete original message, which includes tool content to generate assistant response
+	// but we don't need tool content in conversation file to save tokens
 	empty := ""
-	for _, msg := range c.Messages {
+	formatMessages := make([]model.ChatCompletionMessage, len(c.Messages))
+	for i, msg := range c.Messages {
+		// copy message
+		formatMessages[i] = *msg
 		if msg.Role == model.ChatMessageRoleTool {
-			//msg.Content = nil // or "" if Content is a string
-			msg.Content = &model.ChatCompletionMessageContent{StringValue: &empty}
+			// Create new pointer - safe because we're replacing, not modifying
+			formatMessages[i].Content = &model.ChatCompletionMessageContent{StringValue: &empty}
 		}
 	}
 
-	data, err := json.MarshalIndent(c.Messages, "", "  ")
+	data, err := json.MarshalIndent(formatMessages, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to serialize conversation: %w", err)
 	}

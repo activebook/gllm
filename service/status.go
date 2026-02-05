@@ -5,19 +5,20 @@ import "fmt"
 type StreamStatus int
 
 const (
-	StatusUnknown             StreamStatus = iota
-	StatusProcessing                       // 1
-	StatusStarted                          // 2
-	StatusFinished                         // 3
-	StatusWarn                             // 4
-	StatusError                            // 5
-	StatusReasoning                        // 6
-	StatusReasoningOver                    // 7
-	StatusFunctionCalling                  // 8
-	StatusFunctionCallingOver              // 9
-	StatusDiffConfirm                      // 10
-	StatusDiffConfirmOver                  // 11
-	StatusSwitchAgent                      // 12
+	StatusUnknown StreamStatus = iota
+	StatusProcessing
+	StatusStarted
+	StatusFinished
+	StatusWarn
+	StatusError
+	StatusReasoning
+	StatusReasoningOver
+	StatusFunctionCalling
+	StatusFunctionCallingOver
+	StatusDiffConfirm
+	StatusDiffConfirmOver
+	StatusSwitchAgent
+	StatusUserCancel
 )
 
 type StreamNotify struct {

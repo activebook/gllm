@@ -126,6 +126,11 @@ func RunAgent(prompt string, files []*service.FileData, convoName string, yolo b
 					// Switch agent, continue to next loop
 					continue
 				}
+			} else if service.IsUserCancelError(err) {
+				// User cancelled operation
+				userCancelErr := err.(*service.UserCancelError)
+				service.Infof("%v", userCancelErr)
+				break
 			} else {
 				// Other error, return
 				return err
