@@ -283,9 +283,6 @@ func (ci *ChatInfo) startREPL() {
 
 		// Handle shell commands
 		if ci.startWithLocalCommand(input) {
-			// here there is a nuance bug: the ui.RunChatInput still not update its view
-			// so we need to call it again to update the view forcely
-			// otherwise, in /history /editor situations, the view would be broken
 			ci.executeShellCommand(input[1:])
 			continue
 		}
@@ -378,7 +375,10 @@ func (ci *ChatInfo) showHistory() {
 	m := ui.NewViewportModel(provider, content, func() string {
 		return fmt.Sprintf("Conversation: %s", convoName)
 	})
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	// Bugfix: we don't need to run history in alt screen
+	// because it will break the ChatInput view
+	// p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
 		service.Errorf("Error running viewport: %v", err)
 	}
