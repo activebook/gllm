@@ -45,16 +45,47 @@ func (g *GeminiConversation) Save() error {
 		return nil
 	}
 
-	// Remove any model messages with nil Parts before saving
-	filtered := make([]*genai.Content, 0, len(g.Messages))
-	for _, content := range g.Messages {
-		if content.Role == genai.RoleModel && content.Parts == nil {
-			continue // skip invalid model messages
+	// Filter out function response to save tokens (only deep copy if needed)
+	formatMessages := make([]*genai.Content, len(g.Messages))
+	for i, content := range g.Messages {
+		// Check if this message has any function responses that need clearing
+		hasFunctionResponse := false
+		for _, part := range content.Parts {
+			if part.FunctionResponse != nil {
+				hasFunctionResponse = true
+				break
+			}
 		}
-		filtered = append(filtered, content)
+
+		// Only deep copy if we need to modify function responses
+		if hasFunctionResponse {
+			// Create new Content with deep copy of Parts
+			contentCopy := &genai.Content{
+				Role: content.Role,
+			}
+			contentCopy.Parts = make([]*genai.Part, len(content.Parts))
+			for j, part := range content.Parts {
+				if part.FunctionResponse != nil {
+					// Create new Part with empty FunctionResponse
+					contentCopy.Parts[j] = &genai.Part{
+						FunctionResponse: &genai.FunctionResponse{
+							Name:     part.FunctionResponse.Name,
+							Response: map[string]any{}, // Empty response to save tokens
+						},
+					}
+				} else {
+					// Shallow copy non-function-response parts
+					contentCopy.Parts[j] = part
+				}
+			}
+			formatMessages[i] = contentCopy
+		} else {
+			// No modification needed, shallow copy the pointer
+			formatMessages[i] = content
+		}
 	}
 
-	data, err := json.MarshalIndent(filtered, "", "  ")
+	data, err := json.MarshalIndent(formatMessages, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to serialize conversation: %w", err)
 	}
