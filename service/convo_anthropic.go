@@ -45,30 +45,53 @@ func (c *AnthropicConversation) Save() error {
 		return nil
 	}
 
-	// Important: We need to copy the message, otherwise it will modify the original message
-	// model need complete original message, which includes tool content to generate assistant response
+	// Important: We only deep copy tool result content that we modify
+	// model needs complete original message, which includes tool content to generate assistant response
 	// but we don't need tool content in conversation file to save tokens
 	empty := ""
 	formatMessages := make([]anthropic.MessageParam, len(c.Messages))
 	for i, msg := range c.Messages {
-		// Copy message
+		// Shallow copy the message first - efficient since we're not modifying most fields
 		msgCopy := msg
-		// Clear content if it contains tool_result
-		for j, block := range msgCopy.Content {
-			if block.OfToolResult != nil {
-				// Create a new tool result with empty content
-				toolResult := anthropic.ToolResultBlockParamContentUnion{
-					OfText: &anthropic.TextBlockParam{
-						Text: empty,
-					},
+
+		// Check if this message has any tool results that need content clearing
+		hasToolResult := false
+		if msg.Content != nil {
+			for _, block := range msg.Content {
+				if block.OfToolResult != nil {
+					hasToolResult = true
+					break
 				}
-				block.OfToolResult.Content = []anthropic.ToolResultBlockParamContentUnion{
-					toolResult,
-				}
-				// Replace the tool result in the copied message
-				msgCopy.Content[j] = anthropic.ContentBlockParamUnion{OfToolResult: block.OfToolResult}
 			}
 		}
+
+		// Only deep copy Content slice if we need to modify tool results
+		if hasToolResult {
+			msgCopy.Content = make([]anthropic.ContentBlockParamUnion, len(msg.Content))
+			for j, block := range msg.Content {
+				if block.OfToolResult != nil {
+					// Only here we create a NEW ToolResultBlockParam with empty content
+					msgCopy.Content[j] = anthropic.ContentBlockParamUnion{
+						OfToolResult: &anthropic.ToolResultBlockParam{
+							ToolUseID: block.OfToolResult.ToolUseID,
+							IsError:   block.OfToolResult.IsError,
+							// Replace content with empty - this is a NEW slice, not modifying original
+							Content: []anthropic.ToolResultBlockParamContentUnion{
+								{
+									OfText: &anthropic.TextBlockParam{
+										Text: empty,
+									},
+								},
+							},
+						},
+					}
+				} else {
+					// No change needed, shallow copy the block
+					msgCopy.Content[j] = block
+				}
+			}
+		}
+
 		formatMessages[i] = msgCopy
 	}
 
