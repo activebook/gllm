@@ -46,7 +46,7 @@ func (c *OpenChatConversation) MarshalMessages(messages []*model.ChatCompletionM
 		// Marshal to compact JSON
 		line, err := json.Marshal(formatted)
 		if err != nil {
-			Warnf("failed to serialize message: %w", err)
+			Warnf("failed to serialize message: %v", err)
 			continue
 		}
 

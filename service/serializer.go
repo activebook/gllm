@@ -123,91 +123,88 @@ func DetectAnthropicKeyMessage(msg *anthropic.MessageParam) bool {
 }
 
 /*
+ * Helper function to detect provider from a single JSONL line or message object
+ */
+func DetectMessageProviderFromLine(line []byte) string {
+	line = bytes.TrimSpace(line)
+	if len(line) == 0 || !json.Valid(line) {
+		return ModelProviderUnknown
+	}
+
+	// 1. Check Gemini (Most unique structure "parts")
+	var geminiMsg gemini.Content
+	if err := json.Unmarshal(line, &geminiMsg); err == nil {
+		if DetectGeminiKeyMessage(&geminiMsg) {
+			return ModelProviderGemini
+		}
+	}
+
+	// 2. Check Anthropic
+	var anthropicMsg anthropic.MessageParam
+	if err := json.Unmarshal(line, &anthropicMsg); err == nil {
+		if DetectAnthropicKeyMessage(&anthropicMsg) {
+			return ModelProviderAnthropic
+		}
+	}
+
+	// 3. Check OpenAI
+	var openaiMsg openai.ChatCompletionMessage
+	if err := json.Unmarshal(line, &openaiMsg); err == nil {
+		if DetectOpenAIKeyMessage(&openaiMsg) {
+			return ModelProviderOpenAI
+		}
+		// Weak check for OpenAI Compatible (pure text content)
+		if openaiMsg.Role != "" && (openaiMsg.Content != "" || len(openaiMsg.MultiContent) > 0) {
+			return ModelProviderOpenAICompatible
+		}
+	}
+
+	return ModelProviderUnknown
+}
+
+/*
  * Detects the conversation provider based on message format.
  * Supports both JSONL (preferred) and legacy JSON array formats.
  */
 func DetectMessageProviderByContent(input []byte) string {
-	// Try to unmarshal as array of messages
-	var messages []json.RawMessage
+	// 1. Try to unmarshal as array of messages (Legacy Format)
+	// var arrayMessages []json.RawMessage
+	// if err := json.Unmarshal(input, &arrayMessages); err == nil && len(arrayMessages) > 0 {
+	// 	// It's a valid JSON array, detect provider from the messages
+	// 	var weakMatch bool
+	// 	for _, msg := range arrayMessages {
+	// 		provider := DetectMessageProviderFromLine(msg)
+	// 		if provider != ModelProviderUnknown && provider != ModelProviderOpenAICompatible {
+	// 			return provider // Found definitive match
+	// 		}
+	// 		if provider == ModelProviderOpenAICompatible {
+	// 			weakMatch = true
+	// 		}
+	// 	}
+	// 	if weakMatch {
+	// 		return ModelProviderOpenAICompatible
+	// 	}
+	// 	return ModelProviderUnknown
+	// }
 
-	// JSONL format: parse each line as a separate JSON object
+	// 2. JSONL format: parse each line
 	lines := bytes.Split(input, []byte("\n"))
+	var weakMatch bool
 	for _, line := range lines {
-		line = bytes.TrimSpace(line)
-		if len(line) == 0 {
-			continue
+		provider := DetectMessageProviderFromLine(line)
+		if provider != ModelProviderUnknown && provider != ModelProviderOpenAICompatible {
+			return provider // Found definitive match
 		}
-		if json.Valid(line) {
-			messages = append(messages, json.RawMessage(line))
-		}
-	}
-
-	provider := ModelProviderUnknown
-	if len(messages) == 0 {
-		return provider
-	}
-
-	// Try to detect Gemini format
-	var geminiMsg gemini.Content
-	for _, msg := range messages {
-		if err := json.Unmarshal(msg, &geminiMsg); err == nil {
-			// Gemini messages must have a role and parts array
-			// If parts length aren't 0, then it must be gemini
-			if DetectGeminiKeyMessage(&geminiMsg) {
-				provider = ModelProviderGemini
-				break
-			} else {
-				// The first message can detect gemini or not, if not, break
-				break
-			}
-		}
-	}
-	if provider != ModelProviderUnknown {
-		return provider
-	}
-
-	// Try to detect Anthropic format
-	// Bugfix:
-	// The Anthropic SDK has a custom decoder that automatically handles string content by converting it to an array of content blocks.
-	// So we cannot rely on Content[] along to detect whether it's anthropic or not
-	// Because "content": "hi" would be converted Content[{"text":"hi"}] automatically
-	var anthropicMsg anthropic.MessageParam
-	for _, msg := range messages {
-		if err := json.Unmarshal(msg, &anthropicMsg); err == nil {
-			// For Anthropic messages, we must find the first key message
-			if DetectAnthropicKeyMessage(&anthropicMsg) {
-				provider = ModelProviderAnthropic
-				break
-			} else if anthropicMsg.Role != anthropic.MessageParamRoleUser && anthropicMsg.Role != anthropic.MessageParamRoleAssistant {
-				// If role is not user or assistant, it's not anthropic
-				// Remember: anthropic only has two roles, no system and tools
-				provider = ModelProviderUnknown
-				break
-			}
-		}
-	}
-	if provider != ModelProviderUnknown {
-		return provider
-	}
-
-	// Try to detect OpenAI format (fallback)
-	var openaiMsg openai.ChatCompletionMessage
-	for _, msg := range messages {
-		if err := json.Unmarshal(msg, &openaiMsg); err == nil {
-			// OpenAI messages must have a role
-			if DetectOpenAIKeyMessage(&openaiMsg) {
-				provider = ModelProviderOpenAI
-				break
-			} else if openaiMsg.Role != "" && (openaiMsg.Content != "" || len(openaiMsg.MultiContent) > 0) {
-				// If role exists, check whether it's pure text content
-				// If so, we can consider it OpenAICompatible (Pure text content)
-				provider = ModelProviderOpenAICompatible
-				// don't break, continue to check the next message
-			}
+		if provider == ModelProviderOpenAICompatible {
+			weakMatch = true
 		}
 	}
 
-	return provider
+	if weakMatch {
+		return ModelProviderOpenAICompatible
+	}
+
+	return ModelProviderUnknown
 }
 
 // Detects the conversation provider based on message format using a scanner
@@ -224,45 +221,25 @@ func DetectMessageProvider(path string) string {
 	buf := make([]byte, 64*1024)
 	scanner.Buffer(buf, 1024*1024)
 
-	provider := ModelProviderUnknown
+	var weakMatch bool
 
 	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
-			continue
-		}
-		if !json.Valid(line) {
-			continue
-		}
+		line := scanner.Bytes()
+		provider := DetectMessageProviderFromLine(line)
 
-		// Gemini Check
-		var geminiMsg gemini.Content
-		if err := json.Unmarshal(line, &geminiMsg); err == nil {
-			if DetectGeminiKeyMessage(&geminiMsg) {
-				return ModelProviderGemini
-			}
+		if provider != ModelProviderUnknown && provider != ModelProviderOpenAICompatible {
+			return provider // Found definitive match
 		}
-
-		// Anthropic Check
-		var anthropicMsg anthropic.MessageParam
-		if err := json.Unmarshal(line, &anthropicMsg); err == nil {
-			if DetectAnthropicKeyMessage(&anthropicMsg) {
-				return ModelProviderAnthropic
-			}
-		}
-
-		// OpenAI Check
-		var openaiMsg openai.ChatCompletionMessage
-		if err := json.Unmarshal(line, &openaiMsg); err == nil {
-			if DetectOpenAIKeyMessage(&openaiMsg) {
-				return ModelProviderOpenAI
-			} else if openaiMsg.Role != "" && (openaiMsg.Content != "" || len(openaiMsg.MultiContent) > 0) {
-				return ModelProviderOpenAICompatible
-			}
+		if provider == ModelProviderOpenAICompatible {
+			weakMatch = true
 		}
 	}
 
-	return provider
+	if weakMatch {
+		return ModelProviderOpenAICompatible
+	}
+
+	return ModelProviderUnknown
 }
 
 // styleEachRune applies color to each rune individually except newlines.
