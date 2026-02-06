@@ -143,7 +143,10 @@ func (ag *Agent) SortOpenChatMessagesByOrder() error {
 
 	// Update the conversation with new messages
 	ag.Convo.SetMessages(history)
-	return nil
+	// Save the conversation
+	// Bugfix: save conversation after update messages
+	// Because the system message could be modified, and added user message
+	return ag.Convo.Save()
 }
 
 // In current openchat api, we can't use cached tokens
@@ -264,6 +267,7 @@ func (c *OpenChat) process(ag *Agent) error {
 			Debugf("Context messages after truncation: [%d]", len(messages))
 			// Update the conversation with truncated messages
 			ag.Convo.SetMessages(messages)
+			ag.Convo.Save()
 		}
 
 		// Set thinking mode using ThinkingLevel conversion
@@ -322,7 +326,7 @@ func (c *OpenChat) process(ag *Agent) error {
 		ag.addUpOpenChatTokenUsage(resp)
 
 		// Add the assistant's message to the conversation
-		err = c.processConvoSave(ag, assistantMessage)
+		err = c.saveToConvo(ag, assistantMessage)
 		if err != nil {
 			return err
 		}
@@ -337,12 +341,12 @@ func (c *OpenChat) process(ag *Agent) error {
 					if IsSwitchAgentError(err) {
 						// Bugfix: left an "orphan" tool_call that had no matching tool result.
 						// Add tool message to conversation to fix this.
-						c.processConvoSave(ag, toolMessage)
+						c.saveToConvo(ag, toolMessage)
 						return err
 					}
 					if IsUserCancelError(err) {
 						// User cancelled tool call, pop up
-						c.processConvoSave(ag, toolMessage)
+						c.saveToConvo(ag, toolMessage)
 						return err
 					}
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
@@ -350,7 +354,7 @@ func (c *OpenChat) process(ag *Agent) error {
 				// IMPORTANT: Even error happened still add an error response message to maintain conversation integrity
 				// The API requires every tool_call to have a corresponding tool response
 				// Add the tool response to the conversation
-				err = c.processConvoSave(ag, toolMessage)
+				err = c.saveToConvo(ag, toolMessage)
 				if err != nil {
 					return err
 				}
@@ -387,16 +391,14 @@ func (c *OpenChat) process(ag *Agent) error {
 	return nil
 }
 
-// processConvoSave processes the conversation save
+// saveToConvo processes the conversation save
 // We need to save the conversation after each message is sent to the client
 // Because model supports interleaved tool calls and responses, aka ReAct
 // If error happened or user cancelled, in order to maintain conversation integrity, we need to save the conversation
 // So that we can resume the conversation from the last saved state
-func (c *OpenChat) processConvoSave(ag *Agent, message *model.ChatCompletionMessage) error {
+func (c *OpenChat) saveToConvo(ag *Agent, message *model.ChatCompletionMessage) error {
 	// Add the assistant's message to the conversation
-	ag.Convo.Push(message)
-	// Save the conversation
-	err := ag.Convo.Save()
+	err := ag.Convo.Push(message)
 	if err != nil {
 		return fmt.Errorf("failed to save conversation: %v", err)
 	}

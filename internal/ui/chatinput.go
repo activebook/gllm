@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/reflow/wrap"
 )
 
 const (
@@ -185,7 +186,7 @@ func (m ChatInputModel) UpdateSuggestions(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Detect suggestions
 	val := m.textarea.Value()
-	cursor := getCursorIndex(m.textarea)
+	cursor := getCursorIndex(m.textarea, m.width)
 
 	// Find word start
 	start := 0
@@ -331,7 +332,7 @@ func (m *ChatInputModel) selectSuggestion() {
 
 	selected := m.filteredCommands[m.suggestionIndex].Command
 	val := m.textarea.Value()
-	cursor := getCursorIndex(m.textarea)
+	cursor := getCursorIndex(m.textarea, m.width)
 
 	switch m.suggestionType {
 	case suggestionTypeCommand:
@@ -370,29 +371,88 @@ func (m *ChatInputModel) selectSuggestion() {
 }
 
 // Helper to get absolute cursor index
-func getCursorIndex(ta textarea.Model) int {
+// simulating the soft wrap done by bubbles/textarea
+func getCursorIndex(ta textarea.Model, width int) int {
 	val := ta.Value()
 
-	// We assume Line() and LineInfo() exist on textarea.Model.
-	line := ta.Line()
-	col := ta.LineInfo().CharOffset
-
-	lines := strings.Split(val, "\n")
-
-	pos := 0
-	for i := 0; i < line && i < len(lines); i++ {
-		pos += len(lines[i]) + 1 // +1 for newline
+	// Calculate inner width for wrapping
+	// textarea subtracts prompt width and line number width (if applicable)
+	// We assume prompt is "┃ " (2 chars visual width usually, but let's be safe with 2)
+	// and ShowLineNumbers is false.
+	promptWidth := 2
+	innerWidth := width - promptWidth
+	if innerWidth < 1 {
+		innerWidth = 1
 	}
 
-	if line < len(lines) {
-		currentLineLen := len(lines[line])
-		if col > currentLineLen {
-			col = currentLineLen
+	// Calculate absolute visual line index
+	logicalLines := strings.Split(val, "\n")
+	targetLogLine := ta.Line()
+	absoluteVisLine := 0
+
+	// Sum visual lines for previous logical lines
+	for i := 0; i < targetLogLine && i < len(logicalLines); i++ {
+		// Wrap THIS logical line
+		w := wrap.String(logicalLines[i], innerWidth)
+		// Count how many visual lines it takes
+		// wrap.String inserts \n. So count \n + 1.
+		absoluteVisLine += strings.Count(w, "\n") + 1
+	}
+
+	// Add RowOffset (visual line within the current logical line)
+	absoluteVisLine += ta.LineInfo().RowOffset
+
+	// Wrap the ENTIRE content to get the flat list of visual lines matching textarea's view
+	wrapped := wrap.String(val, innerWidth)
+	wLines := strings.Split(wrapped, "\n")
+
+	// Calculate 1D index in 'wrapped'
+	wrappedPos := 0
+	for i := 0; i < len(wLines) && i < absoluteVisLine; i++ {
+		wrappedPos += len(wLines[i]) + 1 // +1 for the newline in wrapped string
+	}
+	wrappedPos += ta.LineInfo().CharOffset // CharOffset is visual column
+
+	// Ensure wrappedPos doesn't exceed wrapped length
+	if wrappedPos > len(wrapped) {
+		wrappedPos = len(wrapped)
+	}
+
+	// Map wrappedPos back to val index
+	valIdx := 0
+	wrapIdx := 0
+
+	// Use byte iteration as bubbles/textarea uses byte offsets mostly
+	for wrapIdx < wrappedPos && wrapIdx < len(wrapped) {
+		if valIdx >= len(val) {
+			break
 		}
-		pos += col
+
+		wChar := wrapped[wrapIdx]
+		vChar := val[valIdx]
+
+		if wChar == vChar {
+			valIdx++
+			wrapIdx++
+		} else if wChar == '\n' && vChar != '\n' {
+			// Soft wrap newline
+			if vChar == ' ' {
+				// Space replaced by newline
+				valIdx++
+				wrapIdx++
+			} else {
+				// Newline inserted
+				wrapIdx++
+			}
+		} else {
+			// Desync or other difference?
+			// Just advance both to avoid infinite loop
+			valIdx++
+			wrapIdx++
+		}
 	}
 
-	return pos
+	return valIdx
 }
 
 // getFileSuggestions returns a list of file suggestions based on the prefix

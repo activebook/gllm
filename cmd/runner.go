@@ -299,7 +299,7 @@ func CheckConvoFormat(agent *data.AgentConfig, convoData []byte) (isCompatible b
 	modelProvider = agent.Model.Provider
 
 	// Detect provider based on message format
-	provider = service.DetectMessageProvider(convoData)
+	provider = service.DetectMessageProviderByContent(convoData)
 
 	// Check compatibility
 	isCompatible = provider == modelProvider

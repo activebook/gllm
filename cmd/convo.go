@@ -133,8 +133,8 @@ gllm convo remove "2 - 5" --force`,
 			var matches []string
 			var names []string
 			for _, s := range selected {
-				names = append(names, s+".json")
-				matches = append(matches, filepath.Join(convoDir, s+".json"))
+				names = append(names, s+".jsonl")
+				matches = append(matches, filepath.Join(convoDir, s+".jsonl"))
 			}
 
 			// Confirm if not forced
@@ -191,7 +191,7 @@ gllm convo remove "2 - 5" --force`,
 
 				// Collect matching files in range
 				for i := start; i <= end; i++ {
-					convoPath := filepath.Join(convoDir, convos[i-1].Name+".json")
+					convoPath := filepath.Join(convoDir, convos[i-1].Name+".jsonl")
 					matches = append(matches, convoPath)
 				}
 			} else {
@@ -262,7 +262,7 @@ func handleAsPattern(pattern string, convoDir string) []string {
 	}
 
 	// Now pattern is either a name or a wildcard
-	convoPathPattern := filepath.Join(convoDir, pattern+".json")
+	convoPathPattern := filepath.Join(convoDir, pattern+".jsonl")
 
 	// Find matching files using the pattern
 	matches, err = filepath.Glob(convoPathPattern)
@@ -312,9 +312,9 @@ gllm convo clear --force`,
 		}
 
 		for _, file := range files {
-			if !file.IsDir() && strings.HasSuffix(file.Name(), ".json") {
-				name := strings.TrimSuffix(file.Name(), ".json")
-				if err := os.Remove(filepath.Join(convoDir, name+".json")); err != nil {
+			if !file.IsDir() && strings.HasSuffix(file.Name(), ".jsonl") {
+				name := strings.TrimSuffix(file.Name(), ".jsonl")
+				if err := os.Remove(filepath.Join(convoDir, name+".jsonl")); err != nil {
 					return fmt.Errorf("failed to remove conversation: %v", err)
 				}
 				fmt.Printf("  - '%s' removed.\n", name)
@@ -389,7 +389,7 @@ Using the --message-chars (-c) flag, set the maximum length of each message's co
 			convoName = convos[index-1].Name
 		}
 
-		convoPath := filepath.Join(convoDir, convoName+".json")
+		convoPath := filepath.Join(convoDir, convoName+".jsonl")
 
 		// Check if conversation exists
 		if _, err := os.Stat(convoPath); os.IsNotExist(err) {
@@ -407,9 +407,8 @@ Using the --message-chars (-c) flag, set the maximum length of each message's co
 		fmt.Printf("Name: %s\n", convoName)
 
 		// Detect provider based on message format
-		provider := service.DetectMessageProvider(data)
+		provider := service.DetectMessageProviderByContent(data)
 
-		// Process and display messages based on provider
 		// Process and display messages based on provider
 		var content string
 		switch provider {
@@ -518,8 +517,8 @@ var convoRenameCmd = &cobra.Command{
 			oldName = convos[index-1].Name
 		}
 
-		oldPath := service.GetFilePath(convoDir, oldName+".json")
-		newPath := service.GetFilePath(convoDir, newName+".json")
+		oldPath := service.GetFilePath(convoDir, oldName+".jsonl")
+		newPath := service.GetFilePath(convoDir, newName+".jsonl")
 
 		// Check if source exists
 		if _, err := os.Stat(oldPath); os.IsNotExist(err) {
@@ -580,7 +579,7 @@ var convoShareCmd = &cobra.Command{
 		convoName = resolvedName
 
 		convoDir := service.GetConvoDir()
-		sourcePath := service.GetFilePath(convoDir, convoName+".json")
+		sourcePath := service.GetFilePath(convoDir, convoName+".jsonl")
 
 		if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
 			return fmt.Errorf("conversation '%s' not found", convoName)
@@ -593,11 +592,11 @@ var convoShareCmd = &cobra.Command{
 
 		// If destPath is not given, use convo name in local path
 		if destPath == "" {
-			destPath = convoName + ".json"
+			destPath = convoName + ".jsonl"
 		} else {
 			// If destPath is a directory, append the filename
 			if info, err := os.Stat(destPath); err == nil && info.IsDir() {
-				destPath = filepath.Join(destPath, convoName+".json")
+				destPath = filepath.Join(destPath, convoName+".jsonl")
 			}
 		}
 

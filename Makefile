@@ -55,6 +55,18 @@ update: ## Update all dependencies to latest
 	@go get -u ./...
 	@go mod tidy
 
+create-pr: ## Create a pull request
+	@echo "  >  Creating pull request..."
+	@./build/create-pr.sh
+
+close-pr: ## Close a pull request
+	@echo "  >  Closing pull request..."
+	@./build/close-pr.sh
+
+merge-pr: ## Merge a pull request
+	@echo "  >  Merging pull request..."
+	@./build/merge-pr.sh
+
 release: ## Run the release script
 	@echo "  >  Releasing..."
 	@./build/release.sh

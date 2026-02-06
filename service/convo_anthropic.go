@@ -17,18 +17,6 @@ type AnthropicConversation struct {
 	Messages []anthropic.MessageParam
 }
 
-// PushMessages adds multiple messages to the conversation
-func (c *AnthropicConversation) Push(messages ...interface{}) {
-	for _, msg := range messages {
-		switch v := msg.(type) {
-		case anthropic.MessageParam:
-			c.Messages = append(c.Messages, v)
-		case []anthropic.MessageParam:
-			c.Messages = append(c.Messages, v...)
-		}
-	}
-}
-
 func (c *AnthropicConversation) GetMessages() interface{} {
 	return c.Messages
 }
@@ -39,19 +27,14 @@ func (c *AnthropicConversation) SetMessages(messages interface{}) {
 	}
 }
 
-// Save persists the conversation to disk
-func (c *AnthropicConversation) Save() error {
-	if c.Name == "" || len(c.Messages) == 0 {
-		return nil
-	}
-
+func (c *AnthropicConversation) MarshalMessages(messages []anthropic.MessageParam) []byte {
 	// Important: We only deep copy tool result content that we modify
 	// model needs complete original message, which includes tool content to generate assistant response
 	// but we don't need tool content in conversation file to save tokens
 	empty := ""
-	formatMessages := make([]anthropic.MessageParam, len(c.Messages))
-	for i, msg := range c.Messages {
-		// Shallow copy the message first - efficient since we're not modifying most fields
+	var data []byte
+	for _, msg := range messages {
+		// Shallow copy the message first
 		msgCopy := msg
 
 		// Check if this message has any tool results that need content clearing
@@ -70,12 +53,11 @@ func (c *AnthropicConversation) Save() error {
 			msgCopy.Content = make([]anthropic.ContentBlockParamUnion, len(msg.Content))
 			for j, block := range msg.Content {
 				if block.OfToolResult != nil {
-					// Only here we create a NEW ToolResultBlockParam with empty content
+					// Create a NEW ToolResultBlockParam with empty content
 					msgCopy.Content[j] = anthropic.ContentBlockParamUnion{
 						OfToolResult: &anthropic.ToolResultBlockParam{
 							ToolUseID: block.OfToolResult.ToolUseID,
 							IsError:   block.OfToolResult.IsError,
-							// Replace content with empty - this is a NEW slice, not modifying original
 							Content: []anthropic.ToolResultBlockParamContentUnion{
 								{
 									OfText: &anthropic.TextBlockParam{
@@ -86,44 +68,85 @@ func (c *AnthropicConversation) Save() error {
 						},
 					}
 				} else {
-					// No change needed, shallow copy the block
 					msgCopy.Content[j] = block
 				}
 			}
 		}
 
-		formatMessages[i] = msgCopy
+		// Marshal to compact JSON
+		line, err := json.Marshal(msgCopy)
+		if err != nil {
+			Warnf("failed to serialize message: %v", err)
+			continue
+		}
+
+		// Write all lines as JSONL (one message per line)
+		data = append(data, line...)
+		data = append(data, '\n')
+	}
+	return data
+}
+
+// PushMessages adds multiple messages to the conversation (high performance)
+// Uses append-mode for incremental saves using JSONL format (one message per line)
+func (c *AnthropicConversation) Push(messages ...interface{}) error {
+	if c.Name == "" || len(messages) == 0 {
+		return nil
 	}
 
-	data, err := json.MarshalIndent(formatMessages, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to serialize conversation: %w", err)
+	newmsgs := []anthropic.MessageParam{}
+	for _, msg := range messages {
+		switch v := msg.(type) {
+		case anthropic.MessageParam:
+			newmsgs = append(newmsgs, v)
+		case []anthropic.MessageParam:
+			newmsgs = append(newmsgs, v...)
+		}
 	}
 
+	// append new messages to c.Messages
+	c.Messages = append(c.Messages, newmsgs...)
+
+	// append new messages to file
+	data := c.MarshalMessages(newmsgs)
+	return c.appendFile(data)
+}
+
+// Save persists the conversation to disk using JSONL format (one message per line).
+func (c *AnthropicConversation) Save() error {
+	if c.Name == "" || len(c.Messages) == 0 {
+		return nil
+	}
+
+	data := c.MarshalMessages(c.Messages)
 	return c.writeFile(data)
 }
 
-// Load retrieves the conversation from disk
+// Load retrieves the conversation from disk (JSONL format).
 func (c *AnthropicConversation) Load() error {
 	if c.Name == "" {
 		return nil
 	}
 
-	// read file
-	data, err := c.readFile()
-	if err != nil || data == nil {
+	lines, err := c.readFile()
+	if err != nil {
 		return err
 	}
 
-	// Handle empty files
-	if len(data) == 0 {
+	// Handle empty or non-existent files
+	if len(lines) == 0 {
 		c.Messages = []anthropic.MessageParam{}
 		return nil
 	}
 
-	// Parse messages
-	if err := json.Unmarshal(data, &c.Messages); err != nil {
-		return fmt.Errorf("failed to parse conversation file: %v", err)
+	// Parse each JSONL line as a message
+	c.Messages = make([]anthropic.MessageParam, 0, len(lines))
+	for i, line := range lines {
+		var msg anthropic.MessageParam
+		if err := json.Unmarshal(line, &msg); err != nil {
+			return fmt.Errorf("failed to parse message at line %d: %w", i+1, err)
+		}
+		c.Messages = append(c.Messages, msg)
 	}
 
 	return nil

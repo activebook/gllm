@@ -143,6 +143,7 @@ func (a *Anthropic) process(ag *Agent) error {
 			Debugf("Context messages after truncation: [%d]", len(messages))
 			// Update the conversation with truncated messages
 			ag.Convo.SetMessages(messages)
+			ag.Convo.Save()
 		}
 
 		// Create params
@@ -159,6 +160,12 @@ func (a *Anthropic) process(ag *Agent) error {
 
 		// Enable Thinking if requested, with budget based on level
 		params.Thinking = ag.ThinkingLevel.ToAnthropicParams()
+		if params.Thinking.OfEnabled != nil {
+			if params.Thinking.OfEnabled.BudgetTokens > params.MaxTokens {
+				params.Thinking.OfEnabled.BudgetTokens = params.MaxTokens * 1 / 2
+			}
+			Debugf("Anthropic MaxTokens: %d, Thinking BudgetTokens: %d\n", params.MaxTokens, params.Thinking.OfEnabled.BudgetTokens)
+		}
 
 		// Temperature/TopP
 		// Bug: `temperature` and `top_p` cannot both be specified for this model. Please use only one.
@@ -181,7 +188,7 @@ func (a *Anthropic) process(ag *Agent) error {
 		addUpAnthropicTokenUsage(ag, usage)
 
 		// Push assistant message
-		err = a.processConvoSave(ag, msg)
+		err = a.saveToConvo(ag, msg)
 		if err != nil {
 			return err
 		}
@@ -196,19 +203,19 @@ func (a *Anthropic) process(ag *Agent) error {
 					if IsSwitchAgentError(err) {
 						// Bugfix: left an "orphan" tool_call that had no matching tool result.
 						// Add tool message to conversation to fix this.
-						a.processConvoSave(ag, toolMsg)
+						a.saveToConvo(ag, toolMsg)
 						return err
 					}
 					if IsUserCancelError(err) {
 						// User cancel signal, pop up
-						a.processConvoSave(ag, toolMsg)
+						a.saveToConvo(ag, toolMsg)
 						return err
 					}
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Tool call failed: %v", err)}, nil)
 				}
 				// IMPORTANT: Even error happened still add an error response message to maintain conversation integrity
 				// The API requires every tool_call to have a corresponding tool response
-				err = a.processConvoSave(ag, toolMsg)
+				err = a.saveToConvo(ag, toolMsg)
 				if err != nil {
 					return err
 				}
@@ -235,16 +242,14 @@ func (a *Anthropic) process(ag *Agent) error {
 	return nil
 }
 
-// processConvoSave processes the conversation save
+// saveToConvo processes the conversation save
 // We need to save the conversation after each message is sent to the client
 // Because model supports interleaved tool calls and responses, aka ReAct
 // If error happened or user cancelled, in order to maintain conversation integrity, we need to save the conversation
 // So that we can resume the conversation from the last saved state
-func (a *Anthropic) processConvoSave(ag *Agent, message anthropic.MessageParam) error {
+func (a *Anthropic) saveToConvo(ag *Agent, message anthropic.MessageParam) error {
 	// Add the assistant's message to the conversation
-	ag.Convo.Push(message)
-	// Save the conversation
-	err := ag.Convo.Save()
+	err := ag.Convo.Push(message)
 	if err != nil {
 		return fmt.Errorf("failed to save conversation: %v", err)
 	}
@@ -521,7 +526,9 @@ func (ag *Agent) SortAnthropicMessagesByOrder() error {
 	}
 
 	ag.Convo.SetMessages(history)
-	return nil
+	// Bugfix: save conversation after update messages
+	// Although system message wouldn't needed, but it's better to save it for consistency
+	return ag.Convo.Save()
 }
 
 func (ag *Agent) getAnthropicTools() []anthropic.ToolUnionParam {
