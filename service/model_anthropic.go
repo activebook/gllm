@@ -160,6 +160,12 @@ func (a *Anthropic) process(ag *Agent) error {
 
 		// Enable Thinking if requested, with budget based on level
 		params.Thinking = ag.ThinkingLevel.ToAnthropicParams()
+		if params.Thinking.OfEnabled != nil {
+			if params.Thinking.OfEnabled.BudgetTokens > params.MaxTokens {
+				params.Thinking.OfEnabled.BudgetTokens = params.MaxTokens * 1 / 2
+			}
+			Debugf("Anthropic MaxTokens: %d, Thinking BudgetTokens: %d\n", params.MaxTokens, params.Thinking.OfEnabled.BudgetTokens)
+		}
 
 		// Temperature/TopP
 		// Bug: `temperature` and `top_p` cannot both be specified for this model. Please use only one.
