@@ -1,13 +1,10 @@
 # Specific
-.qodo
-gllm.yaml
-mcp.json
 design.md
-workflow.json
+.qodo
+*.yaml
+*.json
 **test*/*
 **test*/*.*
-**workflow/*
-**workflow/*.*
 *checksums.txt
 
 # Ignore the compiled binary
