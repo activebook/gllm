@@ -281,7 +281,7 @@ func (oa *OpenAI) process(ag *Agent) error {
 		addUpOpenAITokenUsage(ag, resp)
 
 		// Add the assistant's message to the conversation
-		err = oa.processConvoSave(ag, assistantMessage)
+		err = oa.saveToConvo(ag, assistantMessage)
 		if err != nil {
 			return err
 		}
@@ -296,12 +296,12 @@ func (oa *OpenAI) process(ag *Agent) error {
 					if IsSwitchAgentError(err) {
 						// Bugfix: left an "orphan" tool_call that had no matching tool result.
 						// Add tool message to conversation to fix this.
-						oa.processConvoSave(ag, toolMessage)
+						oa.saveToConvo(ag, toolMessage)
 						return err
 					}
 					if IsUserCancelError(err) {
 						// User cancelled tool call, pop up
-						oa.processConvoSave(ag, toolMessage)
+						oa.saveToConvo(ag, toolMessage)
 						return err
 					}
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
@@ -309,7 +309,7 @@ func (oa *OpenAI) process(ag *Agent) error {
 				// IMPORTANT: Even error happened still add an error response message to maintain conversation integrity
 				// The API requires every tool_call to have a corresponding tool response
 				// Add the tool response to the conversation
-				err = oa.processConvoSave(ag, toolMessage)
+				err = oa.saveToConvo(ag, toolMessage)
 				if err != nil {
 					return err
 				}
@@ -340,16 +340,14 @@ func (oa *OpenAI) process(ag *Agent) error {
 	return nil
 }
 
-// processConvoSave processes the conversation save
+// saveToConvo processes the conversation save
 // We need to save the conversation after each message is sent to the client
 // Because model supports interleaved tool calls and responses, aka ReAct
 // If error happened or user cancelled, in order to maintain conversation integrity, we need to save the conversation
 // So that we can resume the conversation from the last saved state
-func (oa *OpenAI) processConvoSave(ag *Agent, message openai.ChatCompletionMessage) error {
+func (oa *OpenAI) saveToConvo(ag *Agent, message openai.ChatCompletionMessage) error {
 	// Add the assistant's message to the conversation
-	ag.Convo.Push(message)
-	// Save the conversation
-	err := ag.Convo.Save()
+	err := ag.Convo.Push(message)
 	if err != nil {
 		return fmt.Errorf("failed to save conversation: %v", err)
 	}

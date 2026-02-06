@@ -1,8 +1,11 @@
 package service
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/activebook/gllm/data"
@@ -94,6 +97,9 @@ func DetectAnthropicKeyMessage(msg *anthropic.MessageParam) bool {
 	if msg.Role == "" {
 		return false
 	}
+	if msg.Role != anthropic.MessageParamRoleUser && msg.Role != anthropic.MessageParamRoleAssistant {
+		return false
+	}
 	for _, block := range msg.Content {
 		if v := block.OfText; v != nil {
 			// For pure text content, Anthropic and OpenAI multimodal messages have identical JSON structure
@@ -117,17 +123,23 @@ func DetectAnthropicKeyMessage(msg *anthropic.MessageParam) bool {
 }
 
 /*
- * Detects the conversation provider based on message format
- * OpenAICompatible: OpenAI messages that are pure text content
- * OpenAI: OpenAI messages that are unique to OpenAI
- * Anthropic: Anthropic messages that are unique to Anthropic
- * Gemini: Gemini messages that are unique to Gemini
+ * Detects the conversation provider based on message format.
+ * Supports both JSONL (preferred) and legacy JSON array formats.
  */
-func DetectMessageProvider(input []byte) string {
+func DetectMessageProviderByContent(input []byte) string {
 	// Try to unmarshal as array of messages
 	var messages []json.RawMessage
-	if err := json.Unmarshal(input, &messages); err != nil {
-		return ModelProviderUnknown
+
+	// JSONL format: parse each line as a separate JSON object
+	lines := bytes.Split(input, []byte("\n"))
+	for _, line := range lines {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		if json.Valid(line) {
+			messages = append(messages, json.RawMessage(line))
+		}
 	}
 
 	provider := ModelProviderUnknown
@@ -194,8 +206,60 @@ func DetectMessageProvider(input []byte) string {
 			}
 		}
 	}
-	if provider != ModelProviderUnknown {
-		return provider
+
+	return provider
+}
+
+// Detects the conversation provider based on message format using a scanner
+// This is more efficient for large files as it doesn't read the entire file into memory
+func DetectMessageProvider(path string) string {
+	file, err := os.Open(path)
+	if err != nil {
+		return ModelProviderUnknown
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	// Increase buffer size for long messages
+	buf := make([]byte, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
+
+	provider := ModelProviderUnknown
+
+	for scanner.Scan() {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		if !json.Valid(line) {
+			continue
+		}
+
+		// Gemini Check
+		var geminiMsg gemini.Content
+		if err := json.Unmarshal(line, &geminiMsg); err == nil {
+			if DetectGeminiKeyMessage(&geminiMsg) {
+				return ModelProviderGemini
+			}
+		}
+
+		// Anthropic Check
+		var anthropicMsg anthropic.MessageParam
+		if err := json.Unmarshal(line, &anthropicMsg); err == nil {
+			if DetectAnthropicKeyMessage(&anthropicMsg) {
+				return ModelProviderAnthropic
+			}
+		}
+
+		// OpenAI Check
+		var openaiMsg openai.ChatCompletionMessage
+		if err := json.Unmarshal(line, &openaiMsg); err == nil {
+			if DetectOpenAIKeyMessage(&openaiMsg) {
+				return ModelProviderOpenAI
+			} else if openaiMsg.Role != "" && (openaiMsg.Content != "" || len(openaiMsg.MultiContent) > 0) {
+				return ModelProviderOpenAICompatible
+			}
+		}
 	}
 
 	return provider
@@ -236,12 +300,23 @@ func indentText(text string, indent string) string {
 	return strings.Join(lines, "\n")
 }
 
-// RenderGeminiConversationLog returns a string summary of Gemini conversation
+// RenderGeminiConversationLog returns a string summary of Gemini conversation (JSONL or JSON array format)
 func RenderGeminiConversationLog(input []byte) string {
 	var sb strings.Builder
 	var messages []gemini.Content
-	if err := json.Unmarshal(input, &messages); err != nil {
-		return fmt.Sprintf("Error parsing Gemini messages: %v\n", err)
+
+	// JSONL format: parse each line
+	lines := bytes.Split(input, []byte("\n"))
+	for _, line := range lines {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		var msg gemini.Content
+		if err := json.Unmarshal(line, &msg); err != nil {
+			return fmt.Sprintf("Error parsing Gemini message: %v\n", err)
+		}
+		messages = append(messages, msg)
 	}
 
 	// Summary section
@@ -342,12 +417,23 @@ func RenderGeminiConversationLog(input []byte) string {
 	return sb.String()
 }
 
-// RenderOpenAIConversationLog returns a string summary of OpenAI conversation
+// RenderOpenAIConversationLog returns a string summary of OpenAI conversation (JSONL or JSON array format)
 func RenderOpenAIConversationLog(input []byte) string {
 	var sb strings.Builder
 	var messages []openai.ChatCompletionMessage
-	if err := json.Unmarshal(input, &messages); err != nil {
-		return fmt.Sprintf("Error parsing OpenAI messages: %v\n", err)
+
+	// JSONL format: parse each line
+	lines := bytes.Split(input, []byte("\n"))
+	for _, line := range lines {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		var msg openai.ChatCompletionMessage
+		if err := json.Unmarshal(line, &msg); err != nil {
+			return fmt.Sprintf("Error parsing OpenAI message: %v\n", err)
+		}
+		messages = append(messages, msg)
 	}
 
 	// Summary section
@@ -469,12 +555,23 @@ func RenderOpenAIConversationLog(input []byte) string {
 	return sb.String()
 }
 
-// RenderAnthropicConversationLog returns a string summary of Anthropic conversation
+// RenderAnthropicConversationLog returns a string summary of Anthropic conversation (JSONL or JSON array format)
 func RenderAnthropicConversationLog(input []byte) string {
 	var sb strings.Builder
 	var messages []anthropic.MessageParam
-	if err := json.Unmarshal(input, &messages); err != nil {
-		return fmt.Sprintf("Error parsing Anthropic messages: %v\n", err)
+
+	// JSONL format: parse each line
+	lines := bytes.Split(input, []byte("\n"))
+	for _, line := range lines {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		var msg anthropic.MessageParam
+		if err := json.Unmarshal(line, &msg); err != nil {
+			return fmt.Sprintf("Error parsing Anthropic message: %v\n", err)
+		}
+		messages = append(messages, msg)
 	}
 
 	// Summary section

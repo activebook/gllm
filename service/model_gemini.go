@@ -252,7 +252,7 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 		}
 
 		// Update History
-		err = ga.processConvoSave(ag, modelContent)
+		err = ga.saveToConvo(ag, modelContent)
 		if err != nil {
 			return err
 		}
@@ -280,19 +280,19 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 				// Switch agent signal, pop up
 				if IsSwitchAgentError(err) {
 					// Add the response part to satisfy history integrity
-					ga.processConvoSave(ag, funcResp)
+					ga.saveToConvo(ag, funcResp)
 					return err
 				}
 				if IsUserCancelError(err) {
 					// Add the response part to satisfy history integrity
-					ga.processConvoSave(ag, funcResp)
+					ga.saveToConvo(ag, funcResp)
 					return err
 				}
 				ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
 			}
 			// Bugfix: Even error happened, we still need to send the function response back through the chat session
 			// Send function response back through the chat session
-			err = ga.processConvoSave(ag, funcResp)
+			err = ga.saveToConvo(ag, funcResp)
 			if err != nil {
 				return err
 			}
@@ -319,10 +319,14 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 	return nil
 }
 
-func (ga *GeminiAgent) processConvoSave(ag *Agent, content *genai.Content) error {
+// saveToConvo processes the conversation save
+// We need to save the conversation after each message is sent to the client
+// Because model supports interleaved tool calls and responses, aka ReAct
+// If error happened or user cancelled, in order to maintain conversation integrity, we need to save the conversation
+// So that we can resume the conversation from the last saved state
+func (ga *GeminiAgent) saveToConvo(ag *Agent, content *genai.Content) error {
 	// Save the conversation history(curated)
-	ag.Convo.Push(content)
-	err := ag.Convo.Save()
+	err := ag.Convo.Push(content)
 	if err != nil {
 		return fmt.Errorf("failed to save conversation: %v", err)
 	}

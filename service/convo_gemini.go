@@ -48,19 +48,6 @@ func (g *GeminiConversation) consolidateTextParts(parts []*genai.Part) []*genai.
 	return consolidated
 }
 
-// Open initializes a GeminiConversation with the provided title
-// PushContents adds multiple content items to the history
-func (g *GeminiConversation) Push(messages ...interface{}) {
-	for _, msg := range messages {
-		switch v := msg.(type) {
-		case *genai.Content:
-			g.Messages = append(g.Messages, v)
-		case []*genai.Content:
-			g.Messages = append(g.Messages, v...)
-		}
-	}
-}
-
 func (g *GeminiConversation) GetMessages() interface{} {
 	return g.Messages
 }
@@ -71,15 +58,10 @@ func (g *GeminiConversation) SetMessages(messages interface{}) {
 	}
 }
 
-// Save persists the Gemini conversation to disk
-func (g *GeminiConversation) Save() error {
-	if g.Name == "" || len(g.Messages) == 0 {
-		return nil
-	}
-
-	// Consolidate text parts and filter out function response to save tokens
-	formatMessages := make([]*genai.Content, len(g.Messages))
-	for i, content := range g.Messages {
+func (g *GeminiConversation) MarshalMessages(messages []*genai.Content) []byte {
+	// Build all formatted messages
+	var data []byte
+	for _, content := range messages {
 		// First, consolidate consecutive text parts from streaming
 		consolidatedParts := g.consolidateTextParts(content.Parts)
 
@@ -92,7 +74,8 @@ func (g *GeminiConversation) Save() error {
 			}
 		}
 
-		// Create new Content with consolidated parts
+		// Create formatted message
+		var formatted *genai.Content
 		if hasFunctionResponse {
 			// Deep copy with empty function responses
 			contentCopy := &genai.Content{
@@ -101,7 +84,6 @@ func (g *GeminiConversation) Save() error {
 			}
 			for j, part := range consolidatedParts {
 				if part.FunctionResponse != nil {
-					// Create new Part with empty FunctionResponse
 					contentCopy.Parts[j] = &genai.Part{
 						FunctionResponse: &genai.FunctionResponse{
 							Name:     part.FunctionResponse.Name,
@@ -109,53 +91,97 @@ func (g *GeminiConversation) Save() error {
 						},
 					}
 				} else {
-					// Shallow copy non-function-response parts
 					contentCopy.Parts[j] = part
 				}
 			}
-			formatMessages[i] = contentCopy
+			formatted = contentCopy
 		} else {
-			// No function responses, just use consolidated parts
-			formatMessages[i] = &genai.Content{
+			formatted = &genai.Content{
 				Role:  content.Role,
 				Parts: consolidatedParts,
 			}
 		}
+
+		// Marshal to JSON (compact, no indent for JSONL)
+		line, err := json.Marshal(formatted)
+		if err != nil {
+			Warnf("failed to serialize message: %w", err)
+			continue
+		}
+
+		// Write all lines as JSONL (one message per line)
+		data = append(data, line...)
+		data = append(data, '\n')
+	}
+	return data
+}
+
+// PushMessages adds multiple content items to the history (high performance)
+// Uses append-mode for incremental saves using JSONL format (one message per line)
+func (g *GeminiConversation) Push(messages ...interface{}) error {
+	if g.Name == "" || len(messages) == 0 {
+		return nil
 	}
 
-	data, err := json.MarshalIndent(formatMessages, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to serialize conversation: %w", err)
+	newmsgs := []*genai.Content{}
+	for _, msg := range messages {
+		switch v := msg.(type) {
+		case *genai.Content:
+			newmsgs = append(newmsgs, v)
+		case []*genai.Content:
+			newmsgs = append(newmsgs, v...)
+		}
 	}
 
+	// append new messages to c.Messages
+	g.Messages = append(g.Messages, newmsgs...)
+
+	// append new messages to file
+	data := g.MarshalMessages(newmsgs)
+	return g.appendFile(data)
+}
+
+// Save persists the Gemini conversation to disk using JSONL format (one message per line).
+func (g *GeminiConversation) Save() error {
+	if g.Name == "" || len(g.Messages) == 0 {
+		return nil
+	}
+
+	// Write all messages to file
+	data := g.MarshalMessages(g.Messages)
 	return g.writeFile(data)
 }
 
-// Load retrieves the Gemini conversation from disk
+// Load retrieves the Gemini conversation from disk (JSONL format).
 func (g *GeminiConversation) Load() error {
 	if g.Name == "" {
 		return nil
 	}
 
-	data, err := g.readFile()
-	if err != nil || data == nil {
+	lines, err := g.readFile()
+	if err != nil {
 		return err
 	}
 
-	// Handle empty files
-	if len(data) == 0 {
+	// Handle empty or non-existent files
+	if len(lines) == 0 {
 		g.Messages = []*genai.Content{}
 		return nil
 	}
 
-	err = json.Unmarshal(data, &g.Messages)
-	if err != nil {
-		return fmt.Errorf("failed to deserialize conversation: %w", err)
+	// Parse each JSONL line as a message
+	g.Messages = make([]*genai.Content, 0, len(lines))
+	for i, line := range lines {
+		var msg genai.Content
+		if err := json.Unmarshal(line, &msg); err != nil {
+			return fmt.Errorf("failed to parse message at line %d: %w", i+1, err)
+		}
+		g.Messages = append(g.Messages, &msg)
 	}
 
+	// Validate format
 	if len(g.Messages) > 0 {
 		msg := g.Messages[0]
-		// Try to detect Gemini format
 		if len(msg.Parts) <= 0 || msg.Role == "" {
 			return fmt.Errorf("invalid conversation format: isn't a compatible format. '%s'", g.Path)
 		}

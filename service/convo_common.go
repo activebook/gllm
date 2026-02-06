@@ -1,6 +1,8 @@
 package service
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
-	//"github.com/google/generative-ai-go/genai"
 )
 
 // ConversationManager is an interface for handling conversation history
@@ -20,7 +21,7 @@ type ConversationManager interface {
 	Save() error
 	Open(title string) error
 	Clear() error
-	Push(messages ...interface{})
+	Push(messages ...interface{}) error
 	GetMessages() interface{}
 	SetMessages(messages interface{})
 }
@@ -38,35 +39,75 @@ func (c *BaseConversation) SetPath(title string) {
 		return
 	}
 	dir := MakeUserSubDir("gllm", "convo")
-	c.Path = GetFilePath(dir, title+".json")
+	c.Path = GetFilePath(dir, title+".jsonl")
 }
 
 func (c *BaseConversation) GetPath() string {
 	return c.Path
 }
 
-// readFile reads the file content and validates JSON format
-func (c *BaseConversation) readFile() ([]byte, error) {
+// readFile reads the JSONL file and returns each line as a separate byte slice.
+// Each line in a JSONL file is a complete JSON object representing one message.
+func (c *BaseConversation) readFile() ([][]byte, error) {
 	if c.Name == "" {
 		return nil, nil
 	}
 
-	data, err := os.ReadFile(c.Path)
+	file, err := os.Open(c.Path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to read conversation file '%s': %w", c.Path, err)
+		return nil, fmt.Errorf("failed to open conversation file '%s': %w", c.Path, err)
+	}
+	defer file.Close()
+
+	var lines [][]byte
+	scanner := bufio.NewScanner(file)
+	buf := make([]byte, 64*1024)   // Start with 64KB
+	scanner.Buffer(buf, 1024*1024) // Can grow up to 1MB
+
+	for scanner.Scan() {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
+			continue // Skip empty lines
+		}
+		if !json.Valid(line) {
+			return nil, fmt.Errorf("invalid JSON in conversation file '%s'", c.Path)
+		}
+		// Make a copy since scanner reuses the buffer
+		lineCopy := make([]byte, len(line))
+		copy(lineCopy, line)
+		lines = append(lines, lineCopy)
 	}
 
-	if len(data) > 0 && !json.Valid(data) {
-		return nil, fmt.Errorf("invalid JSON format in conversation file '%s'", c.Path)
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading conversation file '%s': %w", c.Path, err)
 	}
 
-	return data, nil
+	return lines, nil
 }
 
-// writeFile writes the file content
+// appendFile appends data to the JSONL file.
+// This is the primary write method for efficient incremental saves.
+func (c *BaseConversation) appendFile(data []byte) error {
+	if c.Name == "" {
+		return nil
+	}
+	file, err := os.OpenFile(c.Path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open file for append: %w", err)
+	}
+	defer file.Close()
+
+	// Write the JSON line followed by newline
+	if _, err := file.Write(data); err != nil {
+		return err
+	}
+	return err
+}
+
+// writeFile rewrites the entire file content (used for full saves when needed).
 func (c *BaseConversation) writeFile(data []byte) error {
 	if c.Name == "" {
 		return nil
@@ -151,7 +192,7 @@ func ClearEmptyConvosAsync() {
 			return
 		}
 		for _, file := range files {
-			if !file.IsDir() && strings.HasSuffix(file.Name(), ".json") {
+			if !file.IsDir() && strings.HasSuffix(file.Name(), ".jsonl") {
 				fullPath := GetFilePath(GetConvoDir(), file.Name())
 				info, err := file.Info()
 				if err != nil {
@@ -205,8 +246,8 @@ func ListSortedConvos(convoDir string, onlyNonEmpty bool, detectProvider bool) (
 
 	var convos []ConvoMeta
 	for _, file := range files {
-		if !file.IsDir() && strings.HasSuffix(file.Name(), ".json") {
-			title := strings.TrimSuffix(file.Name(), ".json")
+		if !file.IsDir() && strings.HasSuffix(file.Name(), ".jsonl") {
+			title := strings.TrimSuffix(file.Name(), ".jsonl")
 			fullPath := GetFilePath(convoDir, file.Name())
 
 			// Use file.Info() instead of os.Stat()
@@ -220,10 +261,7 @@ func ListSortedConvos(convoDir string, onlyNonEmpty bool, detectProvider bool) (
 			}
 			var provider string
 			if detectProvider {
-				data, err := os.ReadFile(fullPath)
-				if err == nil {
-					provider = DetectMessageProvider(data)
-				}
+				provider = DetectMessageProvider(fullPath)
 			}
 			convos = append(convos, ConvoMeta{
 				Name:     title,
