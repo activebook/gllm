@@ -365,8 +365,12 @@ func RenderGeminiConversationLog(input []byte) string {
 						}
 					case part.FunctionResponse != nil:
 						sb.WriteString(fmt.Sprintf("\n    %s[Function response]%s", ContentTypeColors["function_response"], data.ResetSeq))
-						respPreview, _ := json.MarshalIndent(part.FunctionResponse.Response, "    ", "  ")
-						sb.WriteString(fmt.Sprintf("\n    data: %s", string(respPreview)))
+						respName, _ := json.MarshalIndent(part.FunctionResponse.Name, "    ", "  ")
+						sb.WriteString(fmt.Sprintf("\n    name: %s", string(respName)))
+						if part.FunctionResponse.Response != nil {
+							respData, _ := json.MarshalIndent(part.FunctionResponse.Response, "    ", "  ")
+							sb.WriteString(fmt.Sprintf("\n    data: %s", string(respData)))
+						}
 					case part.InlineData != nil:
 						mimeType := part.InlineData.MIMEType
 						if strings.HasPrefix(mimeType, "image/") {
