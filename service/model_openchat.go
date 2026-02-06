@@ -143,7 +143,10 @@ func (ag *Agent) SortOpenChatMessagesByOrder() error {
 
 	// Update the conversation with new messages
 	ag.Convo.SetMessages(history)
-	return nil
+	// Save the conversation
+	// Bugfix: save conversation after update messages
+	// Because the system message could be modified, and added user message
+	return ag.Convo.Save()
 }
 
 // In current openchat api, we can't use cached tokens
@@ -264,6 +267,7 @@ func (c *OpenChat) process(ag *Agent) error {
 			Debugf("Context messages after truncation: [%d]", len(messages))
 			// Update the conversation with truncated messages
 			ag.Convo.SetMessages(messages)
+			ag.Convo.Save()
 		}
 
 		// Set thinking mode using ThinkingLevel conversion

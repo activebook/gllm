@@ -119,9 +119,10 @@ func (ag *Agent) SortOpenAIMessagesByOrder() error {
 		history = append(history, userMessage)
 	}
 
-	// Update the conversation with new messages
 	ag.Convo.SetMessages(history)
-	return nil
+	// Bugfix: save conversation after update messages
+	// Because the system message could be modified, and added user message
+	return ag.Convo.Save()
 }
 
 // GenerateOpenAIStream generates a streaming response using OpenAI API
@@ -234,6 +235,7 @@ func (oa *OpenAI) process(ag *Agent) error {
 			Debugf("Context messages after truncation: [%d]", len(messages))
 			// Update the conversation with truncated messages
 			ag.Convo.SetMessages(messages)
+			ag.Convo.Save()
 		}
 
 		// Create the request

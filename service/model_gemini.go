@@ -109,7 +109,9 @@ func (ag *Agent) SortGeminiMessagesByOrder() error {
 
 	// Save messages to conversation
 	ag.Convo.SetMessages(messages)
-	return nil
+	// Bugfix: save conversation after update messages
+	// Although system message wouldn't needed, but it's better to save it for consistency
+	return ag.Convo.Save()
 }
 
 func (ag *Agent) GenerateGeminiStream() error {
@@ -243,6 +245,7 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 			ag.Warn("Context trimmed to fit model limits")
 			Debugf("Context messages after truncation: [%d]", len(messages))
 			ag.Convo.SetMessages(messages)
+			ag.Convo.Save()
 		}
 
 		// Call API

@@ -143,6 +143,7 @@ func (a *Anthropic) process(ag *Agent) error {
 			Debugf("Context messages after truncation: [%d]", len(messages))
 			// Update the conversation with truncated messages
 			ag.Convo.SetMessages(messages)
+			ag.Convo.Save()
 		}
 
 		// Create params
@@ -519,7 +520,9 @@ func (ag *Agent) SortAnthropicMessagesByOrder() error {
 	}
 
 	ag.Convo.SetMessages(history)
-	return nil
+	// Bugfix: save conversation after update messages
+	// Although system message wouldn't needed, but it's better to save it for consistency
+	return ag.Convo.Save()
 }
 
 func (ag *Agent) getAnthropicTools() []anthropic.ToolUnionParam {
