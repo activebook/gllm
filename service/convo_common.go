@@ -130,14 +130,14 @@ func (c *BaseConversation) SetMessages(messages interface{}) {
 // sanitizes the conversation name for the path, and sets the internal path accordingly.
 // Returns an error if the title cannot be resolved.
 func (c *BaseConversation) Open(title string) error {
+	// If title is still empty, no convo found
+	if title == "" {
+		return nil
+	}
 	// check if it's an index
 	title, err := FindConvosByIndex(title)
 	if err != nil {
 		return err
-	}
-	// If title is still empty, no convo found
-	if title == "" {
-		return nil
 	}
 	// Set the name and path
 	c.Name = title

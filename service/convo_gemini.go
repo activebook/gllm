@@ -119,7 +119,7 @@ func (g *GeminiConversation) MarshalMessages(messages []*genai.Content) []byte {
 // PushMessages adds multiple content items to the history (high performance)
 // Uses append-mode for incremental saves using JSONL format (one message per line)
 func (g *GeminiConversation) Push(messages ...interface{}) error {
-	if g.Name == "" || len(messages) == 0 {
+	if len(messages) == 0 {
 		return nil
 	}
 
@@ -133,10 +133,13 @@ func (g *GeminiConversation) Push(messages ...interface{}) error {
 		}
 	}
 
-	// append new messages to c.Messages
+	// Always append to in-memory messages (needed for tool-call loop in single-turn mode)
 	g.Messages = append(g.Messages, newmsgs...)
 
-	// append new messages to file
+	// Only persist to file if conversation has a name
+	if g.Name == "" {
+		return nil
+	}
 	data := g.MarshalMessages(newmsgs)
 	return g.appendFile(data)
 }
