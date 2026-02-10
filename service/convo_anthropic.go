@@ -90,7 +90,7 @@ func (c *AnthropicConversation) MarshalMessages(messages []anthropic.MessagePara
 // PushMessages adds multiple messages to the conversation (high performance)
 // Uses append-mode for incremental saves using JSONL format (one message per line)
 func (c *AnthropicConversation) Push(messages ...interface{}) error {
-	if c.Name == "" || len(messages) == 0 {
+	if len(messages) == 0 {
 		return nil
 	}
 
@@ -104,10 +104,13 @@ func (c *AnthropicConversation) Push(messages ...interface{}) error {
 		}
 	}
 
-	// append new messages to c.Messages
+	// Always append to in-memory messages (needed for tool-call loop in single-turn mode)
 	c.Messages = append(c.Messages, newmsgs...)
 
-	// append new messages to file
+	// Only persist to file if conversation has a name
+	if c.Name == "" {
+		return nil
+	}
 	data := c.MarshalMessages(newmsgs)
 	return c.appendFile(data)
 }
