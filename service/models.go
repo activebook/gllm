@@ -18,6 +18,8 @@ var DefaultModelLimits = map[string]ModelLimits{
 	/*
 	 * Aliyun Models
 	 */
+	"qwen3.5-plus":                   {ContextWindow: 1000000, MaxOutputTokens: 65536},
+	"qwen3.5-397b-a17b":              {ContextWindow: 262144, MaxOutputTokens: 65536},
 	"qwen3-235b-a22b":                {ContextWindow: 128000, MaxOutputTokens: 8192},
 	"qwen3-235b-a22b-instruct-2507":  {ContextWindow: 262144, MaxOutputTokens: 8192},
 	"qwen3-235b-a22b-thinking-2507":  {ContextWindow: 262144, MaxOutputTokens: 8192},
@@ -25,6 +27,7 @@ var DefaultModelLimits = map[string]ModelLimits{
 	"qwen3-32b":                      {ContextWindow: 40000, MaxOutputTokens: 8192},
 	"qwen3-coder-480b-a35b-instruct": {ContextWindow: 262000, MaxOutputTokens: 8192},
 	"qwen3-coder-plus":               {ContextWindow: 128000, MaxOutputTokens: 8192},
+	"qwen3-max-thinking":             {ContextWindow: 256000, MaxOutputTokens: 65536},
 	"qwen3-max":                      {ContextWindow: 256000, MaxOutputTokens: 65536},
 	"qwen3-max-preview":              {ContextWindow: 256000, MaxOutputTokens: 65536},
 	"qwen3-next-80b-a3b-instruct":    {ContextWindow: 131072, MaxOutputTokens: 8192},
@@ -39,6 +42,10 @@ var DefaultModelLimits = map[string]ModelLimits{
 	/*
 	 * ByteDance Models
 	 */
+	"doubao-seed-2-0-pro":      {ContextWindow: 256000, MaxOutputTokens: 65536},
+	"doubao-seed-2-0-code":     {ContextWindow: 256000, MaxOutputTokens: 65536},
+	"doubao-seed-2-0-lite":     {ContextWindow: 256000, MaxOutputTokens: 32768},
+	"doubao-seed-2-0-mini":     {ContextWindow: 256000, MaxOutputTokens: 32768},
 	"doubao-seed-1-8":          {ContextWindow: 256000, MaxOutputTokens: 65536},
 	"doubao-seed-1-6":          {ContextWindow: 256000, MaxOutputTokens: 32768},
 	"doubao-seed-1.6":          {ContextWindow: 256000, MaxOutputTokens: 32768},
@@ -53,12 +60,12 @@ var DefaultModelLimits = map[string]ModelLimits{
 	 * DeepSeek Models
 	 */
 	"deepseek-math-v2":                {ContextWindow: 160000, MaxOutputTokens: 8192},
-	"deepseek-v3.1-terminus":          {ContextWindow: 128000, MaxOutputTokens: 8192},
-	"deepseek-v3.1-terminus-thinking": {ContextWindow: 128000, MaxOutputTokens: 8192},
 	"deepseek-v3.2-251201":            {ContextWindow: 128000, MaxOutputTokens: 8192},
 	"deepseek-v3.2-exp":               {ContextWindow: 128000, MaxOutputTokens: 8192},
 	"deepseek-v3.2-exp-thinking":      {ContextWindow: 128000, MaxOutputTokens: 8192},
 	"deepseek-v3-2":                   {ContextWindow: 128000, MaxOutputTokens: 32768},
+	"deepseek-v3.1-terminus":          {ContextWindow: 128000, MaxOutputTokens: 8192},
+	"deepseek-v3.1-terminus-thinking": {ContextWindow: 128000, MaxOutputTokens: 8192},
 	"deepseek-v3-1":                   {ContextWindow: 128000, MaxOutputTokens: 32768},
 	"deepseek-r1":                     {ContextWindow: 80000, MaxOutputTokens: 8192},
 	"deepseek-r1-0528":                {ContextWindow: 80000, MaxOutputTokens: 8192},
@@ -69,12 +76,14 @@ var DefaultModelLimits = map[string]ModelLimits{
 	/*
 	 * Meituan Models
 	 */
-	"longcat-flash-chat":     {ContextWindow: 131072, MaxOutputTokens: 8192},
-	"longcat-flash-thinking": {ContextWindow: 131072, MaxOutputTokens: 8192},
+	"longcat-flash-chat":     {ContextWindow: 256000, MaxOutputTokens: 32768},
+	"longcat-flash-lite":     {ContextWindow: 320000, MaxOutputTokens: 32768},
+	"longcat-flash-thinking": {ContextWindow: 256000, MaxOutputTokens: 32768},
 
 	/*
 	 * Minimax Models
 	 */
+	"minimax-m2.5": {ContextWindow: 200000, MaxOutputTokens: 65536},
 	"minimax-m2.1": {ContextWindow: 200000, MaxOutputTokens: 65536},
 	"minimax-m2":   {ContextWindow: 200000, MaxOutputTokens: 65536},
 	"minimax-m1":   {ContextWindow: 1000000, MaxOutputTokens: 8192},
@@ -82,9 +91,10 @@ var DefaultModelLimits = map[string]ModelLimits{
 	/*
 	 * Moonshot-Kimi Models
 	 */
-	"kimi-k2-0905":     {ContextWindow: 256000, MaxOutputTokens: 8192},
-	"kimi-k2-thinking": {ContextWindow: 256000, MaxOutputTokens: 8192},
-	"kimi-k2-turbo":    {ContextWindow: 256000, MaxOutputTokens: 8192},
+	"kimi-k2.5":        {ContextWindow: 256000, MaxOutputTokens: 65536},
+	"kimi-k2-0905":     {ContextWindow: 256000, MaxOutputTokens: 16384},
+	"kimi-k2-thinking": {ContextWindow: 256000, MaxOutputTokens: 16384},
+	"kimi-k2-turbo":    {ContextWindow: 256000, MaxOutputTokens: 16384},
 	"kimi-k2":          {ContextWindow: 128000, MaxOutputTokens: 8192},
 
 	/*
@@ -96,16 +106,24 @@ var DefaultModelLimits = map[string]ModelLimits{
 	/*
 	 * xAI Models
 	 */
-	"grok-code-fast-1": {ContextWindow: 256000, MaxOutputTokens: 10000},
-	"grok-4-1-fast":    {ContextWindow: 2000000, MaxOutputTokens: 30000},
-	"grok-4.1-fast":    {ContextWindow: 2000000, MaxOutputTokens: 30000},
-	"grok-4-fast":      {ContextWindow: 2000000, MaxOutputTokens: 30000},
-	"grok-4":           {ContextWindow: 256000, MaxOutputTokens: 8192},
+	"grok-4.1-fast-non-reasoning": {ContextWindow: 2000000, MaxOutputTokens: 30000},
+	"grok-4.1-fast-reasoning":     {ContextWindow: 2000000, MaxOutputTokens: 30000},
+	"grok-code-fast-1":            {ContextWindow: 256000, MaxOutputTokens: 10000},
+	"grok-4-1-fast":               {ContextWindow: 2000000, MaxOutputTokens: 30000},
+	"grok-4-fast-non-reasoning":   {ContextWindow: 2000000, MaxOutputTokens: 30000},
+	"grok-4-fast-reasoning":       {ContextWindow: 2000000, MaxOutputTokens: 30000},
+	"grok-4-fast":                 {ContextWindow: 2000000, MaxOutputTokens: 30000},
+	"grok-4":                      {ContextWindow: 256000, MaxOutputTokens: 8192},
 
 	/*
 	 * Xiaomi Models
 	 */
-	"mimo-v2-flash": {ContextWindow: 256000, MaxOutputTokens: 8192},
+	"mimo-v2-flash": {ContextWindow: 256000, MaxOutputTokens: 32768},
+
+	/*
+	 * StepFun Models
+	 */
+	"step-3.5-flash": {ContextWindow: 256000, MaxOutputTokens: 32768},
 
 	/*
 	 * Kuaishou Models
@@ -115,19 +133,29 @@ var DefaultModelLimits = map[string]ModelLimits{
 	/*
 	 * zAI Models
 	 */
+	"glm-5":       {ContextWindow: 200000, MaxOutputTokens: 65536},
 	"glm-4.7":     {ContextWindow: 200000, MaxOutputTokens: 16384},
 	"glm-4.6":     {ContextWindow: 200000, MaxOutputTokens: 16384},
 	"glm-4.5":     {ContextWindow: 131000, MaxOutputTokens: 16384},
 	"glm-4.5-air": {ContextWindow: 131000, MaxOutputTokens: 16384},
 
 	// OpenAI Models
-	"gpt-5.2":       {ContextWindow: 400000, MaxOutputTokens: 128000},
-	"gpt-5.2-pro":   {ContextWindow: 400000, MaxOutputTokens: 128000},
-	"gpt-5.2-chat":  {ContextWindow: 128000, MaxOutputTokens: 16384},
+	"gpt-5.3-codex": {ContextWindow: 400000, MaxOutputTokens: 128000},
+	"gpt-5.2-codex": {ContextWindow: 400000, MaxOutputTokens: 128000},
 	"gpt-5.1-codex": {ContextWindow: 400000, MaxOutputTokens: 128000},
-	"gpt-5.1-chat":  {ContextWindow: 128000, MaxOutputTokens: 16384},
-	"gpt-5.1":       {ContextWindow: 400000, MaxOutputTokens: 128000},
-	"gpt-5":         {ContextWindow: 400000, MaxOutputTokens: 128000},
+
+	"gpt-5.2-pro": {ContextWindow: 400000, MaxOutputTokens: 128000},
+	"gpt-5.1-pro": {ContextWindow: 400000, MaxOutputTokens: 128000},
+	"gpt-5-pro":   {ContextWindow: 400000, MaxOutputTokens: 128000},
+
+	"gpt-5.2-chat": {ContextWindow: 128000, MaxOutputTokens: 16384},
+	"gpt-5.1-chat": {ContextWindow: 128000, MaxOutputTokens: 16384},
+	"gpt-5-chat":   {ContextWindow: 128000, MaxOutputTokens: 16384},
+
+	"gpt-5.2": {ContextWindow: 400000, MaxOutputTokens: 128000},
+	"gpt-5.1": {ContextWindow: 400000, MaxOutputTokens: 128000},
+	"gpt-5":   {ContextWindow: 400000, MaxOutputTokens: 128000},
+
 	"gpt-4.1":       {ContextWindow: 1000000, MaxOutputTokens: 32768},
 	"gpt-4.1-mini":  {ContextWindow: 1000000, MaxOutputTokens: 32768},
 	"gpt-4o":        {ContextWindow: 128000, MaxOutputTokens: 16384},
@@ -146,19 +174,21 @@ var DefaultModelLimits = map[string]ModelLimits{
 	"o4-mini-high":  {ContextWindow: 200000, MaxOutputTokens: 100000},
 
 	// Anthropic (verified)
-	"claude-opus-4.5":   {ContextWindow: 200000, MaxOutputTokens: 64000},
-	"claude-4.5-opus":   {ContextWindow: 200000, MaxOutputTokens: 64000},
+	"claude-opus-4.6": {ContextWindow: 1000000, MaxOutputTokens: 64000},
+	"claude-4.6-opus": {ContextWindow: 1000000, MaxOutputTokens: 64000},
+	"claude-opus-4.5": {ContextWindow: 200000, MaxOutputTokens: 64000},
+	"claude-4.5-opus": {ContextWindow: 200000, MaxOutputTokens: 64000},
+
+	"claude-sonnet-4.6": {ContextWindow: 1000000, MaxOutputTokens: 64000},
+	"claude-4.6-sonnet": {ContextWindow: 1000000, MaxOutputTokens: 64000},
 	"claude-sonnet-4.5": {ContextWindow: 1000000, MaxOutputTokens: 64000},
 	"claude-4.5-sonnet": {ContextWindow: 1000000, MaxOutputTokens: 64000},
-	"claude-haiku-4.5":  {ContextWindow: 200000, MaxOutputTokens: 64000},
-	"claude-4.5-haiku":  {ContextWindow: 200000, MaxOutputTokens: 64000},
-	"claude-opus-4.1":   {ContextWindow: 200000, MaxOutputTokens: 64000},
-	"claude-sonnet-4":   {ContextWindow: 1000000, MaxOutputTokens: 64000},
-	"claude-3.7-sonnet": {ContextWindow: 200000, MaxOutputTokens: 8192},
-	"claude-3-5-sonnet": {ContextWindow: 200000, MaxOutputTokens: 8192},
-	"claude-3-5-haiku":  {ContextWindow: 200000, MaxOutputTokens: 8192},
+
+	"claude-haiku-4.5": {ContextWindow: 200000, MaxOutputTokens: 64000},
+	"claude-4.5-haiku": {ContextWindow: 200000, MaxOutputTokens: 64000},
 
 	// Google Gemini Models
+	"gemini-3.1-pro-preview":     {ContextWindow: 1048576, MaxOutputTokens: 65536},
 	"gemini-3-pro-preview":       {ContextWindow: 1048576, MaxOutputTokens: 65536},
 	"gemini-3-flash-preview":     {ContextWindow: 1048576, MaxOutputTokens: 65536},
 	"gemini-3-pro-image-preview": {ContextWindow: 65536, MaxOutputTokens: 32768},
@@ -196,17 +226,11 @@ var DefaultModelLimits = map[string]ModelLimits{
 	"qwen-coder-plus":         {ContextWindow: 131072, MaxOutputTokens: 8192},
 	"qwen-vl-plus":            {ContextWindow: 131072, MaxOutputTokens: 8192},
 
-	// Chinese Models - Moonshot Kimi
-
 	// Chinese Models - ByteDance Doubao
 	"doubao-pro":       {ContextWindow: 128000, MaxOutputTokens: 4096},
 	"doubao-lite":      {ContextWindow: 32000, MaxOutputTokens: 4096},
 	"doubao-vision":    {ContextWindow: 128000, MaxOutputTokens: 4096},
 	"doubao-embedding": {ContextWindow: 32000, MaxOutputTokens: 4096},
-
-	// Chinese Models - Zhipu GLM
-
-	// Chinese Models - MiniMax
 
 	// Chinese Models - Tencent (Added)
 	"hunyuan-2.0-thinking": {ContextWindow: 128000, MaxOutputTokens: 64000},
