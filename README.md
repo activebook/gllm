@@ -576,6 +576,20 @@ The LLM will detect relevant MCP tools and use them to enhance its responses wit
   gllm search --help
   ```
 
+- **Local API reverse proxy:**
+
+  ```sh
+  localhost:
+        endpoint: http://127.0.0.1:8045
+        key: your-proxy-api-key
+        model: gemini-3-pro-high
+        provider: gemini
+        temperature: 0.7
+        top_p: 1
+  ```
+  
+![Local Proxy](screenshots/local_proxy.png)
+
 - **Verbose mode:**
 
   ```sh
