@@ -272,15 +272,34 @@ func GetThemeFromConfig() string {
 // This preserves glamour's hand-crafted, vibrant colour palettes and rich
 // Chroma syntax highlighting instead of a flat programmatic approximation.
 func MostSimilarGlamourStyle() string {
+	name := strings.ToLower(CurrentThemeName)
+
+	// Explicit name-based matches (Priority)
+	if strings.Contains(name, "dracula") {
+		return styles.DraculaStyle
+	}
+	if strings.Contains(name, "night") {
+		return styles.TokyoNightStyle
+	}
+	if strings.Contains(name, "dark") {
+		return styles.DarkStyle
+	}
+	if strings.Contains(name, "light") || strings.Contains(name, "day") {
+		return styles.LightStyle
+	}
+	if strings.Contains(name, "rose") || strings.Contains(name, "red") || strings.Contains(name, "pink") || strings.Contains(name, "sun") {
+		return styles.AutoStyle
+	}
+
 	t := CurrentTheme
 
-	// Step 1: light vs dark by background luminance.
+	// Smart fallback by background luminance.
 	// Perceived luminance formula (ITU-R BT.601): L = 0.299R + 0.587G + 0.114B
 	if hexLuminance(t.Background) > 0.45 {
 		return styles.LightStyle
 	}
 
-	// Step 2: For dark themes, use the theme's BrightMagenta as the primary
+	// For dark themes, use the theme's BrightMagenta as the primary
 	// accent (most distinctive per-palette hue) and find the nearest glamour
 	// dark-style fingerprint by circular hue distance.
 	// Fallback to Magenta if BrightMagenta is absent.
@@ -298,7 +317,7 @@ func MostSimilarGlamourStyle() string {
 	fingerprints := []fingerprint{
 		{styles.DraculaStyle, 264},    // BrightMagenta #bd93f9 → purple
 		{styles.TokyoNightStyle, 220}, // dominant blue-indigo
-		{styles.PinkStyle, 330},       // rose-pink
+		{styles.AutoStyle, 330},       // rose-pink
 		{styles.DarkStyle, 195},       // neutral teal (ANSI 39)
 	}
 
