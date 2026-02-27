@@ -272,6 +272,14 @@ func GetThemeFromConfig() string {
 // This preserves glamour's hand-crafted, vibrant colour palettes and rich
 // Chroma syntax highlighting instead of a flat programmatic approximation.
 func MostSimilarGlamourStyle() string {
+	t := CurrentTheme
+
+	// Smart fallback by background luminance.
+	// Perceived luminance formula (ITU-R BT.601): L = 0.299R + 0.587G + 0.114B
+	if hexLuminance(t.Background) > 0.45 {
+		return styles.LightStyle
+	}
+
 	name := strings.ToLower(CurrentThemeName)
 
 	// Explicit name-based matches (Priority)
@@ -289,14 +297,6 @@ func MostSimilarGlamourStyle() string {
 	}
 	if strings.Contains(name, "rose") || strings.Contains(name, "red") || strings.Contains(name, "pink") || strings.Contains(name, "sun") {
 		return styles.AutoStyle
-	}
-
-	t := CurrentTheme
-
-	// Smart fallback by background luminance.
-	// Perceived luminance formula (ITU-R BT.601): L = 0.299R + 0.587G + 0.114B
-	if hexLuminance(t.Background) > 0.45 {
-		return styles.LightStyle
 	}
 
 	// For dark themes, use the theme's BrightMagenta as the primary
