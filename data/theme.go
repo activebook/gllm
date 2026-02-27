@@ -2,8 +2,11 @@ package data
 
 import (
 	"fmt"
+	"math"
 	"sort"
+	"strings"
 
+	"github.com/charmbracelet/glamour/styles"
 	"github.com/muesli/termenv"
 	goghthemes "github.com/willyv3/gogh-themes"
 )
@@ -255,4 +258,120 @@ func SaveThemeConfig(name string) error {
 func GetThemeFromConfig() string {
 	store := GetSettingsStore()
 	return store.GetTheme()
+}
+
+// MostSimilarGlamourStyle returns the name of the glamour built-in style that
+// most closely matches the active gogh theme. It uses two heuristics:
+//
+//  1. Background luminance → decides dark vs. light family.
+//  2. For dark themes, the circular HSL hue-distance between the theme's
+//     accent color and each dark style's known dominant hue determines the
+//     winner among dracula (~264°), tokyo-night (~220°), pink (~330°), and
+//     dark (~195° neutral teal).
+//
+// This preserves glamour's hand-crafted, vibrant colour palettes and rich
+// Chroma syntax highlighting instead of a flat programmatic approximation.
+func MostSimilarGlamourStyle() string {
+	name := strings.ToLower(CurrentThemeName)
+
+	// Explicit name-based matches (Priority)
+	if strings.Contains(name, "dracula") {
+		return styles.DraculaStyle
+	}
+	if strings.Contains(name, "night") {
+		return styles.TokyoNightStyle
+	}
+	if strings.Contains(name, "dark") {
+		return styles.DarkStyle
+	}
+	if strings.Contains(name, "light") || strings.Contains(name, "day") {
+		return styles.LightStyle
+	}
+	if strings.Contains(name, "rose") || strings.Contains(name, "red") || strings.Contains(name, "pink") || strings.Contains(name, "sun") {
+		return styles.AutoStyle
+	}
+
+	t := CurrentTheme
+
+	// Smart fallback by background luminance.
+	// Perceived luminance formula (ITU-R BT.601): L = 0.299R + 0.587G + 0.114B
+	if hexLuminance(t.Background) > 0.45 {
+		return styles.LightStyle
+	}
+
+	// For dark themes, use the theme's BrightMagenta as the primary
+	// accent (most distinctive per-palette hue) and find the nearest glamour
+	// dark-style fingerprint by circular hue distance.
+	// Fallback to Magenta if BrightMagenta is absent.
+	accent := t.BrightMagenta
+	if accent == "" {
+		accent = t.Magenta
+	}
+	accentHue := hexHue(accent)
+
+	type fingerprint struct {
+		name string
+		hue  float64
+	}
+	// Dominant hue of each dark glamour style (measured from their JSON palettes)
+	fingerprints := []fingerprint{
+		{styles.DraculaStyle, 264},    // BrightMagenta #bd93f9 → purple
+		{styles.TokyoNightStyle, 220}, // dominant blue-indigo
+		{styles.AutoStyle, 330},       // rose-pink
+		{styles.DarkStyle, 195},       // neutral teal (ANSI 39)
+	}
+
+	best, bestDist := styles.DarkStyle, math.MaxFloat64
+	for _, fp := range fingerprints {
+		if d := hueCircularDist(accentHue, fp.hue); d < bestDist {
+			best, bestDist = fp.name, d
+		}
+	}
+	return best
+}
+
+// hexLuminance returns the perceived luminance [0,1] of a hex colour string.
+func hexLuminance(hex string) float64 {
+	var r, g, b int
+	fmt.Sscanf(strings.TrimPrefix(hex, "#"), "%02x%02x%02x", &r, &g, &b)
+	return (0.299*float64(r) + 0.587*float64(g) + 0.114*float64(b)) / 255.0
+}
+
+// hexHue returns the HSL hue [0°, 360°) of a hex colour string.
+func hexHue(hex string) float64 {
+	if hex == "" {
+		return 0
+	}
+	var r, g, b int
+	fmt.Sscanf(strings.TrimPrefix(hex, "#"), "%02x%02x%02x", &r, &g, &b)
+	rf, gf, bf := float64(r)/255.0, float64(g)/255.0, float64(b)/255.0
+	max := math.Max(rf, math.Max(gf, bf))
+	min := math.Min(rf, math.Min(gf, bf))
+	if max == min {
+		return 0 // achromatic
+	}
+	delta := max - min
+	var h float64
+	switch max {
+	case rf:
+		h = (gf - bf) / delta
+		if gf < bf {
+			h += 6
+		}
+	case gf:
+		h = 2 + (bf-rf)/delta
+	case bf:
+		h = 4 + (rf-gf)/delta
+	}
+	return h * 60
+}
+
+// hueCircularDist returns the shortest angular distance [0°, 180°] between
+// two HSL hue values on the colour wheel.
+func hueCircularDist(h1, h2 float64) float64 {
+	d := math.Abs(h1 - h2)
+	if d > 180 {
+		d = 360 - d
+	}
+	return d
 }

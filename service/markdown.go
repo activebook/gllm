@@ -98,15 +98,22 @@ func (mr *Markdown) Render(r ui.Render) {
 	r.Writeln("")
 	r.Writeln(data.TaskCompleteColor + "✓ Task Completed" + data.ResetSeq)
 
-	// Render the Markdown using glamour
-	tr, _ := glamour.NewTermRenderer(
-		glamour.WithAutoStyle(), // Auto-detect dark/light mode
-		// glamour.WithWordWrap(80), // Optional: wrap output at 80 characters
+	// Pick the glamour built-in style whose palette most closely matches the
+	// active theme (dark/light family + hue-distance against style fingerprints)
+	// so we preserve glamour's hand-crafted vibrant colours and rich Chroma
+	// syntax highlighting, rather than a flat programmatic approximation.
+	glamourStyle := data.MostSimilarGlamourStyle()
+	tr, err := glamour.NewTermRenderer(
+		glamour.WithStandardStyle(glamourStyle),
 	)
-
-	out, err := tr.Render(output)
 	if err != nil {
-		Warnf("Cannot render Markdown correctly: %v", err)
+		// Graceful fallback to auto-style if matching unexpectedly fails.
+		tr, _ = glamour.NewTermRenderer(glamour.WithAutoStyle())
+	}
+
+	out, err2 := tr.Render(output)
+	if err2 != nil {
+		Warnf("Cannot render Markdown correctly: %v", err2)
 		return
 	}
 
