@@ -12,6 +12,22 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const markdownSample = `## This is a Header.
+* This is a **paragraph**.
+* Using ` + "`%s`" + ` style.
+* [Google](https://www.google.com)
+### Code Block
+` + "```python" + `
+def hello_world():
+    print("Hello, world!")
+
+hello_world()
+` + "```" + `
+### Blockquote
+---
+> This is a blockquote.
+---`
+
 func init() {
 	configCmd.AddCommand(themeCmd)
 	themeCmd.AddCommand(themeSwitchCmd)
@@ -29,7 +45,7 @@ var themeCmd = &cobra.Command{
 			BorderForeground(lipgloss.Color(data.BorderHex)).
 			Width(safeWidth).
 			Margin(0, 1).
-			Padding(1)
+			Padding(1, 1, 0)
 
 		// Calculate inner width by subtracting frame (borders + padding)
 		innerWidth := safeWidth - borderStyle.GetHorizontalFrameSize()
@@ -91,8 +107,9 @@ var themeCmd = &cobra.Command{
 			glamour.WithStandardStyle(glamourStyle),
 			glamour.WithWordWrap(innerWidth),
 		)
-		md := fmt.Sprintf("\n\n## This is a Header.\n* This is a **paragraph**.\n* Using `%s` style.\n* [Google](https://www.google.com)\n### Code Block\n```python\ndef hello_world():\n    print(\"Hello, world!\")\n\nhello_world()\n```", glamourStyle)
+		md := fmt.Sprintf("\n\n"+markdownSample, glamourStyle)
 		out, _ := tr.Render(md)
+		out = strings.TrimSuffix(out, "\n")
 		samples = append(samples, fmt.Sprintf("%-20s:\n%s", "Markdown", out))
 
 		content := contentStyle.Render(strings.Join(samples, "\n"))
