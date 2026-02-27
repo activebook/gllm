@@ -27,6 +27,7 @@
 - **@ Reference Support**: Reference files and directories directly in prompts using @ syntax for seamless context inclusion.
 - **Workflow Commands**: Define and execute workflows as commands for streamlined operations.
 - **Colorful Themes**: Supports hundreds of popular themes, compatible with light and dark modes, ANSI-color, and full true-color.
+- **API local Proxy**: Supports Multi-Protocol (OpenAI, Anthropic, Google Gemini) local API reverse proxy, ensures seamless compatibility with a wide range of applications.
 - **Cross-platform Support**: gllm is available for macOS, Windows, and Linux, and easy to install and update.
 
 ---
