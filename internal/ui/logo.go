@@ -47,7 +47,7 @@ func GetLogo(textColor string, gradientColor string, scale float64) string {
 	rendered := ansifonts.RenderTextWithOptions(LogoText, font, options)
 	logo := strings.Builder{}
 	for _, line := range rendered {
-		logo.WriteString(line + "\n")
+		logo.WriteString(strings.TrimRight(line, " ") + "\n")
 	}
 	return logo.String()
 }
@@ -85,6 +85,6 @@ func PrintLogo(textColor string, gradientColor string, scale float64) {
 
 	rendered := ansifonts.RenderTextWithOptions(LogoText, font, options)
 	for _, line := range rendered {
-		fmt.Println(line)
+		fmt.Println(strings.TrimRight(line, " "))
 	}
 }

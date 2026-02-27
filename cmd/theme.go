@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
@@ -20,18 +21,37 @@ var themeCmd = &cobra.Command{
 	Use:   "theme",
 	Short: "Manage and switch themes",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("\nCurrent Theme: %s%s%s\n\n", data.HighlightColor, data.CurrentThemeName, data.ResetSeq)
+		termWidth := ui.GetTerminalWidth()
+		safeWidth := max(40, termWidth-4)
+
+		borderStyle := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color(data.BorderHex)).
+			Width(safeWidth).
+			Margin(0, 1).
+			Padding(1)
+
+		// Calculate inner width by subtracting frame (borders + padding)
+		innerWidth := safeWidth - borderStyle.GetHorizontalFrameSize()
 
 		headerStyle := lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color(data.KeyHex)).
+			Width(innerWidth).
 			Align(lipgloss.Center).
 			MarginTop(0).
-			MarginBottom(0).
+			MarginBottom(1).
 			Padding(0, 0)
 
+		contentStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(data.LabelHex)).
+			Width(innerWidth).
+			Align(lipgloss.Left).
+			Padding(0, 2)
+
 		logo := ui.GetLogo(data.KeyHex, data.LabelHex, 0.5)
-		header := headerStyle.Render(logo)
+		welcomeText := logo + "\nCurrent Theme: " + data.CurrentThemeName
+		header := headerStyle.Render(welcomeText)
 
 		var samples []string
 
@@ -69,22 +89,21 @@ var themeCmd = &cobra.Command{
 		glamourStyle := data.MostSimilarGlamourStyle()
 		tr, _ := glamour.NewTermRenderer(
 			glamour.WithStandardStyle(glamourStyle),
+			glamour.WithWordWrap(innerWidth),
 		)
 		md := fmt.Sprintf("\n\n## This is a Header.\n* This is a **paragraph**.\n* Using `%s` style.\n* [Google](https://www.google.com)\n### Code Block\n```python\ndef hello_world():\n    print(\"Hello, world!\")\n\nhello_world()\n```", glamourStyle)
 		out, _ := tr.Render(md)
 		samples = append(samples, fmt.Sprintf("%-20s:\n%s", "Markdown", out))
 
-		smps := lipgloss.JoinVertical(lipgloss.Left, samples...)
+		content := contentStyle.Render(strings.Join(samples, "\n"))
 
-		block := lipgloss.JoinVertical(lipgloss.Center, header, smps)
+		banner := borderStyle.Render(lipgloss.JoinVertical(
+			lipgloss.Center,
+			header,
+			content,
+		))
 
-		style := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color(data.BorderHex)).
-			Padding(1, 2, 0).
-			MarginLeft(1)
-
-		fmt.Println(style.Render(block))
+		fmt.Println(banner)
 	},
 }
 
