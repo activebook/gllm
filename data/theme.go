@@ -256,3 +256,136 @@ func GetThemeFromConfig() string {
 	store := GetSettingsStore()
 	return store.GetTheme()
 }
+
+// BuildGlamourStyleJSON derives a glamour-compatible JSON style string from the
+// currently-active gogh theme palette. Structural skeleton (margins, prefixes,
+// bold/italic rules) is borrowed from Dracula; colours are replaced with the
+// live theme's hex values so that Markdown rendering stays visually coherent
+// with the rest of the application UI chrome.
+func BuildGlamourStyleJSON() string {
+	t := CurrentTheme
+	// Convenience aliases
+	fg := t.Foreground
+	bg := t.Background
+	purple := t.BrightMagenta // headings
+	cyan := t.Cyan            // links, enumerations, chroma names
+	yellow := t.Yellow        // emph, strong, chroma strings
+	green := t.Green          // inline code, chroma functions/inserted
+	magenta := t.Magenta      // link text, chroma keywords/operators
+	gray := t.BrightBlack     // block quotes, comments, separators
+	orange := t.BrightYellow  // strong, chroma generic-strong
+	if orange == "" {
+		orange = yellow
+	}
+	red := t.Red // errors
+
+	return `{
+  "document": {
+    "block_prefix": "\n",
+    "block_suffix": "\n",
+    "color": "` + fg + `",
+    "margin": 2
+  },
+  "block_quote": {
+    "color": "` + gray + `",
+    "italic": true,
+    "indent": 2
+  },
+  "paragraph": {},
+  "list": {
+    "color": "` + fg + `",
+    "level_indent": 2
+  },
+  "heading": {
+    "block_suffix": "\n",
+    "color": "` + purple + `",
+    "bold": true
+  },
+  "h1": { "prefix": "# " },
+  "h2": { "prefix": "## " },
+  "h3": { "prefix": "### " },
+  "h4": { "prefix": "#### " },
+  "h5": { "prefix": "##### " },
+  "h6": { "prefix": "###### " },
+  "text": {},
+  "strikethrough": { "crossed_out": true },
+  "emph": {
+    "color": "` + yellow + `",
+    "italic": true
+  },
+  "strong": {
+    "color": "` + orange + `",
+    "bold": true
+  },
+  "hr": {
+    "color": "` + gray + `",
+    "format": "\n--------\n"
+  },
+  "item": { "block_prefix": "• " },
+  "enumeration": {
+    "block_prefix": ". ",
+    "color": "` + cyan + `"
+  },
+  "task": {
+    "ticked": "[✓] ",
+    "unticked": "[ ] "
+  },
+  "link": {
+    "color": "` + cyan + `",
+    "underline": true
+  },
+  "link_text": { "color": "` + magenta + `" },
+  "image": {
+    "color": "` + cyan + `",
+    "underline": true
+  },
+  "image_text": {
+    "color": "` + magenta + `",
+    "format": "Image: {{.text}} →"
+  },
+  "code": { "color": "` + green + `" },
+  "code_block": {
+    "color": "` + yellow + `",
+    "margin": 2,
+    "chroma": {
+      "text":                   { "color": "` + fg + `" },
+      "error":                  { "color": "` + fg + `", "background_color": "` + red + `" },
+      "comment":                { "color": "` + gray + `" },
+      "comment_preproc":        { "color": "` + magenta + `" },
+      "keyword":                { "color": "` + magenta + `" },
+      "keyword_reserved":       { "color": "` + magenta + `" },
+      "keyword_namespace":      { "color": "` + magenta + `" },
+      "keyword_type":           { "color": "` + cyan + `" },
+      "operator":               { "color": "` + magenta + `" },
+      "punctuation":            { "color": "` + fg + `" },
+      "name":                   { "color": "` + cyan + `" },
+      "name_builtin":           { "color": "` + cyan + `" },
+      "name_tag":               { "color": "` + magenta + `" },
+      "name_attribute":         { "color": "` + green + `" },
+      "name_class":             { "color": "` + cyan + `" },
+      "name_constant":          { "color": "` + purple + `" },
+      "name_decorator":         { "color": "` + green + `" },
+      "name_exception":         {},
+      "name_function":          { "color": "` + green + `" },
+      "name_other":             {},
+      "literal":                {},
+      "literal_number":         { "color": "` + cyan + `" },
+      "literal_date":           {},
+      "literal_string":         { "color": "` + yellow + `" },
+      "literal_string_escape":  { "color": "` + magenta + `" },
+      "generic_deleted":        { "color": "` + red + `" },
+      "generic_emph":           { "color": "` + yellow + `", "italic": true },
+      "generic_inserted":       { "color": "` + green + `" },
+      "generic_strong":         { "color": "` + orange + `", "bold": true },
+      "generic_subheading":     { "color": "` + purple + `" },
+      "background":             { "background_color": "` + bg + `" }
+    }
+  },
+  "table": {},
+  "definition_list": {},
+  "definition_term": {},
+  "definition_description": { "block_prefix": "\n🠶 " },
+  "html_block": {},
+  "html_span": {}
+}`
+}

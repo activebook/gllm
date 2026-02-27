@@ -98,15 +98,21 @@ func (mr *Markdown) Render(r ui.Render) {
 	r.Writeln("")
 	r.Writeln(data.TaskCompleteColor + "✓ Task Completed" + data.ResetSeq)
 
-	// Render the Markdown using glamour
-	tr, _ := glamour.NewTermRenderer(
-		glamour.WithAutoStyle(), // Auto-detect dark/light mode
-		// glamour.WithWordWrap(80), // Optional: wrap output at 80 characters
+	// Render the Markdown using the active theme's colour palette so that
+	// headings, code blocks, links, etc. are visually coherent with the
+	// rest of the application UI chrome.
+	styleJSON := data.BuildGlamourStyleJSON()
+	tr, err := glamour.NewTermRenderer(
+		glamour.WithStylesFromJSONBytes([]byte(styleJSON)),
 	)
-
-	out, err := tr.Render(output)
 	if err != nil {
-		Warnf("Cannot render Markdown correctly: %v", err)
+		// Graceful fallback: if the derived style somehow fails, use auto-style
+		tr, _ = glamour.NewTermRenderer(glamour.WithAutoStyle())
+	}
+
+	out, err2 := tr.Render(output)
+	if err2 != nil {
+		Warnf("Cannot render Markdown correctly: %v", err2)
 		return
 	}
 
