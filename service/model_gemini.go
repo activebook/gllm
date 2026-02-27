@@ -60,6 +60,12 @@ func (ag *Agent) initGeminiAgent() (*GeminiAgent, error) {
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:  ag.Model.ApiKey,
 		Backend: genai.BackendGeminiAPI,
+		HTTPOptions: genai.HTTPOptions{
+			// BaseURL specifies the base URL for the API endpoint. If empty, defaults
+			// to "https://generativelanguage.googleapis.com/"
+			// APIVersion specifies the version of the API to use. If empty, defaults to "v1beta"
+			BaseURL: ag.Model.EndPoint,
+		},
 	})
 	if err != nil {
 		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create client: %v", err)}, nil)
