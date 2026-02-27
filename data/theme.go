@@ -274,6 +274,11 @@ func GetThemeFromConfig() string {
 func MostSimilarGlamourStyle() string {
 	t := CurrentTheme
 
+	// If the terminal doesn't support true color, fallback to the basic ASCII style.
+	if termenv.ColorProfile() != termenv.TrueColor {
+		return styles.AsciiStyle
+	}
+
 	// Smart fallback by background luminance.
 	// Perceived luminance formula (ITU-R BT.601): L = 0.299R + 0.587G + 0.114B
 	if hexLuminance(t.Background) > 0.45 {

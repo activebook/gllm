@@ -113,10 +113,22 @@ type ChatInfo struct {
 }
 
 func (ci *ChatInfo) printWelcome() {
+	termWidth := ui.GetTerminalWidth()
+	safeWidth := max(40, termWidth-4)
+
+	borderStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(data.BorderHex)).
+		Width(safeWidth).
+		Margin(0, 1).
+		Padding(1)
+
+	innerWidth := safeWidth - borderStyle.GetHorizontalFrameSize()
+
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color(data.KeyHex)).
-		Width(ui.GetTerminalWidth()-4).
+		Width(innerWidth).
 		Align(lipgloss.Center).
 		MarginTop(0).
 		MarginBottom(1).
@@ -124,22 +136,15 @@ func (ci *ChatInfo) printWelcome() {
 
 	contentStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(data.LabelHex)).
-		Width(ui.GetTerminalWidth()-4).
+		Width(innerWidth).
 		Align(lipgloss.Left).
 		Padding(0, 2)
 
 	hintStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(data.DetailHex)).
-		Width(ui.GetTerminalWidth() - 4).
+		Width(innerWidth).
 		Align(lipgloss.Center).
 		Italic(true)
-
-	borderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(data.BorderHex)).
-		Width(ui.GetTerminalWidth()-4).
-		Margin(0, 1).
-		Padding(1)
 
 	logo := ui.GetLogo(data.KeyHex, data.LabelHex, 0.5)
 	welcomeText := logo + "\nWelcome to Chat Mode" + " (v" + version + ")"
