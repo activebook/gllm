@@ -2,8 +2,11 @@ package data
 
 import (
 	"fmt"
+	"math"
 	"sort"
+	"strings"
 
+	"github.com/charmbracelet/glamour/styles"
 	"github.com/muesli/termenv"
 	goghthemes "github.com/willyv3/gogh-themes"
 )
@@ -257,135 +260,99 @@ func GetThemeFromConfig() string {
 	return store.GetTheme()
 }
 
-// BuildGlamourStyleJSON derives a glamour-compatible JSON style string from the
-// currently-active gogh theme palette. Structural skeleton (margins, prefixes,
-// bold/italic rules) is borrowed from Dracula; colours are replaced with the
-// live theme's hex values so that Markdown rendering stays visually coherent
-// with the rest of the application UI chrome.
-func BuildGlamourStyleJSON() string {
+// MostSimilarGlamourStyle returns the name of the glamour built-in style that
+// most closely matches the active gogh theme. It uses two heuristics:
+//
+//  1. Background luminance → decides dark vs. light family.
+//  2. For dark themes, the circular HSL hue-distance between the theme's
+//     accent color and each dark style's known dominant hue determines the
+//     winner among dracula (~264°), tokyo-night (~220°), pink (~330°), and
+//     dark (~195° neutral teal).
+//
+// This preserves glamour's hand-crafted, vibrant colour palettes and rich
+// Chroma syntax highlighting instead of a flat programmatic approximation.
+func MostSimilarGlamourStyle() string {
 	t := CurrentTheme
-	// Convenience aliases
-	fg := t.Foreground
-	bg := t.Background
-	purple := t.BrightMagenta // headings
-	cyan := t.Cyan            // links, enumerations, chroma names
-	yellow := t.Yellow        // emph, strong, chroma strings
-	green := t.Green          // inline code, chroma functions/inserted
-	magenta := t.Magenta      // link text, chroma keywords/operators
-	gray := t.BrightBlack     // block quotes, comments, separators
-	orange := t.BrightYellow  // strong, chroma generic-strong
-	if orange == "" {
-		orange = yellow
-	}
-	red := t.Red // errors
 
-	return `{
-  "document": {
-    "block_prefix": "\n",
-    "block_suffix": "\n",
-    "color": "` + fg + `",
-    "margin": 2
-  },
-  "block_quote": {
-    "color": "` + gray + `",
-    "italic": true,
-    "indent": 2
-  },
-  "paragraph": {},
-  "list": {
-    "color": "` + fg + `",
-    "level_indent": 2
-  },
-  "heading": {
-    "block_suffix": "\n",
-    "color": "` + purple + `",
-    "bold": true
-  },
-  "h1": { "prefix": "# " },
-  "h2": { "prefix": "## " },
-  "h3": { "prefix": "### " },
-  "h4": { "prefix": "#### " },
-  "h5": { "prefix": "##### " },
-  "h6": { "prefix": "###### " },
-  "text": {},
-  "strikethrough": { "crossed_out": true },
-  "emph": {
-    "color": "` + yellow + `",
-    "italic": true
-  },
-  "strong": {
-    "color": "` + orange + `",
-    "bold": true
-  },
-  "hr": {
-    "color": "` + gray + `",
-    "format": "\n--------\n"
-  },
-  "item": { "block_prefix": "• " },
-  "enumeration": {
-    "block_prefix": ". ",
-    "color": "` + cyan + `"
-  },
-  "task": {
-    "ticked": "[✓] ",
-    "unticked": "[ ] "
-  },
-  "link": {
-    "color": "` + cyan + `",
-    "underline": true
-  },
-  "link_text": { "color": "` + magenta + `" },
-  "image": {
-    "color": "` + cyan + `",
-    "underline": true
-  },
-  "image_text": {
-    "color": "` + magenta + `",
-    "format": "Image: {{.text}} →"
-  },
-  "code": { "color": "` + green + `" },
-  "code_block": {
-    "color": "` + yellow + `",
-    "margin": 2,
-    "chroma": {
-      "text":                   { "color": "` + fg + `" },
-      "error":                  { "color": "` + fg + `", "background_color": "` + red + `" },
-      "comment":                { "color": "` + gray + `" },
-      "comment_preproc":        { "color": "` + magenta + `" },
-      "keyword":                { "color": "` + magenta + `" },
-      "keyword_reserved":       { "color": "` + magenta + `" },
-      "keyword_namespace":      { "color": "` + magenta + `" },
-      "keyword_type":           { "color": "` + cyan + `" },
-      "operator":               { "color": "` + magenta + `" },
-      "punctuation":            { "color": "` + fg + `" },
-      "name":                   { "color": "` + cyan + `" },
-      "name_builtin":           { "color": "` + cyan + `" },
-      "name_tag":               { "color": "` + magenta + `" },
-      "name_attribute":         { "color": "` + green + `" },
-      "name_class":             { "color": "` + cyan + `" },
-      "name_constant":          { "color": "` + purple + `" },
-      "name_decorator":         { "color": "` + green + `" },
-      "name_exception":         {},
-      "name_function":          { "color": "` + green + `" },
-      "name_other":             {},
-      "literal":                {},
-      "literal_number":         { "color": "` + cyan + `" },
-      "literal_date":           {},
-      "literal_string":         { "color": "` + yellow + `" },
-      "literal_string_escape":  { "color": "` + magenta + `" },
-      "generic_deleted":        { "color": "` + red + `" },
-      "generic_emph":           { "color": "` + yellow + `", "italic": true },
-      "generic_inserted":       { "color": "` + green + `" },
-      "generic_strong":         { "color": "` + orange + `", "bold": true },
-      "generic_subheading":     { "color": "` + purple + `" },
-      "background":             { "background_color": "` + bg + `" }
-    }
-  },
-  "table": {},
-  "definition_list": {},
-  "definition_term": {},
-  "definition_description": { "block_prefix": "\n🠶 " },
-  "html_block": {},
-  "html_span": {}
-}`
+	// Step 1: light vs dark by background luminance.
+	// Perceived luminance formula (ITU-R BT.601): L = 0.299R + 0.587G + 0.114B
+	if hexLuminance(t.Background) > 0.45 {
+		return styles.LightStyle
+	}
+
+	// Step 2: For dark themes, use the theme's BrightMagenta as the primary
+	// accent (most distinctive per-palette hue) and find the nearest glamour
+	// dark-style fingerprint by circular hue distance.
+	// Fallback to Magenta if BrightMagenta is absent.
+	accent := t.BrightMagenta
+	if accent == "" {
+		accent = t.Magenta
+	}
+	accentHue := hexHue(accent)
+
+	type fingerprint struct {
+		name string
+		hue  float64
+	}
+	// Dominant hue of each dark glamour style (measured from their JSON palettes)
+	fingerprints := []fingerprint{
+		{styles.DraculaStyle, 264},    // BrightMagenta #bd93f9 → purple
+		{styles.TokyoNightStyle, 220}, // dominant blue-indigo
+		{styles.PinkStyle, 330},       // rose-pink
+		{styles.DarkStyle, 195},       // neutral teal (ANSI 39)
+	}
+
+	best, bestDist := styles.DarkStyle, math.MaxFloat64
+	for _, fp := range fingerprints {
+		if d := hueCircularDist(accentHue, fp.hue); d < bestDist {
+			best, bestDist = fp.name, d
+		}
+	}
+	return best
+}
+
+// hexLuminance returns the perceived luminance [0,1] of a hex colour string.
+func hexLuminance(hex string) float64 {
+	var r, g, b int
+	fmt.Sscanf(strings.TrimPrefix(hex, "#"), "%02x%02x%02x", &r, &g, &b)
+	return (0.299*float64(r) + 0.587*float64(g) + 0.114*float64(b)) / 255.0
+}
+
+// hexHue returns the HSL hue [0°, 360°) of a hex colour string.
+func hexHue(hex string) float64 {
+	if hex == "" {
+		return 0
+	}
+	var r, g, b int
+	fmt.Sscanf(strings.TrimPrefix(hex, "#"), "%02x%02x%02x", &r, &g, &b)
+	rf, gf, bf := float64(r)/255.0, float64(g)/255.0, float64(b)/255.0
+	max := math.Max(rf, math.Max(gf, bf))
+	min := math.Min(rf, math.Min(gf, bf))
+	if max == min {
+		return 0 // achromatic
+	}
+	delta := max - min
+	var h float64
+	switch max {
+	case rf:
+		h = (gf - bf) / delta
+		if gf < bf {
+			h += 6
+		}
+	case gf:
+		h = 2 + (bf-rf)/delta
+	case bf:
+		h = 4 + (rf-gf)/delta
+	}
+	return h * 60
+}
+
+// hueCircularDist returns the shortest angular distance [0°, 180°] between
+// two HSL hue values on the colour wheel.
+func hueCircularDist(h1, h2 float64) float64 {
+	d := math.Abs(h1 - h2)
+	if d > 180 {
+		d = 360 - d
+	}
+	return d
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -64,6 +65,15 @@ var themeCmd = &cobra.Command{
 		// 5. Tool Call
 		samples = append(samples, fmt.Sprintf("%-20s: %s[TOOL] execute_command()%s", "Tool Call", data.ToolCallColor, data.ResetSeq))
 
+		// 6. Markdown
+		glamourStyle := data.MostSimilarGlamourStyle()
+		tr, _ := glamour.NewTermRenderer(
+			glamour.WithStandardStyle(glamourStyle),
+		)
+		md := fmt.Sprintf("\n\n## This is a Header.\n* This is a **paragraph**.\n* Using `%s` style.\n* [Google](https://www.google.com)\n### Code Block\n```python\ndef hello_world():\n    print(\"Hello, world!\")\n\nhello_world()\n```", glamourStyle)
+		out, _ := tr.Render(md)
+		samples = append(samples, fmt.Sprintf("%-20s:\n%s", "Markdown", out))
+
 		smps := lipgloss.JoinVertical(lipgloss.Left, samples...)
 
 		block := lipgloss.JoinVertical(lipgloss.Center, header, smps)
@@ -71,7 +81,7 @@ var themeCmd = &cobra.Command{
 		style := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color(data.BorderHex)).
-			Padding(1, 2).
+			Padding(1, 2, 0).
 			MarginLeft(1)
 
 		fmt.Println(style.Render(block))

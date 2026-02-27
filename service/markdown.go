@@ -98,15 +98,16 @@ func (mr *Markdown) Render(r ui.Render) {
 	r.Writeln("")
 	r.Writeln(data.TaskCompleteColor + "✓ Task Completed" + data.ResetSeq)
 
-	// Render the Markdown using the active theme's colour palette so that
-	// headings, code blocks, links, etc. are visually coherent with the
-	// rest of the application UI chrome.
-	styleJSON := data.BuildGlamourStyleJSON()
+	// Pick the glamour built-in style whose palette most closely matches the
+	// active theme (dark/light family + hue-distance against style fingerprints)
+	// so we preserve glamour's hand-crafted vibrant colours and rich Chroma
+	// syntax highlighting, rather than a flat programmatic approximation.
+	glamourStyle := data.MostSimilarGlamourStyle()
 	tr, err := glamour.NewTermRenderer(
-		glamour.WithStylesFromJSONBytes([]byte(styleJSON)),
+		glamour.WithStandardStyle(glamourStyle),
 	)
 	if err != nil {
-		// Graceful fallback: if the derived style somehow fails, use auto-style
+		// Graceful fallback to auto-style if matching unexpectedly fails.
 		tr, _ = glamour.NewTermRenderer(glamour.WithAutoStyle())
 	}
 
