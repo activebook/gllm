@@ -25,7 +25,7 @@
 - **Agentic Workflow**: Orchestrate sophisticated multi-agent behaviors using state-of-the-art models for parallel task execution and save context window.
 - **Agent Skills**: Support agent skills, switch skills on and off, and install from git or local path.
 - **@ Reference Support**: Reference files and directories directly in prompts using @ syntax for seamless context inclusion.
-- **Workflow Commands**: Define and execute workflows as commands for streamlined operations.
+- **Workflow & Skills Commands**: Define and execute workflows and skills as commands for streamlined operations.
 - **Colorful Themes**: Supports hundreds of popular themes, compatible with light and dark modes, ANSI-color, and full true-color.
 - **API local Proxy**: Supports Multi-Protocol (OpenAI, Anthropic, Google Gemini) local API reverse proxy, ensures seamless compatibility with a wide range of applications.
 - **Cross-platform Support**: gllm is available for macOS, Windows, and Linux, and easy to install and update.
@@ -161,6 +161,14 @@ Workflow commands are predefined sequences of actions that can be executed with 
 | Use debug command | Workflow commands |
 |:-------------------:|:--------------:|
 | ![Debug command](screenshots/cmd_workflow_1.png) | ![Workflow commands](screenshots/cmd_workflow_2.png) |
+
+### Skills Commands
+
+Skills are reusable sets of instructions that can be invoked with a single command. They are stored as SKILL.md files in the `skills` directory. 
+
+| arxiv skill command | Code skill command |
+|:-------------------:|:--------------:|
+| ![arxiv skill command](screenshots/cmd_skill_1.png) | ![Code skill command](screenshots/cmd_skill_2.png) |
 
 ### Multi-Line Input with Editor
 

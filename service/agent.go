@@ -481,15 +481,23 @@ func CallAgent(op *AgentOptions) error {
 				// Switch agent signal, pop up
 				ag.StopIndicator()
 				ag.WriteEnd()
-				// Convert notify.Extra to SwitchAgentError
-				switchErr := notify.Extra.(*SwitchAgentError)
-				return switchErr
+				// Convert notify.Extra to SwitchAgentError safely
+				if err, ok := notify.Extra.(error); ok {
+					if switchErr, ok := AsSwitchAgentError(err); ok {
+						return switchErr
+					}
+				}
+				return fmt.Errorf("unknown switch agent error type: %v", notify.Extra)
 			case StatusUserCancel:
 				ag.StopIndicator()
 				ag.WriteEnd()
-				// Convert notify.Extra to UserCancelError
-				userCancelErr := notify.Extra.(*UserCancelError)
-				return userCancelErr
+				// Convert notify.Extra to UserCancelError safely
+				if err, ok := notify.Extra.(error); ok {
+					if cancelErr, ok := AsUserCancelError(err); ok {
+						return cancelErr
+					}
+				}
+				return fmt.Errorf("unknown user cancel error type: %v", notify.Extra)
 			case StatusFinished:
 				ag.StopIndicator()
 				// Render the markdown
