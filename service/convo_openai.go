@@ -27,10 +27,9 @@ func (c *OpenAIConversation) SetMessages(messages interface{}) {
 	}
 }
 
-func (c *OpenAIConversation) MarshalMessages(messages []openai.ChatCompletionMessage) []byte {
-	// Most major systems (including ChatGPT and Google's Gemini) discard search results between turns
-	// Always clear content for tool messages before saving to save tokens
-	// Keep the "record" of the tool call (e.g., call_id: 123, tool: google_search) but drop the "body" of the result.
+func (c *OpenAIConversation) MarshalMessages(messages []openai.ChatCompletionMessage, dropToolContent bool) []byte {
+	// The industry's current answer is basically "save everything by default, then compress/prune when it gets too big."
+	// The complete conversation history, including your prompts and the model's responses, all tool executions (inputs and outputs).
 	// Important: We need to copy the message, otherwise it will modify the original message
 	// model need complete original message, which includes tool content to generate assistant response
 	// but we don't need tool content in conversation file to save tokens
@@ -40,7 +39,7 @@ func (c *OpenAIConversation) MarshalMessages(messages []openai.ChatCompletionMes
 	for _, msg := range messages {
 		// Copy message and clear tool content to save tokens
 		formatted := msg
-		if msg.Role == openai.ChatMessageRoleTool {
+		if dropToolContent && msg.Role == openai.ChatMessageRoleTool {
 			formatted.Content = empty
 		}
 
@@ -82,7 +81,7 @@ func (c *OpenAIConversation) Push(messages ...interface{}) error {
 	if c.Name == "" {
 		return nil
 	}
-	data := c.MarshalMessages(newmsgs)
+	data := c.MarshalMessages(newmsgs, false)
 	return c.appendFile(data)
 }
 
@@ -93,7 +92,7 @@ func (c *OpenAIConversation) Save() error {
 	}
 
 	// Write all messages to file
-	data := c.MarshalMessages(c.Messages)
+	data := c.MarshalMessages(c.Messages, false)
 	return c.writeFile(data)
 }
 

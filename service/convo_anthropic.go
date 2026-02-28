@@ -27,10 +27,9 @@ func (c *AnthropicConversation) SetMessages(messages interface{}) {
 	}
 }
 
-func (c *AnthropicConversation) MarshalMessages(messages []anthropic.MessageParam) []byte {
-	// Important: We only deep copy tool result content that we modify
-	// model needs complete original message, which includes tool content to generate assistant response
-	// but we don't need tool content in conversation file to save tokens
+func (c *AnthropicConversation) MarshalMessages(messages []anthropic.MessageParam, dropToolContent bool) []byte {
+	// The industry's current answer is basically "save everything by default, then compress/prune when it gets too big."
+	// The complete conversation history, including your prompts and the model's responses, all tool executions (inputs and outputs).
 	empty := ""
 	var data []byte
 	for _, msg := range messages {
@@ -49,7 +48,7 @@ func (c *AnthropicConversation) MarshalMessages(messages []anthropic.MessagePara
 		}
 
 		// Only deep copy Content slice if we need to modify tool results
-		if hasToolResult {
+		if hasToolResult && dropToolContent {
 			msgCopy.Content = make([]anthropic.ContentBlockParamUnion, len(msg.Content))
 			for j, block := range msg.Content {
 				if block.OfToolResult != nil {
@@ -111,7 +110,7 @@ func (c *AnthropicConversation) Push(messages ...interface{}) error {
 	if c.Name == "" {
 		return nil
 	}
-	data := c.MarshalMessages(newmsgs)
+	data := c.MarshalMessages(newmsgs, false)
 	return c.appendFile(data)
 }
 
@@ -121,7 +120,7 @@ func (c *AnthropicConversation) Save() error {
 		return nil
 	}
 
-	data := c.MarshalMessages(c.Messages)
+	data := c.MarshalMessages(c.Messages, false)
 	return c.writeFile(data)
 }
 
