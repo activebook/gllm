@@ -420,6 +420,37 @@ func (ci *ChatInfo) showHistory() {
 	}
 }
 
+// compressContext compresses the conversation context by replacing it with a summary
+func (ci *ChatInfo) compressContext() {
+	// Get active agent
+	agent, err := EnsureActiveAgent()
+	if err != nil {
+		service.Errorf("%v", err)
+		return
+	}
+
+	// Get conversation data
+	convoData, convoName, err := GetConvoData(convoName, agent.Model.Provider)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("No available conversation yet.")
+			return
+		}
+		service.Errorf("%v", err)
+		return
+	}
+
+	// Detect provider based on message format
+	isCompatible, provider, modelProvider := CheckConvoFormat(agent, convoData)
+	if !isCompatible {
+		// Warn about potential incompatibility if providers differ
+		service.Warnf("Conversation '%s' [%s] is not compatible with the current model provider [%s].\n", convoName, provider, modelProvider)
+	}
+
+	// Compress the conversation context
+
+}
+
 func (ci *ChatInfo) callAgent(input string) {
 	// Call agent using the shared runner, passing persisted SharedState
 	err := RunAgent(input, ci.Files, convoName, ci.outputFile, ci.sharedState)

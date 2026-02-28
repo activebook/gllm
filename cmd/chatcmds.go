@@ -33,6 +33,7 @@ var (
 		"/memory":   "Manage memory (list, add, clear)",
 		"/yolo":     "Toggle YOLO mode",
 		"/convo":    "Manage conversations (list, info, remove, etc.)",
+		"/compress": "Compresses the context by replacing it with a summary",
 		"/think":    "Set thinking level",
 		"/features": "Switch agent features",
 		"/editor":   "Manage editor or open for multi-line input",
@@ -169,6 +170,9 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 
 	case "/convo":
 		runCommand(convoCmd, parts[1:])
+
+	case "/compress":
+		ci.compressContext()
 
 	case "/think":
 		runCommand(thinkCmd, parts[1:])

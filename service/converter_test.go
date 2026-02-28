@@ -1,7 +1,6 @@
 package service
 
 import (
-	"encoding/json"
 	"testing"
 )
 
@@ -16,22 +15,20 @@ This matches all test function names that contain "TestConvertMessages"
 */
 
 func TestConvertMessages_OpenAIToGemini(t *testing.T) {
-	// Input: Simple OpenAI conversation
-	input := `[
-		{"role": "system", "content": "You are a helpful assistant."},
-		{"role": "user", "content": "Hello!"},
-		{"role": "assistant", "content": "Hi there!"}
-	]`
+	// Input: Simple OpenAI conversation (JSONL format)
+	input := `{"role": "system", "content": "You are a helpful assistant."}
+{"role": "user", "content": "Hello!"}
+{"role": "assistant", "content": "Hi there!"}`
 
 	result, err := ConvertMessages([]byte(input), ModelProviderOpenAI, ModelProviderGemini)
 	if err != nil {
 		t.Fatalf("ConvertMessages failed: %v", err)
 	}
 
-	// Verify result is valid JSON
+	// Verify result is valid JSONL
 	var geminiMessages []map[string]interface{}
-	if err := json.Unmarshal(result, &geminiMessages); err != nil {
-		t.Fatalf("Result is not valid JSON: %v", err)
+	if err := parseJSONL(result, &geminiMessages); err != nil {
+		t.Fatalf("Result is not valid JSONL: %v", err)
 	}
 
 	// Should have 2 messages (system is inlined into first user message)
@@ -56,21 +53,19 @@ func TestConvertMessages_OpenAIToGemini(t *testing.T) {
 }
 
 func TestConvertMessages_GeminiToOpenAI(t *testing.T) {
-	// Input: Simple Gemini conversation
-	input := `[
-		{"role": "user", "parts": [{"text": "Hello from Gemini!"}]},
-		{"role": "model", "parts": [{"text": "Greetings!"}]}
-	]`
+	// Input: Simple Gemini conversation (JSONL format)
+	input := `{"role": "user", "parts": [{"text": "Hello from Gemini!"}]}
+{"role": "model", "parts": [{"text": "Greetings!"}]}`
 
 	result, err := ConvertMessages([]byte(input), ModelProviderGemini, ModelProviderOpenAI)
 	if err != nil {
 		t.Fatalf("ConvertMessages failed: %v", err)
 	}
 
-	// Verify result is valid JSON
+	// Verify result is valid JSONL
 	var openaiMessages []map[string]interface{}
-	if err := json.Unmarshal(result, &openaiMessages); err != nil {
-		t.Fatalf("Result is not valid JSON: %v", err)
+	if err := parseJSONL(result, &openaiMessages); err != nil {
+		t.Fatalf("Result is not valid JSONL: %v", err)
 	}
 
 	// Should have 2 messages
@@ -90,21 +85,19 @@ func TestConvertMessages_GeminiToOpenAI(t *testing.T) {
 }
 
 func TestConvertMessages_AnthropicToOpenAI(t *testing.T) {
-	// Input: Simple Anthropic conversation
-	input := `[
-		{"role": "user", "content": [{"type": "text", "text": "Hello from Anthropic!"}]},
-		{"role": "assistant", "content": [{"type": "text", "text": "Hi!"}]}
-	]`
+	// Input: Simple Anthropic conversation (JSONL format)
+	input := `{"role": "user", "content": [{"type": "text", "text": "Hello from Anthropic!"}]}
+{"role": "assistant", "content": [{"type": "text", "text": "Hi!"}]}`
 
 	result, err := ConvertMessages([]byte(input), ModelProviderAnthropic, ModelProviderOpenAI)
 	if err != nil {
 		t.Fatalf("ConvertMessages failed: %v", err)
 	}
 
-	// Verify result is valid JSON
+	// Verify result is valid JSONL
 	var openaiMessages []map[string]interface{}
-	if err := json.Unmarshal(result, &openaiMessages); err != nil {
-		t.Fatalf("Result is not valid JSON: %v", err)
+	if err := parseJSONL(result, &openaiMessages); err != nil {
+		t.Fatalf("Result is not valid JSONL: %v", err)
 	}
 
 	// Should have 2 messages
@@ -115,7 +108,7 @@ func TestConvertMessages_AnthropicToOpenAI(t *testing.T) {
 
 func TestConvertMessages_SameProvider(t *testing.T) {
 	// Should return input unchanged when source == target
-	input := `[{"role": "user", "content": "hello"}]`
+	input := `{"role": "user", "content": "hello"}`
 
 	result, err := ConvertMessages([]byte(input), ModelProviderOpenAI, ModelProviderOpenAI)
 	if err != nil {
@@ -127,49 +120,48 @@ func TestConvertMessages_SameProvider(t *testing.T) {
 	}
 }
 
-func TestConvertMessages_SkipsToolCalls(t *testing.T) {
-	// OpenAI conversation with tool calls - should be ignored
-	input := `[
-		{"role": "user", "content": "Search for cats"},
-		{"role": "assistant", "tool_calls": [{"id": "1", "type": "function", "function": {"name": "search", "arguments": "{}"}}]},
-		{"role": "tool", "tool_call_id": "1", "content": "Search results"},
-		{"role": "assistant", "content": "Here are the results."}
-	]`
+func TestConvertMessages_InlinesToolResults(t *testing.T) {
+	// OpenAI conversation with tool calls (JSONL format)
+	// The tool response content should be preserved, but the call itself ignored.
+	input := `{"role": "user", "content": "Search for cats"}
+{"role": "assistant", "tool_calls": [{"id": "1", "type": "function", "function": {"name": "search", "arguments": "{}"}}]}
+{"role": "tool", "tool_call_id": "1", "content": "Search results"}
+{"role": "assistant", "content": "Here are the results."}`
 
 	result, err := ConvertMessages([]byte(input), ModelProviderOpenAI, ModelProviderGemini)
 	if err != nil {
 		t.Fatalf("ConvertMessages failed: %v", err)
 	}
 
-	// Verify result is valid JSON
+	// Verify result is valid JSONL
 	var geminiMessages []map[string]interface{}
-	if err := json.Unmarshal(result, &geminiMessages); err != nil {
-		t.Fatalf("Result is not valid JSON: %v", err)
+	if err := parseJSONL(result, &geminiMessages); err != nil {
+		t.Fatalf("Result is not valid JSONL: %v", err)
 	}
 
-	// Should only have 2 messages (user + final assistant)
-	// Tool messages and assistant with only tool_calls should be skipped
-	if len(geminiMessages) != 2 {
-		t.Errorf("Expected 2 messages after filtering, got %d", len(geminiMessages))
+	// Should have 3 messages:
+	// 1. user ("Search for cats")
+	// 2. user ("[Tool Result]:\nSearch results")
+	// 3. model ("Here are the results.")
+	if len(geminiMessages) != 3 {
+		t.Errorf("Expected 3 messages after conversion, got %d", len(geminiMessages))
 	}
 }
 
 func TestConvertMessages_PreservesReasoning(t *testing.T) {
-	// OpenAI conversation with reasoning
-	input := `[
-		{"role": "user", "content": "Think about this"},
-		{"role": "assistant", "content": "My answer", "reasoning_content": "Let me think..."}
-	]`
+	// OpenAI conversation with reasoning (JSONL format)
+	input := `{"role": "user", "content": "Think about this"}
+{"role": "assistant", "content": "My answer", "reasoning_content": "Let me think..."}`
 
 	result, err := ConvertMessages([]byte(input), ModelProviderOpenAI, ModelProviderGemini)
 	if err != nil {
 		t.Fatalf("ConvertMessages failed: %v", err)
 	}
 
-	// Verify result is valid JSON
+	// Verify result is valid JSONL
 	var geminiMessages []map[string]interface{}
-	if err := json.Unmarshal(result, &geminiMessages); err != nil {
-		t.Fatalf("Result is not valid JSON: %v", err)
+	if err := parseJSONL(result, &geminiMessages); err != nil {
+		t.Fatalf("Result is not valid JSONL: %v", err)
 	}
 
 	// Check that reasoning is preserved as a thought part
