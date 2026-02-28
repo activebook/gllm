@@ -51,6 +51,34 @@ func (sm *SkillManager) LoadMetadata() error {
 	return nil
 }
 
+// GetAvailableSkillsMetadata returns the list of available skills
+func (sm *SkillManager) GetAvailableSkillsMetadata() []data.SkillMetadata {
+	if err := sm.LoadMetadata(); err != nil {
+		// Log warning but don't fail - skills are optional
+		Warnf("Failed to load skills: %v", err)
+		return nil
+	}
+
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+
+	if len(sm.skills) == 0 {
+		return nil
+	}
+
+	// Get disabled skills from settings
+	settingsStore := data.GetSettingsStore()
+	var skills []data.SkillMetadata
+	for _, skill := range sm.skills {
+		// Skip disabled skills
+		if settingsStore.IsSkillDisabled(skill.Name) {
+			continue
+		}
+		skills = append(skills, skill)
+	}
+	return skills
+}
+
 // GetAvailableSkills returns the XML string for system prompt injection
 // Skills that are disabled in settings.json are excluded from the output.
 func (sm *SkillManager) GetAvailableSkills() string {

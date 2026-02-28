@@ -482,13 +482,13 @@ func CallAgent(op *AgentOptions) error {
 				ag.StopIndicator()
 				ag.WriteEnd()
 				// Convert notify.Extra to SwitchAgentError
-				switchErr := notify.Extra.(*SwitchAgentError)
+				switchErr := notify.Extra.(SwitchAgentError)
 				return switchErr
 			case StatusUserCancel:
 				ag.StopIndicator()
 				ag.WriteEnd()
 				// Convert notify.Extra to UserCancelError
-				userCancelErr := notify.Extra.(*UserCancelError)
+				userCancelErr := notify.Extra.(UserCancelError)
 				return userCancelErr
 			case StatusFinished:
 				ag.StopIndicator()

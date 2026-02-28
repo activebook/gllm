@@ -192,6 +192,11 @@ func (ci *ChatInfo) awaitChat_legacy() (string, error) {
 
 // This is the new awaitChat function, which uses bubbletea, support auto-complete
 func (ci *ChatInfo) awaitChat() (string, error) {
+	agent, err := EnsureActiveAgent()
+	if err != nil {
+		return "", err
+	}
+
 	var commands []ui.Suggestion
 	for cmd, desc := range chatCommandMap {
 		commands = append(commands, ui.Suggestion{Command: cmd, Description: desc})
@@ -210,6 +215,24 @@ func (ci *ChatInfo) awaitChat() (string, error) {
 		commands = append(commands, ui.Suggestion{Command: cmd, Description: desc})
 	}
 
+	// Add skill commands
+	if service.IsAgentSkillsEnabled(agent.Capabilities) {
+		sm := service.GetSkillManager()
+		skills := sm.GetAvailableSkillsMetadata()
+
+		for _, skill := range skills {
+			cmdName := "/" + strings.ToLower(skill.Name)
+			// Skip if the command already exists in chatCommandMap or workflow cmds
+			if _, ok := chatCommandMap[cmdName]; ok {
+				continue
+			}
+
+			// Add to suggestions with prefix to distinguish it
+			desc := skill.Description
+			commands = append(commands, ui.Suggestion{Command: cmdName, Description: desc})
+		}
+	}
+
 	// Sort commands by text
 	sort.Slice(commands, func(i, j int) bool {
 		return commands[i].Command < commands[j].Command
@@ -221,7 +244,8 @@ func (ci *ChatInfo) awaitChat() (string, error) {
 		return "", err
 	}
 	if result.Canceled {
-		return "", fmt.Errorf("user canceled")
+		// Return user cancel error
+		return "", service.UserCancelError{Reason: service.UserCancelReasonCancel}
 	}
 
 	// Update history
@@ -258,8 +282,12 @@ func (ci *ChatInfo) startREPL() {
 		// Get user input
 		input, err = ci.awaitChat()
 		if err != nil {
-			// Handle user cancellation (Ctrl+C)
-			fmt.Println("\nSession ended.")
+			if service.IsUserCancelError(err) {
+				// Handle user cancellation (Ctrl+C)
+				fmt.Println("\nSession ended.")
+				break
+			}
+			service.Errorf("%v\n", err)
 			break
 		}
 		if input == "" {

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -12,7 +13,7 @@ type SwitchAgentError struct {
 	Instruction string
 }
 
-func (e *SwitchAgentError) Error() string {
+func (e SwitchAgentError) Error() string {
 	if e.Instruction != "" {
 		return fmt.Sprintf("switching to agent: %s with instruction: %s", e.TargetAgent, e.Instruction)
 	}
@@ -20,12 +21,8 @@ func (e *SwitchAgentError) Error() string {
 }
 
 func IsSwitchAgentError(err error) bool {
-	switch err.(type) {
-	case *SwitchAgentError:
-		return true
-	default:
-		return false
-	}
+	var target SwitchAgentError
+	return errors.As(err, &target)
 }
 
 const (
@@ -33,6 +30,7 @@ const (
 	UserCancelReasonUnknown = "Unknown"
 	UserCancelReasonTimeout = "Timeout"
 	UserCancelReasonDeny    = "User denied execution."
+	UserCancelReasonCancel  = "User canceled execution."
 )
 
 // UserCancelError is a sentinel error used to signal that the user has cancelled an operation.
@@ -42,7 +40,8 @@ type UserCancelError struct {
 	Reason string
 }
 
-func (e *UserCancelError) Error() string {
+// Error implements [error].
+func (e UserCancelError) Error() string {
 	if e.Reason != "" {
 		return fmt.Sprintf("%s Reason: %s", UserCancelCommon, e.Reason)
 	}
@@ -50,10 +49,6 @@ func (e *UserCancelError) Error() string {
 }
 
 func IsUserCancelError(err error) bool {
-	switch err.(type) {
-	case *UserCancelError:
-		return true
-	default:
-		return false
-	}
+	var target UserCancelError
+	return errors.As(err, &target)
 }

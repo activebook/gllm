@@ -214,6 +214,11 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		if ci.executeWorkflow(command, parts) {
 			return
 		}
+
+		// Try to execute as skill command
+		if ci.executeSkill(command, parts) {
+			return
+		}
 		fmt.Printf("Unknown command: %s\n", command)
 	}
 }
@@ -512,7 +517,56 @@ func (ci *ChatInfo) executeWorkflow(command string, parts []string) bool {
 		return false // Not a workflow command
 	}
 
+	// Extract any arguments passed to the workflow command
+	var userArgs string
+	if len(parts) > 1 {
+		userArgs = strings.Join(parts[1:], " ")
+	}
+	input := content
+	if userArgs != "" {
+		input += "\n" + userArgs
+	}
+
 	// Set the content as input to be processed by the agent
-	ci.EditorInput = content
+	ci.EditorInput = input
+	return true
+}
+
+// executeSkill checks if command is a skill and sets up the prompt to activate it
+// Returns true if it was a skill command
+func (ci *ChatInfo) executeSkill(command string, parts []string) bool {
+	// Strip leading /
+	name := strings.TrimPrefix(command, "/")
+
+	// Check if skill exists and is not disabled
+	sm := service.GetSkillManager()
+	skills := sm.GetAvailableSkillsMetadata()
+	var foundSkill *data.SkillMetadata
+	for _, s := range skills {
+		if strings.ToLower(s.Name) == name {
+			foundSkill = &s
+			break
+		}
+	}
+
+	if foundSkill == nil {
+		return false // Not a skill command
+	}
+
+	// Extract any arguments passed to the skill command
+	var userArgs string
+	if len(parts) > 1 {
+		userArgs = strings.Join(parts[1:], " ")
+	}
+
+	// Construct the system instruction to force skill activation
+	// prompt := fmt.Sprintf(`[System Note: The user explicitly wants to use the skill '%s'. Please use the tool 'activate_skill' with the skill name '%s'.]`, foundSkill.Name, foundSkill.Name)
+	input := foundSkill.Name
+	if userArgs != "" {
+		input += "\n" + userArgs
+	}
+
+	ci.EditorInput = input
+	// fmt.Printf("Triggering skill: %s\n", foundSkill.Name)
 	return true
 }
