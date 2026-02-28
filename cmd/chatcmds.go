@@ -559,9 +559,8 @@ func (ci *ChatInfo) executeSkill(command string, parts []string) bool {
 		userArgs = strings.Join(parts[1:], " ")
 	}
 
-	// Construct the system instruction to force skill activation
-	// prompt := fmt.Sprintf(`[System Note: The user explicitly wants to use the skill '%s'. Please use the tool 'activate_skill' with the skill name '%s'.]`, foundSkill.Name, foundSkill.Name)
-	input := foundSkill.Name
+	// Construct the instruction to force skill activation
+	input := fmt.Sprintf("[Use tool 'activate_skill' with the skill name '%s']", foundSkill.Name)
 	if userArgs != "" {
 		input += "\n" + userArgs
 	}

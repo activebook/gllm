@@ -58,7 +58,7 @@ func NeedUserConfirm(info string, prompt string, description string) (bool, erro
 // If the user choose "All", set toolsUse.AutoApprove to true and toolsUse.Confirm to data.ToolConfirmYes
 // If the user choose "Yes", set toolsUse.Confirm to data.ToolConfirmYes
 // If the user choose "No", set toolsUse.Confirm to data.ToolConfirmCancel
-func NeedUserConfirmToolUse(info string, prompt string, description string, toolsUse *data.ToolsUse) error {
+func NeedUserConfirmToolUse(info string, prompt string, description string, toolsUse *data.ToolsUse) {
 	// Output the info message if provided
 	if len(strings.TrimSpace(info)) > 0 {
 		fmt.Println(info)
@@ -66,7 +66,7 @@ func NeedUserConfirmToolUse(info string, prompt string, description string, tool
 
 	if toolsUse.AutoApprove {
 		toolsUse.Confirm = data.ToolConfirmYes
-		return nil
+		return
 	}
 
 	var fields []huh.Field
@@ -76,7 +76,7 @@ func NeedUserConfirmToolUse(info string, prompt string, description string, tool
 
 	// If description is too long, use a Note before the Confirm field
 	if isLong {
-		fields = append(fields, GetStaticHuhNote("", description))
+		fields = append(fields, GetStaticHuhNoteFull("", description))
 	}
 
 	var choice string
@@ -104,7 +104,9 @@ func NeedUserConfirmToolUse(info string, prompt string, description string, tool
 
 	err := form.Run()
 	if err != nil {
-		return fmt.Errorf("error in confirmation prompt: %v", err)
+		// User aborted
+		toolsUse.ConfirmCancel()
+		return
 	}
 
 	switch choice {
@@ -116,6 +118,4 @@ func NeedUserConfirmToolUse(info string, prompt string, description string, tool
 	default:
 		toolsUse.ConfirmCancel()
 	}
-
-	return nil
 }

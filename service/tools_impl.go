@@ -116,11 +116,8 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tools
 		}
 
 		// Prompt user for confirmation
-		err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
+		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
 		closeDiff() // Close the diff
-		if err != nil {
-			return "", err
-		}
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: write to file %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -162,10 +159,7 @@ func createDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data
 		}
 
 		// Prompt user for confirmation
-		err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
-		if err != nil {
-			return "", err
-		}
+		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: create directory %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -251,10 +245,7 @@ func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tool
 		}
 
 		// Prompt user for confirmation
-		err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
-		if err != nil {
-			return "", err
-		}
+		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: delete file %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -290,10 +281,7 @@ func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data
 		}
 
 		// Prompt user for confirmation
-		err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
-		if err != nil {
-			return "", err
-		}
+		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: delete directory %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -334,10 +322,7 @@ func moveToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) 
 		}
 
 		// Prompt user for confirmation
-		err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
-		if err != nil {
-			return "", err
-		}
+		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: move %s to %s", source, destination), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -613,10 +598,7 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse)
 			descStr = ""
 		}
 		// Use the command string as the info for confirmation
-		err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, descStr, toolsUse)
-		if err != nil {
-			return "", err
-		}
+		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, descStr, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: shell command '%s'", cmdStr), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -825,11 +807,8 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsU
 		}
 
 		// Response with a prompt to let user confirm
-		err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
+		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
 		closeDiff() // Close the diff
-		if err != nil {
-			return "", err
-		}
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf(ToolRespDiscardEditFile, path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -879,10 +858,7 @@ func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) 
 		}
 
 		// Prompt user for confirmation
-		err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
-		if err != nil {
-			return "", err
-		}
+		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: copy %s to %s", source, destination), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -1092,10 +1068,7 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Too
 
 	if needConfirm && !toolsUse.AutoApprove {
 		purpose := fmt.Sprintf("switch to agent '%s'", name)
-		err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
-		if err != nil {
-			return "", err
-		}
+		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: switch to agent %s", name), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -1217,10 +1190,7 @@ func spawnSubAgentsToolCallImpl(
 				taskDesc.WriteString(fmt.Sprintf("- Task %d: %s (Agent: %s)", i+1, tm["task_key"], tm["agent"]))
 			}
 		}
-		err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, taskDesc.String(), toolsUse)
-		if err != nil {
-			return "", err
-		}
+		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, taskDesc.String(), toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return "Operation cancelled by user: spawn sub-agents", UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -1379,10 +1349,7 @@ func activateSkillToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.T
 	// Check if confirmation is needed (default logic: always confirm unless AutoApprove is true)
 	if !toolsUse.AutoApprove {
 		description := "Activate Skill:\n" + name + "\n\nDescription:\n" + desc + "\n\nResources:\n" + tree
-		err := ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, description, toolsUse)
-		if err != nil {
-			return "", err
-		}
+		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, description, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: activate skill %s", name), UserCancelError{Reason: UserCancelReasonDeny}
 		}

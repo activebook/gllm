@@ -120,6 +120,37 @@ func GetStaticHuhNote(title string, description string) *huh.Note {
 	return note
 }
 
+func GetStaticHuhNoteFull(title string, description string) *huh.Note {
+	// Parse the JSON into StyleConfig
+	var renderer *glamour.TermRenderer
+	var err error
+	// Create renderer with the parsed style
+	renderer, err = glamour.NewTermRenderer(
+		glamour.WithAutoStyle(),
+		// For some reason, this doesn't work well with DescriptionFunc
+		// it sometimes trims the description output
+		glamour.WithStylesFromJSONBytes([]byte(compactStyleJSON)),
+		glamour.WithPreservedNewLines(),
+	)
+	if err != nil {
+		renderer, err = glamour.NewTermRenderer(glamour.WithAutoStyle())
+	}
+
+	var note *huh.Note
+	if strings.TrimSpace(title) == "" {
+		note = huh.NewNote()
+	} else {
+		note = huh.NewNote().Title(title)
+	}
+	renderedDesc, err := renderer.Render(description)
+	if err != nil {
+		renderedDesc = description
+	}
+	renderedDesc = strings.TrimRight(renderedDesc, "\n")
+	note.Description(renderedDesc)
+	return note
+}
+
 /*
  *
  */
