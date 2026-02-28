@@ -122,7 +122,7 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tools
 			return "", err
 		}
 		if toolsUse.Confirm == data.ToolConfirmCancel {
-			return fmt.Sprintf("Operation cancelled by user: write to file %s", path), &UserCancelError{Reason: UserCancelReasonDeny}
+			return fmt.Sprintf("Operation cancelled by user: write to file %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
 
@@ -167,7 +167,7 @@ func createDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data
 			return "", err
 		}
 		if toolsUse.Confirm == data.ToolConfirmCancel {
-			return fmt.Sprintf("Operation cancelled by user: create directory %s", path), &UserCancelError{Reason: UserCancelReasonDeny}
+			return fmt.Sprintf("Operation cancelled by user: create directory %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
 
@@ -256,7 +256,7 @@ func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tool
 			return "", err
 		}
 		if toolsUse.Confirm == data.ToolConfirmCancel {
-			return fmt.Sprintf("Operation cancelled by user: delete file %s", path), &UserCancelError{Reason: UserCancelReasonDeny}
+			return fmt.Sprintf("Operation cancelled by user: delete file %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
 
@@ -295,7 +295,7 @@ func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data
 			return "", err
 		}
 		if toolsUse.Confirm == data.ToolConfirmCancel {
-			return fmt.Sprintf("Operation cancelled by user: delete directory %s", path), &UserCancelError{Reason: UserCancelReasonDeny}
+			return fmt.Sprintf("Operation cancelled by user: delete directory %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
 
@@ -339,7 +339,7 @@ func moveToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) 
 			return "", err
 		}
 		if toolsUse.Confirm == data.ToolConfirmCancel {
-			return fmt.Sprintf("Operation cancelled by user: move %s to %s", source, destination), &UserCancelError{Reason: UserCancelReasonDeny}
+			return fmt.Sprintf("Operation cancelled by user: move %s to %s", source, destination), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
 
@@ -618,7 +618,7 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse)
 			return "", err
 		}
 		if toolsUse.Confirm == data.ToolConfirmCancel {
-			return fmt.Sprintf("Operation cancelled by user: shell command '%s'", cmdStr), &UserCancelError{Reason: UserCancelReasonDeny}
+			return fmt.Sprintf("Operation cancelled by user: shell command '%s'", cmdStr), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
 
@@ -831,7 +831,7 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsU
 			return "", err
 		}
 		if toolsUse.Confirm == data.ToolConfirmCancel {
-			return fmt.Sprintf(ToolRespDiscardEditFile, path), &UserCancelError{Reason: UserCancelReasonDeny}
+			return fmt.Sprintf(ToolRespDiscardEditFile, path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
 
@@ -884,7 +884,7 @@ func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) 
 			return "", err
 		}
 		if toolsUse.Confirm == data.ToolConfirmCancel {
-			return fmt.Sprintf("Operation cancelled by user: copy %s to %s", source, destination), &UserCancelError{Reason: UserCancelReasonDeny}
+			return fmt.Sprintf("Operation cancelled by user: copy %s to %s", source, destination), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
 
@@ -1097,7 +1097,7 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Too
 			return "", err
 		}
 		if toolsUse.Confirm == data.ToolConfirmCancel {
-			return fmt.Sprintf("Operation cancelled by user: switch to agent %s", name), &UserCancelError{Reason: UserCancelReasonDeny}
+			return fmt.Sprintf("Operation cancelled by user: switch to agent %s", name), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
 
@@ -1114,7 +1114,7 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Too
 	}
 
 	// Signal to switch
-	return fmt.Sprintf("Switching to agent '%s'...", name), &SwitchAgentError{TargetAgent: name, Instruction: instruction}
+	return fmt.Sprintf("Switching to agent '%s'...", name), SwitchAgentError{TargetAgent: name, Instruction: instruction}
 }
 
 // listAgentToolCallImpl handles the list_agent tool call
@@ -1222,7 +1222,7 @@ func spawnSubAgentsToolCallImpl(
 			return "", err
 		}
 		if toolsUse.Confirm == data.ToolConfirmCancel {
-			return "Operation cancelled by user: spawn sub-agents", &UserCancelError{Reason: UserCancelReasonDeny}
+			return "Operation cancelled by user: spawn sub-agents", UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
 
@@ -1384,7 +1384,7 @@ func activateSkillToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.T
 			return "", err
 		}
 		if toolsUse.Confirm == data.ToolConfirmCancel {
-			return fmt.Sprintf("Operation cancelled by user: activate skill %s", name), &UserCancelError{Reason: UserCancelReasonDeny}
+			return fmt.Sprintf("Operation cancelled by user: activate skill %s", name), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
 

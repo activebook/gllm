@@ -115,7 +115,7 @@ func RunAgent(prompt string, files []*service.FileData, convoName string, output
 		if err != nil {
 			// Switch agent signal
 			if service.IsSwitchAgentError(err) {
-				switchErr := err.(*service.SwitchAgentError)
+				switchErr, _ := service.AsSwitchAgentError(err)
 				service.Infof("Already switched to agent [%s].", switchErr.TargetAgent)
 				// Set instruction, shouldn't use the old prompt
 				prompt = switchErr.Instruction
@@ -131,7 +131,7 @@ func RunAgent(prompt string, files []*service.FileData, convoName string, output
 				}
 			} else if service.IsUserCancelError(err) {
 				// User cancelled operation
-				userCancelErr := err.(*service.UserCancelError)
+				userCancelErr, _ := service.AsUserCancelError(err)
 				service.Infof("%v", userCancelErr)
 				break
 			} else {

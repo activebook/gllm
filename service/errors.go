@@ -22,7 +22,22 @@ func (e SwitchAgentError) Error() string {
 
 func IsSwitchAgentError(err error) bool {
 	var target SwitchAgentError
-	return errors.As(err, &target)
+	var target2 *SwitchAgentError
+	return errors.As(err, &target) || errors.As(err, &target2)
+}
+
+// AsSwitchAgentError safely extracts a SwitchAgentError from an error,
+// handling both value and pointer variants.
+func AsSwitchAgentError(err error) (SwitchAgentError, bool) {
+	var target SwitchAgentError
+	if errors.As(err, &target) {
+		return target, true
+	}
+	var target2 *SwitchAgentError
+	if errors.As(err, &target2) {
+		return *target2, true
+	}
+	return SwitchAgentError{}, false
 }
 
 const (
@@ -50,5 +65,20 @@ func (e UserCancelError) Error() string {
 
 func IsUserCancelError(err error) bool {
 	var target UserCancelError
-	return errors.As(err, &target)
+	var target2 *UserCancelError
+	return errors.As(err, &target) || errors.As(err, &target2)
+}
+
+// AsUserCancelError safely extracts a UserCancelError from an error,
+// handling both value and pointer variants.
+func AsUserCancelError(err error) (UserCancelError, bool) {
+	var target UserCancelError
+	if errors.As(err, &target) {
+		return target, true
+	}
+	var target2 *UserCancelError
+	if errors.As(err, &target2) {
+		return *target2, true
+	}
+	return UserCancelError{}, false
 }
