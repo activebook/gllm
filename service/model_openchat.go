@@ -149,6 +149,53 @@ func (ag *Agent) SortOpenChatMessagesByOrder() error {
 	return ag.Convo.Save()
 }
 
+// GenerateOpenChatSync generates a single, non-streaming completion using the Volcengine API.
+// This is used for background tasks like context compression where streaming is unnecessary.
+// systemPrompt is the system prompt to be used for the sync generation, it's majorly a role.
+// the last message is the user prompt to do the task.
+func (ag *Agent) GenerateOpenChatSync(messages []*model.ChatCompletionMessage, systemPrompt string) (string, error) {
+	ctx := context.Background()
+	client := arkruntime.NewClientWithApiKey(
+		ag.Model.ApiKey,
+		arkruntime.WithTimeout(30*time.Minute),
+		arkruntime.WithBaseUrl(ag.Model.EndPoint),
+	)
+
+	// Add system prompt
+	messages = append([]*model.ChatCompletionMessage{{
+		Role: model.ChatMessageRoleSystem,
+		Content: &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(systemPrompt),
+		},
+		Name: Ptr(""),
+	}}, messages...)
+
+	// Context Management
+	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
+	messages, truncated := cm.PrepareOpenChatMessages(messages, nil)
+	if truncated {
+		ag.Warn("Context trimmed to fit model limits during sync generation")
+	}
+
+	req := model.CreateChatCompletionRequest{
+		Model:       ag.Model.ModelName,
+		Temperature: &ag.Model.Temperature,
+		TopP:        &ag.Model.TopP,
+		Messages:    messages,
+	}
+
+	resp, err := client.CreateChatCompletion(ctx, req)
+	if err != nil {
+		return "", fmt.Errorf("sync chat completion error: %w", err)
+	}
+
+	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == nil || resp.Choices[0].Message.Content.StringValue == nil {
+		return "", fmt.Errorf("no choices returned in sync response")
+	}
+
+	return *resp.Choices[0].Message.Content.StringValue, nil
+}
+
 // In current openchat api, we can't use cached tokens
 // The context api and response api are not available for current golang lib
 func (ag *Agent) GenerateOpenChatStream() error {

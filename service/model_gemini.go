@@ -120,6 +120,52 @@ func (ag *Agent) SortGeminiMessagesByOrder() error {
 	return ag.Convo.Save()
 }
 
+// GenerateGeminiSync generates a single, non-streaming completion using the Gemini API.
+// This is used for background tasks like context compression where streaming is unnecessary.
+// systemPrompt is the system prompt to be used for the sync generation, it's majorly a role.
+// the last message is the user prompt to do the task.
+func (ag *Agent) GenerateGeminiSync(messages []*genai.Content, systemPrompt string) (string, error) {
+	ga, err := ag.initGeminiAgent()
+	if err != nil {
+		return "", err
+	}
+
+	config := &genai.GenerateContentConfig{
+		Temperature: &ag.Model.Temperature,
+		TopP:        &ag.Model.TopP,
+	}
+	if ag.Model.Seed != nil {
+		config.Seed = ag.Model.Seed
+	}
+	if systemPrompt != "" {
+		config.SystemInstruction = &genai.Content{Parts: []*genai.Part{{Text: systemPrompt}}}
+	}
+
+	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
+	messages, truncated := cm.PrepareGeminiMessages(messages, systemPrompt, nil)
+	if truncated {
+		ag.Warn("Context trimmed to fit model limits during sync generation")
+	}
+
+	resp, err := ga.client.Models.GenerateContent(ga.ctx, ga.Model.ModelName, messages, config)
+	if err != nil {
+		return "", fmt.Errorf("sync chat completion error: %w", err)
+	}
+
+	if len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil {
+		return "", fmt.Errorf("no candidates returned in sync response")
+	}
+
+	var textContent string
+	for _, part := range resp.Candidates[0].Content.Parts {
+		if part.Text != "" {
+			textContent += part.Text
+		}
+	}
+
+	return textContent, nil
+}
+
 func (ag *Agent) GenerateGeminiStream() error {
 	var err error
 	// Check the setup of Gemini client

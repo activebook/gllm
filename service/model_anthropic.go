@@ -34,6 +34,65 @@ func (ag *Agent) getAnthropicFilePart(file *FileData) *anthropic.ContentBlockPar
 	return nil
 }
 
+// GenerateAnthropicSync generates a single, non-streaming completion using Anthropic API.
+// This is used for background tasks like context compression where streaming is unnecessary.
+// systemPrompt is the system prompt to be used for the sync generation, it's majorly a role.
+// the last message is the user prompt to do the task.
+func (ag *Agent) GenerateAnthropicSync(messages []anthropic.MessageParam, systemPrompt string) (string, error) {
+	ctx := context.Background()
+	opts := []option.RequestOption{
+		option.WithAPIKey(ag.Model.ApiKey),
+		option.WithAuthToken(ag.Model.ApiKey),
+	}
+	if ag.Model.EndPoint != "" {
+		opts = append(opts, option.WithBaseURL(ag.Model.EndPoint))
+	}
+	client := anthropic.NewClient(opts...)
+
+	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
+	messages, truncated := cm.PrepareAnthropicMessages(messages, systemPrompt, nil)
+	if truncated {
+		ag.Warn("Context trimmed to fit model limits during sync generation")
+	}
+
+	params := anthropic.MessageNewParams{
+		Model:     anthropic.Model(ag.Model.ModelName),
+		Messages:  messages,
+		MaxTokens: int64(cm.MaxOutputTokens),
+	}
+
+	if systemPrompt != "" {
+		params.System = []anthropic.TextBlockParam{{
+			Text: systemPrompt,
+			Type: constant.Text("text"),
+		}}
+	}
+
+	if ag.Model.Temperature > 0 {
+		params.Temperature = param.NewOpt(float64(ag.Model.Temperature))
+	} else if ag.Model.TopP > 0 {
+		params.TopP = param.NewOpt(float64(ag.Model.TopP))
+	}
+
+	resp, err := client.Messages.New(ctx, params)
+	if err != nil {
+		return "", fmt.Errorf("sync chat completion error: %w", err)
+	}
+
+	if len(resp.Content) == 0 {
+		return "", fmt.Errorf("no content returned in sync response")
+	}
+
+	var textContent string
+	for _, block := range resp.Content {
+		if block.Type == "text" {
+			textContent += block.Text
+		}
+	}
+
+	return textContent, nil
+}
+
 // GenerateAnthropicStream generates a streaming response using Anthropic API
 func (ag *Agent) GenerateAnthropicStream() error {
 	// Initialize the Client

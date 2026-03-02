@@ -301,9 +301,10 @@ func (ml ModelLimits) MaxInputTokens(bufferPercent float64) int {
 		bufferPercent = 0.8 // Default to 80% if invalid
 	}
 	// If there's no strict output cap smaller than the context,
+	// and the output cap is too large (>= 90% of context window),
 	// assume the maximum possible output is contextWindow itself.
 	maxOutputCap := ml.MaxOutputTokens
-	if ml.MaxOutputTokens >= ml.ContextWindow {
+	if ml.MaxOutputTokens >= ml.ContextWindow || ml.MaxOutputTokens >= int(float64(0.9)*float64(ml.ContextWindow)) {
 		maxOutputCap = 0
 	}
 	// Remaining tokens for input + generation = context window - strict output cap

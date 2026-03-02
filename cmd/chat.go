@@ -440,15 +440,31 @@ func (ci *ChatInfo) compressContext() {
 		return
 	}
 
-	// Detect provider based on message format
-	isCompatible, provider, modelProvider := CheckConvoFormat(agent, convoData)
-	if !isCompatible {
-		// Warn about potential incompatibility if providers differ
-		service.Warnf("Conversation '%s' [%s] is not compatible with the current model provider [%s].\n", convoName, provider, modelProvider)
+	// Compress the conversation context
+	ui.GetIndicator().Start(ui.IndicatorCompressingContext)
+	summary, err := service.CompressConversation(agent, convoData)
+	ui.GetIndicator().Stop()
+
+	if err != nil {
+		service.Errorf("Failed to compress conversation: %v\n", err)
+		return
 	}
 
-	// Compress the conversation context
+	// Build the new compressed conversation
+	newData, err := service.BuildCompressedConvo(summary, agent.Model.Provider)
+	if err != nil {
+		service.Errorf("Failed to build compressed conversation: %v\n", err)
+		return
+	}
 
+	// Save back to the file format
+	err = WriteConvoData(convoName, newData, agent.Model.Provider)
+	if err != nil {
+		service.Errorf("Failed to save compressed conversation: %v\n", err)
+		return
+	}
+
+	service.Successf("Compressed successfully!\nUse /history to view the compressed conversation.\n")
 }
 
 func (ci *ChatInfo) callAgent(input string) {
