@@ -253,6 +253,8 @@ For a more interactive experience, you can use the `chat` command to enter a rea
 
 `gllm` provides advanced strategies to manage conversation history when it approaches the model's context window limit. You can choose between preserving space through truncation or summarizing the conversation to maintain full context.
 
+![Context Compress](screenshots/context_compress.png)
+
 ### Truncation Strategies
 
 You can configure the strategy using `gllm features switch`->`auto compression`:
