@@ -188,17 +188,19 @@ var DefaultModelLimits = map[string]ModelLimits{
 	"claude-4.5-haiku": {ContextWindow: 200000, MaxOutputTokens: 64000},
 
 	// Google Gemini Models
-	"gemini-3.1-pro-preview":     {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-3-pro-preview":       {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-3-flash-preview":     {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-3-pro-image-preview": {ContextWindow: 65536, MaxOutputTokens: 32768},
-	"gemini-flash-latest":        {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-flash-lite-latest":   {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-2.5-pro":             {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-2.5-flash":           {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-2.5-flash-lite":      {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-2.0-flash":           {ContextWindow: 1048576, MaxOutputTokens: 8192},
-	"gemini-pro":                 {ContextWindow: 32760, MaxOutputTokens: 8192},
+	"gemini-3.1-pro": {ContextWindow: 1048576, MaxOutputTokens: 65536},
+	"gemini-3-pro":   {ContextWindow: 1048576, MaxOutputTokens: 65536},
+	"gemini-3-flash": {ContextWindow: 1048576, MaxOutputTokens: 65536},
+	//"gemini-3-flash":             {ContextWindow: 12800, MaxOutputTokens: 8192},
+	"gemini-3.1-flash-image":   {ContextWindow: 65536, MaxOutputTokens: 32768},
+	"gemini-3-pro-image":       {ContextWindow: 65536, MaxOutputTokens: 32768},
+	"gemini-flash-latest":      {ContextWindow: 1048576, MaxOutputTokens: 65536},
+	"gemini-flash-lite-latest": {ContextWindow: 1048576, MaxOutputTokens: 65536},
+	"gemini-2.5-pro":           {ContextWindow: 1048576, MaxOutputTokens: 65536},
+	"gemini-2.5-flash":         {ContextWindow: 1048576, MaxOutputTokens: 65536},
+	"gemini-2.5-flash-lite":    {ContextWindow: 1048576, MaxOutputTokens: 65536},
+	"gemini-2.0-flash":         {ContextWindow: 1048576, MaxOutputTokens: 8192},
+	"gemini-pro":               {ContextWindow: 32760, MaxOutputTokens: 8192},
 
 	// Mistral Models
 	"mistral-large-latest": {ContextWindow: 131072, MaxOutputTokens: 65536}, // context :contentReference[oaicite:14]{index=14}

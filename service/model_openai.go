@@ -54,8 +54,6 @@ func (ag *Agent) SortOpenAIMessagesByOrder() error {
 	// Load previous messages if any
 	err := ag.Convo.Load()
 	if err != nil {
-		// Notify error and return
-		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}, nil)
 		return err
 	}
 
@@ -273,7 +271,8 @@ func (oa *OpenAI) process(ag *Agent) error {
 			return fmt.Errorf("failed to check context limits: %w", err)
 		}
 		if truncated {
-			ag.Warn("Context trimmed to fit model limits")
+			// Notify user or log that truncation happened
+			Warnf("Context limit reached: older messages have been trimmed (%s) to continue.\n", ag.Context.Strategy)
 			Debugf("Context messages after truncation: [%d]", len(messages))
 			// Update the conversation with truncated messages
 			ag.Convo.SetMessages(messages)

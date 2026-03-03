@@ -191,7 +191,8 @@ func (a *Anthropic) process(ag *Agent) error {
 			return fmt.Errorf("failed to check context limits: %w", err)
 		}
 		if truncated {
-			ag.Warn("Context trimmed to fit model limits")
+			// Notify user or log that truncation happened
+			Warnf("Context limit reached: older messages have been trimmed (%s) to continue.\n", ag.Context.Strategy)
 			Debugf("Context messages after truncation: [%d]", len(messages))
 			// Update the conversation with truncated messages
 			ag.Convo.SetMessages(messages)

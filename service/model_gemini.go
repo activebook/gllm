@@ -68,7 +68,6 @@ func (ag *Agent) initGeminiAgent() (*GeminiAgent, error) {
 		},
 	})
 	if err != nil {
-		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create client: %v", err)}, nil)
 		return nil, err
 	}
 	return &GeminiAgent{
@@ -82,7 +81,6 @@ func (ag *Agent) SortGeminiMessagesByOrder() error {
 	// Load previous messages if any
 	err := ag.Convo.Load()
 	if err != nil {
-		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}, nil)
 		return err
 	}
 
@@ -287,7 +285,7 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 		}
 		if truncated {
 			// Notify user or log that truncation happened
-			ag.Warn("Context trimmed to fit model limits")
+			Warnf("Context limit reached: older messages have been trimmed (%s) to continue.\n", ag.Context.Strategy)
 			Debugf("Context messages after truncation: [%d]", len(messages))
 			ag.Convo.SetMessages(messages)
 			ag.Convo.Save()
@@ -401,7 +399,6 @@ func (ga *GeminiAgent) processGeminiStream(ctx context.Context,
 
 	for resp, err := range iter {
 		if err != nil {
-			ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}, nil)
 			return nil, nil, err
 		}
 
