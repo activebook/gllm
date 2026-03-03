@@ -1,8 +1,10 @@
 package service
 
 import (
+	"fmt"
 	"strings"
 
+	"github.com/activebook/gllm/data"
 	"github.com/anthropics/anthropic-sdk-go"
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
@@ -799,6 +801,137 @@ func (cm *ContextManager) findToolPairAnthropic(messages []anthropic.MessagePara
 			}
 		}
 		return indices
+	}
+
+	return nil
+}
+
+// =============================================================================
+// Auto-Compression Context Management
+// =============================================================================
+
+// CheckAndCompressContext evaluates the exact token count using provider-specific logic
+// and synchronously orchestrates the summarization if the context window is exceeded.
+func (cm *ContextManager) CheckAndCompressContext(ag *Agent) error {
+	if cm.Strategy != StrategySummarize {
+		return nil
+	}
+
+	needsCompression := false
+	messagesInter := ag.Convo.GetMessages()
+	if messagesInter == nil {
+		return nil
+	}
+	switch ag.Model.Provider {
+	case ModelProviderOpenAI:
+		if openaiMsgs, ok := messagesInter.([]openai.ChatCompletionMessage); ok {
+			tools := ag.getOpenAITools() // this is available on ag
+			mcpTools := ag.getOpenAIMCPTools()
+			tools = append(tools, mcpTools...)
+			tokens := cm.estimateOpenAIMessagesWithCache(openaiMsgs) + EstimateOpenAIToolTokens(tools)
+			if tokens > cm.MaxInputTokens {
+				needsCompression = true
+			}
+		}
+	case ModelProviderAnthropic:
+		if anthropicMsgs, ok := messagesInter.([]anthropic.MessageParam); ok {
+			tools := ag.getAnthropicTools()
+			mcpTools := ag.getAnthropicMCPTools()
+			tools = append(tools, mcpTools...)
+			tokens := cm.estimateAnthropicMessagesWithCache(anthropicMsgs) + EstimateAnthropicToolTokens(tools)
+			if ag.SystemPrompt != "" {
+				tokens += EstimateTokens(ag.SystemPrompt) + MessageOverheadTokens
+			}
+			if tokens > cm.MaxInputTokens {
+				needsCompression = true
+			}
+		}
+	case ModelProviderGemini:
+		if geminiMsgs, ok := messagesInter.([]*genai.Content); ok {
+			ga := &GeminiAgent{Agent: ag}
+			var tools []*genai.Tool
+			var combinedTool *genai.Tool
+			if len(ag.EnabledTools) > 0 {
+				combinedTool = ga.getGeminiTools()
+			}
+			if ag.MCPClient != nil {
+				if mcpTool := getGeminiMCPTools(ag.MCPClient); mcpTool != nil {
+					combinedTool = appendGeminiTool(combinedTool, mcpTool)
+				}
+			}
+			if combinedTool != nil {
+				tools = append(tools, combinedTool)
+			}
+			tokens := cm.estimateGeminiMessagesWithCache(geminiMsgs) + EstimateGeminiToolTokens(tools)
+			if ag.SystemPrompt != "" {
+				tokens += EstimateTokens(ag.SystemPrompt) + MessageOverheadTokens
+			}
+			if tokens > cm.MaxInputTokens {
+				needsCompression = true
+			}
+		}
+	case ModelProviderOpenAICompatible:
+		if openchatMsgs, ok := messagesInter.([]*model.ChatCompletionMessage); ok {
+			tools := ag.getOpenChatTools()
+			mcpTools := ag.getOpenChatMCPTools()
+			tools = append(tools, mcpTools...)
+			tokens := cm.estimateOpenChatMessagesWithCache(openchatMsgs) + EstimateOpenChatToolTokens(tools)
+			if tokens > cm.MaxInputTokens {
+				needsCompression = true
+			}
+		}
+	}
+
+	if !needsCompression {
+		return nil
+	}
+
+	if ag.NotifyChan != nil {
+		ag.NotifyChan <- StreamNotify{Status: StatusProcessing, Data: "Compressing context..."}
+	}
+
+	rawBytes, err := ag.Convo.GetRawBytes()
+	if err != nil {
+		return fmt.Errorf("failed to read context for compression: %w", err)
+	}
+
+	config := &data.AgentConfig{
+		Model: data.Model{
+			Provider: ag.Model.Provider,
+			Model:    ag.Model.ModelName,
+			Endpoint: ag.Model.EndPoint,
+			Key:      ag.Model.ApiKey,
+			Temp:     ag.Model.Temperature,
+			TopP:     ag.Model.TopP,
+		},
+		SystemPrompt: ag.SystemPrompt,
+	}
+
+	summary, err := CompressConversation(config, rawBytes)
+	if err != nil {
+		if ag.NotifyChan != nil {
+			ag.NotifyChan <- StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Auto-compression failed (falling back to truncation): %v", err)}
+		}
+		return nil // Fallback to normal execution which will truncate
+	}
+
+	compressedBytes, err := BuildCompressedConvo(summary, ag.Model.Provider)
+	if err != nil {
+		if ag.NotifyChan != nil {
+			ag.NotifyChan <- StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to build compressed context: %v", err)}
+		}
+		return nil
+	}
+
+	if err := ag.Convo.Overwrite(compressedBytes); err != nil {
+		if ag.NotifyChan != nil {
+			ag.NotifyChan <- StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to save compressed context: %v", err)}
+		}
+		return nil
+	}
+
+	if err := ag.Convo.Load(); err != nil {
+		return fmt.Errorf("failed to reload compressed context: %w", err)
 	}
 
 	return nil

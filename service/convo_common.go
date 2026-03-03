@@ -24,6 +24,8 @@ type ConversationManager interface {
 	Push(messages ...interface{}) error
 	GetMessages() interface{}
 	SetMessages(messages interface{})
+	GetRawBytes() ([]byte, error)
+	Overwrite(data []byte) error
 }
 
 // BaseConversation holds common fields and methods for all conversation types
@@ -113,6 +115,26 @@ func (c *BaseConversation) writeFile(data []byte) error {
 		return nil
 	}
 	return os.WriteFile(c.Path, data, 0644)
+}
+
+// GetRawBytes retrieves the entire conversation file content as a single byte slice
+func (c *BaseConversation) GetRawBytes() ([]byte, error) {
+	if c.Name == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(c.Path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read raw bytes: %w", err)
+	}
+	return data, nil
+}
+
+// Overwrite completely replaces the conversation file with new data
+func (c *BaseConversation) Overwrite(data []byte) error {
+	return c.writeFile(data)
 }
 
 func (c *BaseConversation) Push(messages ...interface{}) {
