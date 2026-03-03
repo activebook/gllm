@@ -188,10 +188,9 @@ var DefaultModelLimits = map[string]ModelLimits{
 	"claude-4.5-haiku": {ContextWindow: 200000, MaxOutputTokens: 64000},
 
 	// Google Gemini Models
-	"gemini-3.1-pro": {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-3-pro":   {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-3-flash": {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	//"gemini-3-flash":             {ContextWindow: 12800, MaxOutputTokens: 8192},
+	"gemini-3.1-pro":           {ContextWindow: 1048576, MaxOutputTokens: 65536},
+	"gemini-3-pro":             {ContextWindow: 1048576, MaxOutputTokens: 65536},
+	"gemini-3-flash":           {ContextWindow: 1048576, MaxOutputTokens: 65536},
 	"gemini-3.1-flash-image":   {ContextWindow: 65536, MaxOutputTokens: 32768},
 	"gemini-3-pro-image":       {ContextWindow: 65536, MaxOutputTokens: 32768},
 	"gemini-flash-latest":      {ContextWindow: 1048576, MaxOutputTokens: 65536},
@@ -203,8 +202,8 @@ var DefaultModelLimits = map[string]ModelLimits{
 	"gemini-pro":               {ContextWindow: 32760, MaxOutputTokens: 8192},
 
 	// Mistral Models
-	"mistral-large-latest": {ContextWindow: 131072, MaxOutputTokens: 65536}, // context :contentReference[oaicite:14]{index=14}
-	"mistral-small-latest": {ContextWindow: 131072, MaxOutputTokens: 65536}, // context :contentReference[oaicite:15]{index=15}
+	"mistral-large-latest": {ContextWindow: 131072, MaxOutputTokens: 65536},
+	"mistral-small-latest": {ContextWindow: 131072, MaxOutputTokens: 65536},
 	"codestral-latest":     {ContextWindow: 262144, MaxOutputTokens: 65536},
 	"mistral-large":        {ContextWindow: 128000, MaxOutputTokens: 8192},
 	"mistral-medium":       {ContextWindow: 32000, MaxOutputTokens: 8192},
