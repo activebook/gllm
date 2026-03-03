@@ -143,13 +143,6 @@ func (ag *Agent) GenerateOpenAISync(messages []openai.ChatCompletionMessage, sys
 		Content: systemPrompt,
 	}}, messages...)
 
-	// Context Management
-	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
-	messages, truncated := cm.PrepareOpenAIMessages(messages, nil)
-	if truncated {
-		ag.Warn("Context trimmed to fit model limits during sync generation")
-	}
-
 	req := openai.ChatCompletionRequest{
 		Model:       ag.Model.ModelName,
 		Temperature: ag.Model.Temperature,
@@ -261,10 +254,6 @@ type OpenAI struct {
 }
 
 func (oa *OpenAI) process(ag *Agent) error {
-	// Context Management
-	truncated := false
-	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
-
 	// Recursively process the conversation
 	// Because the model can call tools multiple times
 	i := 0
@@ -279,7 +268,10 @@ func (oa *OpenAI) process(ag *Agent) error {
 		// Apply context window management
 		// This ensures we don't exceed the model's context window
 		Debugf("Context messages: [%d]", len(messages))
-		messages, truncated = cm.PrepareOpenAIMessages(messages, oa.tools)
+		messages, truncated, err := ag.Context.PruneOpenAIMessages(messages, oa.tools)
+		if err != nil {
+			return fmt.Errorf("failed to check context limits: %w", err)
+		}
 		if truncated {
 			ag.Warn("Context trimmed to fit model limits")
 			Debugf("Context messages after truncation: [%d]", len(messages))

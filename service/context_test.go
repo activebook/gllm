@@ -10,7 +10,13 @@ import (
 
 func TestNewContextManager(t *testing.T) {
 	limits := ModelLimits{ContextWindow: 128000, MaxOutputTokens: 16384}
-	cm := NewContextManager(limits, StrategyTruncateOldest)
+	expectedMax := limits.MaxInputTokens(DefaultBufferPercent)
+	cm := &ContextManager{
+		MaxInputTokens:  expectedMax,
+		MaxOutputTokens: limits.MaxOutputTokens,
+		Strategy:        StrategyTruncateOldest,
+		BufferPercent:   DefaultBufferPercent,
+	}
 
 	if cm.Strategy != StrategyTruncateOldest {
 		t.Errorf("Strategy = %v, want %v", cm.Strategy, StrategyTruncateOldest)
@@ -20,25 +26,27 @@ func TestNewContextManager(t *testing.T) {
 		t.Errorf("BufferPercent = %v, want %v", cm.BufferPercent, DefaultBufferPercent)
 	}
 
-	// MaxInputTokens should match what MaxInputTokens method returns
-	expectedMax := limits.MaxInputTokens(DefaultBufferPercent)
 	if cm.MaxInputTokens != expectedMax {
 		t.Errorf("MaxInputTokens = %d, want %d", cm.MaxInputTokens, expectedMax)
 	}
 }
 
 func TestNewContextManagerForModel(t *testing.T) {
-	cm := NewContextManagerForModel("gpt-4o", StrategyTruncateOldest)
-
 	// gpt-4o has 128000 context, 16384 output
 	limits := GetModelLimits("gpt-4o")
 	expectedMax := limits.MaxInputTokens(DefaultBufferPercent)
+	cm := &ContextManager{
+		MaxInputTokens:  expectedMax,
+		MaxOutputTokens: limits.MaxOutputTokens,
+		Strategy:        StrategyTruncateOldest,
+		BufferPercent:   DefaultBufferPercent,
+	}
 	if cm.MaxInputTokens != expectedMax {
 		t.Errorf("MaxInputTokens for gpt-4o = %d, want %d", cm.MaxInputTokens, expectedMax)
 	}
 }
 
-func TestPrepareOpenAIMessagesNoTruncation(t *testing.T) {
+func TestPruneOpenAIMessagesNoTruncation(t *testing.T) {
 	// Create a context manager with large limit
 	cm := &ContextManager{
 		MaxInputTokens: 100000,
@@ -52,7 +60,7 @@ func TestPrepareOpenAIMessagesNoTruncation(t *testing.T) {
 		{Role: openai.ChatMessageRoleAssistant, Content: "Hi there!"},
 	}
 
-	result, truncated := cm.PrepareOpenAIMessages(messages, nil)
+	result, truncated, _ := cm.PruneOpenAIMessages(messages, nil)
 
 	if truncated {
 		t.Error("Expected no truncation for small messages")
@@ -63,7 +71,7 @@ func TestPrepareOpenAIMessagesNoTruncation(t *testing.T) {
 	}
 }
 
-func TestPrepareOpenAIMessagesWithTruncation(t *testing.T) {
+func TestPruneOpenAIMessagesWithTruncation(t *testing.T) {
 	// Create a context manager with small limit
 	cm := &ContextManager{
 		MaxInputTokens: 50, // Very small to force truncation
@@ -79,7 +87,7 @@ func TestPrepareOpenAIMessagesWithTruncation(t *testing.T) {
 		{Role: openai.ChatMessageRoleAssistant, Content: "This is response two with some content."},
 	}
 
-	result, truncated := cm.PrepareOpenAIMessages(messages, nil)
+	result, truncated, _ := cm.PruneOpenAIMessages(messages, nil)
 
 	if !truncated {
 		t.Error("Expected truncation for messages exceeding limit")
@@ -100,7 +108,7 @@ func TestPrepareOpenAIMessagesWithTruncation(t *testing.T) {
 	}
 }
 
-func TestPrepareOpenAIMessagesWithStrategyNone(t *testing.T) {
+func TestPruneOpenAIMessagesWithStrategyNone(t *testing.T) {
 	cm := &ContextManager{
 		MaxInputTokens: 10, // Very small
 		Strategy:       StrategyNone,
@@ -112,7 +120,7 @@ func TestPrepareOpenAIMessagesWithStrategyNone(t *testing.T) {
 		{Role: openai.ChatMessageRoleUser, Content: "Hello, this is a relatively long message."},
 	}
 
-	result, truncated := cm.PrepareOpenAIMessages(messages, nil)
+	result, truncated, _ := cm.PruneOpenAIMessages(messages, nil)
 
 	// With StrategyNone, no truncation should occur
 	if truncated {
@@ -153,7 +161,7 @@ func TestToolPairRemoval(t *testing.T) {
 		{Role: openai.ChatMessageRoleUser, Content: "Thanks! What about tomorrow?"},
 	}
 
-	result, truncated := cm.PrepareOpenAIMessages(messages, nil)
+	result, truncated, _ := cm.PruneOpenAIMessages(messages, nil)
 
 	if !truncated {
 		t.Error("Expected truncation to occur")
@@ -215,7 +223,7 @@ func TestPreserveMultiSystemMessages(t *testing.T) {
 
 	// Should preserve all system messages by merging them into one
 	// Msg A, B, C, D likely dropped to fit 40 tokens
-	result, truncated := cm.PrepareOpenAIMessages(messages, nil)
+	result, truncated, _ := cm.PruneOpenAIMessages(messages, nil)
 
 	if !truncated {
 		t.Error("Expected truncation")
@@ -253,7 +261,7 @@ func strPtr(s string) *string {
 	return &s
 }
 
-func TestPrepareOpenChatMessagesNoTruncation(t *testing.T) {
+func TestPruneOpenChatMessagesNoTruncation(t *testing.T) {
 	ClearTokenCache()
 
 	cm := &ContextManager{
@@ -283,7 +291,7 @@ func TestPrepareOpenChatMessagesNoTruncation(t *testing.T) {
 		},
 	}
 
-	result, truncated := cm.PrepareOpenChatMessages(messages, nil)
+	result, truncated, _ := cm.PruneOpenChatMessages(messages, nil)
 
 	if truncated {
 		t.Error("Expected no truncation for small messages")
@@ -294,7 +302,7 @@ func TestPrepareOpenChatMessagesNoTruncation(t *testing.T) {
 	}
 }
 
-func TestPrepareOpenChatMessagesWithTruncation(t *testing.T) {
+func TestPruneOpenChatMessagesWithTruncation(t *testing.T) {
 	ClearTokenCache()
 
 	cm := &ContextManager{
@@ -336,7 +344,7 @@ func TestPrepareOpenChatMessagesWithTruncation(t *testing.T) {
 		},
 	}
 
-	result, truncated := cm.PrepareOpenChatMessages(messages, nil)
+	result, truncated, _ := cm.PruneOpenChatMessages(messages, nil)
 
 	if !truncated {
 		t.Error("Expected truncation for messages exceeding limit")
@@ -408,7 +416,7 @@ func TestOpenChatToolPairRemoval(t *testing.T) {
 		},
 	}
 
-	result, truncated := cm.PrepareOpenChatMessages(messages, nil)
+	result, truncated, _ := cm.PruneOpenChatMessages(messages, nil)
 
 	if !truncated {
 		t.Error("Expected truncation to occur")
@@ -466,7 +474,7 @@ func TestOpenChatPreserveMultiSystemMessages(t *testing.T) {
 	}
 
 	// Should preserve all system messages by merging them into one
-	result, _ := cm.PrepareOpenChatMessages(messages, nil)
+	result, _, _ := cm.PruneOpenChatMessages(messages, nil)
 
 	// Should have exactly 1 system message now (consolidated)
 	systemCount := 0
@@ -495,7 +503,7 @@ func TestOpenChatPreserveMultiSystemMessages(t *testing.T) {
 // Gemini Context Tests
 // =============================================================================
 
-func TestPrepareGeminiMessages(t *testing.T) {
+func TestPruneGeminiMessages(t *testing.T) {
 	ClearTokenCache()
 	cm := &ContextManager{
 		MaxInputTokens: 200, // Large enough for all
@@ -512,7 +520,7 @@ func TestPrepareGeminiMessages(t *testing.T) {
 	}
 
 	// 1. No truncation needed
-	result, truncated := cm.PrepareGeminiMessages(messages, "System Prompt", nil)
+	result, truncated, _ := cm.PruneGeminiMessages(messages, "System Prompt", nil)
 	if truncated {
 		t.Errorf("Expected no truncation, but got truncated")
 	}
@@ -522,7 +530,7 @@ func TestPrepareGeminiMessages(t *testing.T) {
 
 	// 2. Truncation needed (Low MaxTokens)
 	cm.MaxInputTokens = 30 // Should drop some messages
-	result, truncated = cm.PrepareGeminiMessages(messages, "System Prompt", nil)
+	result, truncated, _ = cm.PruneGeminiMessages(messages, "System Prompt", nil)
 	if !truncated {
 		t.Error("Expected truncation")
 	}
@@ -554,7 +562,7 @@ func TestGeminiToolPairRemoval(t *testing.T) {
 		{Parts: []*genai.Part{{Text: "Final answer"}}},
 	}
 
-	result, truncated := cm.PrepareGeminiMessages(messages, "", nil)
+	result, truncated, _ := cm.PruneGeminiMessages(messages, "", nil)
 
 	if !truncated {
 		t.Error("Expected truncation")

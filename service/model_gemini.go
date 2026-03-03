@@ -141,12 +141,6 @@ func (ag *Agent) GenerateGeminiSync(messages []*genai.Content, systemPrompt stri
 		config.SystemInstruction = &genai.Content{Parts: []*genai.Part{{Text: systemPrompt}}}
 	}
 
-	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
-	messages, truncated := cm.PrepareGeminiMessages(messages, systemPrompt, nil)
-	if truncated {
-		ag.Warn("Context trimmed to fit model limits during sync generation")
-	}
-
 	resp, err := ga.client.Models.GenerateContent(ga.ctx, ga.Model.ModelName, messages, config)
 	if err != nil {
 		return "", fmt.Errorf("sync chat completion error: %w", err)
@@ -268,10 +262,6 @@ func (ag *Agent) GenerateGeminiStream() error {
 }
 
 func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) error {
-	// Context Management
-	truncated := false
-	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
-
 	// Signal that streaming has started
 	// Wait for the main goroutine to tell sub-goroutine to proceed
 	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusProcessing}, ag.ProceedChan)
@@ -291,7 +281,10 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 		// Context Management
 		// Directly truncate on the messages
 		Debugf("Context messages: [%d]", len(messages))
-		messages, truncated = cm.PrepareGeminiMessages(messages, ag.SystemPrompt, config.Tools)
+		messages, truncated, err := ag.Context.PruneGeminiMessages(messages, ag.SystemPrompt, config.Tools)
+		if err != nil {
+			return fmt.Errorf("failed to check context limits: %w", err)
+		}
 		if truncated {
 			// Notify user or log that truncation happened
 			ag.Warn("Context trimmed to fit model limits")

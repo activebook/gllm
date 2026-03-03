@@ -1,10 +1,8 @@
 package service
 
 import (
-	"fmt"
 	"strings"
 
-	"github.com/activebook/gllm/data"
 	"github.com/anthropics/anthropic-sdk-go"
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
@@ -18,7 +16,7 @@ const (
 	// StrategyTruncateOldest removes oldest messages first, preserving system prompt
 	StrategyTruncateOldest TruncationStrategy = "truncate_oldest"
 
-	// StrategySummarize replaces old context with a summary (future implementation)
+	// StrategySummarize replaces old context with a summary
 	StrategySummarize TruncationStrategy = "summarize"
 
 	// StrategyNone disables truncation - will fail if context exceeds limit
@@ -30,6 +28,7 @@ const (
 
 // ContextManager handles context window limits for LLM conversations
 type ContextManager struct {
+	Agent           *Agent
 	MaxInputTokens  int                // Maximum input tokens allowed
 	MaxOutputTokens int                // Maximum output tokens allowed (new field for Anthropic)
 	Strategy        TruncationStrategy // Strategy for handling overflow
@@ -37,9 +36,12 @@ type ContextManager struct {
 }
 
 // NewContextManager creates a context manager with the given model limits
-func NewContextManager(limits ModelLimits, strategy TruncationStrategy) *ContextManager {
+func NewContextManager(ag *Agent, strategy TruncationStrategy) *ContextManager {
+	limits := GetModelLimits(ag.Model.ModelName)
+	Debugf("Context Quota: modelName=%s, limits=%v, strategy=%s", ag.Model.ModelName, limits, strategy)
 	bufferPercent := DefaultBufferPercent
 	return &ContextManager{
+		Agent:           ag,
 		MaxInputTokens:  limits.MaxInputTokens(bufferPercent),
 		MaxOutputTokens: limits.MaxOutputTokens,
 		Strategy:        strategy,
@@ -47,24 +49,15 @@ func NewContextManager(limits ModelLimits, strategy TruncationStrategy) *Context
 	}
 }
 
-// NewContextManagerForModel creates a context manager by looking up the model name
-func NewContextManagerForModel(modelName string, strategy TruncationStrategy) *ContextManager {
-	limits := GetModelLimits(modelName)
-	Debugf("Context Quota: modelName=%s, limits=%v, strategy=%s", modelName, limits, strategy)
-	return NewContextManager(limits, strategy)
-}
-
 // =============================================================================
 // OpenAI Message Handling
 // =============================================================================
 
-// PrepareOpenAIMessages processes messages to fit within context window limits.
+// PruneOpenAIMessages processes messages to fit within context window limits.
 // Returns the processed messages and a boolean indicating if truncation occurred.
-// PrepareOpenAIMessages processes messages to fit within context window limits.
-// Returns the processed messages and a boolean indicating if truncation occurred.
-func (cm *ContextManager) PrepareOpenAIMessages(messages []openai.ChatCompletionMessage, tools []openai.Tool) ([]openai.ChatCompletionMessage, bool) {
+func (cm *ContextManager) PruneOpenAIMessages(messages []openai.ChatCompletionMessage, tools []openai.Tool) ([]openai.ChatCompletionMessage, bool, error) {
 	if cm.Strategy == StrategyNone || len(messages) == 0 {
-		return messages, false
+		return messages, false, nil
 	}
 
 	// Estimate tool tokens
@@ -75,11 +68,20 @@ func (cm *ContextManager) PrepareOpenAIMessages(messages []openai.ChatCompletion
 	// Debug logging (uses nil-safe wrapper)
 	Debugf("Token count: %d MaxInputTokens[80%%]: %d", currentTokens, cm.MaxInputTokens)
 	if currentTokens <= cm.MaxInputTokens {
-		return messages, false
+		return messages, false, nil
 	}
 
 	// Need to truncate
-	return cm.truncateOpenAIMessages(messages, toolTokens)
+	switch cm.Strategy {
+	case StrategySummarize:
+		compressedMessages, err := compressOpenAIMessages(cm.Agent, messages)
+		return compressedMessages, true, err
+	case StrategyTruncateOldest:
+		compressedMessages, truncated := cm.truncateOpenAIMessages(messages, toolTokens)
+		return compressedMessages, truncated, nil
+	default:
+		return messages, false, nil
+	}
 }
 
 // estimateOpenAIMessagesWithCache uses global cache for token estimation
@@ -236,10 +238,10 @@ func (cm *ContextManager) gatherToolPairOpenAI(messages []openai.ChatCompletionM
 // OpenChat Message Handling (same logic, different types)
 // =============================================================================
 
-// PrepareOpenChatMessages processes messages to fit within context window limits for OpenChat format.
-func (cm *ContextManager) PrepareOpenChatMessages(messages []*model.ChatCompletionMessage, tools []*model.Tool) ([]*model.ChatCompletionMessage, bool) {
+// PruneOpenChatMessages processes messages to fit within context window limits for OpenChat format.
+func (cm *ContextManager) PruneOpenChatMessages(messages []*model.ChatCompletionMessage, tools []*model.Tool) ([]*model.ChatCompletionMessage, bool, error) {
 	if cm.Strategy == StrategyNone || len(messages) == 0 {
-		return messages, false
+		return messages, false, nil
 	}
 
 	// Estimate tool tokens
@@ -250,11 +252,20 @@ func (cm *ContextManager) PrepareOpenChatMessages(messages []*model.ChatCompleti
 	// Debug logging (uses nil-safe wrapper)
 	Debugf("Token count: %d MaxInputTokens[80%%]: %d", currentTokens, cm.MaxInputTokens)
 	if currentTokens <= cm.MaxInputTokens {
-		return messages, false
+		return messages, false, nil
 	}
 
 	// Need to truncate
-	return cm.truncateOpenChatMessages(messages, toolTokens)
+	switch cm.Strategy {
+	case StrategySummarize:
+		compressedMessages, err := compressOpenChatMessages(cm.Agent, messages)
+		return compressedMessages, true, err
+	case StrategyTruncateOldest:
+		compressedMessages, truncated := cm.truncateOpenChatMessages(messages, toolTokens)
+		return compressedMessages, truncated, nil
+	default:
+		return messages, false, nil
+	}
 }
 
 // estimateOpenChatMessagesWithCache uses global cache for token estimation
@@ -436,10 +447,10 @@ func GetCurrentTokenCountOpenChat(messages []*model.ChatCompletionMessage) int {
 // Gemini Message Handling
 // =============================================================================
 
-// PrepareGeminiMessages processes messages to fit within context window limits.
-func (cm *ContextManager) PrepareGeminiMessages(messages []*genai.Content, systemPrompt string, tools []*genai.Tool) ([]*genai.Content, bool) {
+// PruneGeminiMessages processes messages to fit within context window limits.
+func (cm *ContextManager) PruneGeminiMessages(messages []*genai.Content, systemPrompt string, tools []*genai.Tool) ([]*genai.Content, bool, error) {
 	if cm.Strategy == StrategyNone {
-		return messages, false
+		return messages, false, nil
 	}
 
 	// Calculate tokens for system prompt (passed separately)
@@ -458,10 +469,19 @@ func (cm *ContextManager) PrepareGeminiMessages(messages []*genai.Content, syste
 	// Debug logging (uses nil-safe wrapper)
 	Debugf("Token count: %d MaxInputTokens[80%%]: %d", currentTokens, cm.MaxInputTokens)
 	if currentTokens <= cm.MaxInputTokens {
-		return messages, false
+		return messages, false, nil
 	}
 
-	return cm.truncateGeminiMessages(messages, totalOverhead)
+	switch cm.Strategy {
+	case StrategySummarize:
+		compressedMessages, err := compressGeminiMessages(cm.Agent, messages)
+		return compressedMessages, true, err
+	case StrategyTruncateOldest:
+		compressedMessages, truncated := cm.truncateGeminiMessages(messages, totalOverhead)
+		return compressedMessages, truncated, nil
+	default:
+		return messages, false, nil
+	}
 }
 
 func (cm *ContextManager) estimateGeminiMessagesWithCache(messages []*genai.Content) int {
@@ -624,10 +644,10 @@ func GetCurrentTokenCountGemini(messages []*genai.Content) int {
 // Anthropic Message Handling
 // =============================================================================
 
-// PrepareAnthropicMessages processes messages to fit within context window limits.
-func (cm *ContextManager) PrepareAnthropicMessages(messages []anthropic.MessageParam, systemPrompt string, tools []anthropic.ToolUnionParam) ([]anthropic.MessageParam, bool) {
+// PruneAnthropicMessages processes messages to fit within context window limits.
+func (cm *ContextManager) PruneAnthropicMessages(messages []anthropic.MessageParam, systemPrompt string, tools []anthropic.ToolUnionParam) ([]anthropic.MessageParam, bool, error) {
 	if cm.Strategy == StrategyNone || len(messages) == 0 {
-		return messages, false
+		return messages, false, nil
 	}
 
 	// Calculate tokens for system prompt (passed separately)
@@ -647,11 +667,20 @@ func (cm *ContextManager) PrepareAnthropicMessages(messages []anthropic.MessageP
 	// Debug logging (uses nil-safe wrapper)
 	Debugf("Token count: %d MaxInputTokens[80%%]: %d", currentTokens, cm.MaxInputTokens)
 	if currentTokens <= cm.MaxInputTokens {
-		return messages, false
+		return messages, false, nil
 	}
 
 	// Need to truncate
-	return cm.truncateAnthropicMessages(messages, totalOverhead)
+	switch cm.Strategy {
+	case StrategySummarize:
+		compressedMessages, err := compressAnthropicMessages(cm.Agent, messages)
+		return compressedMessages, true, err
+	case StrategyTruncateOldest:
+		compressedMessages, truncated := cm.truncateAnthropicMessages(messages, totalOverhead)
+		return compressedMessages, truncated, nil
+	default:
+		return messages, false, nil
+	}
 }
 
 // estimateAnthropicMessagesWithCache uses global cache for token estimation
@@ -739,200 +768,81 @@ func (cm *ContextManager) findToolPairAnthropic(messages []anthropic.MessagePara
 	}
 	msg := messages[index]
 
-	// Helper to check for content blocks
-	hasToolUse := false
-	hasToolResult := false
-	var toolUseID string
+	// Collect all tool use IDs and detect tool results in this message
+	toolUseIDs := make(map[string]bool)
+	var toolResultIDs []string
 
 	for _, block := range msg.Content {
 		if block.OfToolUse != nil {
-			hasToolUse = true
-			toolUseID = block.OfToolUse.ID
-			break // Assuming one tool use per message for simplicity of pair finding, though parallel is possible
+			toolUseIDs[block.OfToolUse.ID] = true
 		}
 		if block.OfToolResult != nil {
-			hasToolResult = true
-			toolUseID = block.OfToolResult.ToolUseID
-			break
+			toolResultIDs = append(toolResultIDs, block.OfToolResult.ToolUseID)
 		}
 	}
 
-	// Case 1: Message is Tool Result (User) -> Find preceding Assistant Tool Use
-	if hasToolResult && msg.Role == anthropic.MessageParamRoleUser {
-		// Look backwards for the tool use
+	// Case 1: Message is Tool Result (User) → Find preceding Assistant Tool Use
+	if len(toolResultIDs) > 0 && msg.Role == anthropic.MessageParamRoleUser {
+		// Search backwards for the assistant message that owns any of these result IDs
 		for i := index - 1; i >= 0; i-- {
 			prevMsg := messages[i]
-			if prevMsg.Role == anthropic.MessageParamRoleAssistant {
-				for _, b := range prevMsg.Content {
-					if b.OfToolUse != nil && b.OfToolUse.ID == toolUseID {
-						return []int{i, index} // Found unique pair (Assistant, User)
-						// Note: This simplistic logic assumes 1:1. Parallel tool calls might be trickier.
-						// But removing just this pair is a safe start.
-					}
+			if prevMsg.Role != anthropic.MessageParamRoleAssistant {
+				continue
+			}
+			// Collect all tool use IDs in this candidate assistant message
+			candidateIDs := make(map[string]bool)
+			for _, b := range prevMsg.Content {
+				if b.OfToolUse != nil {
+					candidateIDs[b.OfToolUse.ID] = true
 				}
 			}
+			// Check if any of our result IDs belong to this assistant message
+			matched := false
+			for _, rid := range toolResultIDs {
+				if candidateIDs[rid] {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+			// Found the assistant message: gather it plus ALL subsequent user result messages
+			// that contain results for any of its tool use IDs
+			return cm.gatherToolPairAnthropic(messages, i, candidateIDs)
 		}
-		// If not found, it's an orphan result, safe to remove itself
+		// Orphan result with no matching assistant call — safe to remove alone
 		return []int{index}
 	}
 
-	// Case 2: Message is Tool Use (Assistant) -> Find following User Tool Result
-	if hasToolUse && msg.Role == anthropic.MessageParamRoleAssistant {
-		indices := []int{index}
-		// Look forward for the tool result
-		// A single Assistant message might have multiple tool uses.
-		// We should gather ALL results.
-		// But `findToolPair` contract usually returns a group to remove.
-		// Let's gather all subsequent results.
-		for j := index + 1; j < len(messages); j++ {
-			nextMsg := messages[j]
-			if nextMsg.Role == anthropic.MessageParamRoleUser {
-				for _, b := range nextMsg.Content {
-					if b.OfToolResult != nil {
-						// Is this result for one of the tool uses in `msg`?
-						// Need to check all tool uses in `msg`.
-						// For now, simpler: if it's a tool result, assume it's related if usage pattern holds.
-						// More strictly: check IDs.
-						if b.OfToolResult.ToolUseID == toolUseID {
-							indices = append(indices, j)
-						}
-					}
-				}
-			}
-		}
-		return indices
+	// Case 2: Message is Tool Use (Assistant) → Find following User Tool Result messages
+	if len(toolUseIDs) > 0 && msg.Role == anthropic.MessageParamRoleAssistant {
+		return cm.gatherToolPairAnthropic(messages, index, toolUseIDs)
 	}
 
 	return nil
 }
 
-// =============================================================================
-// Auto-Compression Context Management
-// =============================================================================
-
-// CheckAndCompressContext evaluates the exact token count using provider-specific logic
-// and synchronously orchestrates the summarization if the context window is exceeded.
-func (cm *ContextManager) CheckAndCompressContext(ag *Agent) error {
-	if cm.Strategy != StrategySummarize {
-		return nil
-	}
-
-	needsCompression := false
-	messagesInter := ag.Convo.GetMessages()
-	if messagesInter == nil {
-		return nil
-	}
-	switch ag.Model.Provider {
-	case ModelProviderOpenAI:
-		if openaiMsgs, ok := messagesInter.([]openai.ChatCompletionMessage); ok {
-			tools := ag.getOpenAITools() // this is available on ag
-			mcpTools := ag.getOpenAIMCPTools()
-			tools = append(tools, mcpTools...)
-			tokens := cm.estimateOpenAIMessagesWithCache(openaiMsgs) + EstimateOpenAIToolTokens(tools)
-			if tokens > cm.MaxInputTokens {
-				needsCompression = true
+// gatherToolPairAnthropic collects the assistant tool-use message at callIndex plus
+// all immediately following user messages that contain tool results for any of the
+// given call IDs. This handles parallel tool use correctly.
+func (cm *ContextManager) gatherToolPairAnthropic(messages []anthropic.MessageParam, callIndex int, callIDs map[string]bool) []int {
+	indices := []int{callIndex}
+	for j := callIndex + 1; j < len(messages); j++ {
+		nextMsg := messages[j]
+		if nextMsg.Role != anthropic.MessageParamRoleUser {
+			break // Tool results always immediately follow the assistant message
+		}
+		hasMatchingResult := false
+		for _, b := range nextMsg.Content {
+			if b.OfToolResult != nil && callIDs[b.OfToolResult.ToolUseID] {
+				hasMatchingResult = true
+				break
 			}
 		}
-	case ModelProviderAnthropic:
-		if anthropicMsgs, ok := messagesInter.([]anthropic.MessageParam); ok {
-			tools := ag.getAnthropicTools()
-			mcpTools := ag.getAnthropicMCPTools()
-			tools = append(tools, mcpTools...)
-			tokens := cm.estimateAnthropicMessagesWithCache(anthropicMsgs) + EstimateAnthropicToolTokens(tools)
-			if ag.SystemPrompt != "" {
-				tokens += EstimateTokens(ag.SystemPrompt) + MessageOverheadTokens
-			}
-			if tokens > cm.MaxInputTokens {
-				needsCompression = true
-			}
-		}
-	case ModelProviderGemini:
-		if geminiMsgs, ok := messagesInter.([]*genai.Content); ok {
-			ga := &GeminiAgent{Agent: ag}
-			var tools []*genai.Tool
-			var combinedTool *genai.Tool
-			if len(ag.EnabledTools) > 0 {
-				combinedTool = ga.getGeminiTools()
-			}
-			if ag.MCPClient != nil {
-				if mcpTool := getGeminiMCPTools(ag.MCPClient); mcpTool != nil {
-					combinedTool = appendGeminiTool(combinedTool, mcpTool)
-				}
-			}
-			if combinedTool != nil {
-				tools = append(tools, combinedTool)
-			}
-			tokens := cm.estimateGeminiMessagesWithCache(geminiMsgs) + EstimateGeminiToolTokens(tools)
-			if ag.SystemPrompt != "" {
-				tokens += EstimateTokens(ag.SystemPrompt) + MessageOverheadTokens
-			}
-			if tokens > cm.MaxInputTokens {
-				needsCompression = true
-			}
-		}
-	case ModelProviderOpenAICompatible:
-		if openchatMsgs, ok := messagesInter.([]*model.ChatCompletionMessage); ok {
-			tools := ag.getOpenChatTools()
-			mcpTools := ag.getOpenChatMCPTools()
-			tools = append(tools, mcpTools...)
-			tokens := cm.estimateOpenChatMessagesWithCache(openchatMsgs) + EstimateOpenChatToolTokens(tools)
-			if tokens > cm.MaxInputTokens {
-				needsCompression = true
-			}
+		if hasMatchingResult {
+			indices = append(indices, j)
 		}
 	}
-
-	if !needsCompression {
-		return nil
-	}
-
-	if ag.NotifyChan != nil {
-		ag.NotifyChan <- StreamNotify{Status: StatusProcessing, Data: "Compressing context..."}
-	}
-
-	rawBytes, err := ag.Convo.GetRawBytes()
-	if err != nil {
-		return fmt.Errorf("failed to read context for compression: %w", err)
-	}
-
-	config := &data.AgentConfig{
-		Model: data.Model{
-			Provider: ag.Model.Provider,
-			Model:    ag.Model.ModelName,
-			Endpoint: ag.Model.EndPoint,
-			Key:      ag.Model.ApiKey,
-			Temp:     ag.Model.Temperature,
-			TopP:     ag.Model.TopP,
-		},
-		SystemPrompt: ag.SystemPrompt,
-	}
-
-	summary, err := CompressConversation(config, rawBytes)
-	if err != nil {
-		if ag.NotifyChan != nil {
-			ag.NotifyChan <- StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Auto-compression failed (falling back to truncation): %v", err)}
-		}
-		return nil // Fallback to normal execution which will truncate
-	}
-
-	compressedBytes, err := BuildCompressedConvo(summary, ag.Model.Provider)
-	if err != nil {
-		if ag.NotifyChan != nil {
-			ag.NotifyChan <- StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to build compressed context: %v", err)}
-		}
-		return nil
-	}
-
-	if err := ag.Convo.Overwrite(compressedBytes); err != nil {
-		if ag.NotifyChan != nil {
-			ag.NotifyChan <- StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to save compressed context: %v", err)}
-		}
-		return nil
-	}
-
-	if err := ag.Convo.Load(); err != nil {
-		return fmt.Errorf("failed to reload compressed context: %w", err)
-	}
-
-	return nil
+	return indices
 }

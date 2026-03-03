@@ -349,7 +349,7 @@ func CallAgent(op *AgentOptions) error {
 	if IsAutoCompressionEnabled(op.Capabilities) {
 		strategy = StrategySummarize
 	}
-	ag.Context = NewContextManagerForModel(ag.Model.ModelName, strategy)
+	ag.Context = NewContextManager(&ag, strategy)
 
 	// Start the generation in a goroutine
 	go func() {

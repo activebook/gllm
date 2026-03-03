@@ -49,16 +49,10 @@ func (ag *Agent) GenerateAnthropicSync(messages []anthropic.MessageParam, system
 	}
 	client := anthropic.NewClient(opts...)
 
-	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
-	messages, truncated := cm.PrepareAnthropicMessages(messages, systemPrompt, nil)
-	if truncated {
-		ag.Warn("Context trimmed to fit model limits during sync generation")
-	}
-
 	params := anthropic.MessageNewParams{
 		Model:     anthropic.Model(ag.Model.ModelName),
 		Messages:  messages,
-		MaxTokens: int64(cm.MaxOutputTokens),
+		MaxTokens: int64(ag.Context.MaxOutputTokens),
 	}
 
 	if systemPrompt != "" {
@@ -183,10 +177,6 @@ type Anthropic struct {
 }
 
 func (a *Anthropic) process(ag *Agent) error {
-	// Context Management
-	truncated := false
-	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
-
 	// Recursion loop
 	i := 0
 	for range ag.MaxRecursions {
@@ -196,7 +186,10 @@ func (a *Anthropic) process(ag *Agent) error {
 		messages, _ := ag.Convo.GetMessages().([]anthropic.MessageParam)
 
 		// Apply context window management
-		messages, truncated = cm.PrepareAnthropicMessages(messages, ag.SystemPrompt, a.tools)
+		messages, truncated, err := ag.Context.PruneAnthropicMessages(messages, ag.SystemPrompt, a.tools)
+		if err != nil {
+			return fmt.Errorf("failed to check context limits: %w", err)
+		}
 		if truncated {
 			ag.Warn("Context trimmed to fit model limits")
 			Debugf("Context messages after truncation: [%d]", len(messages))
@@ -209,7 +202,7 @@ func (a *Anthropic) process(ag *Agent) error {
 		params := anthropic.MessageNewParams{
 			Model:     anthropic.Model(ag.Model.ModelName),
 			Messages:  messages,
-			MaxTokens: int64(cm.MaxOutputTokens), // Use ContextManager limit
+			MaxTokens: int64(ag.Context.MaxOutputTokens), // Use ContextManager limit
 			System: []anthropic.TextBlockParam{{
 				Text: ag.SystemPrompt,
 				Type: constant.Text("text"),

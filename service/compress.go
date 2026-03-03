@@ -139,3 +139,93 @@ func BuildCompressedConvo(summary string, provider string) ([]byte, error) {
 		return nil, fmt.Errorf("unsupported provider for building compressed convo: %s", provider)
 	}
 }
+
+/**
+ * Utility Compression functions for different providers
+ * These functions are used by the ContextManager to compress messages.
+ * Only inside service/ directory
+ */
+
+// compressOpenAIMessages compresses OpenAI messages using the active provider's non-streaming API.
+func compressOpenAIMessages(ag *Agent, messages []openai.ChatCompletionMessage) ([]openai.ChatCompletionMessage, error) {
+	// Copy into a fresh slice to avoid mutating the caller's backing array (slice aliasing)
+	send := append(make([]openai.ChatCompletionMessage, 0, len(messages)+1), messages...)
+	send = append(send, openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleUser,
+		Content: CompressionPromptFormat,
+	})
+	summary, err := ag.GenerateOpenAISync(send, CompressionSystemPrompt)
+	if err != nil {
+		return nil, err
+	}
+	return []openai.ChatCompletionMessage{
+		{Role: openai.ChatMessageRoleUser, Content: CompressedContextPrefix + summary},
+		{Role: openai.ChatMessageRoleAssistant, Content: CompressedContextAck},
+	}, nil
+}
+
+// compressAnthropicMessages compresses Anthropic messages using the active provider's non-streaming API.
+func compressAnthropicMessages(ag *Agent, messages []anthropic.MessageParam) ([]anthropic.MessageParam, error) {
+	// Copy into a fresh slice to avoid mutating the caller's backing array (slice aliasing)
+	send := append(make([]anthropic.MessageParam, 0, len(messages)+1), messages...)
+	send = append(send, anthropic.NewUserMessage(anthropic.NewTextBlock(CompressionPromptFormat)))
+	summary, err := ag.GenerateAnthropicSync(send, CompressionSystemPrompt)
+	if err != nil {
+		return nil, err
+	}
+	return []anthropic.MessageParam{
+		anthropic.NewUserMessage(anthropic.NewTextBlock(CompressedContextPrefix + summary)),
+		anthropic.NewAssistantMessage(anthropic.NewTextBlock(CompressedContextAck)),
+	}, nil
+}
+
+// compressGeminiMessages compresses Gemini messages using the active provider's non-streaming API.
+func compressGeminiMessages(ag *Agent, messages []*genai.Content) ([]*genai.Content, error) {
+	// Copy into a fresh slice to avoid mutating the caller's backing array (slice aliasing)
+	send := append(make([]*genai.Content, 0, len(messages)+1), messages...)
+	send = append(send, &genai.Content{
+		Role:  genai.RoleUser,
+		Parts: []*genai.Part{{Text: CompressionPromptFormat}},
+	})
+	summary, err := ag.GenerateGeminiSync(send, CompressionSystemPrompt)
+	if err != nil {
+		return nil, err
+	}
+	return []*genai.Content{
+		{Role: genai.RoleUser, Parts: []*genai.Part{{Text: CompressedContextPrefix + summary}}},
+		{Role: genai.RoleModel, Parts: []*genai.Part{{Text: CompressedContextAck}}},
+	}, nil
+}
+
+// compressOpenChatMessages compresses OpenChat messages using the active provider's non-streaming API.
+func compressOpenChatMessages(ag *Agent, messages []*model.ChatCompletionMessage) ([]*model.ChatCompletionMessage, error) {
+	// Copy into a fresh slice to avoid mutating the caller's backing array (slice aliasing)
+	send := append(make([]*model.ChatCompletionMessage, 0, len(messages)+1), messages...)
+	send = append(send, &model.ChatCompletionMessage{
+		Role: model.ChatMessageRoleUser,
+		Content: &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(CompressionPromptFormat),
+		},
+		Name: Ptr(""),
+	})
+	summary, err := ag.GenerateOpenChatSync(send, CompressionSystemPrompt)
+	if err != nil {
+		return nil, err
+	}
+	return []*model.ChatCompletionMessage{
+		{
+			Role: model.ChatMessageRoleUser,
+			Content: &model.ChatCompletionMessageContent{
+				StringValue: volcengine.String(CompressedContextPrefix + summary),
+			},
+			Name: Ptr(""),
+		},
+		{
+			Role: model.ChatMessageRoleAssistant,
+			Content: &model.ChatCompletionMessageContent{
+				StringValue: volcengine.String(CompressedContextAck),
+			},
+			Name: Ptr(""),
+		},
+	}, nil
+}

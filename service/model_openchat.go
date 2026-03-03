@@ -170,13 +170,6 @@ func (ag *Agent) GenerateOpenChatSync(messages []*model.ChatCompletionMessage, s
 		Name: Ptr(""),
 	}}, messages...)
 
-	// Context Management
-	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
-	messages, truncated := cm.PrepareOpenChatMessages(messages, nil)
-	if truncated {
-		ag.Warn("Context trimmed to fit model limits during sync generation")
-	}
-
 	req := model.CreateChatCompletionRequest{
 		Model:       ag.Model.ModelName,
 		Temperature: &ag.Model.Temperature,
@@ -283,10 +276,6 @@ type OpenChat struct {
 }
 
 func (c *OpenChat) process(ag *Agent) error {
-	// Context Management
-	truncated := false
-	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
-
 	// Recursively process the conversation
 	// Because the model can call tools multiple times
 	i := 0
@@ -308,7 +297,10 @@ func (c *OpenChat) process(ag *Agent) error {
 		// Apply context window management
 		// This ensures we don't exceed the model's context window
 		Debugf("Context messages: [%d]", len(messages))
-		messages, truncated = cm.PrepareOpenChatMessages(messages, c.tools)
+		messages, truncated, err := ag.Context.PruneOpenChatMessages(messages, c.tools)
+		if err != nil {
+			return fmt.Errorf("failed to check context limits: %w", err)
+		}
 		if truncated {
 			ag.Warn("Context trimmed to fit model limits")
 			Debugf("Context messages after truncation: [%d]", len(messages))
