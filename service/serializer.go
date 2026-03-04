@@ -477,6 +477,31 @@ func RenderOpenAIConversationLog(input []byte) string {
 			}
 			sb.WriteString(": ")
 
+			// Function call details
+			if msg.FunctionCall != nil {
+				sb.WriteString(fmt.Sprintf("\n    %s[Function call: %s]%s", ContentTypeColors["function_call"], msg.FunctionCall.Name, data.ResetSeq))
+				if msg.FunctionCall.Arguments != "" {
+					sb.WriteString(fmt.Sprintf(" args: %s", msg.FunctionCall.Arguments))
+				}
+			}
+
+			// Tool call details
+			if len(msg.ToolCalls) > 0 {
+				sb.WriteString(fmt.Sprintf("\n    %s[Tool calls: ", ContentTypeColors["function_call"]))
+				for j, tool := range msg.ToolCalls {
+					if j > 0 {
+						sb.WriteString(", ")
+					}
+					sb.WriteString(fmt.Sprintf("%s (id: %s)", tool.Function.Name, tool.ID))
+				}
+				sb.WriteString(fmt.Sprintf("]%s", data.ResetSeq))
+			}
+
+			// Tool response details
+			if msg.ToolCallID != "" {
+				sb.WriteString(fmt.Sprintf("\n    %s[Response to tool call: %s]%s", ContentTypeColors["function_response"], msg.ToolCallID, data.ResetSeq))
+			}
+
 			// Output the reasoning content if it exists
 			if msg.ReasoningContent != "" {
 				sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
@@ -503,31 +528,6 @@ func RenderOpenAIConversationLog(input []byte) string {
 					}
 				}
 				// sb.WriteString("\n    ")
-			}
-
-			// Function call details
-			if msg.FunctionCall != nil {
-				sb.WriteString(fmt.Sprintf("\n    %s[Function call: %s]%s", ContentTypeColors["function_call"], msg.FunctionCall.Name, data.ResetSeq))
-				if msg.FunctionCall.Arguments != "" {
-					sb.WriteString(fmt.Sprintf(" args: %s", msg.FunctionCall.Arguments))
-				}
-			}
-
-			// Tool call details
-			if len(msg.ToolCalls) > 0 {
-				sb.WriteString(fmt.Sprintf("\n    %s[Tool calls: ", ContentTypeColors["function_call"]))
-				for j, tool := range msg.ToolCalls {
-					if j > 0 {
-						sb.WriteString(", ")
-					}
-					sb.WriteString(fmt.Sprintf("%s (id: %s)", tool.Function.Name, tool.ID))
-				}
-				sb.WriteString(fmt.Sprintf("]%s", data.ResetSeq))
-			}
-
-			// Tool response details
-			if msg.ToolCallID != "" {
-				sb.WriteString(fmt.Sprintf("\n    %s[Response to tool call: %s]%s", ContentTypeColors["function_response"], msg.ToolCallID, data.ResetSeq))
 			}
 
 			sb.WriteString("\n\n")

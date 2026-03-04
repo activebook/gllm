@@ -70,8 +70,6 @@ func (ag *Agent) SortOpenChatMessagesByOrder() error {
 	// Load previous messages if any
 	err := ag.Convo.Load()
 	if err != nil {
-		// Notify error and return
-		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}, nil)
 		return err
 	}
 
@@ -147,6 +145,46 @@ func (ag *Agent) SortOpenChatMessagesByOrder() error {
 	// Bugfix: save conversation after update messages
 	// Because the system message could be modified, and added user message
 	return ag.Convo.Save()
+}
+
+// GenerateOpenChatSync generates a single, non-streaming completion using the Volcengine API.
+// This is used for background tasks like context compression where streaming is unnecessary.
+// systemPrompt is the system prompt to be used for the sync generation, it's majorly a role.
+// the last message is the user prompt to do the task.
+func (ag *Agent) GenerateOpenChatSync(messages []*model.ChatCompletionMessage, systemPrompt string) (string, error) {
+	ctx := context.Background()
+	client := arkruntime.NewClientWithApiKey(
+		ag.Model.ApiKey,
+		arkruntime.WithTimeout(30*time.Minute),
+		arkruntime.WithBaseUrl(ag.Model.EndPoint),
+	)
+
+	// Add system prompt
+	messages = append([]*model.ChatCompletionMessage{{
+		Role: model.ChatMessageRoleSystem,
+		Content: &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(systemPrompt),
+		},
+		Name: Ptr(""),
+	}}, messages...)
+
+	req := model.CreateChatCompletionRequest{
+		Model:       ag.Model.ModelName,
+		Temperature: &ag.Model.Temperature,
+		TopP:        &ag.Model.TopP,
+		Messages:    messages,
+	}
+
+	resp, err := client.CreateChatCompletion(ctx, req)
+	if err != nil {
+		return "", fmt.Errorf("sync chat completion error: %w", err)
+	}
+
+	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == nil || resp.Choices[0].Message.Content.StringValue == nil {
+		return "", fmt.Errorf("no choices returned in sync response")
+	}
+
+	return *resp.Choices[0].Message.Content.StringValue, nil
 }
 
 // In current openchat api, we can't use cached tokens
@@ -236,10 +274,6 @@ type OpenChat struct {
 }
 
 func (c *OpenChat) process(ag *Agent) error {
-	// Context Management
-	truncated := false
-	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
-
 	// Recursively process the conversation
 	// Because the model can call tools multiple times
 	i := 0
@@ -261,9 +295,13 @@ func (c *OpenChat) process(ag *Agent) error {
 		// Apply context window management
 		// This ensures we don't exceed the model's context window
 		Debugf("Context messages: [%d]", len(messages))
-		messages, truncated = cm.PrepareOpenChatMessages(messages, c.tools)
+		messages, truncated, err := ag.Context.PruneOpenChatMessages(messages, c.tools)
+		if err != nil {
+			return fmt.Errorf("failed to check context limits: %w", err)
+		}
 		if truncated {
-			ag.Warn("Context trimmed to fit model limits")
+			// Notify user or log that truncation happened
+			Warnf("Context limit reached: older messages have been trimmed (%s) to continue.\n", ag.Context.Strategy)
 			Debugf("Context messages after truncation: [%d]", len(messages))
 			// Update the conversation with truncated messages
 			ag.Convo.SetMessages(messages)

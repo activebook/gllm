@@ -107,6 +107,7 @@ type ChatInfo struct {
 	Files       []*service.FileData
 	QuitFlag    bool     // for cmd /quit or /exit
 	EditorInput string   // for /e editor edit
+	Instruction string   // for underlying system instructions (e.g. skill activation)
 	History     []string // for chat input history
 	outputFile  string
 	sharedState *data.SharedState // Persistent SharedState for the session
@@ -420,9 +421,62 @@ func (ci *ChatInfo) showHistory() {
 	}
 }
 
+// compressContext compresses the conversation context by replacing it with a summary
+func (ci *ChatInfo) compressContext() {
+	// Get active agent
+	agent, err := EnsureActiveAgent()
+	if err != nil {
+		service.Errorf("%v", err)
+		return
+	}
+
+	// Get conversation data
+	convoData, convoName, err := GetConvoData(convoName, agent.Model.Provider)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("No available conversation yet.")
+			return
+		}
+		service.Errorf("%v", err)
+		return
+	}
+
+	// Compress the conversation context
+	ui.GetIndicator().Start(ui.IndicatorCompressingContext)
+	summary, err := service.CompressConversation(agent, convoData)
+	ui.GetIndicator().Stop()
+
+	if err != nil {
+		service.Errorf("Failed to compress conversation: %v\n", err)
+		return
+	}
+
+	// Build the new compressed conversation
+	newData, err := service.BuildCompressedConvo(summary, agent.Model.Provider)
+	if err != nil {
+		service.Errorf("Failed to build compressed conversation: %v\n", err)
+		return
+	}
+
+	// Save back to the file format
+	err = WriteConvoData(convoName, newData, agent.Model.Provider)
+	if err != nil {
+		service.Errorf("Failed to save compressed conversation: %v\n", err)
+		return
+	}
+
+	service.Successf("Compressed successfully!\nUse /history to view the compressed conversation.\n")
+}
+
 func (ci *ChatInfo) callAgent(input string) {
+	prompt := input
+	if ci.Instruction != "" {
+		prompt = fmt.Sprintf("<instruction>\n%s\n</instruction>\n\n<user-request>%s</user-request>", ci.Instruction, input)
+		ci.Instruction = "" // Clear it after use
+	}
+
 	// Call agent using the shared runner, passing persisted SharedState
-	err := RunAgent(input, ci.Files, convoName, ci.outputFile, ci.sharedState)
+	err := RunAgent(prompt, ci.Files, convoName, ci.outputFile, ci.sharedState)
 	if err != nil {
 		service.Errorf("%v", err)
 		return

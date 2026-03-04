@@ -33,6 +33,7 @@ var (
 		"/memory":   "Manage memory (list, add, clear)",
 		"/yolo":     "Toggle YOLO mode",
 		"/convo":    "Manage conversations (list, info, remove, etc.)",
+		"/compress": "Compresses the context by replacing it with a summary",
 		"/think":    "Set thinking level",
 		"/features": "Switch agent features",
 		"/editor":   "Manage editor or open for multi-line input",
@@ -169,6 +170,9 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 
 	case "/convo":
 		runCommand(convoCmd, parts[1:])
+
+	case "/compress":
+		ci.compressContext()
 
 	case "/think":
 		runCommand(thinkCmd, parts[1:])
@@ -560,12 +564,14 @@ func (ci *ChatInfo) executeSkill(command string, parts []string) bool {
 	}
 
 	// Construct the instruction to force skill activation
-	input := fmt.Sprintf("[Use tool 'activate_skill' with the skill name '%s']", foundSkill.Name)
+	ci.Instruction = fmt.Sprintf("You need to activate the skill '%s' and follow its instructions to answer the user's request. Use tool 'activate_skill' with the skill name '%s'.", foundSkill.Name, foundSkill.Name)
+
+	input := "/" + foundSkill.Name // Fallback to echo the command itself if no args
 	if userArgs != "" {
 		input += "\n" + userArgs
 	}
 
+	// Set the content as input to be processed by the agent
 	ci.EditorInput = input
-	// fmt.Printf("Triggering skill: %s\n", foundSkill.Name)
 	return true
 }

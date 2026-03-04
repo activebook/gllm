@@ -58,8 +58,9 @@ func (g *GeminiConversation) SetMessages(messages interface{}) {
 	}
 }
 
-func (g *GeminiConversation) MarshalMessages(messages []*genai.Content) []byte {
-	// Build all formatted messages
+func (g *GeminiConversation) MarshalMessages(messages []*genai.Content, dropToolContent bool) []byte {
+	// The industry's current answer is basically "save everything by default, then compress/prune when it gets too big."
+	// The complete conversation history, including your prompts and the model's responses, all tool executions (inputs and outputs).
 	var data []byte
 	for _, content := range messages {
 		// First, consolidate consecutive text parts from streaming
@@ -76,7 +77,7 @@ func (g *GeminiConversation) MarshalMessages(messages []*genai.Content) []byte {
 
 		// Create formatted message
 		var formatted *genai.Content
-		if hasFunctionResponse {
+		if hasFunctionResponse && dropToolContent {
 			// Deep copy with empty function responses
 			contentCopy := &genai.Content{
 				Role:  content.Role,
@@ -140,7 +141,7 @@ func (g *GeminiConversation) Push(messages ...interface{}) error {
 	if g.Name == "" {
 		return nil
 	}
-	data := g.MarshalMessages(newmsgs)
+	data := g.MarshalMessages(newmsgs, false)
 	return g.appendFile(data)
 }
 
@@ -151,7 +152,7 @@ func (g *GeminiConversation) Save() error {
 	}
 
 	// Write all messages to file
-	data := g.MarshalMessages(g.Messages)
+	data := g.MarshalMessages(g.Messages, false)
 	return g.writeFile(data)
 }
 

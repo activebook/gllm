@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -95,6 +96,10 @@ func ConvertToUniversalRole(role string) UniversalRole {
 		return UniversalRoleAssistant
 	case openai.ChatMessageRoleAssistant:
 		return UniversalRoleAssistant
+	case openai.ChatMessageRoleTool:
+		return UniversalRoleAssistant
+	case openai.ChatMessageRoleFunction:
+		return UniversalRoleAssistant
 	case openai.ChatMessageRoleUser:
 		return UniversalRoleUser
 	case openai.ChatMessageRoleSystem:
@@ -109,20 +114,11 @@ func ConvertToUniversalRole(role string) UniversalRole {
 // ==============================
 
 // ParseOpenAIMessages converts OpenAI messages to universal format.
-// Extracts: Content, MultiContent[].Text, ReasoningContent
+// Extracts: Content, MultiContent[].Text, ReasoningContent, Tool Responses as text
 // Ignores: ToolCalls, FunctionCall, ImageURL
 func ParseOpenAIMessages(messages []openai.ChatCompletionMessage) []UniversalMessage {
 	var result []UniversalMessage
 	for _, msg := range messages {
-		// Skip tool/function responses
-		if msg.Role == openai.ChatMessageRoleTool || msg.Role == openai.ChatMessageRoleFunction {
-			continue
-		}
-		// Skip messages with tool calls but no content
-		if len(msg.ToolCalls) > 0 && msg.Content == "" && len(msg.MultiContent) == 0 {
-			continue
-		}
-
 		um := UniversalMessage{
 			Role:      ConvertToUniversalRole(msg.Role),
 			Reasoning: msg.ReasoningContent,
@@ -155,15 +151,6 @@ func ParseOpenAIMessages(messages []openai.ChatCompletionMessage) []UniversalMes
 func ParseOpenChatMessages(messages []*model.ChatCompletionMessage) []UniversalMessage {
 	var result []UniversalMessage
 	for _, msg := range messages {
-		// Skip tool responses
-		if msg.Role == model.ChatMessageRoleTool {
-			continue
-		}
-		// Skip messages with tool calls but no content
-		if len(msg.ToolCalls) > 0 && (msg.Content == nil || msg.Content.StringValue == nil || *msg.Content.StringValue == "") {
-			continue
-		}
-
 		um := UniversalMessage{
 			Role: ConvertToUniversalRole(msg.Role),
 		}
@@ -199,8 +186,8 @@ func ParseOpenChatMessages(messages []*model.ChatCompletionMessage) []UniversalM
 }
 
 // ParseAnthropicMessages converts Anthropic messages to universal format.
-// Extracts: OfText blocks, OfThinking/OfRedactedThinking blocks
-// Ignores: OfToolUse, OfToolResult, OfImage, OfDocument
+// Extracts: OfText blocks, OfThinking/OfRedactedThinking blocks, OfToolResult as text
+// Ignores: OfToolUse, OfImage, OfDocument
 func ParseAnthropicMessages(messages []anthropic.MessageParam) []UniversalMessage {
 	var result []UniversalMessage
 	for _, msg := range messages {
@@ -224,8 +211,25 @@ func ParseAnthropicMessages(messages []anthropic.MessageParam) []UniversalMessag
 					um.Reasoning += "\n"
 				}
 				um.Reasoning += "[Redacted Thinking]" + v.Data
+			} else if v := block.OfToolResult; v != nil {
+				// Extract tool result content as plain text
+				toolText := ""
+				for _, resBlock := range v.Content {
+					if resv := resBlock.OfText; resv != nil && resv.Text != "" {
+						if toolText != "" {
+							toolText += "\n"
+						}
+						toolText += resv.Text
+					}
+				}
+				if toolText != "" {
+					if um.Content != "" {
+						um.Content += "\n"
+					}
+					um.Content += toolText
+				}
 			}
-			// Skip: OfToolUse, OfToolResult, OfImage, OfDocument
+			// Skip: OfToolUse, OfImage, OfDocument
 		}
 
 		// Only add if there's actual content
@@ -237,8 +241,8 @@ func ParseAnthropicMessages(messages []anthropic.MessageParam) []UniversalMessag
 }
 
 // ParseGeminiMessages converts Gemini messages to universal format.
-// Extracts: Parts.Text, Parts.Thought
-// Ignores: FunctionCall, FunctionResponse, InlineData
+// Extracts: Parts.Text, Parts.Thought, FunctionResponse as text
+// Ignores: FunctionCall, InlineData
 // Maps: "model" → "assistant"
 func ParseGeminiMessages(messages []*gemini.Content) []UniversalMessage {
 	var result []UniversalMessage
@@ -248,12 +252,26 @@ func ParseGeminiMessages(messages []*gemini.Content) []UniversalMessage {
 		}
 
 		for _, part := range msg.Parts {
-			// Skip function calls and responses
-			if part.FunctionCall != nil || part.FunctionResponse != nil {
+			// Skip function calls
+			if part.FunctionCall != nil {
 				continue
 			}
 			// Skip inline data (images, files)
 			if part.InlineData != nil {
+				continue
+			}
+
+			// Extract function response
+			if part.FunctionResponse != nil {
+				if part.FunctionResponse.Response != nil {
+					// Need to serialize the map to string to preserve as text context
+					if respBytes, err := json.Marshal(part.FunctionResponse.Response); err == nil && string(respBytes) != "{}" {
+						if um.Content != "" {
+							um.Content += "\n"
+						}
+						um.Content += string(respBytes)
+					}
+				}
 				continue
 			}
 
@@ -410,6 +428,37 @@ func BuildGeminiMessages(messages []UniversalMessage) []*gemini.Content {
 // High-Level Conversion Function
 // ==============================
 
+// parseJSONL parses strictly JSONL format (one JSON object per line)
+func parseJSONL[T any](data []byte, target *[]T) error {
+	lines := bytes.Split(data, []byte("\n"))
+	for i, line := range lines {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		var item T
+		if err := json.Unmarshal(line, &item); err != nil {
+			return fmt.Errorf("line %d: %w", i+1, err)
+		}
+		*target = append(*target, item)
+	}
+	return nil
+}
+
+// marshalJSONL encodes a slice as JSONL (one JSON object per line)
+func marshalJSONL[T any](messages []T) ([]byte, error) {
+	var buf bytes.Buffer
+	for _, msg := range messages {
+		line, err := json.Marshal(msg)
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(line)
+		buf.WriteByte('\n')
+	}
+	return buf.Bytes(), nil
+}
+
 // ConvertMessages parses source provider data and builds target provider messages.
 // Returns the converted data encoded as JSON.
 //
@@ -437,29 +486,28 @@ func ConvertMessages(data []byte, sourceProvider, targetProvider string) ([]byte
 	switch sourceProvider {
 	case ModelProviderOpenAI:
 		var msgs []openai.ChatCompletionMessage
-		if err := json.Unmarshal(data, &msgs); err != nil {
+		if err := parseJSONL(data, &msgs); err != nil {
 			return nil, fmt.Errorf("failed to parse OpenAI messages: %w", err)
 		}
 		uniMsgs = ParseOpenAIMessages(msgs)
 
 	case ModelProviderOpenAICompatible:
-		// Try OpenAI format first (most OpenChat convos use this)
 		var msgs []openai.ChatCompletionMessage
-		if err := json.Unmarshal(data, &msgs); err != nil {
+		if err := parseJSONL(data, &msgs); err != nil {
 			return nil, fmt.Errorf("failed to parse OpenChat messages: %w", err)
 		}
 		uniMsgs = ParseOpenAIMessages(msgs)
 
 	case ModelProviderAnthropic:
 		var msgs []anthropic.MessageParam
-		if err := json.Unmarshal(data, &msgs); err != nil {
+		if err := parseJSONL(data, &msgs); err != nil {
 			return nil, fmt.Errorf("failed to parse Anthropic messages: %w", err)
 		}
 		uniMsgs = ParseAnthropicMessages(msgs)
 
 	case ModelProviderGemini:
 		var msgs []*gemini.Content
-		if err := json.Unmarshal(data, &msgs); err != nil {
+		if err := parseJSONL(data, &msgs); err != nil {
 			return nil, fmt.Errorf("failed to parse Gemini messages: %w", err)
 		}
 		uniMsgs = ParseGeminiMessages(msgs)
@@ -468,31 +516,25 @@ func ConvertMessages(data []byte, sourceProvider, targetProvider string) ([]byte
 		return nil, fmt.Errorf("unsupported source provider: %s", sourceProvider)
 	}
 
-	// Step 2: Build target format from universal
-	var targetData interface{}
-
+	// Step 2: Build target format and marshal as JSONL
 	switch targetProvider {
 	case ModelProviderOpenAI:
-		targetData = BuildOpenAIMessages(uniMsgs)
+		newmsgs := BuildOpenAIMessages(uniMsgs)
+		return marshalJSONL(newmsgs)
 
 	case ModelProviderOpenAICompatible:
-		targetData = BuildOpenChatMessages(uniMsgs)
+		newmsgs := BuildOpenChatMessages(uniMsgs)
+		return marshalJSONL(newmsgs)
 
 	case ModelProviderAnthropic:
-		targetData = BuildAnthropicMessages(uniMsgs)
+		newmsgs := BuildAnthropicMessages(uniMsgs)
+		return marshalJSONL(newmsgs)
 
 	case ModelProviderGemini:
-		targetData = BuildGeminiMessages(uniMsgs)
+		newmsgs := BuildGeminiMessages(uniMsgs)
+		return marshalJSONL(newmsgs)
 
 	default:
 		return nil, fmt.Errorf("unsupported target provider: %s", targetProvider)
 	}
-
-	// Step 3: Marshal to JSON
-	result, err := json.MarshalIndent(targetData, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize converted messages: %w", err)
-	}
-
-	return result, nil
 }

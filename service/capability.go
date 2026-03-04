@@ -1,13 +1,14 @@
 package service
 
 const (
-	CapabilityMCPServers  = "mcp_servers"
-	CapabilityAgentSkills = "agent_skills"
-	CapabilityAgentMemory = "agent_memory"
-	CapabilityTokenUsage  = "token_usage"
-	CapabilityMarkdown    = "markdown_output"
-	CapabilitySubAgents   = "sub_agents"
-	CapabilityWebSearch   = "web_search"
+	CapabilityMCPServers      = "mcp_servers"
+	CapabilityAgentSkills     = "agent_skills"
+	CapabilityAgentMemory     = "agent_memory"
+	CapabilityTokenUsage      = "token_usage"
+	CapabilityMarkdown        = "markdown_output"
+	CapabilitySubAgents       = "sub_agents"
+	CapabilityWebSearch       = "web_search"
+	CapabilityAutoCompression = "auto_compression"
 )
 
 /*
@@ -145,4 +146,19 @@ func EnableWebSearch(capabilities []string) []string {
 
 func DisableWebSearch(capabilities []string) []string {
 	return disableCapability(capabilities, CapabilityWebSearch)
+}
+
+/*
+ * Auto Compression
+ */
+func IsAutoCompressionEnabled(capabilities []string) bool {
+	return isCapabilityEnabled(capabilities, CapabilityAutoCompression)
+}
+
+func EnableAutoCompression(capabilities []string) []string {
+	return enableCapability(capabilities, CapabilityAutoCompression)
+}
+
+func DisableAutoCompression(capabilities []string) []string {
+	return disableCapability(capabilities, CapabilityAutoCompression)
 }

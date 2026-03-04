@@ -54,8 +54,6 @@ func (ag *Agent) SortOpenAIMessagesByOrder() error {
 	// Load previous messages if any
 	err := ag.Convo.Load()
 	if err != nil {
-		// Notify error and return
-		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}, nil)
 		return err
 	}
 
@@ -123,6 +121,49 @@ func (ag *Agent) SortOpenAIMessagesByOrder() error {
 	// Bugfix: save conversation after update messages
 	// Because the system message could be modified, and added user message
 	return ag.Convo.Save()
+}
+
+// GenerateOpenAISync generates a single, non-streaming completion using OpenAI API.
+// This is used for background tasks like context compression where streaming is unnecessary.
+// systemPrompt is the system prompt to be used for the sync generation, it's majorly a role.
+// the last message is the user prompt to do the task.
+func (ag *Agent) GenerateOpenAISync(messages []openai.ChatCompletionMessage, systemPrompt string) (string, error) {
+	ctx := context.Background()
+	config := openai.DefaultConfig(ag.Model.ApiKey)
+	if ag.Model.EndPoint != "" {
+		config.BaseURL = ag.Model.EndPoint
+	}
+	client := openai.NewClientWithConfig(config)
+
+	// Add system prompt
+	messages = append([]openai.ChatCompletionMessage{{
+		Role:    openai.ChatMessageRoleSystem,
+		Content: systemPrompt,
+	}}, messages...)
+
+	req := openai.ChatCompletionRequest{
+		Model:       ag.Model.ModelName,
+		Temperature: ag.Model.Temperature,
+		TopP:        ag.Model.TopP,
+		Messages:    messages,
+		Stream:      false,
+	}
+
+	if ag.Model.Seed != nil {
+		seedInt32 := int(*ag.Model.Seed)
+		req.Seed = &seedInt32
+	}
+
+	resp, err := client.CreateChatCompletion(ctx, req)
+	if err != nil {
+		return "", fmt.Errorf("sync chat completion error: %w", err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("no choices returned in sync response")
+	}
+
+	return resp.Choices[0].Message.Content, nil
 }
 
 // GenerateOpenAIStream generates a streaming response using OpenAI API
@@ -211,10 +252,6 @@ type OpenAI struct {
 }
 
 func (oa *OpenAI) process(ag *Agent) error {
-	// Context Management
-	truncated := false
-	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
-
 	// Recursively process the conversation
 	// Because the model can call tools multiple times
 	i := 0
@@ -229,9 +266,13 @@ func (oa *OpenAI) process(ag *Agent) error {
 		// Apply context window management
 		// This ensures we don't exceed the model's context window
 		Debugf("Context messages: [%d]", len(messages))
-		messages, truncated = cm.PrepareOpenAIMessages(messages, oa.tools)
+		messages, truncated, err := ag.Context.PruneOpenAIMessages(messages, oa.tools)
+		if err != nil {
+			return fmt.Errorf("failed to check context limits: %w", err)
+		}
 		if truncated {
-			ag.Warn("Context trimmed to fit model limits")
+			// Notify user or log that truncation happened
+			Warnf("Context limit reached: older messages have been trimmed (%s) to continue.\n", ag.Context.Strategy)
 			Debugf("Context messages after truncation: [%d]", len(messages))
 			// Update the conversation with truncated messages
 			ag.Convo.SetMessages(messages)

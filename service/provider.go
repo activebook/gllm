@@ -64,6 +64,7 @@ var modelPatterns = map[string]string{
 	"glm":      ModelProviderOpenAICompatible, // Zhipu GLM models
 	"chatglm":  ModelProviderOpenAICompatible, // Zhipu ChatGLM models
 	"ernie":    ModelProviderOpenAICompatible, // Baidu ERNIE models
+	"step":     ModelProviderOpenAICompatible, // StepFun models
 	"hunyuan":  ModelProviderOpenAICompatible, // Tencent Hunyuan models
 	"doubao":   ModelProviderOpenAICompatible, // ByteDance Doubao models
 	"skylark":  ModelProviderOpenAICompatible, // ByteDance Skylark models
@@ -74,6 +75,7 @@ var modelPatterns = map[string]string{
 	"yi_":      ModelProviderOpenAICompatible, // 01.AI Yi models (with underscore)
 
 	"claude": ModelProviderAnthropic, // Anthropic Claude models
+	"gemini": ModelProviderGemini,    // Google Gemini models
 }
 
 // DetectModelProvider detects the model provider based on endpoint and model name.

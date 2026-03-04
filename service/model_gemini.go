@@ -68,7 +68,6 @@ func (ag *Agent) initGeminiAgent() (*GeminiAgent, error) {
 		},
 	})
 	if err != nil {
-		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Failed to create client: %v", err)}, nil)
 		return nil, err
 	}
 	return &GeminiAgent{
@@ -82,7 +81,6 @@ func (ag *Agent) SortGeminiMessagesByOrder() error {
 	// Load previous messages if any
 	err := ag.Convo.Load()
 	if err != nil {
-		ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("failed to load conversation: %v", err)}, nil)
 		return err
 	}
 
@@ -118,6 +116,46 @@ func (ag *Agent) SortGeminiMessagesByOrder() error {
 	// Bugfix: save conversation after update messages
 	// Although system message wouldn't needed, but it's better to save it for consistency
 	return ag.Convo.Save()
+}
+
+// GenerateGeminiSync generates a single, non-streaming completion using the Gemini API.
+// This is used for background tasks like context compression where streaming is unnecessary.
+// systemPrompt is the system prompt to be used for the sync generation, it's majorly a role.
+// the last message is the user prompt to do the task.
+func (ag *Agent) GenerateGeminiSync(messages []*genai.Content, systemPrompt string) (string, error) {
+	ga, err := ag.initGeminiAgent()
+	if err != nil {
+		return "", err
+	}
+
+	config := &genai.GenerateContentConfig{
+		Temperature: &ag.Model.Temperature,
+		TopP:        &ag.Model.TopP,
+	}
+	if ag.Model.Seed != nil {
+		config.Seed = ag.Model.Seed
+	}
+	if systemPrompt != "" {
+		config.SystemInstruction = &genai.Content{Parts: []*genai.Part{{Text: systemPrompt}}}
+	}
+
+	resp, err := ga.client.Models.GenerateContent(ga.ctx, ga.Model.ModelName, messages, config)
+	if err != nil {
+		return "", fmt.Errorf("sync chat completion error: %w", err)
+	}
+
+	if len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil {
+		return "", fmt.Errorf("no candidates returned in sync response")
+	}
+
+	var textContent string
+	for _, part := range resp.Candidates[0].Content.Parts {
+		if part.Text != "" {
+			textContent += part.Text
+		}
+	}
+
+	return textContent, nil
 }
 
 func (ag *Agent) GenerateGeminiStream() error {
@@ -222,10 +260,6 @@ func (ag *Agent) GenerateGeminiStream() error {
 }
 
 func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) error {
-	// Context Management
-	truncated := false
-	cm := NewContextManagerForModel(ag.Model.ModelName, StrategyTruncateOldest)
-
 	// Signal that streaming has started
 	// Wait for the main goroutine to tell sub-goroutine to proceed
 	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusProcessing}, ag.ProceedChan)
@@ -245,10 +279,13 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 		// Context Management
 		// Directly truncate on the messages
 		Debugf("Context messages: [%d]", len(messages))
-		messages, truncated = cm.PrepareGeminiMessages(messages, ag.SystemPrompt, config.Tools)
+		messages, truncated, err := ag.Context.PruneGeminiMessages(messages, ag.SystemPrompt, config.Tools)
+		if err != nil {
+			return fmt.Errorf("failed to check context limits: %w", err)
+		}
 		if truncated {
 			// Notify user or log that truncation happened
-			ag.Warn("Context trimmed to fit model limits")
+			Warnf("Context limit reached: older messages have been trimmed (%s) to continue.\n", ag.Context.Strategy)
 			Debugf("Context messages after truncation: [%d]", len(messages))
 			ag.Convo.SetMessages(messages)
 			ag.Convo.Save()
@@ -362,7 +399,6 @@ func (ga *GeminiAgent) processGeminiStream(ctx context.Context,
 
 	for resp, err := range iter {
 		if err != nil {
-			ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusError, Data: fmt.Sprintf("Generation error: %v", err)}, nil)
 			return nil, nil, err
 		}
 

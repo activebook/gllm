@@ -13,45 +13,50 @@ import (
 )
 
 const (
-	AgentMCPTitle                 = "MCP (Model Context Protocol)"
-	AgentSkillsTitle              = "Agent Skills"
-	AgentMemoryTitle              = "Agent Memory"
-	AgentSubAgentsTitle           = "Sub Agents"
-	AgentWebSearchTitle           = "Web Search"
-	AgentTokenUsageTitle          = "Token usage"
-	AgentMarkdownTitle            = "Markdown output"
-	AgentMCPTitleHighlight        = "[MCP (Model Context Protocol)]()"
-	AgentSkillsTitleHighlight     = "[Agent Skills]()"
-	AgentMemoryTitleHighlight     = "[Agent Memory]()"
-	AgentSubAgentsTitleHighlight  = "[Sub Agents]()"
-	AgentWebSearchTitleHighlight  = "[Web Search]()"
-	AgentTokenUsageTitleHighlight = "[Token usage]()"
-	AgentMarkdownTitleHighlight   = "[Markdown output]()"
+	AgentMCPTitle                   = "MCP (Model Context Protocol)"
+	AgentSkillsTitle                = "Agent Skills"
+	AgentMemoryTitle                = "Agent Memory"
+	AgentSubAgentsTitle             = "Sub Agents"
+	AgentWebSearchTitle             = "Web Search"
+	AgentTokenUsageTitle            = "Token usage"
+	AgentMarkdownTitle              = "Markdown output"
+	AgentAutoCompressTitle          = "Auto Compression"
+	AgentMCPTitleHighlight          = "[MCP (Model Context Protocol)]()"
+	AgentSkillsTitleHighlight       = "[Agent Skills]()"
+	AgentMemoryTitleHighlight       = "[Agent Memory]()"
+	AgentSubAgentsTitleHighlight    = "[Sub Agents]()"
+	AgentWebSearchTitleHighlight    = "[Web Search]()"
+	AgentTokenUsageTitleHighlight   = "[Token usage]()"
+	AgentMarkdownTitleHighlight     = "[Markdown output]()"
+	AgentAutoCompressTitleHighlight = "[Auto Compression]()"
 
-	AgentMCPBody        = "enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."
-	AgentSkillsBody     = "are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.\nAfter integrating skills, **agent** will use skills automatically."
-	AgentMemoryBody     = "allows agents to remember important facts about you across sessions.\nFacts are used to personalize responses."
-	AgentSubAgentsBody  = "allow an agent to respawn other agents to perform tasks or workflows.\nUse when you need to orchestrate multiple agents working in parallel."
-	AgentWebSearchBody  = "enables the agent to search the web for real-time information.\nYou must configure a search engine (Google, Bing, Tavily) to use this feature."
-	AgentTokenUsageBody = "allows agents to track their token usage.\nThis helps you to control the cost of using the agent."
-	AgentMarkdownBody   = "allows agents to generate final response in Markdown format.\nThis helps you to format the response in a more readable way."
+	AgentMCPBody          = "enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."
+	AgentSkillsBody       = "are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.\nAfter integrating skills, **agent** will use skills automatically."
+	AgentMemoryBody       = "allows agents to remember important facts about you across sessions.\nFacts are used to personalize responses."
+	AgentSubAgentsBody    = "allow an agent to respawn other agents to perform tasks or workflows.\nUse when you need to orchestrate multiple agents working in parallel."
+	AgentWebSearchBody    = "enables the agent to search the web for real-time information.\nYou must configure a search engine (Google, Bing, Tavily) to use this feature."
+	AgentTokenUsageBody   = "allows agents to track their token usage.\nThis helps you to control the cost of using the agent."
+	AgentMarkdownBody     = "allows agents to generate final response in Markdown format.\nThis helps you to format the response in a more readable way."
+	AgentAutoCompressBody = "automatically compresses conversation context using a summary when context window limits are reached.\nThis provides an infinite context window continuity with minimal detail loss."
 
-	AgentMCPDescription        = AgentMCPTitle + " " + AgentMCPBody
-	AgentSkillsDescription     = AgentSkillsTitle + " " + AgentSkillsBody
-	AgentMemoryDescription     = AgentMemoryTitle + " " + AgentMemoryBody
-	AgentSubAgentsDescription  = AgentSubAgentsTitle + " " + AgentSubAgentsBody
-	AgentWebSearchDescription  = AgentWebSearchTitle + " " + AgentWebSearchBody
-	AgentTokenUsageDescription = AgentTokenUsageTitle + " " + AgentTokenUsageBody
-	AgentMarkdownDescription   = AgentMarkdownTitle + " " + AgentMarkdownBody
+	AgentMCPDescription          = AgentMCPTitle + " " + AgentMCPBody
+	AgentSkillsDescription       = AgentSkillsTitle + " " + AgentSkillsBody
+	AgentMemoryDescription       = AgentMemoryTitle + " " + AgentMemoryBody
+	AgentSubAgentsDescription    = AgentSubAgentsTitle + " " + AgentSubAgentsBody
+	AgentWebSearchDescription    = AgentWebSearchTitle + " " + AgentWebSearchBody
+	AgentTokenUsageDescription   = AgentTokenUsageTitle + " " + AgentTokenUsageBody
+	AgentMarkdownDescription     = AgentMarkdownTitle + " " + AgentMarkdownBody
+	AgentAutoCompressDescription = AgentAutoCompressTitle + " " + AgentAutoCompressBody
 
 	// Agent Features Description Highlight
-	AgentMCPDescriptionHighlight        = AgentMCPTitleHighlight + AgentMCPBody
-	AgentSkillsDescriptionHighlight     = AgentSkillsTitleHighlight + AgentSkillsBody
-	AgentMemoryDescriptionHighlight     = AgentMemoryTitleHighlight + AgentMemoryBody
-	AgentSubAgentsDescriptionHighlight  = AgentSubAgentsTitleHighlight + AgentSubAgentsBody
-	AgentWebSearchDescriptionHighlight  = AgentWebSearchTitleHighlight + AgentWebSearchBody
-	AgentTokenUsageDescriptionHighlight = AgentTokenUsageTitleHighlight + AgentTokenUsageBody
-	AgentMarkdownDescriptionHighlight   = AgentMarkdownTitleHighlight + AgentMarkdownBody
+	AgentMCPDescriptionHighlight          = AgentMCPTitleHighlight + AgentMCPBody
+	AgentSkillsDescriptionHighlight       = AgentSkillsTitleHighlight + AgentSkillsBody
+	AgentMemoryDescriptionHighlight       = AgentMemoryTitleHighlight + AgentMemoryBody
+	AgentSubAgentsDescriptionHighlight    = AgentSubAgentsTitleHighlight + AgentSubAgentsBody
+	AgentWebSearchDescriptionHighlight    = AgentWebSearchTitleHighlight + AgentWebSearchBody
+	AgentTokenUsageDescriptionHighlight   = AgentTokenUsageTitleHighlight + AgentTokenUsageBody
+	AgentMarkdownDescriptionHighlight     = AgentMarkdownTitleHighlight + AgentMarkdownBody
+	AgentAutoCompressDescriptionHighlight = AgentAutoCompressTitleHighlight + AgentAutoCompressBody
 )
 
 func init() {
@@ -152,6 +157,14 @@ var capsSwitchCmd = &cobra.Command{
 			options = append(options, huh.NewOption("Web Search", service.CapabilityWebSearch))
 		}
 
+		// Auto Compression
+		if service.IsAutoCompressionEnabled(agent.Capabilities) {
+			options = append(options, huh.NewOption("Auto Compression", service.CapabilityAutoCompression).Selected(true))
+			selected = append(selected, service.CapabilityAutoCompression)
+		} else {
+			options = append(options, huh.NewOption("Auto Compression", service.CapabilityAutoCompression))
+		}
+
 		// Sort with selected at top
 		ui.SortMultiOptions(options, selected)
 
@@ -186,6 +199,7 @@ var capsSwitchCmd = &cobra.Command{
 			service.CapabilitySubAgents,
 			service.CapabilityAgentMemory,
 			service.CapabilityWebSearch,
+			service.CapabilityAutoCompression,
 		}
 		for _, cap := range allCaps {
 			if selectedSet[cap] {
@@ -222,6 +236,8 @@ func getFeatureDescription(cap string) string {
 		return AgentMemoryDescriptionHighlight
 	case service.CapabilityWebSearch:
 		return AgentWebSearchDescriptionHighlight
+	case service.CapabilityAutoCompression:
+		return AgentAutoCompressDescriptionHighlight
 	default:
 		return ""
 	}
@@ -238,6 +254,7 @@ func printCapSummary(caps []string) {
 	printCapStatus("Agent Skills", service.IsAgentSkillsEnabled(caps))
 	printCapStatus("Agent Memory", service.IsAgentMemoryEnabled(caps))
 	printCapStatus("Sub Agents", service.IsSubAgentsEnabled(caps))
+	printCapStatus("Auto Compression", service.IsAutoCompressionEnabled(caps))
 
 	fmt.Printf("%s = Enabled capability\n", ui.FormatEnabledIndicator(true))
 }
@@ -262,6 +279,8 @@ func printCapStatus(name string, enabled bool) {
 		desc = AgentTokenUsageDescription
 	case "Markdown Output":
 		desc = AgentMarkdownDescription
+	case "Auto Compression":
+		desc = AgentAutoCompressDescription
 	}
 
 	if desc != "" {

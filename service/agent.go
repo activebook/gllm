@@ -53,6 +53,7 @@ type Agent struct {
 	OutputFile      *ui.FileRenderer    // File renderer
 	Status          StatusStack         // Stack to manage streaming status
 	Convo           ConversationManager // Conversation manager
+	Context         *ContextManager     // Context manager
 	LastWrittenData string              // Last written data
 
 	// Sub-agent orchestration
@@ -342,6 +343,13 @@ func CallAgent(op *AgentOptions) error {
 		return err
 	}
 	ag.Convo = cm
+
+	// Instantiate correct context manager
+	strategy := StrategyTruncateOldest
+	if IsAutoCompressionEnabled(op.Capabilities) {
+		strategy = StrategySummarize
+	}
+	ag.Context = NewContextManager(&ag, strategy)
 
 	// Start the generation in a goroutine
 	go func() {
