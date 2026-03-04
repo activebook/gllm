@@ -1,11 +1,56 @@
-agent:
-    markdown: true
-    max_recursions: 50
-    model: qwen-v31
-    search: ""
-    think: false
-    tools: true
-    usage: true
+agent: coder
+agents:
+    act:
+        capabilities: []
+        max_recursions: 20
+        model: longcat
+        system_prompt: ""
+        template: ""
+        think: high
+        tools:
+            - copy
+            - create_directory
+            - delete_directory
+            - delete_file
+            - edit_file
+            - list_directory
+            - move
+            - read_file
+            - read_multiple_files
+            - search_files
+            - search_text_in_file
+            - shell
+            - switch_agent
+            - web_fetch
+            - write_file
+    coder:
+        capabilities:
+            - agent_skills
+            - token_usage
+            - markdown_output
+            - agent_memory
+            - auto_compression
+        max_recursions: -1
+        model: qiniu-doubao2
+        system_prompt: coder
+        template: ""
+        think: high
+        tools:
+            - copy
+            - create_directory
+            - delete_directory
+            - delete_file
+            - edit_file
+            - list_directory
+            - move
+            - read_file
+            - read_multiple_files
+            - search_files
+            - search_text_in_file
+            - shell
+            - switch_agent
+            - web_fetch
+            - write_file
 log:
     level: info
 models:
@@ -23,12 +68,18 @@ models:
     
 search_engines:
     bing:
-
+        deep_dive: 1
+        key: 
+        references: 3
     google:
-
-    results:
-        save: false
+        cx: c287130f1cb6c40f0
+        deep_dive: 3
+        key: 
+        references: 5
     tavily:
+        deep_dive: 3
+        key: 
+        references: 5
 
 system_prompts:
     agent: 'You are an AI assistant operating within the ''gllm'' command-line interface. You possess a special capability: executing commands directly on the user''s operating system via the `execute_command` function.\n\n**Your Goal:** Assist the user by effectively utilizing their operating system''s commands and utilities whenever it''s the most appropriate and efficient method to fulfill their request. Think beyond simple file listing; consider the full power of the shell.\n\n**Invoke `execute_command` when the user''s request involves:**'
@@ -72,45 +123,3 @@ templates:
     socrate: Craft a response that is eloquent, insightful, and deeply informative. Structure your answer with clarity and sophistication, incorporating relevant historical, scientific, or philosophical context where applicable. Use refined language, striking yet precise phrasing, and an engaging narrative style. Aim for a balance between depth and accessibility, ensuring the response is both intellectually stimulating and easy to comprehend. Where appropriate, include illustrative examples, analogies, or thought-provoking perspectives to enrich the discussion.
     summarizer: Summarize all information concisely while preserving key details and main ideas.
     translator: Translate the following text accurately and naturally into English, maintaining tone and context.
-workflow:
-    agents:
-        - input: ""
-          model: atlas-gpt-oss20
-          name: planner
-          output: ./workflow/planner
-          pass: false
-          role: master
-          template: "Design and generate a comprehensive deep research plan. \nGiven a user request, identify the primary task, decompose it into sequential subtasks focused on deep dives into multiple perspectives, angles, and dimensions. \nRemember you can only make max 3 subtasks for saving tokens. Must consider cost efficiency.\nBreak the query into diverse research tasks that explore historical context, current developments, expert opinions, counterarguments, data-driven insights, interdisciplinary connections, potential future implications, and underrepresented viewpoints.\nEnsure the plan is structured as a detailed list of subtasks, each with clear objectives for thorough, multi-faceted investigation to achieve exhaustive coverage and nuanced understanding."
-          think: true
-          tools: false
-        - input: ./workflow/planner
-          markdown: true
-          model: gemini-l
-          name: dispatcher
-          output: ./workflow/dispatcher
-          pass: false
-          role: master
-          template: |-
-            Dispatch the research plan into subtasks, assigning each to specialized searchers or workflows that cover different aspects of the main task. Make the dispatch as inclusive and exhaustive as possible, ensuring subtasks include queries for primary sources, secondary analyses, comparative studies, quantitative data, qualitative insights, global vs. local perspectives, and edge cases. Generate multiple parallel or iterative search paths to enable deep, layered research across diverse domains and viewpoints.
-            Save all generated task files into the directory: ./workflow/worker/.
-            Must first clearup that directory, if has tools, use delete_directory, and use create_directory to make a new one. if that directory doesn't exist, create a new one.
-          think: false
-          tools: true
-          usage: false
-        - input: ./workflow/worker
-          model: gemini-f
-          name: executor
-          output: ./workflow/summarizer
-          pass: false
-          role: worker
-          search: google
-          template: Execute the assigned research subtasks with depth and rigor. Perform thorough searches, cross-reference sources, analyze data from multiple angles, seek out primary evidence, evaluate biases, and explore related tangents for comprehensive insights. Use iterative querying if needed to refine and deepen results, ensuring each subtask uncovers layered details, contradictions, and novel connections.
-          think: true
-          tools: false
-        - input: ./workflow/summarizer/
-          markdown: true
-          model: qwen-v3
-          name: summarizer
-          output: ./workflow/final/
-          role: master
-          template: Synthesize all gathered research from subtasks into a cohesive, deeply insightful summary. Preserve key details, main ideas, diverse perspectives, evidence-based findings, and critical analyses. Structure the output for readability with sections on core insights, supporting data, counterpoints, implications, and recommendations, ensuring the final report is intensely helpful, balanced, and reflective of multi-dimensional deep research.

@@ -52,7 +52,7 @@ func (ag *Agent) GenerateAnthropicSync(messages []anthropic.MessageParam, system
 	params := anthropic.MessageNewParams{
 		Model:     anthropic.Model(ag.Model.ModelName),
 		Messages:  messages,
-		MaxTokens: int64(ag.Context.MaxOutputTokens),
+		MaxTokens: int64(ag.Context.GetMaxOutputTokens()),
 	}
 
 	if systemPrompt != "" {
@@ -185,14 +185,16 @@ func (a *Anthropic) process(ag *Agent) error {
 
 		messages, _ := ag.Convo.GetMessages().([]anthropic.MessageParam)
 
-		// Apply context window management
-		messages, truncated, err := ag.Context.PruneAnthropicMessages(messages, ag.SystemPrompt, a.tools)
+		// check context limit and prune if needed
+		Debugf("Context messages: [%d]", len(messages))
+		pruned, truncated, err := ag.Context.PruneMessages(messages, ag.SystemPrompt, a.tools)
 		if err != nil {
-			return fmt.Errorf("failed to check context limits: %w", err)
+			return fmt.Errorf("failed to prune context: %w", err)
 		}
+		messages = pruned.([]anthropic.MessageParam)
+
 		if truncated {
-			// Notify user or log that truncation happened
-			Warnf("Context limit reached: older messages have been trimmed (%s) to continue.\n", ag.Context.Strategy)
+			Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.", ag.Context.GetStrategy())
 			Debugf("Context messages after truncation: [%d]", len(messages))
 			// Update the conversation with truncated messages
 			ag.Convo.SetMessages(messages)
@@ -203,7 +205,7 @@ func (a *Anthropic) process(ag *Agent) error {
 		params := anthropic.MessageNewParams{
 			Model:     anthropic.Model(ag.Model.ModelName),
 			Messages:  messages,
-			MaxTokens: int64(ag.Context.MaxOutputTokens), // Use ContextManager limit
+			MaxTokens: int64(ag.Context.GetMaxOutputTokens()), // Use ContextManager limit
 			System: []anthropic.TextBlockParam{{
 				Text: ag.SystemPrompt,
 				Type: constant.Text("text"),

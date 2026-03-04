@@ -265,14 +265,16 @@ func (oa *OpenAI) process(ag *Agent) error {
 
 		// Apply context window management
 		// This ensures we don't exceed the model's context window
+		// check context limit and prune if needed
 		Debugf("Context messages: [%d]", len(messages))
-		messages, truncated, err := ag.Context.PruneOpenAIMessages(messages, oa.tools)
+		pruned, truncated, err := ag.Context.PruneMessages(messages, oa.tools)
 		if err != nil {
-			return fmt.Errorf("failed to check context limits: %w", err)
+			return fmt.Errorf("failed to prune context: %w", err)
 		}
+		messages = pruned.([]openai.ChatCompletionMessage)
+
 		if truncated {
-			// Notify user or log that truncation happened
-			Warnf("Context limit reached: older messages have been trimmed (%s) to continue.\n", ag.Context.Strategy)
+			Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.", ag.Context.GetStrategy())
 			Debugf("Context messages after truncation: [%d]", len(messages))
 			// Update the conversation with truncated messages
 			ag.Convo.SetMessages(messages)
