@@ -107,6 +107,7 @@ type ChatInfo struct {
 	Files       []*service.FileData
 	QuitFlag    bool     // for cmd /quit or /exit
 	EditorInput string   // for /e editor edit
+	Instruction string   // for underlying system instructions (e.g. skill activation)
 	History     []string // for chat input history
 	outputFile  string
 	sharedState *data.SharedState // Persistent SharedState for the session
@@ -468,8 +469,14 @@ func (ci *ChatInfo) compressContext() {
 }
 
 func (ci *ChatInfo) callAgent(input string) {
+	prompt := input
+	if ci.Instruction != "" {
+		prompt = fmt.Sprintf("<instruction>\n%s\n</instruction>\n\n<user-request>%s</user-request>", ci.Instruction, input)
+		ci.Instruction = "" // Clear it after use
+	}
+
 	// Call agent using the shared runner, passing persisted SharedState
-	err := RunAgent(input, ci.Files, convoName, ci.outputFile, ci.sharedState)
+	err := RunAgent(prompt, ci.Files, convoName, ci.outputFile, ci.sharedState)
 	if err != nil {
 		service.Errorf("%v", err)
 		return
