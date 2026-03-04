@@ -279,13 +279,15 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 		// Context Management
 		// Directly truncate on the messages
 		Debugf("Context messages: [%d]", len(messages))
-		messages, truncated, err := ag.Context.PruneGeminiMessages(messages, ag.SystemPrompt, config.Tools)
+		// check context limit and prune if needed
+		pruned, truncated, err := ag.Context.PruneMessages(messages, ag.SystemPrompt, config.Tools)
 		if err != nil {
-			return fmt.Errorf("failed to check context limits: %w", err)
+			return fmt.Errorf("failed to prune context: %w", err)
 		}
+		messages = pruned.([]*genai.Content)
+
 		if truncated {
-			// Notify user or log that truncation happened
-			Warnf("Context limit reached: older messages have been trimmed (%s) to continue.\n", ag.Context.Strategy)
+			Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.", ag.Context.GetStrategy())
 			Debugf("Context messages after truncation: [%d]", len(messages))
 			ag.Convo.SetMessages(messages)
 			ag.Convo.Save()

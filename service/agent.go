@@ -53,7 +53,7 @@ type Agent struct {
 	OutputFile      *ui.FileRenderer    // File renderer
 	Status          StatusStack         // Stack to manage streaming status
 	Convo           ConversationManager // Conversation manager
-	Context         *ContextManager     // Context manager
+	Context         ContextManager      // Context manager
 	LastWrittenData string              // Last written data
 
 	// Sub-agent orchestration
