@@ -23,31 +23,33 @@ type ReleaseInfo struct {
 	Version   string
 	AssetURL  string
 	AssetName string
+	Newer     bool
 }
 
 // CheckLatest queries GitHub Releases for the latest version.
-// Returns (release, isNewer, error). isNewer is true when remote > currentVersion.
-func CheckLatest(currentVersion string) (*ReleaseInfo, bool, error) {
+// Returns (release, error). isNewer is true when remote > currentVersion.
+func CheckLatest(currentVersion string) (*ReleaseInfo, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), UpdateCheckTimeout)
 	defer cancel()
 
 	latest, found, err := selfupdate.DetectLatest(ctx, selfupdate.ParseSlug(gllmOwner+"/"+gllmRepo))
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to detect latest version: %w", err)
+		return nil, fmt.Errorf("failed to detect latest version: %w", err)
 	}
 	if !found {
-		return nil, false, fmt.Errorf("no release found on GitHub for %s/%s", gllmOwner, gllmRepo)
+		return nil, fmt.Errorf("no release found on GitHub for %s/%s", gllmOwner, gllmRepo)
 	}
 
 	if latest.LessOrEqual(currentVersion) {
-		return &ReleaseInfo{Version: latest.Version()}, false, nil
+		return &ReleaseInfo{Version: latest.Version(), Newer: false}, nil
 	}
 
 	return &ReleaseInfo{
 		Version:   latest.Version(),
 		AssetURL:  latest.AssetURL,
 		AssetName: latest.AssetName,
-	}, true, nil
+		Newer:     true,
+	}, nil
 }
 
 // ApplyUpdate downloads and replaces the running binary in place.

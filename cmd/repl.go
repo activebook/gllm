@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/activebook/gllm/data"
@@ -83,7 +85,10 @@ have a continuous session with the model.`,
 	},
 }
 
-var ()
+var (
+	once       sync.Once
+	userIsIdle atomic.Bool // true = idle at prompt; false = user typed / agent running
+)
 
 const (
 	editTempFile = ".gllm-edit-*.tmp"
@@ -278,12 +283,9 @@ func (ri *ReplInfo) startREPL() {
 		// Align(lipgloss.Right). 	// align would break code formatting
 		Width(tcol) // align and width
 
-	for {
+	for !ri.QuitFlag {
 		var input string
 		var err error
-
-		// Show pending update notification (before model output, non-intrusive).
-		ShowPendingUpdateNotification()
 
 		// Get user input
 		input, err = ri.awaitInput()
@@ -332,11 +334,6 @@ func (ri *ReplInfo) startREPL() {
 		// Call agent
 		ri.callAgent(input)
 		fmt.Println()
-
-		// quit repl mode
-		if ri.QuitFlag {
-			break
-		}
 	}
 }
 

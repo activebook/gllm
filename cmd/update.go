@@ -5,9 +5,7 @@ package cmd
 import (
 	"fmt"
 	"runtime"
-	"sync/atomic"
 	"time"
-	"unsafe"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
@@ -16,11 +14,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
-
-// pendingUpdateVersion holds a pending update notification to be shown after a
-// model response completes. Written by the background goroutine; read+cleared
-// by the REPL after each agent turn.
-var pendingUpdateVersion atomic.Pointer[string]
 
 // updateCmd is the `gllm update` subcommand.
 var updateCmd = &cobra.Command{
@@ -46,33 +39,27 @@ func StartBackgroundUpdateCheck() {
 	go func() {
 		ss := data.GetSettingsStore()
 		if time.Since(ss.GetLastUpdateCheck()) < 24*time.Hour {
+			// time not elapsed, set notification as resolved
+			data.ResolveNotification()
 			return
 		}
 		// Perform the check quietly; do not log on error.
-		release, isNewer, err := service.CheckLatest(version)
+		release, err := service.CheckLatest(version)
 		if err != nil {
+			// error occurred, set notification as resolved
+			data.ResolveNotification()
 			return
 		}
 		// Always record the time so we don't hammer GitHub on every start.
 		_ = ss.SetLastUpdateCheck(time.Now())
-		if isNewer {
-			pendingUpdateVersion.Store(&release.Version)
+		if release.Newer {
+			// newer version, store notification
+			data.StoreNotification(getUpdateBanner(release.Version))
+		} else {
+			// no newer version, set notification as resolved
+			data.ResolveNotification()
 		}
 	}()
-}
-
-// ShowPendingUpdateNotification prints a one-line update banner if a newer
-// version was detected in the background. Safe to call after each agent turn.
-func ShowPendingUpdateNotification() {
-	ptr := pendingUpdateVersion.Load()
-	if ptr == nil {
-		return
-	}
-	latest := *ptr
-	// Clear atomically so the banner only shows once per session.
-	pendingUpdateVersion.CompareAndSwap(ptr, (*string)(unsafe.Pointer(nil)))
-
-	printUpdateBanner(latest)
 }
 
 // runUpdate performs the explicit update flow.
@@ -81,13 +68,13 @@ func runUpdate(interactive bool) error {
 	fmt.Printf("Current version: %s\n", version)
 
 	ui.GetIndicator().Start(ui.IndicatorCheckingUpdate)
-	release, isNewer, err := service.CheckLatest(version)
+	release, err := service.CheckLatest(version)
 	ui.GetIndicator().Stop()
 	if err != nil {
 		return fmt.Errorf("update check failed: %w", err)
 	}
 
-	if !isNewer {
+	if !release.Newer {
 		service.Successf("You are already on the latest version (%s).\n", release.Version)
 		printAlternativeUpdateInstructions()
 		return nil
@@ -123,12 +110,12 @@ func runUpdate(interactive bool) error {
 	return nil
 }
 
-// printUpdateBanner displays a non-intrusive update notification.
-func printUpdateBanner(latestVersion string) {
+// getUpdateBanner returns a non-intrusive update notification.
+func getUpdateBanner(latestVersion string) string {
 	style := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(data.MedCachedHex)).
 		Bold(true)
-	fmt.Println(style.Render(fmt.Sprintf("⬆ Update available: %s → %s  (type /update to install)", version, latestVersion)))
+	return style.Render(fmt.Sprintf("⬆ Update available: %s → %s  (type /update to install)", version, latestVersion))
 }
 
 // printAlternativeUpdateInstructions shows the platform-specific package
