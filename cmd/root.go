@@ -40,7 +40,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 			if len(args) == 0 {
 				// Complete the root command - list all available commands
 				return []string{
-					"agent", "chat", "completion", "config", "convo",
+					"agent", "completion", "config", "session",
 					"diff", "editor", "features", "help", "init",
 					"mcp", "memory", "model", "search", "skills",
 					"system", "template", "theme", "think", "tools", "version",
@@ -100,9 +100,9 @@ Configure your API keys and preferred models, then start chatting or executing c
 				!cmd.Flags().Changed("attachment") &&
 				!cmd.Flags().Changed("version") &&
 				!hasStdinData() {
-				// Default to interactive chat mode when no prompt or subcommand is provided.
+				// Default to interactive REPL mode when no prompt or subcommand is provided.
 				// -g/--agent and -c/--conversation are forwarded via shared package-level globals.
-				if err := chatCmd.RunE(chatCmd, args); err != nil {
+				if err := replCmd.RunE(replCmd, args); err != nil {
 					service.Errorf("%v", err)
 				}
 				return

@@ -19,12 +19,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// chatCmd represents the chat command
-var chatCmd = &cobra.Command{
-	Use:    "chat",
-	Short:  "Start an interactive chat session (REPL)",
+// replCmd represents the repl command
+var replCmd = &cobra.Command{
+	Use:    "repl",
+	Short:  "Start an interactive REPL session",
 	Hidden: true, // users invoke this implicitly via `gllm` with no subcommand
-	Long: `Start an interactive chat session with the configured LLM.
+	Long: `Start an interactive REPL session with the configured LLM.
 This provides a Read-Eval-Print-Loop (REPL) interface where you can
 have a continuous conversation with the model.`,
 	// Add completion support
@@ -41,16 +41,16 @@ have a continuous conversation with the model.`,
 		// Clear empty conversations in background
 		// service.ClearEmptyConvosAsync()
 
-		var chatInfo *ChatInfo
+		var ri *ReplInfo
 		store := data.NewConfigStore()
 
 		// Use the shared package-level convoName/agentName globals so that flags
-		// declared on rootCmd (e.g. -c, -g) are correctly honored when chatCmd
+		// declared on rootCmd (e.g. -c, -g) are correctly honored when replCmd
 		// is invoked programmatically from rootCmd's Run handler.
 
 		// If a conversation name was not supplied, generate a fresh one.
 		if convoName == "" {
-			convoName = GenerateChatFileName()
+			convoName = GenerateSessionName()
 		} else {
 			// Resolve index-based names to their canonical file name.
 			name, err := service.FindConvosByIndex(convoName)
@@ -70,15 +70,15 @@ have a continuous conversation with the model.`,
 			store.SetActiveAgent(agentName)
 		}
 
-		// Build the ChatInfo object
-		chatInfo = &ChatInfo{
+		// Build the ReplInfo object
+		ri = &ReplInfo{
 			QuitFlag: false,
 		}
 
 		ui.GetIndicator().Stop()
 
 		// Start the REPL
-		chatInfo.startREPL()
+		ri.startREPL()
 		return nil
 	},
 }
@@ -86,33 +86,32 @@ have a continuous conversation with the model.`,
 var ()
 
 const (
-	chatEidtTempFile = ".gllm-edit-*.tmp"
+	editTempFile = ".gllm-edit-*.tmp"
 )
 
 // Load when package is initialized
 func init() {
-	rootCmd.AddCommand(chatCmd)
+	rootCmd.AddCommand(replCmd)
 
-	// Add chat-specific flags
-	// In each chat session, it shouldn't change model, because the chat history would be invalid.
-	// Attach should be used inside chat session
-	// Imagine like using web llm ui, you can attach file to the chat session and turn search on and off
-	chatCmd.Flags().StringVarP(&agentName, "agent", "g", "", "Agent to use for the chat session")
-	chatCmd.Flags().StringVarP(&convoName, "conversation", "c", GenerateChatFileName(), "Name for this chat session")
-	chatCmd.Flags().BoolVarP(&yoloFlag, "yolo", "y", false, "Enable yolo mode (non-interactive)")
+	// Add session specific flags
+	// Attach should be used inside session
+	// Imagine like using web llm ui, you can attach file to the session and turn search on and off
+	replCmd.Flags().StringVarP(&agentName, "agent", "g", "", "Agent to use for this session")
+	replCmd.Flags().StringVarP(&convoName, "conversation", "c", GenerateSessionName(), "Name for this session")
+	replCmd.Flags().BoolVarP(&yoloFlag, "yolo", "y", false, "Enable yolo mode (non-interactive)")
 }
 
-type ChatInfo struct {
+type ReplInfo struct {
 	Files       []*service.FileData
 	QuitFlag    bool     // for cmd /quit or /exit
 	EditorInput string   // for /e editor edit
 	Instruction string   // for underlying system instructions (e.g. skill activation)
-	History     []string // for chat input history
+	History     []string // for input history
 	outputFile  string
 	sharedState *data.SharedState // Persistent SharedState for the session
 }
 
-func (ci *ChatInfo) printWelcome() {
+func (ri *ReplInfo) printWelcome() {
 	termWidth := ui.GetTerminalWidth()
 	safeWidth := max(40, termWidth-4)
 
@@ -147,13 +146,13 @@ func (ci *ChatInfo) printWelcome() {
 		Italic(true)
 
 	logo := ui.GetLogo(data.KeyHex, data.LabelHex, 0.5)
-	welcomeText := logo + "\nWelcome to Chat Mode" + " (v" + version + ")"
+	welcomeText := logo + "\nWelcome back!" + data.DetailColor + " (v" + version + ")" + data.ResetSeq
 	instructions := []string{
-		"• '/help' lists all available commands",
-		"• '/exit', '/quit' to end current chat session",
 		"• Ctrl+C to cancel, Ctrl+D to clear the input",
 		"• '/' for commands, '!' for local shell commands",
 		"• '@' for files and folders",
+		"• '/help' lists all available commands",
+		"• '/exit', '/quit' to end current session",
 	}
 
 	header := headerStyle.Render(welcomeText)
@@ -171,7 +170,7 @@ func (ci *ChatInfo) printWelcome() {
 }
 
 // This is the legacy awaitChat function, which uses huh, don't support auto-complete
-func (ci *ChatInfo) awaitChat_legacy() (string, error) {
+func (ri *ReplInfo) awaitChat_legacy() (string, error) {
 	var input string
 
 	form := huh.NewForm(
@@ -190,26 +189,26 @@ func (ci *ChatInfo) awaitChat_legacy() (string, error) {
 	return strings.TrimSpace(input), nil
 }
 
-// This is the new awaitChat function, which uses bubbletea, support auto-complete
-func (ci *ChatInfo) awaitChat() (string, error) {
+// This is the new awaitInput function, which uses bubbletea, support auto-complete
+func (ri *ReplInfo) awaitInput() (string, error) {
 	agent, err := EnsureActiveAgent()
 	if err != nil {
 		return "", err
 	}
 
 	var commands []ui.Suggestion
-	for cmd, desc := range chatCommandMap {
+	for cmd, desc := range replCommandMap {
 		commands = append(commands, ui.Suggestion{Command: cmd, Description: desc})
 	}
 
 	// Load workflow commands
-	_ = service.GetWorkflowManager().LoadMetadata(chatCommandMap)
+	_ = service.GetWorkflowManager().LoadMetadata(replCommandMap)
 
 	// Add workflow commands
 	wm := service.GetWorkflowManager()
 	for cmd, desc := range wm.GetCommands() {
-		// Skip if the command already exists in chatCommandMap
-		if _, ok := chatCommandMap[cmd]; ok {
+		// Skip if the command already exists in replCommandMap
+		if _, ok := replCommandMap[cmd]; ok {
 			continue
 		}
 		commands = append(commands, ui.Suggestion{Command: cmd, Description: desc})
@@ -222,8 +221,8 @@ func (ci *ChatInfo) awaitChat() (string, error) {
 
 		for _, skill := range skills {
 			cmdName := "/" + strings.ToLower(skill.Name)
-			// Skip if the command already exists in chatCommandMap or workflow cmds
-			if _, ok := chatCommandMap[cmdName]; ok {
+			// Skip if the command already exists in replCommandMap or workflow cmds
+			if _, ok := replCommandMap[cmdName]; ok {
 				continue
 			}
 
@@ -239,7 +238,7 @@ func (ci *ChatInfo) awaitChat() (string, error) {
 	})
 
 	// Run chat input
-	result, err := ui.RunChatInput(commands, ci.EditorInput, ci.History)
+	result, err := ui.RunChatInput(commands, ri.EditorInput, ri.History)
 	if err != nil {
 		return "", err
 	}
@@ -249,21 +248,21 @@ func (ci *ChatInfo) awaitChat() (string, error) {
 	}
 
 	// Update history
-	ci.History = result.History
+	ri.History = result.History
 
 	return result.Value, nil
 }
 
-func (ci *ChatInfo) startREPL() {
+func (ri *ReplInfo) startREPL() {
 	// Initialize SharedState for the session
-	ci.sharedState = data.NewSharedState()
-	defer ci.sharedState.Clear()
+	ri.sharedState = data.NewSharedState()
+	defer ri.sharedState.Clear()
 
 	// Set auto approve for the session
 	data.SetToolCallAutoApproveInSession(yoloFlag)
 
 	// Start the REPL
-	ci.printWelcome()
+	ri.printWelcome()
 
 	// Define prompt style
 	tcol := ui.GetTerminalWidth()
@@ -280,7 +279,7 @@ func (ci *ChatInfo) startREPL() {
 		var err error
 
 		// Get user input
-		input, err = ci.awaitChat()
+		input, err = ri.awaitInput()
 		if err != nil {
 			if service.IsUserCancelError(err) {
 				// Handle user cancellation (Ctrl+C)
@@ -295,20 +294,20 @@ func (ci *ChatInfo) startREPL() {
 		}
 
 		// Handle inner commands
-		if ci.startWithInnerCommand(input) {
+		if ri.startWithInnerCommand(input) {
 			// Reset editor input
-			ci.EditorInput = ""
+			ri.EditorInput = ""
 			// Handle inner command
-			ci.handleCommand(input)
-			if ci.QuitFlag {
+			ri.handleCommand(input)
+			if ri.QuitFlag {
 				break
 			}
 			fmt.Println()
 			// If editor input is not empty, use it as input
-			if ci.EditorInput != "" {
-				input = ci.EditorInput
+			if ri.EditorInput != "" {
+				input = ri.EditorInput
 				// Reset editor input
-				ci.EditorInput = ""
+				ri.EditorInput = ""
 			} else {
 				continue
 			}
@@ -318,32 +317,32 @@ func (ci *ChatInfo) startREPL() {
 		fmt.Println(promptStyle.Render(input))
 
 		// Handle shell commands
-		if ci.startWithLocalCommand(input) {
-			ci.executeShellCommand(input[1:])
+		if ri.startWithLocalCommand(input) {
+			ri.executeShellCommand(input[1:])
 			continue
 		}
 
 		// Call agent
-		ci.callAgent(input)
+		ri.callAgent(input)
 		fmt.Println()
 
-		// quit chat
-		if ci.QuitFlag {
+		// quit repl mode
+		if ri.QuitFlag {
 			break
 		}
 	}
 }
 
-func (ci *ChatInfo) startWithInnerCommand(line string) bool {
+func (ri *ReplInfo) startWithInnerCommand(line string) bool {
 	return strings.HasPrefix(line, "/")
 }
 
-func (ci *ChatInfo) startWithLocalCommand(line string) bool {
+func (ri *ReplInfo) startWithLocalCommand(line string) bool {
 	return strings.HasPrefix(line, "!")
 }
 
 // clearContext clears the conversation context
-func (ci *ChatInfo) clearContext() {
+func (ri *ReplInfo) clearContext() {
 	agent, err := EnsureActiveAgent()
 	if err != nil {
 		service.Errorf("%v", err)
@@ -362,12 +361,12 @@ func (ci *ChatInfo) clearContext() {
 		return
 	}
 	// Empty attachments
-	ci.Files = []*service.FileData{}
+	ri.Files = []*service.FileData{}
 	fmt.Printf("Context cleared.\n")
 }
 
 // showHistory displays conversation history using TUI viewport
-func (ci *ChatInfo) showHistory() {
+func (ri *ReplInfo) showHistory() {
 	// Get active agent
 	agent, err := EnsureActiveAgent()
 	if err != nil {
@@ -421,7 +420,7 @@ func (ci *ChatInfo) showHistory() {
 }
 
 // compressContext compresses the conversation context by replacing it with a summary
-func (ci *ChatInfo) compressContext() {
+func (ri *ReplInfo) compressContext() {
 	// Get active agent
 	agent, err := EnsureActiveAgent()
 	if err != nil {
@@ -467,25 +466,25 @@ func (ci *ChatInfo) compressContext() {
 	service.Successf("Compressed successfully!\nUse /history to view the compressed conversation.\n")
 }
 
-func (ci *ChatInfo) callAgent(input string) {
+func (ri *ReplInfo) callAgent(input string) {
 	prompt := input
-	if ci.Instruction != "" {
-		prompt = fmt.Sprintf("<instruction>\n%s\n</instruction>\n\n<user-request>%s</user-request>", ci.Instruction, input)
-		ci.Instruction = "" // Clear it after use
+	if ri.Instruction != "" {
+		prompt = fmt.Sprintf("<instruction>\n%s\n</instruction>\n\n<user-request>%s</user-request>", ri.Instruction, input)
+		ri.Instruction = "" // Clear it after use
 	}
 
 	// Call agent using the shared runner, passing persisted SharedState
-	err := RunAgent(prompt, ci.Files, convoName, ci.outputFile, ci.sharedState)
+	err := RunAgent(prompt, ri.Files, convoName, ri.outputFile, ri.sharedState)
 	if err != nil {
 		service.Errorf("%v", err)
 		return
 	}
 
 	// Reset the files after processing
-	ci.Files = []*service.FileData{}
+	ri.Files = []*service.FileData{}
 }
 
-func (ci *ChatInfo) executeShellCommand(command string) {
+func (ri *ReplInfo) executeShellCommand(command string) {
 	command = strings.TrimSpace(command)
 	if command == "" {
 		fmt.Println("No command provided")
@@ -519,12 +518,12 @@ func (ci *ChatInfo) executeShellCommand(command string) {
 	}
 }
 
-func GenerateChatFileName() string {
+func GenerateSessionName() string {
 	// Get the current time
 	currentTime := time.Now()
 
 	// Format the time as a string in the format "chat_YYYY-MM-DD_HH-MM-SS.json"
-	filename := fmt.Sprintf("chat_%s", currentTime.Format("2006-01-02_15-04-05"))
+	filename := fmt.Sprintf("session-%s", currentTime.Format("2006-01-02_15-04-05"))
 
 	return filename
 }

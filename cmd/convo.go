@@ -21,7 +21,7 @@ var (
 
 // convoCmd represents the convo command
 var convoCmd = &cobra.Command{
-	Use:     "convo",
+	Use:     "session",
 	Aliases: []string{"cv", "conversation"},
 	Short:   "Manage conversations",
 	Long:    `Commands to list, remove, and show details of conversations.`,
