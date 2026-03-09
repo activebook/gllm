@@ -44,7 +44,7 @@ var workflowListCmd = &cobra.Command{
 	Short:   "List all available workflows",
 	Run: func(cmd *cobra.Command, args []string) {
 		wm := service.GetWorkflowManager()
-		if err := wm.LoadMetadata(chatCommandMap); err != nil {
+		if err := wm.LoadMetadata(replCommandMap); err != nil {
 			service.Errorf("Failed to load workflows: %v", err)
 			return
 		}
@@ -74,7 +74,7 @@ var workflowCreateCmd = &cobra.Command{
 	Args:    cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		wm := service.GetWorkflowManager()
-		if err := wm.LoadMetadata(chatCommandMap); err != nil {
+		if err := wm.LoadMetadata(replCommandMap); err != nil {
 			service.Errorf("Failed to load workflows: %v", err)
 			return
 		}
@@ -160,7 +160,7 @@ var workflowRemoveCmd = &cobra.Command{
 	Args:    cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		wm := service.GetWorkflowManager()
-		if err := wm.LoadMetadata(chatCommandMap); err != nil {
+		if err := wm.LoadMetadata(replCommandMap); err != nil {
 			service.Errorf("Failed to load workflows: %v", err)
 			return
 		}
@@ -222,7 +222,7 @@ var workflowRenameCmd = &cobra.Command{
 	Args:    cobra.MaximumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		wm := service.GetWorkflowManager()
-		if err := wm.LoadMetadata(chatCommandMap); err != nil {
+		if err := wm.LoadMetadata(replCommandMap); err != nil {
 			service.Errorf("Failed to load workflows: %v", err)
 			return
 		}
@@ -299,7 +299,7 @@ var workflowInfoCmd = &cobra.Command{
 	Args:    cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		wm := service.GetWorkflowManager()
-		if err := wm.LoadMetadata(chatCommandMap); err != nil {
+		if err := wm.LoadMetadata(replCommandMap); err != nil {
 			service.Errorf("Failed to load workflows: %v", err)
 			return
 		}
@@ -352,7 +352,7 @@ var workflowSetCmd = &cobra.Command{
 	Args:    cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		wm := service.GetWorkflowManager()
-		if err := wm.LoadMetadata(chatCommandMap); err != nil {
+		if err := wm.LoadMetadata(replCommandMap); err != nil {
 			service.Errorf("Failed to load workflows: %v", err)
 			return
 		}

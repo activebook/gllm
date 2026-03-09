@@ -16,12 +16,12 @@ import (
 )
 
 var (
-	chatCommandMap = map[string]string{
-		"/exit":     "Exit the chat session",
-		"/quit":     "Exit the chat session",
+	replCommandMap = map[string]string{
+		"/exit":     "Exit current session",
+		"/quit":     "Exit current session",
 		"/help":     "Show this help message",
-		"/history":  "Show recent conversation history",
-		"/clear":    "Clear conversation history",
+		"/history":  "Show recent session history",
+		"/clear":    "Clear session history",
 		"/model":    "Manage models (list, switch, add, etc.)",
 		"/agent":    "Manage agents (list, switch, add, etc.)",
 		"/template": "Manage templates (list, switch, add, etc.)",
@@ -32,7 +32,7 @@ var (
 		"/skills":   "Manage agent skills (list, switch, install, etc.)",
 		"/memory":   "Manage memory (list, add, clear)",
 		"/yolo":     "Toggle YOLO mode",
-		"/convo":    "Manage conversations (list, info, remove, etc.)",
+		"/session":  "Manage sessions (list, info, remove, etc.)",
 		"/compress": "Compresses the context by replacing it with a summary",
 		"/think":    "Set thinking level",
 		"/features": "Switch agent features",
@@ -46,7 +46,7 @@ var (
 		"/workflow": "Manage workflow commands",
 	}
 
-	chatSpecMap = map[string]string{
+	replSpecMap = map[string]string{
 		"@path":  "Reference to files and folders",
 		"!bash":  "Execute local shell commands",
 		"Ctrl+C": "Cancel current generation or exit session",
@@ -109,8 +109,8 @@ func runCommand(cmd *cobra.Command, args []string) {
 	}
 }
 
-// handleCommand processes chat commands
-func (ci *ChatInfo) handleCommand(cmd string) {
+// handleCommand processes commands
+func (ri *ReplInfo) handleCommand(cmd string) {
 	// Split the command into parts
 	// Robust parsing: find the command (first word) and the raw arguments string
 	cmd = strings.TrimSpace(cmd)
@@ -124,20 +124,20 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	// To minimize changes, we'll keep 'parts' generally available but also provide robust args parsing where needed.
 	switch command {
 	case "/exit", "/quit":
-		ci.QuitFlag = true
+		ri.QuitFlag = true
 		fmt.Println("Session Ended")
 		return
 
 	case "/help":
-		ci.showHelp()
+		ri.showHelp()
 
 	case "/history":
 		// Arguments (num, chars) are deprecated/ignored in viewport mode
 		// We could implement "--raw" here later
-		ci.showHistory()
+		ri.showHistory()
 
 	case "/clear":
-		ci.clearContext()
+		ri.clearContext()
 
 	case "/model":
 		runCommand(modelCmd, parts[1:])
@@ -169,11 +169,11 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 	case "/yolo":
 		switchYoloMode()
 
-	case "/convo":
+	case "/session":
 		runCommand(convoCmd, parts[1:])
 
 	case "/compress":
-		ci.compressContext()
+		ri.compressContext()
 
 	case "/think":
 		runCommand(thinkCmd, parts[1:])
@@ -183,7 +183,7 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 
 	case "/editor":
 		if len(parts) < 2 {
-			ci.handleEditor()
+			ri.handleEditor()
 			return
 		}
 		runCommand(editorCmd, parts[1:])
@@ -193,20 +193,20 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 			fmt.Println("Please specify a file path")
 			return
 		}
-		ci.attachFiles(cmd)
+		ri.attachFiles(cmd)
 
 	case "/detach":
 		if len(parts) < 2 {
 			fmt.Println("Please specify a file path")
 			return
 		}
-		ci.detachFiles(cmd)
+		ri.detachFiles(cmd)
 
 	case "/copy":
-		ci.copyLastMessage()
+		ri.copyLastMessage()
 
 	case "/about":
-		ci.showInfo()
+		ri.showInfo()
 
 	case "/theme":
 		runCommand(themeCmd, parts[1:])
@@ -219,26 +219,26 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 
 	default:
 		// Try to execute as workflow command
-		if ci.executeWorkflow(command, parts) {
+		if ri.executeWorkflow(command, parts) {
 			return
 		}
 
 		// Try to execute as skill command
-		if ci.executeSkill(command, parts) {
+		if ri.executeSkill(command, parts) {
 			return
 		}
 		fmt.Printf("Unknown command: %s\n", command)
 	}
 }
 
-// showHelp displays available chat commands
-func (ci *ChatInfo) showHelp() {
+// showHelp displays available commands
+func (ri *ReplInfo) showHelp() {
 	// Extract keys into a slice
-	commands := make([]string, 0, len(chatCommandMap)+len(chatSpecMap))
-	for cmd := range chatCommandMap {
+	commands := make([]string, 0, len(replCommandMap)+len(replSpecMap))
+	for cmd := range replCommandMap {
 		commands = append(commands, cmd)
 	}
-	for cmd := range chatSpecMap {
+	for cmd := range replSpecMap {
 		commands = append(commands, cmd)
 	}
 
@@ -271,9 +271,9 @@ func (ci *ChatInfo) showHelp() {
 		paddedText := fmt.Sprintf("%-*s", maxLen, cmd)
 
 		// Get description
-		desc := chatCommandMap[cmd]
+		desc := replCommandMap[cmd]
 		if desc == "" {
-			desc = chatSpecMap[cmd]
+			desc = replSpecMap[cmd]
 		}
 
 		line := fmt.Sprintf("%s   %s", textStyle.Render(paddedText), descStyle.Render(desc))
@@ -284,8 +284,8 @@ func (ci *ChatInfo) showHelp() {
 	fmt.Println(suggestionsView)
 }
 
-// showInfo displays current chat settings and information
-func (ci *ChatInfo) showInfo() {
+// showInfo displays current settings and information
+func (ri *ReplInfo) showInfo() {
 
 	printSection := func(title string) {
 		fmt.Println()
@@ -322,9 +322,9 @@ func (ci *ChatInfo) showInfo() {
 
 	// Attachments
 	printSection("ATTACHMENTS")
-	if len(ci.Files) > 0 {
-		fmt.Printf("%s%s%s (%d):\n", data.KeyColor, "Attachments", data.ResetSeq, len(ci.Files))
-		for _, file := range ci.Files {
+	if len(ri.Files) > 0 {
+		fmt.Printf("%s%s%s (%d):\n", data.KeyColor, "Attachments", data.ResetSeq, len(ri.Files))
+		for _, file := range ri.Files {
 			fmt.Printf("  - [%s]: %s\n", file.Format(), file.Path())
 		}
 	} else {
@@ -334,20 +334,20 @@ func (ci *ChatInfo) showInfo() {
 	fmt.Println()
 }
 
-func (ci *ChatInfo) handleEditor() {
+func (ri *ReplInfo) handleEditor() {
 	// No arguments - check if preferred editor is set
 	if getPreferredEditor() == "" {
 		// No preferred editor set, show list
 		listAvailableEditors()
 	} else {
 		// Preferred editor set, open it
-		ci.handleEditorCommand()
+		ri.handleEditorCommand()
 	}
 }
 
-func (ci *ChatInfo) handleEditorCommand() {
+func (ri *ReplInfo) handleEditorCommand() {
 	editor := getPreferredEditor()
-	tempFile, err := createTempFile(chatEidtTempFile)
+	tempFile, err := createTempFile(editTempFile)
 	if err != nil {
 		service.Errorf("Failed to create temp file: %v", err)
 		return
@@ -381,10 +381,10 @@ func (ci *ChatInfo) handleEditorCommand() {
 	}
 
 	// Set editor input
-	ci.EditorInput = content
+	ri.EditorInput = content
 }
 
-func (ci *ChatInfo) attachFiles(input string) {
+func (ri *ReplInfo) attachFiles(input string) {
 	// Split input into tokens
 	tokens := strings.Fields(input)
 
@@ -420,7 +420,7 @@ func (ci *ChatInfo) attachFiles(input string) {
 					// Check if file is already attached
 					mu.Lock()
 					found := false
-					for _, file := range ci.Files {
+					for _, file := range ri.Files {
 						if file.Path() == filePath {
 							found = true
 							break
@@ -442,7 +442,7 @@ func (ci *ChatInfo) attachFiles(input string) {
 
 					// Append the file to the list of attachments
 					mu.Lock()
-					ci.Files = append(ci.Files, file)
+					ri.Files = append(ri.Files, file)
 					mu.Unlock()
 					fmt.Printf("Attachment loaded: %s\n", filePath)
 				}(filePath)
@@ -454,19 +454,19 @@ func (ci *ChatInfo) attachFiles(input string) {
 	}
 	wg.Wait()
 
-	if len(ci.Files) == 0 {
+	if len(ri.Files) == 0 {
 		fmt.Println("No attachments were loaded")
 	}
 }
 
-func (ci *ChatInfo) detachFiles(input string) {
+func (ri *ReplInfo) detachFiles(input string) {
 	// Handle "all" case
 	if strings.Contains(input, "/detach all") {
-		if len(ci.Files) == 0 {
+		if len(ri.Files) == 0 {
 			fmt.Println("No attachments to detach")
 			return
 		}
-		ci.Files = []*service.FileData{}
+		ri.Files = []*service.FileData{}
 		fmt.Println("Detached all attachments")
 		return
 	}
@@ -490,9 +490,9 @@ func (ci *ChatInfo) detachFiles(input string) {
 
 			// Find and detach the file
 			found := false
-			for j, file := range ci.Files {
+			for j, file := range ri.Files {
 				if file.Path() == filePath {
-					ci.Files = append(ci.Files[:j], ci.Files[j+1:]...)
+					ri.Files = append(ri.Files[:j], ri.Files[j+1:]...)
 					fmt.Printf("Detached: %s\n", filePath)
 					detachedAny = true
 					found = true
@@ -513,7 +513,7 @@ func (ci *ChatInfo) detachFiles(input string) {
 
 // executeWorkflow checks if command is a workflow and executes it
 // Returns true if it was a workflow command
-func (ci *ChatInfo) executeWorkflow(command string, parts []string) bool {
+func (ri *ReplInfo) executeWorkflow(command string, parts []string) bool {
 	// Strip leading /
 	name := strings.TrimPrefix(command, "/")
 
@@ -536,13 +536,13 @@ func (ci *ChatInfo) executeWorkflow(command string, parts []string) bool {
 	}
 
 	// Set the content as input to be processed by the agent
-	ci.EditorInput = input
+	ri.EditorInput = input
 	return true
 }
 
 // executeSkill checks if command is a skill and sets up the prompt to activate it
 // Returns true if it was a skill command
-func (ci *ChatInfo) executeSkill(command string, parts []string) bool {
+func (ri *ReplInfo) executeSkill(command string, parts []string) bool {
 	// Strip leading /
 	name := strings.TrimPrefix(command, "/")
 
@@ -568,7 +568,7 @@ func (ci *ChatInfo) executeSkill(command string, parts []string) bool {
 	}
 
 	// Construct the instruction to force skill activation
-	ci.Instruction = fmt.Sprintf("You need to activate the skill '%s' and follow its instructions to answer the user's request. Use tool 'activate_skill' with the skill name '%s'.", foundSkill.Name, foundSkill.Name)
+	ri.Instruction = fmt.Sprintf("You need to activate the skill '%s' and follow its instructions to answer the user's request. Use tool 'activate_skill' with the skill name '%s'.", foundSkill.Name, foundSkill.Name)
 
 	input := "/" + foundSkill.Name // Fallback to echo the command itself if no args
 	if userArgs != "" {
@@ -576,12 +576,12 @@ func (ci *ChatInfo) executeSkill(command string, parts []string) bool {
 	}
 
 	// Set the content as input to be processed by the agent
-	ci.EditorInput = input
+	ri.EditorInput = input
 	return true
 }
 
 // copyLastMessage copies the last assistant response or its latest code block to the clipboard.
-func (ci *ChatInfo) copyLastMessage() {
+func (ri *ReplInfo) copyLastMessage() {
 	lastAssistantMessage := data.GetClipboardText()
 
 	if lastAssistantMessage == "" {
