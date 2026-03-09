@@ -6,7 +6,7 @@
 
 - **Flexible Model Selection**: Easily configure and switch between different LLMs.
 - **Multi-API compatibility**: Compatible with OpenAI API, Anthropic API, and Google Gemini API.
-- **Interactive Chat Mode**: Start real-time conversations with AI models.
+- **Interactive Session / REPL**: Start real-time conversations by simply running `gllm`.
 - **Editor Integration**: Use your preferred text editor for comfortable multi-line input in chat mode.
 - **Prompt Templates & System Prompts**: Manage reusable prompts and instructions.
 - **Attachment Support**: Process files, images, and URLs as part of your queries.
@@ -15,14 +15,14 @@
 - **PDF & Image Processing**: Supports processing of PDF documents and images with capable models.
 - **Reasoning & Deep Thinking**: Generate detailed explanations, logical breakdowns, and step-by-step analysis.
 - **Markdown Support**: Renders Markdown for easy-to-read formatted output.
-- **Multi-turn Conversations**: Engage in multiple rounds of conversation and manage chat history.
+- **Multi-turn Sessions**: Engage in multiple rounds of conversation and manage session history.
 - **Command Agent Mode**: Let LLMs plan and execute commands with your confirmation.
 - **Model Context Protocol (MCP) Support**: Connect to external MCP servers to access additional tools and data sources.
 - **Token Usage Tracking**: Monitor your token consumption.
 - **Configuration Management**: Easily manage models, templates, system prompts, and search engines.
 - **Memory Management**: Remember important facts about you across sessions for personalized responses.
 - **Context-Aware Agent Switching**: Agents can hand off tasks to other specialized agents with full context and instructions across different LLM providers.
-- **Context Compression**: Auto compress conversation history to avoid exceeding the model's context window by using summarization or truncate oldest messages.
+- **Context Compression**: Auto compress session history to avoid exceeding the model's context window by using summarization or truncate oldest messages.
 - **Agentic Workflow**: Orchestrate sophisticated multi-agent behaviors using state-of-the-art models for parallel task execution and save context window.
 - **Agent Skills**: Support agent skills, switch skills on and off, and install from git or local path.
 - **@ Reference Support**: Reference files and directories directly in prompts using @ syntax for seamless context inclusion.
@@ -136,12 +136,12 @@ echo 'source ~/.gllm-completion.bash' >> ~/.bashrc
 
 After adding the appropriate line to your shell configuration file, restart your shell or run `source ~/.bashrc` (or the equivalent for your shell) to enable completion.
 
-### Interactive Chat
+### Interactive Session / REPL
 
-Start an interactive chat session:
+Start an interactive session by running `gllm` without any arguments or prompt:
 
 ```sh
-gllm chat
+gllm
 ```
 
 ![Chat Mode Screenshot](screenshots/chatmode.png)
@@ -173,22 +173,22 @@ Skills are reusable sets of instructions that can be invoked with a single comma
 
 ### Multi-Line Input with Editor
 
-For longer messages or code snippets, use your preferred text editor directly in chat mode:
+For longer messages or code snippets, use your preferred text editor directly in an interactive session:
 
 ```sh
-# In chat mode, type:
+# In a session, type:
 /editor
 /e
 ```
 
-#### ✨ In chat mode, you can copy/paste text/code
+#### ✨ In a session, you can copy/paste text/code
 
 **How to use:**
 
 1. Open prefered editor
 2. Compose your message
 3. Save and exit the editor
-4. Review the content in gllm
+4. Review the content in the session
 5. Press Enter to send or Ctrl+C to discard
 
 **Setup your editor:**
@@ -204,45 +204,45 @@ gllm config editor
 gllm config editor
 ```
 
-### Multi-turn Conversations
+### Multi-turn Sessions
 
 There are two main ways to have a multi-turn conversation:
 
-#### 1. Single-Line Style (using named conversations)
+#### 1. Single-Line Style (using named sessions)
 
-You can maintain a conversation across multiple commands by assigning a name to your conversation with the `-c` flag. This is useful for scripting or when you want to continue a specific line of inquiry.
+You can maintain a session across multiple commands by assigning a name to your session with the `-s` flag. This is useful for scripting or when you want to continue a specific line of inquiry.
 
-- **Start or continue a named conversation:**
+- **Start or continue a named session:**
 
   ```sh
-  gllm "Who's the POTUS right now?" -c my_convo
-  gllm "Tell me more about his policies." -c my_convo
+  gllm "Who's the POTUS right now?" -s my_session
+  gllm "Tell me more about his policies." -s my_session
   ```
 
-- **Conversation Management:**
+- **Session Management:**
 
   ```sh
-  gllm convo list
-  gllm convo info my_convo
-  gllm convo remove my_convo
+  gllm session list
+  gllm session info my_session
+  gllm session remove my_session
   ```
 
-#### 2. Chat Style (interactive session)
+#### 2. Interactive Session Style (REPL)
 
-For a more interactive experience, you can use the `chat` command to enter a real-time chat session.
+For a more interactive experience, simply run `gllm` to enter a real-time session.
 
-- **Start an interactive chat session:**
+- **Start an interactive session:**
 
   ```sh
-  gllm chat
+  gllm
   ```
 
-  Within the chat, the conversation history is automatically maintained.
+  Within the session, the history is automatically maintained.
 
-- **Check chat history:**
+- **Check session history:**
 
   ```sh
-  in chat mode, type: /history or /h
+  in an interactive session, type: /history or /h
   ```
 
   ![Chat History Screenshot](screenshots/chathistory.png)
@@ -251,7 +251,7 @@ For a more interactive experience, you can use the `chat` command to enter a rea
 
 ## 🧠 Context Management
 
-`gllm` provides advanced strategies to manage conversation history when it approaches the model's context window limit. You can choose between preserving space through truncation or summarizing the conversation to maintain full context.
+`gllm` provides advanced strategies to manage session history when it approaches the model's context window limit. You can choose between preserving space through truncation or summarizing the session to maintain full context.
 
 ![Context Compress](screenshots/context_compress.png)
 
@@ -260,11 +260,11 @@ For a more interactive experience, you can use the `chat` command to enter a rea
 You can configure the strategy using `gllm features switch`->`auto compression`:
 
 - **Truncate Oldest (`truncate_oldest`)**: The default strategy. It removes the oldest messages (user/assistant/tool pairs) while preserving system prompts and recent context.
-- **Auto Compression (`summarize`)**: Replaces the older prefix of the conversation history with an information-dense summary generated by the LLM itself. This preserves the "essence" of the conversation while freeing up significant token space.
+- **Auto Compression (`summarize`)**: Replaces the older prefix of the session history with an information-dense summary generated by the LLM itself. This preserves the "essence" of the session while freeing up significant token space.
 
 ### Manual Compression
 
-In interactive chat mode, you can manually trigger compression at any time:
+In an interactive session, you can manually trigger compression at any time:
 
 ```sh
 > /compress
@@ -288,15 +288,15 @@ gllm memory clear --force  # Skip confirmation
 gllm memory path
 ```
 
-### How Memory Works in Conversations
+### How Memory Works in Sessions
 
-Memories are automatically injected into the system prompt, so the LLM will remember your preferences and context across all conversations:
+Memories are automatically injected into the system prompt, so the LLM will remember your preferences and context across all sessions:
 
 **Example:**
 
 ```sh
-# Start a conversation - the LLM will automatically consider your memories
-$ gllm chat
+# Start a session - the LLM will automatically consider your memories
+$ gllm
 > Remember this: I work primarily with Go and Docker
 > Forget this: I love dark jokes
 ```

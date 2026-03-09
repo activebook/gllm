@@ -163,7 +163,7 @@ func DetectMessageProviderFromLine(line []byte) string {
 }
 
 /*
- * Detects the conversation provider based on message format.
+ * Detects the session provider based on message format.
  * Supports both JSONL (preferred) and legacy JSON array formats.
  */
 func DetectMessageProviderByContent(input []byte) string {
@@ -207,7 +207,7 @@ func DetectMessageProviderByContent(input []byte) string {
 	return ModelProviderUnknown
 }
 
-// Detects the conversation provider based on message format using a scanner
+// Detects the session provider based on message format using a scanner
 // This is more efficient for large files as it doesn't read the entire file into memory
 func DetectMessageProvider(path string) string {
 	file, err := os.Open(path)
@@ -277,8 +277,8 @@ func indentText(text string, indent string) string {
 	return strings.Join(lines, "\n")
 }
 
-// RenderGeminiConversationLog returns a string summary of Gemini conversation (JSONL or JSON array format)
-func RenderGeminiConversationLog(input []byte) string {
+// RenderGeminiSessionLog returns a string summary of Gemini session (JSONL or JSON array format)
+func RenderGeminiSessionLog(input []byte) string {
 	var sb strings.Builder
 	var messages []gemini.Content
 
@@ -340,9 +340,9 @@ func RenderGeminiConversationLog(input []byte) string {
 		sb.WriteString(fmt.Sprintf("  %sFiles: %d%s\n", ContentTypeColors["file_data"], fileCount, data.ResetSeq))
 	}
 
-	// Conversation content
+	// session content
 	if len(messages) > 0 {
-		sb.WriteString("\nConversation Content:\n")
+		sb.WriteString("\nsession Content:\n")
 		for _, msg := range messages {
 			// Apply color to role
 			roleColor := RoleColors[msg.Role]
@@ -398,8 +398,8 @@ func RenderGeminiConversationLog(input []byte) string {
 	return sb.String()
 }
 
-// RenderOpenAIConversationLog returns a string summary of OpenAI conversation (JSONL or JSON array format)
-func RenderOpenAIConversationLog(input []byte) string {
+// RenderOpenAISessionLog returns a string summary of OpenAI session (JSONL or JSON array format)
+func RenderOpenAISessionLog(input []byte) string {
 	var sb strings.Builder
 	var messages []openai.ChatCompletionMessage
 
@@ -461,9 +461,9 @@ func RenderOpenAIConversationLog(input []byte) string {
 		sb.WriteString(fmt.Sprintf("  %sImages: %d%s\n", ContentTypeColors["image"], imageCount, data.ResetSeq))
 	}
 
-	// Conversation content
+	// session content
 	if len(messages) > 0 {
-		sb.WriteString("\nConversation Content:\n")
+		sb.WriteString("\nsession Content:\n")
 		for _, msg := range messages {
 			// Apply color to role
 			roleColor := RoleColors[msg.Role]
@@ -536,8 +536,8 @@ func RenderOpenAIConversationLog(input []byte) string {
 	return sb.String()
 }
 
-// RenderAnthropicConversationLog returns a string summary of Anthropic conversation (JSONL or JSON array format)
-func RenderAnthropicConversationLog(input []byte) string {
+// RenderAnthropicSessionLog returns a string summary of Anthropic session (JSONL or JSON array format)
+func RenderAnthropicSessionLog(input []byte) string {
 	var sb strings.Builder
 	var messages []anthropic.MessageParam
 
@@ -588,9 +588,9 @@ func RenderAnthropicConversationLog(input []byte) string {
 		sb.WriteString(fmt.Sprintf("  %sTool results: %d%s\n", ContentTypeColors["function_response"], toolResultCount, data.ResetSeq))
 	}
 
-	// Conversation content
+	// session content
 	if len(messages) > 0 {
-		sb.WriteString("\nConversation Content:\n")
+		sb.WriteString("\nsession Content:\n")
 		for _, msg := range messages {
 			role := string(msg.Role)
 

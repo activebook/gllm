@@ -8,28 +8,28 @@ import (
 )
 
 /*
- * Anthropic Conversation
+ * Anthropic session
  */
 
-// AnthropicConversation represents a conversation using Anthropic format
-type AnthropicConversation struct {
-	BaseConversation
+// AnthropicSession represents a session using Anthropic format
+type AnthropicSession struct {
+	BaseSession
 	Messages []anthropic.MessageParam
 }
 
-func (c *AnthropicConversation) GetMessages() interface{} {
-	return c.Messages
+func (s *AnthropicSession) GetMessages() interface{} {
+	return s.Messages
 }
 
-func (c *AnthropicConversation) SetMessages(messages interface{}) {
+func (s *AnthropicSession) SetMessages(messages interface{}) {
 	if msgs, ok := messages.([]anthropic.MessageParam); ok {
-		c.Messages = msgs
+		s.Messages = msgs
 	}
 }
 
-func (c *AnthropicConversation) MarshalMessages(messages []anthropic.MessageParam, dropToolContent bool) []byte {
+func (s *AnthropicSession) MarshalMessages(messages []anthropic.MessageParam, dropToolContent bool) []byte {
 	// The industry's current answer is basically "save everything by default, then compress/prune when it gets too big."
-	// The complete conversation history, including your prompts and the model's responses, all tool executions (inputs and outputs).
+	// The complete session history, including your prompts and the model's responses, all tool executions (inputs and outputs).
 	empty := ""
 	var data []byte
 	for _, msg := range messages {
@@ -86,9 +86,9 @@ func (c *AnthropicConversation) MarshalMessages(messages []anthropic.MessagePara
 	return data
 }
 
-// PushMessages adds multiple messages to the conversation (high performance)
+// PushMessages adds multiple messages to the session (high performance)
 // Uses append-mode for incremental saves using JSONL format (one message per line)
-func (c *AnthropicConversation) Push(messages ...interface{}) error {
+func (s *AnthropicSession) Push(messages ...interface{}) error {
 	if len(messages) == 0 {
 		return nil
 	}
@@ -104,58 +104,58 @@ func (c *AnthropicConversation) Push(messages ...interface{}) error {
 	}
 
 	// Always append to in-memory messages (needed for tool-call loop in single-turn mode)
-	c.Messages = append(c.Messages, newmsgs...)
+	s.Messages = append(s.Messages, newmsgs...)
 
-	// Only persist to file if conversation has a name
-	if c.Name == "" {
+	// Only persist to file if session has a name
+	if s.Name == "" {
 		return nil
 	}
-	data := c.MarshalMessages(newmsgs, false)
-	return c.appendFile(data)
+	data := s.MarshalMessages(newmsgs, false)
+	return s.appendFile(data)
 }
 
-// Save persists the conversation to disk using JSONL format (one message per line).
-func (c *AnthropicConversation) Save() error {
-	if c.Name == "" || len(c.Messages) == 0 {
+// Save persists the session to disk using JSONL format (one message per line).
+func (s *AnthropicSession) Save() error {
+	if s.Name == "" || len(s.Messages) == 0 {
 		return nil
 	}
 
-	data := c.MarshalMessages(c.Messages, false)
-	return c.writeFile(data)
+	data := s.MarshalMessages(s.Messages, false)
+	return s.writeFile(data)
 }
 
-// Load retrieves the conversation from disk (JSONL format).
-func (c *AnthropicConversation) Load() error {
-	if c.Name == "" {
+// Load retrieves the session from disk (JSONL format).
+func (s *AnthropicSession) Load() error {
+	if s.Name == "" {
 		return nil
 	}
 
-	lines, err := c.readFile()
+	lines, err := s.readFile()
 	if err != nil {
 		return err
 	}
 
 	// Handle empty or non-existent files
 	if len(lines) == 0 {
-		c.Messages = []anthropic.MessageParam{}
+		s.Messages = []anthropic.MessageParam{}
 		return nil
 	}
 
 	// Parse each JSONL line as a message
-	c.Messages = make([]anthropic.MessageParam, 0, len(lines))
+	s.Messages = make([]anthropic.MessageParam, 0, len(lines))
 	for i, line := range lines {
 		var msg anthropic.MessageParam
 		if err := json.Unmarshal(line, &msg); err != nil {
 			return fmt.Errorf("failed to parse message at line %d: %w", i+1, err)
 		}
-		c.Messages = append(c.Messages, msg)
+		s.Messages = append(s.Messages, msg)
 	}
 
 	return nil
 }
 
-// Clear removes all messages from the conversation
-func (c *AnthropicConversation) Clear() error {
-	c.Messages = []anthropic.MessageParam{}
-	return c.BaseConversation.Clear()
+// Clear removes all messages from the session
+func (s *AnthropicSession) Clear() error {
+	s.Messages = []anthropic.MessageParam{}
+	return s.BaseSession.Clear()
 }

@@ -52,7 +52,7 @@ type Agent struct {
 	Std             *ui.StdRenderer     // Standard renderer
 	OutputFile      *ui.FileRenderer    // File renderer
 	Status          StatusStack         // Stack to manage streaming status
-	Convo           ConversationManager // Conversation manager
+	Session         SessionManager      // Session manager
 	Context         ContextManager      // Context manager
 	LastWrittenData string              // Last written data
 
@@ -115,44 +115,43 @@ func constructSearchEngine(capabilities []string) *SearchEngine {
 	return &se
 }
 
-func ConstructConversationManager(convoName string, provider string) (ConversationManager, error) {
-	//var convo ConversationManager
+func ConstructSessionManager(sessionName string, provider string) (SessionManager, error) {
 	switch provider {
 	case ModelProviderOpenAICompatible:
 		// Used for Chinese Models
-		convo := OpenChatConversation{}
-		err := convo.Open(convoName)
+		session := OpenChatSession{}
+		err := session.Open(sessionName)
 		if err != nil {
 			return nil, err
 		}
-		return &convo, nil
+		return &session, nil
 
 	case ModelProviderOpenAI:
 		// Used for OpenAI compatible models
-		convo := OpenAIConversation{}
-		err := convo.Open(convoName)
+		session := OpenAISession{}
+		err := session.Open(sessionName)
 		if err != nil {
 			return nil, err
 		}
-		return &convo, nil
+		return &session, nil
 
 	case ModelProviderGemini:
 		// Used for Gemini
-		convo := GeminiConversation{}
-		err := convo.Open(convoName)
+		session := GeminiSession{}
+		err := session.Open(sessionName)
 		if err != nil {
 			return nil, err
 		}
-		return &convo, nil
+		return &session, nil
 
 	case ModelProviderAnthropic:
 		// Used for Anthropic
-		convo := AnthropicConversation{}
-		err := convo.Open(convoName)
+		session := AnthropicSession{}
+		err := session.Open(sessionName)
 		if err != nil {
 			return nil, err
 		}
-		return &convo, nil
+		return &session, nil
 
 	default:
 		return nil, fmt.Errorf("unknown provider: %s", provider)
@@ -171,7 +170,7 @@ type AgentOptions struct {
 	YoloMode      bool     // Whether to automatically approve tools
 	OutputFile    string
 	QuietMode     bool
-	ConvoName     string
+	SessionName   string
 	MCPConfig     map[string]*data.MCPServer
 
 	// Sub-agent orchestration fields
@@ -337,12 +336,12 @@ func CallAgent(op *AgentOptions) error {
 		Verbose:       verboseMode,
 	}
 
-	// Construct conversation manager
-	cm, err := ConstructConversationManager(op.ConvoName, ag.Model.Provider)
+	// Construct session manager
+	cm, err := ConstructSessionManager(op.SessionName, ag.Model.Provider)
 	if err != nil {
 		return err
 	}
-	ag.Convo = cm
+	ag.Session = cm
 
 	// Instantiate correct context manager
 	strategy := StrategyTruncateOldest

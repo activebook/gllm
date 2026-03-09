@@ -26,11 +26,11 @@ var replCmd = &cobra.Command{
 	Hidden: true, // users invoke this implicitly via `gllm` with no subcommand
 	Long: `Start an interactive REPL session with the configured LLM.
 This provides a Read-Eval-Print-Loop (REPL) interface where you can
-have a continuous conversation with the model.`,
+have a continuous session with the model.`,
 	// Add completion support
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
-			return []string{"--agent", "--conversation", "--yolo", "--help"}, cobra.ShellCompDirectiveNoFileComp
+			return []string{"--agent", "--session", "--yolo", "--help"}, cobra.ShellCompDirectiveNoFileComp
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
@@ -38,27 +38,27 @@ have a continuous conversation with the model.`,
 		// Start indeterminate progress bar
 		ui.GetIndicator().Start("")
 
-		// Clear empty conversations in background
-		// service.ClearEmptyConvosAsync()
+		// Clear empty sessions in background
+		// service.ClearEmptySessionsAsync()
 
 		var ri *ReplInfo
 		store := data.NewConfigStore()
 
-		// Use the shared package-level convoName/agentName globals so that flags
+		// Use the shared package-level sessionName/agentName globals so that flags
 		// declared on rootCmd (e.g. -c, -g) are correctly honored when replCmd
 		// is invoked programmatically from rootCmd's Run handler.
 
-		// If a conversation name was not supplied, generate a fresh one.
-		if convoName == "" {
-			convoName = GenerateSessionName()
+		// If a session name was not supplied, generate a fresh one.
+		if sessionName == "" {
+			sessionName = GenerateSessionName()
 		} else {
 			// Resolve index-based names to their canonical file name.
-			name, err := service.FindConvosByIndex(convoName)
+			name, err := service.FindSessionByIndex(sessionName)
 			if err != nil {
-				return fmt.Errorf("error finding conversation: %v\n", err)
+				return fmt.Errorf("error finding session: %v\n", err)
 			}
 			if name != "" {
-				convoName = name
+				sessionName = name
 			}
 		}
 
@@ -97,7 +97,7 @@ func init() {
 	// Attach should be used inside session
 	// Imagine like using web llm ui, you can attach file to the session and turn search on and off
 	replCmd.Flags().StringVarP(&agentName, "agent", "g", "", "Agent to use for this session")
-	replCmd.Flags().StringVarP(&convoName, "conversation", "c", GenerateSessionName(), "Name for this session")
+	replCmd.Flags().StringVarP(&sessionName, "session", "s", GenerateSessionName(), "Name for this session")
 	replCmd.Flags().BoolVarP(&yoloFlag, "yolo", "y", false, "Enable yolo mode (non-interactive)")
 }
 
@@ -341,20 +341,20 @@ func (ri *ReplInfo) startWithLocalCommand(line string) bool {
 	return strings.HasPrefix(line, "!")
 }
 
-// clearContext clears the conversation context
+// clearContext clears the session context
 func (ri *ReplInfo) clearContext() {
 	agent, err := EnsureActiveAgent()
 	if err != nil {
 		service.Errorf("%v", err)
 		return
 	}
-	// Construct conversation manager
-	cm, err := service.ConstructConversationManager(convoName, agent.Model.Provider)
+	// Construct session manager
+	cm, err := service.ConstructSessionManager(sessionName, agent.Model.Provider)
 	if err != nil {
-		service.Errorf("Error constructing conversation manager: %v\n", err)
+		service.Errorf("Error constructing session manager: %v\n", err)
 		return
 	}
-	// Clear conversation history
+	// Clear session history
 	err = cm.Clear()
 	if err != nil {
 		service.Errorf("Error clearing context: %v\n", err)
@@ -365,7 +365,7 @@ func (ri *ReplInfo) clearContext() {
 	fmt.Printf("Context cleared.\n")
 }
 
-// showHistory displays conversation history using TUI viewport
+// showHistory displays session history using TUI viewport
 func (ri *ReplInfo) showHistory() {
 	// Get active agent
 	agent, err := EnsureActiveAgent()
@@ -374,11 +374,11 @@ func (ri *ReplInfo) showHistory() {
 		return
 	}
 
-	// Get conversation data
-	convoData, convoName, err := GetConvoData(convoName, agent.Model.Provider)
+	// Get session data
+	sessionData, sessionName, err := GetSessionData(sessionName, agent.Model.Provider)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Println("No available conversation yet.")
+			fmt.Println("No available session yet.")
 			return
 		}
 		service.Errorf("%v", err)
@@ -386,29 +386,29 @@ func (ri *ReplInfo) showHistory() {
 	}
 
 	// Detect provider based on message format
-	isCompatible, provider, modelProvider := CheckConvoFormat(agent, convoData)
+	isCompatible, provider, modelProvider := CheckSessionFormat(agent, sessionData)
 	if !isCompatible {
 		// Warn about potential incompatibility if providers differ
-		service.Warnf("Conversation '%s' [%s] is not compatible with the current model provider [%s].\n", convoName, provider, modelProvider)
+		service.Warnf("Session '%s' [%s] is not compatible with the current model provider [%s].\n", sessionName, provider, modelProvider)
 	}
 
-	// Render conversation log
+	// Render session log
 	var content string
 	switch provider {
 	case service.ModelProviderGemini:
-		content = service.RenderGeminiConversationLog(convoData)
+		content = service.RenderGeminiSessionLog(sessionData)
 	case service.ModelProviderOpenAI, service.ModelProviderOpenAICompatible:
-		content = service.RenderOpenAIConversationLog(convoData)
+		content = service.RenderOpenAISessionLog(sessionData)
 	case service.ModelProviderAnthropic:
-		content = service.RenderAnthropicConversationLog(convoData)
+		content = service.RenderAnthropicSessionLog(sessionData)
 	default:
-		fmt.Println("No available conversation yet.")
+		fmt.Println("No available session yet.")
 		return
 	}
 
 	// Show viewport in full screen
 	m := ui.NewViewportModel(provider, content, func() string {
-		return fmt.Sprintf("Conversation: %s", convoName)
+		return fmt.Sprintf("Session: %s", sessionName)
 	})
 	// Bugfix: we don't need to run history in alt screen
 	// because it will break the ChatInput view
@@ -419,7 +419,7 @@ func (ri *ReplInfo) showHistory() {
 	}
 }
 
-// compressContext compresses the conversation context by replacing it with a summary
+// compressContext compresses the session context by replacing it with a summary
 func (ri *ReplInfo) compressContext() {
 	// Get active agent
 	agent, err := EnsureActiveAgent()
@@ -428,42 +428,59 @@ func (ri *ReplInfo) compressContext() {
 		return
 	}
 
-	// Get conversation data
-	convoData, convoName, err := GetConvoData(convoName, agent.Model.Provider)
+	// Get session data
+	sessionData, sessionName, err := GetSessionData(sessionName, agent.Model.Provider)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Println("No available conversation yet.")
+			fmt.Println("No available session yet.")
 			return
 		}
 		service.Errorf("%v", err)
 		return
 	}
 
-	// Compress the conversation context
+	// Compress the session context
 	ui.GetIndicator().Start(ui.IndicatorCompressingContext)
-	summary, err := service.CompressConversation(agent, convoData)
+	summary, err := service.CompressSession(agent, sessionData)
 	ui.GetIndicator().Stop()
 
 	if err != nil {
-		service.Errorf("Failed to compress conversation: %v\n", err)
+		service.Errorf("Failed to compress session: %v\n", err)
 		return
 	}
 
-	// Build the new compressed conversation
-	newData, err := service.BuildCompressedConvo(summary, agent.Model.Provider)
+	// Build the new compressed session
+	newData, err := service.BuildCompressedSession(summary, agent.Model.Provider)
 	if err != nil {
-		service.Errorf("Failed to build compressed conversation: %v\n", err)
+		service.Errorf("Failed to build compressed session: %v\n", err)
 		return
 	}
 
 	// Save back to the file format
-	err = WriteConvoData(convoName, newData, agent.Model.Provider)
+	err = WriteSessionData(sessionName, newData, agent.Model.Provider)
 	if err != nil {
-		service.Errorf("Failed to save compressed conversation: %v\n", err)
+		service.Errorf("Failed to save compressed session: %v\n", err)
 		return
 	}
 
-	service.Successf("Compressed successfully!\nUse /history to view the compressed conversation.\n")
+	service.Successf("Compressed successfully!\nUse /history to view the compressed session.\n")
+}
+
+// copyLastMessage copies the last assistant response or its latest code block to the clipboard.
+func (ri *ReplInfo) copyLastMessage() {
+	lastAssistantMessage := data.GetClipboardText()
+
+	if lastAssistantMessage == "" {
+		fmt.Println("No assistant message found to copy.")
+		return
+	}
+
+	// Actually copy to clipboard using atotto/clipboard
+	err := data.WriteClipboardText(lastAssistantMessage)
+	if err != nil {
+		service.Errorf("Failed to copy to clipboard: %v", err)
+	}
+	service.Successf("Copied the last response to clipboard.\n")
 }
 
 func (ri *ReplInfo) callAgent(input string) {
@@ -474,7 +491,7 @@ func (ri *ReplInfo) callAgent(input string) {
 	}
 
 	// Call agent using the shared runner, passing persisted SharedState
-	err := RunAgent(prompt, ri.Files, convoName, ri.outputFile, ri.sharedState)
+	err := RunAgent(prompt, ri.Files, sessionName, ri.outputFile, ri.sharedState)
 	if err != nil {
 		service.Errorf("%v", err)
 		return

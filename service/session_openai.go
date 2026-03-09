@@ -8,31 +8,31 @@ import (
 )
 
 /*
- * OpenAI Conversation
+ * OpenAI session
  */
 
-// OpenAIConversation represents a conversation using OpenAI format
-type OpenAIConversation struct {
-	BaseConversation
+// OpenAISession represents a session using OpenAI format
+type OpenAISession struct {
+	BaseSession
 	Messages []openai.ChatCompletionMessage
 }
 
-func (c *OpenAIConversation) GetMessages() interface{} {
-	return c.Messages
+func (s *OpenAISession) GetMessages() interface{} {
+	return s.Messages
 }
 
-func (c *OpenAIConversation) SetMessages(messages interface{}) {
+func (s *OpenAISession) SetMessages(messages interface{}) {
 	if msgs, ok := messages.([]openai.ChatCompletionMessage); ok {
-		c.Messages = msgs
+		s.Messages = msgs
 	}
 }
 
-func (c *OpenAIConversation) MarshalMessages(messages []openai.ChatCompletionMessage, dropToolContent bool) []byte {
+func (s *OpenAISession) MarshalMessages(messages []openai.ChatCompletionMessage, dropToolContent bool) []byte {
 	// The industry's current answer is basically "save everything by default, then compress/prune when it gets too big."
-	// The complete conversation history, including your prompts and the model's responses, all tool executions (inputs and outputs).
+	// The complete session history, including your prompts and the model's responses, all tool executions (inputs and outputs).
 	// Important: We need to copy the message, otherwise it will modify the original message
 	// model need complete original message, which includes tool content to generate assistant response
-	// but we don't need tool content in conversation file to save tokens
+	// but we don't need tool content in session file to save tokens
 
 	empty := ""
 	var data []byte
@@ -57,14 +57,14 @@ func (c *OpenAIConversation) MarshalMessages(messages []openai.ChatCompletionMes
 	return data
 }
 
-// PushMessages adds multiple messages to the conversation (high performance)
+// PushMessages adds multiple messages to the session (high performance)
 // Uses append-mode for incremental saves using JSONL format (one message per line)
-func (c *OpenAIConversation) Push(messages ...interface{}) error {
+func (s *OpenAISession) Push(messages ...interface{}) error {
 	if len(messages) == 0 {
 		return nil
 	}
 
-	// append new messages to c.Messages
+	// append new messages to s.Messages
 	newmsgs := []openai.ChatCompletionMessage{}
 	for _, msg := range messages {
 		switch v := msg.(type) {
@@ -75,67 +75,67 @@ func (c *OpenAIConversation) Push(messages ...interface{}) error {
 		}
 	}
 	// Always append to in-memory messages (needed for tool-call loop in single-turn mode)
-	c.Messages = append(c.Messages, newmsgs...)
+	s.Messages = append(s.Messages, newmsgs...)
 
-	// Only persist to file if conversation has a name
-	if c.Name == "" {
+	// Only persist to file if session has a name
+	if s.Name == "" {
 		return nil
 	}
-	data := c.MarshalMessages(newmsgs, false)
-	return c.appendFile(data)
+	data := s.MarshalMessages(newmsgs, false)
+	return s.appendFile(data)
 }
 
-// Save persists the conversation to disk using JSONL format (one message per line).
-func (c *OpenAIConversation) Save() error {
-	if c.Name == "" || len(c.Messages) == 0 {
+// Save persists the session to disk using JSONL format (one message per line).
+func (s *OpenAISession) Save() error {
+	if s.Name == "" || len(s.Messages) == 0 {
 		return nil
 	}
 
 	// Write all messages to file
-	data := c.MarshalMessages(c.Messages, false)
-	return c.writeFile(data)
+	data := s.MarshalMessages(s.Messages, false)
+	return s.writeFile(data)
 }
 
-// Load retrieves the conversation from disk (JSONL format).
-func (c *OpenAIConversation) Load() error {
-	if c.Name == "" {
+// Load retrieves the session from disk (JSONL format).
+func (s *OpenAISession) Load() error {
+	if s.Name == "" {
 		return nil
 	}
 
-	lines, err := c.readFile()
+	lines, err := s.readFile()
 	if err != nil {
 		return err
 	}
 
 	// Handle empty or non-existent files
 	if len(lines) == 0 {
-		c.Messages = []openai.ChatCompletionMessage{}
+		s.Messages = []openai.ChatCompletionMessage{}
 		return nil
 	}
 
 	// Parse each JSONL line as a message
-	c.Messages = make([]openai.ChatCompletionMessage, 0, len(lines))
+	s.Messages = make([]openai.ChatCompletionMessage, 0, len(lines))
 	for i, line := range lines {
 		var msg openai.ChatCompletionMessage
 		if err := json.Unmarshal(line, &msg); err != nil {
 			return fmt.Errorf("failed to parse message at line %d: %w", i+1, err)
 		}
-		c.Messages = append(c.Messages, msg)
+		s.Messages = append(s.Messages, msg)
 	}
 
 	// Validate format
-	if len(c.Messages) > 0 {
-		msg := c.Messages[0]
+	if len(s.Messages) > 0 {
+		msg := s.Messages[0]
 		if msg.Content == "" && len(msg.ToolCalls) == 0 && msg.FunctionCall == nil && msg.ReasoningContent == "" {
-			return fmt.Errorf("invalid conversation format: isn't a compatible format. '%s'", c.Path)
+			return fmt.Errorf("invalid session format: isn't a compatible format. '%s'", s.Path)
 		}
 	}
 
 	return nil
 }
 
-// Clear removes all messages from the conversation
-func (c *OpenAIConversation) Clear() error {
-	c.Messages = []openai.ChatCompletionMessage{}
-	return c.BaseConversation.Clear()
+// Clear removes all messages from the session
+func (s *OpenAISession) Clear() error {
+	s.Messages = []openai.ChatCompletionMessage{}
+	return s.BaseSession.Clear()
 }

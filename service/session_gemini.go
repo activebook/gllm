@@ -8,17 +8,17 @@ import (
 )
 
 /*
- * Google Gemini Conversation
+ * Google Gemini session
  */
-// GeminiConversation manages conversations for Google's Gemini model
-type GeminiConversation struct {
-	BaseConversation
+// GeminiSession manages sessions for Google's Gemini model
+type GeminiSession struct {
+	BaseSession
 	Messages []*genai.Content
 }
 
 // consolidateTextParts merges consecutive text parts to reduce fragmentation
 // from streaming responses while preserving non-text parts (function calls, etc.)
-func (g *GeminiConversation) consolidateTextParts(parts []*genai.Part) []*genai.Part {
+func (s *GeminiSession) consolidateTextParts(parts []*genai.Part) []*genai.Part {
 	if len(parts) == 0 {
 		return parts
 	}
@@ -48,23 +48,23 @@ func (g *GeminiConversation) consolidateTextParts(parts []*genai.Part) []*genai.
 	return consolidated
 }
 
-func (g *GeminiConversation) GetMessages() interface{} {
-	return g.Messages
+func (s *GeminiSession) GetMessages() interface{} {
+	return s.Messages
 }
 
-func (g *GeminiConversation) SetMessages(messages interface{}) {
+func (s *GeminiSession) SetMessages(messages interface{}) {
 	if msgs, ok := messages.([]*genai.Content); ok {
-		g.Messages = msgs
+		s.Messages = msgs
 	}
 }
 
-func (g *GeminiConversation) MarshalMessages(messages []*genai.Content, dropToolContent bool) []byte {
-	// The industry's current answer is basically "save everything by default, then compress/prune when it gets too big."
-	// The complete conversation history, including your prompts and the model's responses, all tool executions (inputs and outputs).
+func (s *GeminiSession) MarshalMessages(messages []*genai.Content, dropToolContent bool) []byte {
+	// The industry's current answer is basically "save everything by default, then compress/prune when it gets too bis."
+	// The complete session history, including your prompts and the model's responses, all tool executions (inputs and outputs).
 	var data []byte
 	for _, content := range messages {
 		// First, consolidate consecutive text parts from streaming
-		consolidatedParts := g.consolidateTextParts(content.Parts)
+		consolidatedParts := s.consolidateTextParts(content.Parts)
 
 		// Check if this message has any function responses that need clearing
 		hasFunctionResponse := false
@@ -119,7 +119,7 @@ func (g *GeminiConversation) MarshalMessages(messages []*genai.Content, dropTool
 
 // PushMessages adds multiple content items to the history (high performance)
 // Uses append-mode for incremental saves using JSONL format (one message per line)
-func (g *GeminiConversation) Push(messages ...interface{}) error {
+func (s *GeminiSession) Push(messages ...interface{}) error {
 	if len(messages) == 0 {
 		return nil
 	}
@@ -135,67 +135,67 @@ func (g *GeminiConversation) Push(messages ...interface{}) error {
 	}
 
 	// Always append to in-memory messages (needed for tool-call loop in single-turn mode)
-	g.Messages = append(g.Messages, newmsgs...)
+	s.Messages = append(s.Messages, newmsgs...)
 
-	// Only persist to file if conversation has a name
-	if g.Name == "" {
+	// Only persist to file if session has a name
+	if s.Name == "" {
 		return nil
 	}
-	data := g.MarshalMessages(newmsgs, false)
-	return g.appendFile(data)
+	data := s.MarshalMessages(newmsgs, false)
+	return s.appendFile(data)
 }
 
-// Save persists the Gemini conversation to disk using JSONL format (one message per line).
-func (g *GeminiConversation) Save() error {
-	if g.Name == "" || len(g.Messages) == 0 {
+// Save persists the Gemini session to disk using JSONL format (one message per line).
+func (s *GeminiSession) Save() error {
+	if s.Name == "" || len(s.Messages) == 0 {
 		return nil
 	}
 
 	// Write all messages to file
-	data := g.MarshalMessages(g.Messages, false)
-	return g.writeFile(data)
+	data := s.MarshalMessages(s.Messages, false)
+	return s.writeFile(data)
 }
 
-// Load retrieves the Gemini conversation from disk (JSONL format).
-func (g *GeminiConversation) Load() error {
-	if g.Name == "" {
+// Load retrieves the Gemini session from disk (JSONL format).
+func (s *GeminiSession) Load() error {
+	if s.Name == "" {
 		return nil
 	}
 
-	lines, err := g.readFile()
+	lines, err := s.readFile()
 	if err != nil {
 		return err
 	}
 
 	// Handle empty or non-existent files
 	if len(lines) == 0 {
-		g.Messages = []*genai.Content{}
+		s.Messages = []*genai.Content{}
 		return nil
 	}
 
 	// Parse each JSONL line as a message
-	g.Messages = make([]*genai.Content, 0, len(lines))
+	s.Messages = make([]*genai.Content, 0, len(lines))
 	for i, line := range lines {
 		var msg genai.Content
 		if err := json.Unmarshal(line, &msg); err != nil {
 			return fmt.Errorf("failed to parse message at line %d: %w", i+1, err)
 		}
-		g.Messages = append(g.Messages, &msg)
+		s.Messages = append(s.Messages, &msg)
 	}
 
 	// Validate format
-	if len(g.Messages) > 0 {
-		msg := g.Messages[0]
+	if len(s.Messages) > 0 {
+		msg := s.Messages[0]
 		if len(msg.Parts) <= 0 || msg.Role == "" {
-			return fmt.Errorf("invalid conversation format: isn't a compatible format. '%s'", g.Path)
+			return fmt.Errorf("invalid session format: isn't a compatible format. '%s'", s.Path)
 		}
 	}
 
 	return nil
 }
 
-// Clear removes all messages from the conversation
-func (g *GeminiConversation) Clear() error {
-	g.Messages = []*genai.Content{}
-	return g.BaseConversation.Clear()
+// Clear removes all messages from the session
+func (s *GeminiSession) Clear() error {
+	s.Messages = []*genai.Content{}
+	return s.BaseSession.Clear()
 }

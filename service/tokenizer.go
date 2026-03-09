@@ -412,8 +412,8 @@ func EstimateOpenAIMessagesTokens(messages []openai.ChatCompletionMessage) int {
 	for _, msg := range messages {
 		total += EstimateOpenAIMessageTokens(msg)
 	}
-	// Add base overhead for the conversation
-	return total + MessageOverheadTokens // Every conversation has 3 extra tokens for priming
+	// Add base overhead for the session
+	return total + MessageOverheadTokens // Every session has 3 extra tokens for priming
 }
 
 // EstimateOpenChatMessagesTokens estimates total tokens for a slice of OpenChat messages.
@@ -441,7 +441,7 @@ func EstimateAnthropicMessagesTokens(messages []anthropic.MessageParam) int {
 	for _, msg := range messages {
 		total += EstimateAnthropicMessageTokens(msg)
 	}
-	// Add base overhead for the conversation
+	// Add base overhead for the session
 	return total + MessageOverheadTokens
 }
 

@@ -24,7 +24,7 @@ var (
 
 	agentName   string   // gllm "What is Go?" -agent(-g) plan
 	attachments []string // gllm "Summarize this" --attachment(-a) report.txt
-	convoName   string   // gllm --conversation(-c) "My Conversation" "What is the stock price of Tesla right now?"
+	sessionName string   // gllm --session(-s) "My Session"
 	yoloFlag    bool     // gllm -y, --yolo enable yolo mode (non-interactive)
 
 	// Global cmd instance, to be used by subcommands
@@ -101,7 +101,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 				!cmd.Flags().Changed("version") &&
 				!hasStdinData() {
 				// Default to interactive REPL mode when no prompt or subcommand is provided.
-				// -g/--agent and -c/--conversation are forwarded via shared package-level globals.
+				// -g/--agent and -s/--session are forwarded via shared package-level globals.
 				if err := replCmd.RunE(replCmd, args); err != nil {
 					service.Errorf("%v", err)
 				}
@@ -129,16 +129,16 @@ Configure your API keys and preferred models, then start chatting or executing c
 			// Set auto approve for the session
 			data.SetToolCallAutoApproveInSession(yoloFlag)
 
-			// If conversation flag is provided, find the conversation file
-			if cmd.Flags().Changed("conversation") {
-				// Bugfix: When convoName is an index number, and use it to find convo file
-				name, err := service.FindConvosByIndex(convoName)
+			// If session flag is provided, find the session file
+			if cmd.Flags().Changed("session") {
+				// Bugfix: When sessionName is an index number, and use it to find session file
+				name, err := service.FindSessionByIndex(sessionName)
 				if err != nil {
-					service.Errorf("error finding conversation: %v\n", err)
+					service.Errorf("error finding session: %v\n", err)
 					return
 				}
 				if name != "" {
-					convoName = name
+					sessionName = name
 				}
 			}
 
@@ -169,7 +169,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 
 			// Call your LLM service here
 			// Call agent using the shared runner, passing nil for SharedState (single turn)
-			err := RunAgent(prompt, files, convoName, "", nil)
+			err := RunAgent(prompt, files, sessionName, "", nil)
 			if err != nil {
 				service.Errorf("%v", err)
 				return
@@ -322,7 +322,7 @@ func init() {
 	// Define the flags
 	rootCmd.Flags().StringVarP(&agentName, "agent", "g", "", "Switch to the agent to use")
 	rootCmd.Flags().StringSliceVarP(&attachments, "attachment", "a", []string{}, "Specify file(s), image(s), url(s) to append to the prompt")
-	rootCmd.Flags().StringVarP(&convoName, "conversation", "c", "", "Specify a conversation name to track chat session")
+	rootCmd.Flags().StringVarP(&sessionName, "session", "s", "", "Specify a session name or index to track")
 	rootCmd.Flags().BoolVarP(&yoloFlag, "yolo", "y", false, "Enable yolo mode (non-interactive)")
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
 

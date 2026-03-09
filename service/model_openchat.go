@@ -68,13 +68,13 @@ func (ag *Agent) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessag
  */
 func (ag *Agent) SortOpenChatMessagesByOrder() error {
 	// Load previous messages if any
-	err := ag.Convo.Load()
+	err := ag.Session.Load()
 	if err != nil {
 		return err
 	}
 
 	// Get current history
-	history, _ := ag.Convo.GetMessages().([]*model.ChatCompletionMessage)
+	history, _ := ag.Session.GetMessages().([]*model.ChatCompletionMessage)
 
 	// Handle System Prompt
 	if len(history) > 0 && history[0].Role == model.ChatMessageRoleSystem {
@@ -139,12 +139,12 @@ func (ag *Agent) SortOpenChatMessagesByOrder() error {
 		history = append(history, userMessage)
 	}
 
-	// Update the conversation with new messages
-	ag.Convo.SetMessages(history)
-	// Save the conversation
-	// Bugfix: save conversation after update messages
+	// Update the session with new messages
+	ag.Session.SetMessages(history)
+	// Save the session
+	// Bugfix: save session after update messages
 	// Because the system message could be modified, and added user message
-	return ag.Convo.Save()
+	return ag.Session.Save()
 }
 
 // GenerateOpenChatSync generates a single, non-streaming completion using the Volcengine API.
@@ -266,7 +266,7 @@ func (ag *Agent) GenerateOpenChatStream() error {
 	return nil
 }
 
-// Conversation manages the state of an ongoing conversation with an AI assistant
+// session manages the state of an ongoing session with an AI assistant
 type OpenChat struct {
 	client *arkruntime.Client
 	tools  []*model.Tool
@@ -274,12 +274,12 @@ type OpenChat struct {
 }
 
 func (c *OpenChat) process(ag *Agent) error {
-	// Recursively process the conversation
+	// Recursively process the session
 	// Because the model can call tools multiple times
 	i := 0
 	for range ag.MaxRecursions {
 		i++
-		//Debugf("Processing conversation at times: %d\n", i)
+		//Debugf("Processing session at times: %d\n", i)
 		c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusProcessing}, c.op.proceed)
 
 		// Note on Thinking Mode:
@@ -290,7 +290,7 @@ func (c *OpenChat) process(ag *Agent) error {
 		// robustly. If thinking tokens are missing in OpenChat, switch to provider: openai.
 
 		// Get all history messages
-		messages, _ := ag.Convo.GetMessages().([]*model.ChatCompletionMessage)
+		messages, _ := ag.Session.GetMessages().([]*model.ChatCompletionMessage)
 
 		// Apply context window management
 		// This ensures we don't exceed the model's context window
@@ -305,9 +305,9 @@ func (c *OpenChat) process(ag *Agent) error {
 		if truncated {
 			Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.", ag.Context.GetStrategy())
 			Debugf("Context messages after truncation: [%d]", len(messages))
-			// Update the conversation with truncated messages
-			ag.Convo.SetMessages(messages)
-			ag.Convo.Save()
+			// Update the session with truncated messages
+			ag.Session.SetMessages(messages)
+			ag.Session.Save()
 		}
 
 		// Set thinking mode using ThinkingLevel conversion
@@ -365,8 +365,8 @@ func (c *OpenChat) process(ag *Agent) error {
 		// The final response contains the token usage metainfo
 		ag.addUpOpenChatTokenUsage(resp)
 
-		// Add the assistant's message to the conversation
-		err = c.saveToConvo(ag, assistantMessage)
+		// Add the assistant's message to the session
+		err = c.saveToSession(ag, assistantMessage)
 		if err != nil {
 			return err
 		}
@@ -380,26 +380,26 @@ func (c *OpenChat) process(ag *Agent) error {
 					// Switch agent signal, pop up
 					if IsSwitchAgentError(err) {
 						// Bugfix: left an "orphan" tool_call that had no matching tool result.
-						// Add tool message to conversation to fix this.
-						c.saveToConvo(ag, toolMessage)
+						// Add tool message to session to fix this.
+						c.saveToSession(ag, toolMessage)
 						return err
 					}
 					if IsUserCancelError(err) {
 						// User cancelled tool call, pop up
-						c.saveToConvo(ag, toolMessage)
+						c.saveToSession(ag, toolMessage)
 						return err
 					}
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
 				}
-				// IMPORTANT: Even error happened still add an error response message to maintain conversation integrity
+				// IMPORTANT: Even error happened still add an error response message to maintain session integrity
 				// The API requires every tool_call to have a corresponding tool response
-				// Add the tool response to the conversation
-				err = c.saveToConvo(ag, toolMessage)
+				// Add the tool response to the session
+				err = c.saveToSession(ag, toolMessage)
 				if err != nil {
 					return err
 				}
 			}
-			// Continue the conversation recursively
+			// Continue the session recursively
 		} else {
 			// No function call and no model content
 			if assistantMessage.Content == nil {
@@ -431,16 +431,16 @@ func (c *OpenChat) process(ag *Agent) error {
 	return nil
 }
 
-// saveToConvo processes the conversation save
-// We need to save the conversation after each message is sent to the client
+// saveToSession processes the session save
+// We need to save the session after each message is sent to the client
 // Because model supports interleaved tool calls and responses, aka ReAct
-// If error happened or user cancelled, in order to maintain conversation integrity, we need to save the conversation
-// So that we can resume the conversation from the last saved state
-func (c *OpenChat) saveToConvo(ag *Agent, message *model.ChatCompletionMessage) error {
-	// Add the assistant's message to the conversation
-	err := ag.Convo.Push(message)
+// If error happened or user cancelled, in order to maintain session integrity, we need to save the session
+// So that we can resume the session from the last saved state
+func (c *OpenChat) saveToSession(ag *Agent, message *model.ChatCompletionMessage) error {
+	// Add the assistant's message to the session
+	err := ag.Session.Push(message)
 	if err != nil {
-		return fmt.Errorf("failed to save conversation: %v", err)
+		return fmt.Errorf("failed to save session: %v", err)
 	}
 	return nil
 }
@@ -676,7 +676,7 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		}
 		// Warn the user
 		c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", toolCall.Function.Name)}, nil)
-		err = nil // Don't stop conversation - let model see the error and adjust
+		err = nil // Don't stop session - let model see the error and adjust
 	}
 
 	// Function call is done
