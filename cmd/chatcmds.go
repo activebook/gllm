@@ -1,11 +1,9 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -13,7 +11,6 @@ import (
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
-	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
@@ -585,90 +582,17 @@ func (ci *ChatInfo) executeSkill(command string, parts []string) bool {
 
 // copyLastMessage copies the last assistant response or its latest code block to the clipboard.
 func (ci *ChatInfo) copyLastMessage() {
-	agent, err := EnsureActiveAgent()
-	if err != nil {
-		service.Errorf("Failed to get active agent: %v", err)
-		return
-	}
-
-	convoData, _, err := GetConvoData(convoName, agent.Model.Provider)
-	if err != nil {
-		service.Errorf("No conversation history available: %v", err)
-		return
-	}
-
-	// We need to decode the conversation data to find the last assistant message
-	// A robust way mapping to the interface is extracting the last text block from the raw log
-
-	// Since GetConvoData gives us raw JSONL, let's extract the last assistant message directly
-	var lastAssistantMessage string
-	lines := strings.Split(strings.TrimSpace(string(convoData)), "\n")
-
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := lines[i]
-		if line == "" {
-			continue
-		}
-
-		// Parse generically
-		var msg map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &msg); err != nil {
-			continue
-		}
-
-		// Check for assistant role
-		role, ok := msg["role"].(string)
-		if ok && (role == "model" || role == "assistant") {
-			// Extract content
-			if content, ok := msg["content"].(string); ok && content != "" {
-				lastAssistantMessage = content
-				break
-			} else if parts, ok := msg["parts"].([]interface{}); ok && len(parts) > 0 { // For Gemini format
-				for _, part := range parts {
-					if partMap, ok := part.(map[string]interface{}); ok {
-						if text, ok := partMap["text"].(string); ok && text != "" {
-							lastAssistantMessage = text
-							break
-						}
-					}
-				}
-				if lastAssistantMessage != "" {
-					break
-				}
-			}
-		}
-	}
+	lastAssistantMessage := data.GetClipboardText()
 
 	if lastAssistantMessage == "" {
 		service.Warnf("No assistant message found to copy.")
 		return
 	}
 
-	// Extract code block if requested, or just the whole message
-	toCopy := lastAssistantMessage
-
-	importClipboard := false
-	_ = importClipboard
-
-	// Optional: extracting last code block
-	// Look for markdown code blocks using regex
-	importRegexp := false
-	_ = importRegexp
-
-	re := regexp.MustCompile("(?s)```[a-zA-Z]*\\n(.*?)```")
-	matches := re.FindAllStringSubmatch(lastAssistantMessage, -1)
-
-	if len(matches) > 0 {
-		// Replace toCopy with just the last code block content
-		toCopy = strings.TrimSpace(matches[len(matches)-1][1])
-		fmt.Println("Copied the latest code snippet to clipboard.")
-	} else {
-		fmt.Println("Copied the last response to clipboard.")
-	}
-
 	// Actually copy to clipboard using atotto/clipboard
-	err = clipboard.WriteAll(toCopy)
+	err := data.WriteClipboardText(lastAssistantMessage)
 	if err != nil {
 		service.Errorf("Failed to copy to clipboard: %v", err)
 	}
+	service.Infof("Copied the last response to clipboard.\n")
 }

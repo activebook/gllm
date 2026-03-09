@@ -94,6 +94,9 @@ func (mr *Markdown) Render(r ui.Render) {
 	// Only gemini has citations
 	//output = removeCitations(output)
 
+	// Save the clean markdown output to the shared clipboard state
+	data.SaveClipboardText(output)
+
 	// Print the colored task completion message directly
 	r.Writeln("")
 	r.Writeln(data.TaskCompleteColor + "✓ Task Completed" + data.ResetSeq)
