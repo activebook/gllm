@@ -97,12 +97,14 @@ Configure your API keys and preferred models, then start chatting or executing c
 			// Args: cobra.ArbitraryArgs: This tells Cobra that receiving any number of positional arguments (including zero arguments) is perfectly valid.
 			// It won't trigger an error or the help message based on the argument count alone.
 			if len(args) == 0 &&
-				!cmd.Flags().Changed("agent") &&
 				!cmd.Flags().Changed("attachment") &&
 				!cmd.Flags().Changed("version") &&
-				!cmd.Flags().Changed("conversation") &&
 				!hasStdinData() {
-				cmd.Help()
+				// Default to interactive chat mode when no prompt or subcommand is provided.
+				// -g/--agent and -c/--conversation are forwarded via shared package-level globals.
+				if err := chatCmd.RunE(chatCmd, args); err != nil {
+					service.Errorf("%v", err)
+				}
 				return
 			}
 

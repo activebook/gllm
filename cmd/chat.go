@@ -21,8 +21,9 @@ import (
 
 // chatCmd represents the chat command
 var chatCmd = &cobra.Command{
-	Use:   "chat",
-	Short: "Start an interactive chat session (REPL)",
+	Use:    "chat",
+	Short:  "Start an interactive chat session (REPL)",
+	Hidden: true, // users invoke this implicitly via `gllm` with no subcommand
 	Long: `Start an interactive chat session with the configured LLM.
 This provides a Read-Eval-Print-Loop (REPL) interface where you can
 have a continuous conversation with the model.`,
@@ -43,17 +44,15 @@ have a continuous conversation with the model.`,
 		var chatInfo *ChatInfo
 		store := data.NewConfigStore()
 
-		// If conversation flag is not provided, generate a new conversation name
-		if !cmd.Flags().Changed("conversation") {
+		// Use the shared package-level convoName/agentName globals so that flags
+		// declared on rootCmd (e.g. -c, -g) are correctly honored when chatCmd
+		// is invoked programmatically from rootCmd's Run handler.
+
+		// If a conversation name was not supplied, generate a fresh one.
+		if convoName == "" {
 			convoName = GenerateChatFileName()
 		} else {
-			// Bugfix: When convoName is an index number, and use it to find convo file
-			// it will return the convo file(sorted by modified time)
-			// but if user mannually update other convo file, the modified time will change
-			// so the next time using index to load convo file, would load the wrong one
-			// How to fix:
-			// First, we need convert convoName
-			// And, keep that name, the next time, it willn't use the index to load convo file
+			// Resolve index-based names to their canonical file name.
 			name, err := service.FindConvosByIndex(convoName)
 			if err != nil {
 				return fmt.Errorf("error finding conversation: %v\n", err)
@@ -63,8 +62,8 @@ have a continuous conversation with the model.`,
 			}
 		}
 
-		// If agent flag is provided, update the default agent
-		if cmd.Flags().Changed("agent") {
+		// If an agent name was supplied, switch to it.
+		if agentName != "" {
 			if store.GetAgent(agentName) == nil {
 				return fmt.Errorf("agent %s does not exist", agentName)
 			}
