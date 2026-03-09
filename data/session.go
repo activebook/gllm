@@ -51,7 +51,7 @@ func (ss *SessionStore) List() ([]string, error) {
 			continue
 		}
 		name := entry.Name()
-		if !strings.HasSuffix(name, ".json") {
+		if !strings.HasSuffix(name, ".jsonl") {
 			continue
 		}
 
@@ -61,7 +61,7 @@ func (ss *SessionStore) List() ([]string, error) {
 		}
 
 		files = append(files, fileInfo{
-			name:    strings.TrimSuffix(name, ".json"),
+			name:    strings.TrimSuffix(name, ".jsonl"),
 			modTime: info.ModTime().Unix(),
 		})
 	}
@@ -127,7 +127,7 @@ func (ss *SessionStore) DeleteAll() error {
 		if entry.IsDir() {
 			continue
 		}
-		if strings.HasSuffix(entry.Name(), ".json") {
+		if strings.HasSuffix(entry.Name(), ".jsonl") {
 			path := filepath.Join(ss.dir, entry.Name())
 			if err := os.Remove(path); err != nil {
 				return fmt.Errorf("failed to delete %s: %w", entry.Name(), err)
@@ -153,8 +153,8 @@ func (ss *SessionStore) GetPath(name string) string {
 func (ss *SessionStore) getPath(name string) string {
 	// Sanitize the name
 	safeName := sanitizeFileName(name)
-	if !strings.HasSuffix(safeName, ".json") {
-		safeName = safeName + ".json"
+	if !strings.HasSuffix(safeName, ".jsonl") {
+		safeName = safeName + ".jsonl"
 	}
 	return filepath.Join(ss.dir, safeName)
 }

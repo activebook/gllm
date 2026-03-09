@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 )
 
 // SkillsSettings holds skill-related settings.
@@ -30,6 +31,11 @@ type VerboseSettings struct {
 	Enabled bool `json:"enabled"` // Whether verbose output is enabled
 }
 
+// UpdateSettings holds update-check-related settings.
+type UpdateSettings struct {
+	LastCheck time.Time `json:"last_check"`
+}
+
 // Settings represents the structure of settings.json.
 type Settings struct {
 	MCP     MCPSettings     `json:"mcp"`
@@ -38,6 +44,7 @@ type Settings struct {
 	Verbose VerboseSettings `json:"verbose"`
 	Theme   string          `json:"theme"`
 	Editor  string          `json:"editor"`
+	Update  UpdateSettings  `json:"update"`
 }
 
 // SettingsStore provides access to settings.json.
@@ -287,6 +294,21 @@ func (s *SettingsStore) GetEditor() string {
 func (s *SettingsStore) SetEditor(editor string) error {
 	s.mu.Lock()
 	s.settings.Editor = editor
+	s.mu.Unlock()
+	return s.Save()
+}
+
+// GetLastUpdateCheck returns the timestamp of the last update check.
+func (s *SettingsStore) GetLastUpdateCheck() time.Time {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.settings.Update.LastCheck
+}
+
+// SetLastUpdateCheck persists the timestamp of the most recent update check.
+func (s *SettingsStore) SetLastUpdateCheck(t time.Time) error {
+	s.mu.Lock()
+	s.settings.Update.LastCheck = t
 	s.mu.Unlock()
 	return s.Save()
 }

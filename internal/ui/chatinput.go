@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/activebook/gllm/data"
 	"github.com/charmbracelet/bubbles/textarea"
@@ -54,7 +55,11 @@ type ChatInputModel struct {
 	history          []string     // input history
 	historyIndex     int          // current history index
 	currentInput     string       // current input value
+	pendingBanner    string       // update notification banner (if any)
 }
+
+// tickMsg is for polling the background update check
+type tickMsg time.Time
 
 // NewChatInputModel creates a new chat input model
 func NewChatInputModel(commands []Suggestion, initialValue string, history []string) ChatInputModel {
@@ -97,7 +102,17 @@ func NewChatInputModel(commands []Suggestion, initialValue string, history []str
 }
 
 func (m ChatInputModel) Init() tea.Cmd {
-	return textarea.Blink
+	return tea.Batch(
+		textarea.Blink,
+		tickPendingUpdate(),
+	)
+}
+
+// tickPendingUpdate periodically emits a tickMsg to check for background updates
+func tickPendingUpdate() tea.Cmd {
+	return tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
 }
 
 // updateHistory updates the history with the given value
@@ -264,6 +279,25 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case tickMsg:
+		// Safe, non-blocking poll.
+		if m.pendingBanner == "" {
+			text, resolved := data.GetNotification()
+			if resolved {
+				if text != "" {
+					m.pendingBanner = text
+				}
+				// Stop ticking! We already got the notification
+				return m, nil
+			} else {
+				// keep ticking until resolved
+				return m, tickPendingUpdate()
+			}
+		} else {
+			// Banner already shown(only shown one), no need to keep ticking.
+			return m, nil
+		}
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -501,6 +535,11 @@ func (m ChatInputModel) View() string {
 	}
 
 	teaView := m.textarea.View()
+
+	// 1. Prepend update banner if we have one
+	if m.pendingBanner != "" {
+		teaView = m.pendingBanner + "\n\n" + teaView
+	}
 
 	if !m.showSuggestions || len(m.filteredCommands) == 0 {
 		return teaView
