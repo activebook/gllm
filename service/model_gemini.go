@@ -53,7 +53,7 @@ type GeminiAgent struct {
 
 func (ag *Agent) initGeminiAgent() (*GeminiAgent, error) {
 	// Setup the Gemini client
-	// In multi-turn conversation, even though we create it each time
+	// In multi-turn session, even though we create it each time
 	// it can still be cached for advanced gemini models such as 2.5 flash/pro
 	// so it's a server side job
 	ctx := context.Background()
@@ -79,12 +79,12 @@ func (ag *Agent) initGeminiAgent() (*GeminiAgent, error) {
 
 func (ag *Agent) SortGeminiMessagesByOrder() error {
 	// Load previous messages if any
-	err := ag.Convo.Load()
+	err := ag.Session.Load()
 	if err != nil {
 		return err
 	}
 
-	messages, _ := ag.Convo.GetMessages().([]*genai.Content)
+	messages, _ := ag.Session.GetMessages().([]*genai.Content)
 
 	var parts []*genai.Part
 
@@ -111,11 +111,11 @@ func (ag *Agent) SortGeminiMessagesByOrder() error {
 		messages = append(messages, content)
 	}
 
-	// Save messages to conversation
-	ag.Convo.SetMessages(messages)
-	// Bugfix: save conversation after update messages
+	// Save messages to session
+	ag.Session.SetMessages(messages)
+	// Bugfix: save session after update messages
 	// Although system message wouldn't needed, but it's better to save it for consistency
-	return ag.Convo.Save()
+	return ag.Session.Save()
 }
 
 // GenerateGeminiSync generates a single, non-streaming completion using the Gemini API.
@@ -274,7 +274,7 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 
 		// Create a chat session - this is the important part
 		// Get all history messages - MUST be inside loop to pick up newly pushed messages
-		messages, _ := ag.Convo.GetMessages().([]*genai.Content)
+		messages, _ := ag.Session.GetMessages().([]*genai.Content)
 
 		// Context Management
 		// Directly truncate on the messages
@@ -289,8 +289,8 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 		if truncated {
 			Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.", ag.Context.GetStrategy())
 			Debugf("Context messages after truncation: [%d]", len(messages))
-			ag.Convo.SetMessages(messages)
-			ag.Convo.Save()
+			ag.Session.SetMessages(messages)
+			ag.Session.Save()
 		}
 
 		// Call API
@@ -300,7 +300,7 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 		}
 
 		// Update History
-		err = ga.saveToConvo(ag, modelContent)
+		err = ga.saveToSession(ag, modelContent)
 		if err != nil {
 			return err
 		}
@@ -328,19 +328,19 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 				// Switch agent signal, pop up
 				if IsSwitchAgentError(err) {
 					// Add the response part to satisfy history integrity
-					ga.saveToConvo(ag, funcResp)
+					ga.saveToSession(ag, funcResp)
 					return err
 				}
 				if IsUserCancelError(err) {
 					// Add the response part to satisfy history integrity
-					ga.saveToConvo(ag, funcResp)
+					ga.saveToSession(ag, funcResp)
 					return err
 				}
 				ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
 			}
 			// Bugfix: Even error happened, we still need to send the function response back through the chat session
 			// Send function response back through the chat session
-			err = ga.saveToConvo(ag, funcResp)
+			err = ga.saveToSession(ag, funcResp)
 			if err != nil {
 				return err
 			}
@@ -367,16 +367,16 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 	return nil
 }
 
-// saveToConvo processes the conversation save
-// We need to save the conversation after each message is sent to the client
+// saveToSession processes the session save
+// We need to save the session after each message is sent to the client
 // Because model supports interleaved tool calls and responses, aka ReAct
-// If error happened or user cancelled, in order to maintain conversation integrity, we need to save the conversation
-// So that we can resume the conversation from the last saved state
-func (ga *GeminiAgent) saveToConvo(ag *Agent, content *genai.Content) error {
-	// Save the conversation history(curated)
-	err := ag.Convo.Push(content)
+// If error happened or user cancelled, in order to maintain session integrity, we need to save the session
+// So that we can resume the session from the last saved state
+func (ga *GeminiAgent) saveToSession(ag *Agent, content *genai.Content) error {
+	// Save the session history(curated)
+	err := ag.Session.Push(content)
 	if err != nil {
-		return fmt.Errorf("failed to save conversation: %v", err)
+		return fmt.Errorf("failed to save session: %v", err)
 	}
 	return nil
 }

@@ -11,28 +11,28 @@ import (
 	"google.golang.org/genai"
 )
 
-const CompressionSystemPrompt = `You are a conversation compression assistant. Your task is to compress the following conversation into a thorough, information-dense summary that preserves ALL key information.
+const CompressionSystemPrompt = `You are a session compression assistant. Your task is to compress the following session into a thorough, information-dense summary that preserves ALL key information.
 
 Rules:
 1. Preserve ALL factual information, decisions, conclusions, and action items
 2. Preserve ALL code snippets, file paths, configuration details, and technical specifications
-3. Preserve the chronological flow of the conversation
+3. Preserve the chronological flow of the session
 4. Preserve any unresolved questions or pending tasks
 5. Use structured format (headers, bullet points) for clarity
-6. Do NOT add any information that was not in the original conversation
-7. Do NOT lose any details that would be needed to continue the conversation seamlessly
+6. Do NOT add any information that was not in the original session
+7. Do NOT lose any details that would be needed to continue the session seamlessly
 
-The compressed output should allow someone to read it and have full context to continue the conversation as if they had read the entire history.`
+The compressed output should allow someone to read it and have full context to continue the session as if they had read the entire history.`
 
-const CompressionPromptFormat = `Please compress the conversation history above according to your system instructions.`
+const CompressionPromptFormat = `Please compress the session history above according to your system instructions.`
 
-const CompressedContextPrefix = "Here is the compressed context of our conversation:\n\n"
+const CompressedContextPrefix = "Here is the compressed context of our session:\n\n"
 const CompressedContextAck = "Context compressed successfully. I have read the summary and am ready to continue."
 
-// CompressConversation takes the raw conversation JSONL bytes and the active agent,
+// CompressSession takes the raw session JSONL bytes and the active agent,
 // and returns a compressed summary string using the active provider's non-streaming API.
 // No need to preserve the latest user message, because it's coming from /compress command.
-func CompressConversation(modelConfig *data.AgentConfig, convoData []byte) (string, error) {
+func CompressSession(modelConfig *data.AgentConfig, sessionData []byte) (string, error) {
 	// Reconstruct a lightweight Agent instance just for sync generation
 	ag := &Agent{
 		Model: constructModelInfo(&modelConfig.Model),
@@ -42,8 +42,8 @@ func CompressConversation(modelConfig *data.AgentConfig, convoData []byte) (stri
 
 	case ModelProviderOpenAI:
 		var messages []openai.ChatCompletionMessage
-		if err := parseJSONL(convoData, &messages); err != nil {
-			return "", fmt.Errorf("failed to parse OpenAI conversation: %w", err)
+		if err := parseJSONL(sessionData, &messages); err != nil {
+			return "", fmt.Errorf("failed to parse OpenAI session: %w", err)
 		}
 		send := append(make([]openai.ChatCompletionMessage, 0, len(messages)+1), messages...)
 		send = append(send, openai.ChatCompletionMessage{
@@ -54,8 +54,8 @@ func CompressConversation(modelConfig *data.AgentConfig, convoData []byte) (stri
 
 	case ModelProviderAnthropic:
 		var messages []anthropic.MessageParam
-		if err := parseJSONL(convoData, &messages); err != nil {
-			return "", fmt.Errorf("failed to parse Anthropic conversation: %w", err)
+		if err := parseJSONL(sessionData, &messages); err != nil {
+			return "", fmt.Errorf("failed to parse Anthropic session: %w", err)
 		}
 		send := append(make([]anthropic.MessageParam, 0, len(messages)+1), messages...)
 		send = append(send, anthropic.NewUserMessage(anthropic.NewTextBlock(CompressionPromptFormat)))
@@ -63,8 +63,8 @@ func CompressConversation(modelConfig *data.AgentConfig, convoData []byte) (stri
 
 	case ModelProviderGemini:
 		var messages []*genai.Content
-		if err := parseJSONL(convoData, &messages); err != nil {
-			return "", fmt.Errorf("failed to parse Gemini conversation: %w", err)
+		if err := parseJSONL(sessionData, &messages); err != nil {
+			return "", fmt.Errorf("failed to parse Gemini session: %w", err)
 		}
 		send := append(make([]*genai.Content, 0, len(messages)+1), messages...)
 		send = append(send, &genai.Content{
@@ -75,8 +75,8 @@ func CompressConversation(modelConfig *data.AgentConfig, convoData []byte) (stri
 
 	case ModelProviderOpenAICompatible: // OpenChat / Volcengine
 		var messages []*model.ChatCompletionMessage
-		if err := parseJSONL(convoData, &messages); err != nil {
-			return "", fmt.Errorf("failed to parse OpenChat conversation: %w", err)
+		if err := parseJSONL(sessionData, &messages); err != nil {
+			return "", fmt.Errorf("failed to parse OpenChat session: %w", err)
 		}
 		send := append(make([]*model.ChatCompletionMessage, 0, len(messages)+1), messages...)
 		send = append(send, &model.ChatCompletionMessage{
@@ -93,9 +93,9 @@ func CompressConversation(modelConfig *data.AgentConfig, convoData []byte) (stri
 	}
 }
 
-// BuildCompressedConvo constructs a new 2-message JSONL conversation from the summary,
+// BuildCompressedSession constructs a new 2-message JSONL session from the summary,
 // formatted for the specified provider. User provides the summary, assistant acknowledges.
-func BuildCompressedConvo(summary string, provider string) ([]byte, error) {
+func BuildCompressedSession(summary string, provider string) ([]byte, error) {
 	switch provider {
 	case ModelProviderOpenAI:
 		messages := []openai.ChatCompletionMessage{
@@ -138,7 +138,7 @@ func BuildCompressedConvo(summary string, provider string) ([]byte, error) {
 		return marshalJSONL(messages)
 
 	default:
-		return nil, fmt.Errorf("unsupported provider for building compressed convo: %s", provider)
+		return nil, fmt.Errorf("unsupported provider for building compressed session: %s", provider)
 	}
 }
 

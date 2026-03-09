@@ -994,7 +994,7 @@ func getSaveMemoryTool() *OpenTool {
 		Name: ToolSaveMemory,
 		Description: `Update long-term user memories.
 
-CRITICAL: Do NOT use this tool for conversation history, trivial facts, or immediate context.
+CRITICAL: Do NOT use this tool for session history, trivial facts, or immediate context.
 Only use this tool when the user EXPLICITLY asks to "remember" or "save" a preference/fact for FUTURE sessions.
 
 This tool replaces ALL memories with the content you provide. You should:
@@ -1105,7 +1105,7 @@ func getSpawnSubAgentsTool() *OpenTool {
 		Description: `Spawn multiple sub-agents to perform parallel or sequential tasks.
 
 This tool allows you to delegate work to specialized agents, manage dependencies between tasks,
-and collect results in a structured way. Sub-agents run in isolated contexts (no shared conversation history).
+and collect results in a structured way. Sub-agents run in isolated contexts (no shared sessions).
 
 CRITICAL: Assign a unique, semantic task_key to each task—this is your ONLY mechanism to retrieve results
 and correlate outputs across the workflow. Returns progress summary; use get_state(task_key) for full detailed results.

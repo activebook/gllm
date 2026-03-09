@@ -183,7 +183,7 @@ func (a *Anthropic) process(ag *Agent) error {
 		i++
 		a.op.status.ChangeTo(a.op.notify, StreamNotify{Status: StatusProcessing}, a.op.proceed)
 
-		messages, _ := ag.Convo.GetMessages().([]anthropic.MessageParam)
+		messages, _ := ag.Session.GetMessages().([]anthropic.MessageParam)
 
 		// check context limit and prune if needed
 		Debugf("Context messages: [%d]", len(messages))
@@ -196,9 +196,9 @@ func (a *Anthropic) process(ag *Agent) error {
 		if truncated {
 			Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.", ag.Context.GetStrategy())
 			Debugf("Context messages after truncation: [%d]", len(messages))
-			// Update the conversation with truncated messages
-			ag.Convo.SetMessages(messages)
-			ag.Convo.Save()
+			// Update the session with truncated messages
+			ag.Session.SetMessages(messages)
+			ag.Session.Save()
 		}
 
 		// Create params
@@ -243,7 +243,7 @@ func (a *Anthropic) process(ag *Agent) error {
 		addUpAnthropicTokenUsage(ag, usage)
 
 		// Push assistant message
-		err = a.saveToConvo(ag, msg)
+		err = a.saveToSession(ag, msg)
 		if err != nil {
 			return err
 		}
@@ -257,20 +257,20 @@ func (a *Anthropic) process(ag *Agent) error {
 					// Switch agent signal, pop up
 					if IsSwitchAgentError(err) {
 						// Bugfix: left an "orphan" tool_call that had no matching tool result.
-						// Add tool message to conversation to fix this.
-						a.saveToConvo(ag, toolMsg)
+						// Add tool message to session to fix this.
+						a.saveToSession(ag, toolMsg)
 						return err
 					}
 					if IsUserCancelError(err) {
 						// User cancel signal, pop up
-						a.saveToConvo(ag, toolMsg)
+						a.saveToSession(ag, toolMsg)
 						return err
 					}
 					ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Failed to process tool call: %v", err)}, nil)
 				}
-				// IMPORTANT: Even error happened still add an error response message to maintain conversation integrity
+				// IMPORTANT: Even error happened still add an error response message to maintain session integrity
 				// The API requires every tool_call to have a corresponding tool response
-				err = a.saveToConvo(ag, toolMsg)
+				err = a.saveToSession(ag, toolMsg)
 				if err != nil {
 					return err
 				}
@@ -297,16 +297,16 @@ func (a *Anthropic) process(ag *Agent) error {
 	return nil
 }
 
-// saveToConvo processes the conversation save
-// We need to save the conversation after each message is sent to the client
+// saveToSession processes the session save
+// We need to save the session after each message is sent to the client
 // Because model supports interleaved tool calls and responses, aka ReAct
-// If error happened or user cancelled, in order to maintain conversation integrity, we need to save the conversation
-// So that we can resume the conversation from the last saved state
-func (a *Anthropic) saveToConvo(ag *Agent, message anthropic.MessageParam) error {
-	// Add the assistant's message to the conversation
-	err := ag.Convo.Push(message)
+// If error happened or user cancelled, in order to maintain session integrity, we need to save the session
+// So that we can resume the session from the last saved state
+func (a *Anthropic) saveToSession(ag *Agent, message anthropic.MessageParam) error {
+	// Add the assistant's message to the session
+	err := ag.Session.Push(message)
 	if err != nil {
-		return fmt.Errorf("failed to save conversation: %v", err)
+		return fmt.Errorf("failed to save session: %v", err)
 	}
 	return nil
 }
@@ -550,12 +550,12 @@ func (a *Anthropic) processToolCall(toolCall anthropic.ToolUseBlockParam) (anthr
 
 func (ag *Agent) SortAnthropicMessagesByOrder() error {
 	// Load
-	err := ag.Convo.Load()
+	err := ag.Session.Load()
 	if err != nil {
 		return err
 	}
 
-	history, _ := ag.Convo.GetMessages().([]anthropic.MessageParam)
+	history, _ := ag.Session.GetMessages().([]anthropic.MessageParam)
 
 	// User Message
 	var userContent []anthropic.ContentBlockParamUnion
@@ -580,10 +580,10 @@ func (ag *Agent) SortAnthropicMessagesByOrder() error {
 		history = append(history, userMsg)
 	}
 
-	ag.Convo.SetMessages(history)
-	// Bugfix: save conversation after update messages
+	ag.Session.SetMessages(history)
+	// Bugfix: save session after update messages
 	// Although system message wouldn't needed, but it's better to save it for consistency
-	return ag.Convo.Save()
+	return ag.Session.Save()
 }
 
 func (ag *Agent) getAnthropicTools() []anthropic.ToolUnionParam {

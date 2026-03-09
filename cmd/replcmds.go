@@ -170,7 +170,7 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 		switchYoloMode()
 
 	case "/session":
-		runCommand(convoCmd, parts[1:])
+		runCommand(sessionCmd, parts[1:])
 
 	case "/compress":
 		ri.compressContext()
@@ -578,21 +578,4 @@ func (ri *ReplInfo) executeSkill(command string, parts []string) bool {
 	// Set the content as input to be processed by the agent
 	ri.EditorInput = input
 	return true
-}
-
-// copyLastMessage copies the last assistant response or its latest code block to the clipboard.
-func (ri *ReplInfo) copyLastMessage() {
-	lastAssistantMessage := data.GetClipboardText()
-
-	if lastAssistantMessage == "" {
-		service.Warnf("No assistant message found to copy.")
-		return
-	}
-
-	// Actually copy to clipboard using atotto/clipboard
-	err := data.WriteClipboardText(lastAssistantMessage)
-	if err != nil {
-		service.Errorf("Failed to copy to clipboard: %v", err)
-	}
-	service.Infof("Copied the last response to clipboard.\n")
 }

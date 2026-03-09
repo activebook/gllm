@@ -37,7 +37,7 @@ const (
 	AgentWebSearchBody    = "enables the agent to search the web for real-time information.\nYou must configure a search engine (Google, Bing, Tavily) to use this feature."
 	AgentTokenUsageBody   = "allows agents to track their token usage.\nThis helps you to control the cost of using the agent."
 	AgentMarkdownBody     = "allows agents to generate final response in Markdown format.\nThis helps you to format the response in a more readable way."
-	AgentAutoCompressBody = "automatically compresses conversation context using a summary when context window limits are reached.\nThis provides an infinite context window continuity with minimal detail loss."
+	AgentAutoCompressBody = "automatically compresses session context using a summary when context window limits are reached.\nThis provides an infinite context window continuity with minimal detail loss."
 
 	AgentMCPDescription          = AgentMCPTitle + " " + AgentMCPBody
 	AgentSkillsDescription       = AgentSkillsTitle + " " + AgentSkillsBody

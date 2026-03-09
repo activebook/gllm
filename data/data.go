@@ -1,5 +1,5 @@
 // Package data provides the foundational data layer for all file I/O operations.
-// It encapsulates config, memory, MCP, and conversation data access behind strongly-typed structs.
+// It encapsulates config, memory, MCP, and session data access behind strongly-typed structs.
 //
 // Architecture: cmd → service → data
 // The data layer is the only layer that should directly access files or viper.
@@ -40,9 +40,9 @@ func GetMemoryFilePath() string {
 	return filepath.Join(GetConfigDir(), "context.md")
 }
 
-// GetConvoDirPath returns the path to the conversation directory.
-func GetConvoDirPath() string {
-	return filepath.Join(GetConfigDir(), "convo")
+// GetSessionDirPath returns the path to the session directory.
+func GetSessionDirPath() string {
+	return filepath.Join(GetConfigDir(), "session")
 }
 
 // GetTasksDirPath returns the path to the subagent tasks directory.

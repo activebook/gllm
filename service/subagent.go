@@ -448,7 +448,7 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 		YoloMode:      true, // Sub-agents always auto-approve
 		OutputFile:    outputFile,
 		QuietMode:     true, // Sub-agents run quietly
-		ConvoName:     "",   // No conversation persistence for sub-agents
+		SessionName:   "",   // No session persistence for sub-agents
 		MCPConfig:     mcpConfig,
 		SharedState:   e.state,
 		AgentName:     task.AgentName,

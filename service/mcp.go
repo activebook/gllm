@@ -81,7 +81,7 @@ type MCPLoadOption struct {
 
 /*
 A singleton pattern for the MCP client is an excellent approach.
-Since MCP functionality is independent of the LLM model and conversation context,
+Since MCP functionality is independent of the LLM model,
 a single shared instance can serve all requests across the application.
 */
 var (
