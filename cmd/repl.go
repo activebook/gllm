@@ -264,6 +264,10 @@ func (ri *ReplInfo) startREPL() {
 	// Start the REPL
 	ri.printWelcome()
 
+	// Launch background update check (non-blocking).
+	// Only check once repl started
+	StartBackgroundUpdateCheck()
+
 	// Define prompt style
 	tcol := ui.GetTerminalWidth()
 	promptStyle := lipgloss.NewStyle().
@@ -277,6 +281,9 @@ func (ri *ReplInfo) startREPL() {
 	for {
 		var input string
 		var err error
+
+		// Show pending update notification (before model output, non-intrusive).
+		ShowPendingUpdateNotification()
 
 		// Get user input
 		input, err = ri.awaitInput()

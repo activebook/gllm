@@ -44,6 +44,7 @@ var (
 		"/theme":    "Manage and switch themes",
 		"/verbose":  "Toggle verbose mode",
 		"/workflow": "Manage workflow commands",
+		"/update":   "Check and update to the latest version",
 	}
 
 	replSpecMap = map[string]string{
@@ -216,6 +217,9 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 
 	case "/workflow":
 		runCommand(workflowCmd, parts[1:])
+
+	case "/update":
+		runCommand(updateCmd, parts[1:])
 
 	default:
 		// Try to execute as workflow command

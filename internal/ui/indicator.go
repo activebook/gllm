@@ -33,6 +33,8 @@ const (
 	IndicatorThinking           = "Thinking..."
 	IndicatorLoadingMCP         = "Loading MCP servers..."
 	IndicatorCompressingContext = "Compressing context..."
+	IndicatorCheckingUpdate     = "Checking for updates..."
+	IndicatorInstallingUpdate   = "Downloading and installing..."
 )
 
 // WhimsicalProcessingWords is a collection of fun, playful processing indicators
