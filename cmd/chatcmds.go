@@ -39,7 +39,8 @@ var (
 		"/editor":   "Manage editor or open for multi-line input",
 		"/attach":   "Attach a file",
 		"/detach":   "Detach a file",
-		"/info":     "Show current settings",
+		"/copy":     "Copy the last result or code snippet to clipboard",
+		"/about":    "Show current settings",
 		"/theme":    "Manage and switch themes",
 		"/verbose":  "Toggle verbose mode",
 		"/workflow": "Manage workflow commands",
@@ -192,7 +193,7 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 			fmt.Println("Please specify a file path")
 			return
 		}
-		ci.addAttachFiles(cmd)
+		ci.attachFiles(cmd)
 
 	case "/detach":
 		if len(parts) < 2 {
@@ -201,7 +202,10 @@ func (ci *ChatInfo) handleCommand(cmd string) {
 		}
 		ci.detachFiles(cmd)
 
-	case "/info":
+	case "/copy":
+		ci.copyLastMessage()
+
+	case "/about":
 		ci.showInfo()
 
 	case "/theme":
@@ -380,7 +384,7 @@ func (ci *ChatInfo) handleEditorCommand() {
 	ci.EditorInput = content
 }
 
-func (ci *ChatInfo) addAttachFiles(input string) {
+func (ci *ChatInfo) attachFiles(input string) {
 	// Split input into tokens
 	tokens := strings.Fields(input)
 
@@ -574,4 +578,21 @@ func (ci *ChatInfo) executeSkill(command string, parts []string) bool {
 	// Set the content as input to be processed by the agent
 	ci.EditorInput = input
 	return true
+}
+
+// copyLastMessage copies the last assistant response or its latest code block to the clipboard.
+func (ci *ChatInfo) copyLastMessage() {
+	lastAssistantMessage := data.GetClipboardText()
+
+	if lastAssistantMessage == "" {
+		service.Warnf("No assistant message found to copy.")
+		return
+	}
+
+	// Actually copy to clipboard using atotto/clipboard
+	err := data.WriteClipboardText(lastAssistantMessage)
+	if err != nil {
+		service.Errorf("Failed to copy to clipboard: %v", err)
+	}
+	service.Infof("Copied the last response to clipboard.\n")
 }
