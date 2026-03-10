@@ -60,6 +60,16 @@ scoop install gllm
 curl -fsSL https://raw.githubusercontent.com/activebook/gllm/main/build/install.sh | sh
 ```
 
+### Multi-Platform Self-Update
+
+`gllm` includes a built-in self-update mechanism that automatically checks for new versions in the background. You can also manually trigger an update or check the current status.
+
+| Background Update Notification | Manual Update with /update |
+|:---:|:---:|
+| ![Self Update 1](screenshots/selfupdate1.png) | ![Self Update 2](screenshots/selfupdate2.png) |
+
+---
+
 ### Build from Source
 
 ```sh
