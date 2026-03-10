@@ -474,9 +474,9 @@ func (ga *GeminiAgent) processGeminiStream(ctx context.Context,
 func (ga *GeminiAgent) processGeminiToolCall(call *genai.FunctionCall) (*genai.Content, error) {
 
 	var filteredArgs map[string]interface{}
-	if call.Name == ToolEditFile || call.Name == ToolWriteFile {
+	if call.Name == ToolEditFile || call.Name == ToolWriteFile || call.Name == ToolAskUser {
 		// Don't show content(the modified content could be too long)
-		filteredArgs = FilterOpenToolArguments(call.Args, []string{"content", "edits"})
+		filteredArgs = FilterOpenToolArguments(call.Args, []string{"content", "edits", "options", "question_type"})
 	} else {
 		filteredArgs = FilterOpenToolArguments(call.Args, []string{})
 	}
@@ -518,6 +518,7 @@ func (ga *GeminiAgent) processGeminiToolCall(call *genai.FunctionCall) (*genai.C
 		ToolSetState:          ga.GeminiSetStateToolCall,
 		ToolListState:         ga.GeminiListStateToolCall,
 		ToolActivateSkill:     ga.GeminiActivateSkillToolCall,
+		ToolAskUser:           ga.GeminiAskUserToolCall,
 	}
 
 	if handler, ok := toolHandlers[call.Name]; ok {

@@ -320,3 +320,14 @@ func (op *OpenProcessor) AnthropicActivateSkillToolCall(toolCall anthropic.ToolU
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
 	return anthropic.NewUserMessage(toolResult), err
 }
+
+func (op *OpenProcessor) AnthropicAskUserToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
+	response, err := askUserToolCallImpl(argsMap)
+	isError := err != nil
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
+	return anthropic.NewUserMessage(toolResult), err
+}

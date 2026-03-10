@@ -551,9 +551,9 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 	}
 
 	var filteredArgs map[string]interface{}
-	if toolCall.Function.Name == ToolEditFile || toolCall.Function.Name == ToolWriteFile {
+	if toolCall.Function.Name == ToolEditFile || toolCall.Function.Name == ToolWriteFile || toolCall.Function.Name == ToolAskUser {
 		// Don't show content(the modified content could be too long)
-		filteredArgs = FilterOpenToolArguments(argsMap, []string{"content", "edits"})
+		filteredArgs = FilterOpenToolArguments(argsMap, []string{"content", "edits", "options", "question_type"})
 	} else {
 		filteredArgs = FilterOpenToolArguments(argsMap, []string{})
 	}
@@ -596,6 +596,7 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 		ToolSetState:          oa.op.OpenAISetStateToolCall,
 		ToolListState:         oa.op.OpenAIListStateToolCall,
 		ToolActivateSkill:     oa.op.OpenAIActivateSkillToolCall,
+		ToolAskUser:           oa.op.OpenAIAskUserToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {

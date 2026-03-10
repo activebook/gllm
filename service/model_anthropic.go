@@ -483,9 +483,9 @@ func (a *Anthropic) processToolCall(toolCall anthropic.ToolUseBlockParam) (anthr
 	}
 
 	var filteredArgs map[string]interface{}
-	if toolCall.Name == ToolEditFile || toolCall.Name == ToolWriteFile {
+	if toolCall.Name == ToolEditFile || toolCall.Name == ToolWriteFile || toolCall.Name == ToolAskUser {
 		// Don't show content(the modified content could be too long)
-		filteredArgs = FilterOpenToolArguments(argsMap, []string{"content", "edits"})
+		filteredArgs = FilterOpenToolArguments(argsMap, []string{"content", "edits", "options", "question_type"})
 	} else {
 		filteredArgs = FilterOpenToolArguments(argsMap, []string{})
 	}
@@ -527,6 +527,7 @@ func (a *Anthropic) processToolCall(toolCall anthropic.ToolUseBlockParam) (anthr
 		ToolSetState:          a.op.AnthropicSetStateToolCall,
 		ToolListState:         a.op.AnthropicListStateToolCall,
 		ToolActivateSkill:     a.op.AnthropicActivateSkillToolCall,
+		ToolAskUser:           a.op.AnthropicAskUserToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Name]; ok {
