@@ -40,9 +40,14 @@ func GetMemoryFilePath() string {
 	return filepath.Join(GetConfigDir(), "context.md")
 }
 
-// GetSessionDirPath returns the path to the session directory.
-func GetSessionDirPath() string {
-	return filepath.Join(GetConfigDir(), "session")
+// GetSessionsDirPath returns the path to the session directory.
+func GetSessionsDirPath() string {
+	return filepath.Join(GetConfigDir(), "sessions")
+}
+
+// GetPlansDirPath returns the path to the plan directory.
+func GetPlansDirPath() string {
+	return filepath.Join(GetConfigDir(), "plans")
 }
 
 // GetTasksDirPath returns the path to the subagent tasks directory.

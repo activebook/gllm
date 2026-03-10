@@ -38,7 +38,7 @@ func (s *BaseSession) SetPath(title string) {
 		s.Path = ""
 		return
 	}
-	dir := GetSessionDir()
+	dir := GetSessionsDir()
 	s.Path = GetFilePath(dir, title+".jsonl")
 }
 
@@ -178,8 +178,8 @@ type SessionMeta struct {
 	Empty    bool
 }
 
-func GetSessionDir() string {
-	dir := data.GetSessionDirPath()
+func GetSessionsDir() string {
+	dir := data.GetSessionsDirPath()
 	os.MkdirAll(dir, 0750)
 	return dir
 }
@@ -187,13 +187,13 @@ func GetSessionDir() string {
 // ClearEmptySessionsAsync clears all empty sessions in background
 func ClearEmptySessionsAsync() {
 	go func() {
-		files, err := os.ReadDir(GetSessionDir())
+		files, err := os.ReadDir(GetSessionsDir())
 		if err != nil {
 			return
 		}
 		for _, file := range files {
 			if !file.IsDir() && strings.HasSuffix(file.Name(), ".jsonl") {
-				fullPath := GetFilePath(GetSessionDir(), file.Name())
+				fullPath := GetFilePath(GetSessionsDir(), file.Name())
 				info, err := file.Info()
 				if err != nil {
 					continue
@@ -217,7 +217,7 @@ func FindSessionByIndex(idx string) (string, error) {
 	index, err := strconv.Atoi(idx)
 	if err == nil {
 		// It's an index, resolve to session name using your sorted list logic
-		sessions, err := ListSortedSessions(GetSessionDir(), false, false)
+		sessions, err := ListSortedSessions(GetSessionsDir(), false, false)
 		if err != nil {
 			return "", err
 		}

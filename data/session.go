@@ -16,7 +16,7 @@ type SessionStore struct {
 // NewSessionStore creates a new sessionStore with the default directory.
 func NewSessionStore() *SessionStore {
 	return &SessionStore{
-		dir: GetSessionDirPath(),
+		dir: GetSessionsDirPath(),
 	}
 }
 
