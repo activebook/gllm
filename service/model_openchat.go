@@ -611,9 +611,9 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	}
 
 	var filteredArgs map[string]interface{}
-	if toolCall.Function.Name == ToolEditFile || toolCall.Function.Name == ToolWriteFile {
+	if toolCall.Function.Name == ToolEditFile || toolCall.Function.Name == ToolWriteFile || toolCall.Function.Name == ToolAskUser {
 		// Don't show content(the modified content could be too long)
-		filteredArgs = FilterOpenToolArguments(argsMap, []string{"content", "edits"})
+		filteredArgs = FilterOpenToolArguments(argsMap, []string{"content", "edits", "options", "question_type"})
 	} else {
 		filteredArgs = FilterOpenToolArguments(argsMap, []string{})
 	}
@@ -656,6 +656,7 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		ToolSetState:          c.op.OpenChatSetStateToolCall,
 		ToolListState:         c.op.OpenChatListStateToolCall,
 		ToolActivateSkill:     c.op.OpenChatActivateSkillToolCall,
+		ToolAskUser:           c.op.OpenChatAskUserToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {

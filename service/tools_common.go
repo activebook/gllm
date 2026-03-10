@@ -34,6 +34,7 @@ const (
 	ToolReadMultipleFiles = "read_multiple_files"
 	ToolWebFetch          = "web_fetch"
 	ToolSwitchAgent       = "switch_agent"
+	ToolAskUser           = "ask_user"
 	ToolWebSearch         = "web_search"
 	ToolActivateSkill     = "activate_skill"
 	ToolListMemory        = "list_memory"
@@ -97,6 +98,8 @@ var (
 		ToolWebFetch,
 		// agent tools
 		ToolSwitchAgent,
+		// Interactive tools
+		ToolAskUser,
 	}
 	searchTools = []string{
 		// web tools
@@ -561,6 +564,10 @@ func getOpenTools() []*OpenTool {
 	// list_agent tool - List all available agents
 	listAgentTool := getListAgentTool()
 	tools = append(tools, listAgentTool)
+
+	// ask_user tool
+	askUserTool := getAskUserTool()
+	tools = append(tools, askUserTool)
 
 	// spawn_subagents tool - The core orchestration tool
 	spawnSubAgentsTool := getSpawnSubAgentsTool()
@@ -1411,6 +1418,44 @@ LLM should call with:
 	}
 
 	return &shellTool
+}
+
+func getAskUserTool() *OpenTool {
+	askUserFunc := OpenFunctionDefinition{
+		Name:        ToolAskUser,
+		Description: "Pause execution and ask the user an interactive question. Use to resolve ambiguity, gather parameters, confirm actions, or present choices. The answer is returned as: a plain string for 'text'; binary choice for 'confirm'; the selected option string for 'select'; an array of selected option strings for 'multiselect'.",
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"question": map[string]interface{}{
+					"type":        "string",
+					"description": "The question or prompt text to display to the user.",
+				},
+				"question_type": map[string]interface{}{
+					"type":        "string",
+					"enum":        []string{"select", "multiselect", "text", "confirm"},
+					"description": "The interaction mode. 'select'=single choice from options, 'multiselect'=multiple choices from options, 'text'=free-form input, 'confirm'=binary boolean choice (yes/no, true/false, proceed/cancel, enable/disable, etc.).",
+				},
+				"options": map[string]interface{}{
+					"type": "array",
+					"items": map[string]interface{}{
+						"type": "string",
+					},
+					"description": "List of choices. REQUIRED and must be non-empty when question_type is 'select' or 'multiselect' or 'confrim'. Omit for 'text'.",
+				},
+				"placeholder": map[string]interface{}{
+					"type":        "string",
+					"description": "Optional placeholder hint shown inside the input field. Only applicable to 'text' type. Ignored otherwise.",
+				},
+			},
+			"required": []string{"question", "question_type"},
+		},
+	}
+	askUserTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &askUserFunc,
+	}
+	return &askUserTool
 }
 
 // OpenProcessor is the main processor for OpenAI-like models

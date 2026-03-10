@@ -1357,3 +1357,34 @@ func activateSkillToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.T
 
 	return skillDetails, nil
 }
+
+func askUserToolCallImpl(argsMap *map[string]interface{}) (string, error) {
+	question, _ := (*argsMap)["question"].(string)
+	qType, _ := (*argsMap)["question_type"].(string)
+
+	var options []string
+	if rawOpts, ok := (*argsMap)["options"].([]interface{}); ok {
+		for _, o := range rawOpts {
+			if s, ok := o.(string); ok {
+				options = append(options, s)
+			}
+		}
+	}
+	placeholder, _ := (*argsMap)["placeholder"].(string)
+
+	req := ui.AskUserRequest{
+		Question:     question,
+		QuestionType: ui.QuestionType(qType),
+		Options:      options,
+		Placeholder:  placeholder,
+	}
+
+	resp, err := ui.RunAskUser(req)
+	if err != nil {
+		return "", err
+	}
+
+	// Encode answer back to the model
+	out, _ := json.Marshal(resp)
+	return string(out), nil
+}

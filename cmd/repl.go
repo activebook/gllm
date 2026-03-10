@@ -7,8 +7,6 @@ import (
 	"runtime"
 	"sort"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/activebook/gllm/data"
@@ -84,11 +82,6 @@ have a continuous session with the model.`,
 		return nil
 	},
 }
-
-var (
-	once       sync.Once
-	userIsIdle atomic.Bool // true = idle at prompt; false = user typed / agent running
-)
 
 const (
 	editTempFile = ".gllm-edit-*.tmp"

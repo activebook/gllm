@@ -383,3 +383,16 @@ func (op *OpenProcessor) OpenAIActivateSkillToolCall(toolCall openai.ToolCall, a
 		Content:    response,
 	}, err
 }
+
+func (op *OpenProcessor) OpenAIAskUserToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+	response, err := askUserToolCallImpl(argsMap)
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	return openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Content:    response,
+	}, err
+}
