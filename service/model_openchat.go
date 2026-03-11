@@ -60,11 +60,9 @@ func (ag *Agent) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessag
 }
 
 /*
- * Sort the messages by order
- * 1. System Prompt -- always at the top
- * 2. History Prompts
- *    - User Prompt
- *    - Assistant Prompt
+ * Sort the messages by order:
+ *   History (user/assistant/tool turns only — no system message)
+ *   The system prompt is never persisted; it is injected fresh in process().
  */
 func (ag *Agent) SortOpenChatMessagesByOrder() error {
 	// Load previous messages if any
@@ -73,40 +71,8 @@ func (ag *Agent) SortOpenChatMessagesByOrder() error {
 		return err
 	}
 
-	// Get current history
+	// Get current history (pure dialogue, no system messages)
 	history, _ := ag.Session.GetMessages().([]*model.ChatCompletionMessage)
-
-	// Handle System Prompt
-	if len(history) > 0 && history[0].Role == model.ChatMessageRoleSystem {
-		// Check for duplication
-		currentSysContent := ""
-		if history[0].Content != nil && history[0].Content.StringValue != nil {
-			currentSysContent = *history[0].Content.StringValue
-		}
-
-		// If the new system prompt is not empty and not included in the old one, append it
-		if ag.SystemPrompt != "" && !strings.Contains(currentSysContent, ag.SystemPrompt) {
-			newContent := currentSysContent + "\n" + ag.SystemPrompt
-			history[0].Content = &model.ChatCompletionMessageContent{
-				StringValue: volcengine.String(newContent),
-			}
-			Debugf("Modified System Prompt: %s", *history[0].Content.StringValue)
-		} else {
-			Debugf("Reuse System Prompt: %s", *history[0].Content.StringValue)
-		}
-	} else if ag.SystemPrompt != "" {
-		Debugf("New System Prompt: %s", ag.SystemPrompt)
-		// Prepend system prompt
-		sysMsg := &model.ChatCompletionMessage{
-			Role: model.ChatMessageRoleSystem,
-			Content: &model.ChatCompletionMessageContent{
-				StringValue: volcengine.String(ag.SystemPrompt),
-			},
-			Name: Ptr(""),
-		}
-		// Always prepend system prompt at the beginning of the history
-		history = append([]*model.ChatCompletionMessage{sysMsg}, history...)
-	}
 
 	var userMessage *model.ChatCompletionMessage
 	// Add user message
@@ -145,6 +111,25 @@ func (ag *Agent) SortOpenChatMessagesByOrder() error {
 	// Bugfix: save session after update messages
 	// Because the system message could be modified, and added user message
 	return ag.Session.Save()
+}
+
+// prependOpenChatSystemMessage builds the final API messages slice by prepending
+// a fresh system message in-memory. Returns history unchanged when prompt is empty.
+func prependOpenChatSystemMessage(systemPrompt string, history []*model.ChatCompletionMessage) []*model.ChatCompletionMessage {
+	if systemPrompt == "" {
+		return history
+	}
+	sysMsg := &model.ChatCompletionMessage{
+		Role: model.ChatMessageRoleSystem,
+		Content: &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(systemPrompt),
+		},
+		Name: Ptr(""),
+	}
+	messages := make([]*model.ChatCompletionMessage, 0, 1+len(history))
+	messages = append(messages, sysMsg)
+	messages = append(messages, history...)
+	return messages
 }
 
 // GenerateOpenChatSync generates a single, non-streaming completion using the Volcengine API.
@@ -289,14 +274,13 @@ func (c *OpenChat) process(ag *Agent) error {
 		// In contrast, openai.go uses the generic go-openai library which handles standard "reasoning_content" fields
 		// robustly. If thinking tokens are missing in OpenChat, switch to provider: openai.
 
-		// Get all history messages
+		// Get all history messages - MUST be inside loop to pick up newly pushed messages.
+		// Session only holds pure dialogue (user/assistant/tool turns).
 		messages, _ := ag.Session.GetMessages().([]*model.ChatCompletionMessage)
 
-		// Apply context window management
-		// This ensures we don't exceed the model's context window
+		// Apply context window management.
 		Debugf("Context messages: [%d]", len(messages))
-		// check context limit and prune if needed
-		pruned, truncated, err := ag.Context.PruneMessages(messages, c.tools)
+		pruned, truncated, err := ag.Context.PruneMessages(messages, ag.SystemPrompt, c.tools)
 		if err != nil {
 			return fmt.Errorf("failed to prune context: %w", err)
 		}
@@ -305,10 +289,13 @@ func (c *OpenChat) process(ag *Agent) error {
 		if truncated {
 			Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.", ag.Context.GetStrategy())
 			Debugf("Context messages after truncation: [%d]", len(messages))
-			// Update the session with truncated messages
+			// Session write-back is clean: system message not yet prepended at this point.
 			ag.Session.SetMessages(messages)
 			ag.Session.Save()
 		}
+
+		// Prepend the fresh system prompt in-memory only — never persisted.
+		messages = prependOpenChatSystemMessage(ag.SystemPrompt, messages)
 
 		// Set thinking mode using ThinkingLevel conversion
 		thinking, reasoningEffort := ag.ThinkingLevel.ToOpenChatParams()

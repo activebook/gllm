@@ -1,7 +1,7 @@
 package service
 
 import (
-	"strings"
+	"sort"
 
 	openai "github.com/sashabaranov/go-openai"
 )
@@ -12,25 +12,39 @@ type openAIContext struct {
 }
 
 // PruneMessages trims the OpenAI message history to fit within the context window.
-// extra[0] may optionally carry []openai.Tool for tool-token accounting.
+// extra[0] may be a string systemPrompt for token overhead accounting.
+// extra[1] may optionally carry []openai.Tool for tool-token accounting.
 func (c *openAIContext) PruneMessages(messages any, extra ...any) (any, bool, error) {
 	msgs := messages.([]openai.ChatCompletionMessage)
+	var systemPrompt string
 	var tools []openai.Tool
 	if len(extra) > 0 {
-		if t, ok := extra[0].([]openai.Tool); ok {
+		if s, ok := extra[0].(string); ok {
+			systemPrompt = s
+		}
+	}
+	if len(extra) > 1 {
+		if t, ok := extra[1].([]openai.Tool); ok {
 			tools = t
 		}
 	}
-	return c.pruneOpenAIMessages(msgs, tools)
+	return c.pruneOpenAIMessages(msgs, systemPrompt, tools)
 }
 
-func (c *openAIContext) pruneOpenAIMessages(messages []openai.ChatCompletionMessage, tools []openai.Tool) ([]openai.ChatCompletionMessage, bool, error) {
+func (c *openAIContext) pruneOpenAIMessages(messages []openai.ChatCompletionMessage, systemPrompt string, tools []openai.Tool) ([]openai.ChatCompletionMessage, bool, error) {
 	if c.strategy == StrategyNone || len(messages) == 0 {
 		return messages, false, nil
 	}
 
+	// System prompt and tools are fixed overhead, not part of the prunable message history.
+	sysTokens := 0
+	if systemPrompt != "" {
+		sysTokens = EstimateTokens(systemPrompt) + MessageOverheadTokens
+	}
 	toolTokens := EstimateOpenAIToolTokens(tools)
-	currentTokens := c.estimateTokens(messages) + toolTokens
+	totalOverhead := sysTokens + toolTokens
+
+	currentTokens := c.estimateTokens(messages) + totalOverhead
 	Debugf("Token count: %d MaxInputTokens[80%%]: %d", currentTokens, c.maxInputTokens)
 	if currentTokens <= c.maxInputTokens {
 		return messages, false, nil
@@ -41,7 +55,7 @@ func (c *openAIContext) pruneOpenAIMessages(messages []openai.ChatCompletionMess
 		compressed, err := compressOpenAIMessages(c.agent, messages)
 		return compressed, true, err
 	case StrategyTruncateOldest:
-		compressed, truncated := c.truncate(messages, toolTokens)
+		compressed, truncated := c.truncate(messages, totalOverhead)
 		return compressed, truncated, nil
 	default:
 		return messages, false, nil
@@ -57,63 +71,44 @@ func (c *openAIContext) estimateTokens(messages []openai.ChatCompletionMessage) 
 	return total + MessageOverheadTokens
 }
 
-func (c *openAIContext) truncate(messages []openai.ChatCompletionMessage, toolTokens int) ([]openai.ChatCompletionMessage, bool) {
+func (c *openAIContext) truncate(messages []openai.ChatCompletionMessage, totalOverhead int) ([]openai.ChatCompletionMessage, bool) {
 	if len(messages) == 0 {
 		return messages, false
 	}
 
-	// Segregate system vs non-system messages
-	var systemMsgs, nonSystemMsgs []openai.ChatCompletionMessage
-	for _, msg := range messages {
-		if msg.Role == openai.ChatMessageRoleSystem {
-			systemMsgs = append(systemMsgs, msg)
-		} else {
-			nonSystemMsgs = append(nonSystemMsgs, msg)
-		}
-	}
-
-	// Consolidate multiple system messages into one
-	if len(systemMsgs) > 1 {
-		for i := 1; i < len(systemMsgs); i++ {
-			if !strings.Contains(systemMsgs[0].Content, systemMsgs[i].Content) {
-				systemMsgs[0].Content += "\n" + systemMsgs[i].Content
-			}
-		}
-		systemMsgs = systemMsgs[:1]
-	}
-
-	systemTokens := c.estimateTokens(systemMsgs)
-	availableTokens := c.maxInputTokens - systemTokens - toolTokens
+	// Messages are pure dialogue (no system message) — the system cost is already
+	// captured in totalOverhead passed by the caller.
+	availableTokens := c.maxInputTokens - totalOverhead
 
 	cache := GetGlobalTokenCache()
-	tokenCounts := make([]int, len(nonSystemMsgs))
-	nonSystemTokens := 0
-	for i, msg := range nonSystemMsgs {
+	tokenCounts := make([]int, len(messages))
+	historyTokens := 0
+	for i, msg := range messages {
 		tokenCounts[i] = cache.GetOrComputeOpenAITokens(msg)
-		nonSystemTokens += tokenCounts[i]
+		historyTokens += tokenCounts[i]
 	}
 
 	truncated := false
-	for nonSystemTokens > availableTokens && len(nonSystemMsgs) > 0 {
+	for historyTokens > availableTokens && len(messages) > 0 {
 		removed := false
-		for i := 0; i < len(nonSystemMsgs); i++ {
-			msg := nonSystemMsgs[i]
-			if pairIndices := c.findToolPair(nonSystemMsgs, i); len(pairIndices) > 0 {
+		for i := 0; i < len(messages); i++ {
+			msg := messages[i]
+			if pairIndices := c.findToolPair(messages, i); len(pairIndices) > 0 {
 				tokensRemoved := 0
 				for j := len(pairIndices) - 1; j >= 0; j-- {
 					idx := pairIndices[j]
 					tokensRemoved += tokenCounts[idx]
-					nonSystemMsgs = append(nonSystemMsgs[:idx], nonSystemMsgs[idx+1:]...)
+					messages = append(messages[:idx], messages[idx+1:]...)
 					tokenCounts = append(tokenCounts[:idx], tokenCounts[idx+1:]...)
 				}
-				nonSystemTokens -= tokensRemoved
+				historyTokens -= tokensRemoved
 				truncated = true
 				removed = true
 				break
 			}
 			if msg.Role != openai.ChatMessageRoleTool && len(msg.ToolCalls) == 0 {
-				nonSystemTokens -= tokenCounts[i]
-				nonSystemMsgs = append(nonSystemMsgs[:i], nonSystemMsgs[i+1:]...)
+				historyTokens -= tokenCounts[i]
+				messages = append(messages[:i], messages[i+1:]...)
 				tokenCounts = append(tokenCounts[:i], tokenCounts[i+1:]...)
 				truncated = true
 				removed = true
@@ -125,10 +120,7 @@ func (c *openAIContext) truncate(messages []openai.ChatCompletionMessage, toolTo
 		}
 	}
 
-	result := make([]openai.ChatCompletionMessage, 0, len(systemMsgs)+len(nonSystemMsgs))
-	result = append(result, systemMsgs...)
-	result = append(result, nonSystemMsgs...)
-	return result, truncated
+	return messages, truncated
 }
 
 func (c *openAIContext) findToolPair(messages []openai.ChatCompletionMessage, index int) []int {
@@ -158,5 +150,6 @@ func (c *openAIContext) gatherToolPair(messages []openai.ChatCompletionMessage, 
 			}
 		}
 	}
+	sort.Ints(indices)
 	return indices
 }

@@ -22,7 +22,7 @@ var (
 		"/help":     "Show this help message",
 		"/history":  "Show recent session history",
 		"/clear":    "Clear session history",
-		"/plan":     "Toggle Plan Mode",
+		"/plan":     "Toggle Plan Mode (shift+tab)",
 		"/model":    "Manage models (list, switch, add, etc.)",
 		"/agent":    "Manage agents (list, switch, add, etc.)",
 		"/template": "Manage templates (list, switch, add, etc.)",
@@ -49,10 +49,11 @@ var (
 	}
 
 	replSpecMap = map[string]string{
-		"@path":  "Reference to files and folders",
-		"!bash":  "Execute local shell commands",
-		"Ctrl+C": "Cancel current generation or exit session",
-		"Ctrl+D": "Delete all input",
+		"@path":     "Reference to files and folders",
+		"!bash":     "Execute local shell commands",
+		"shift+tab": "Toggle plan mode",
+		"ctrl+c":    "Cancel current generation or exit session",
+		"ctrl+d":    "Delete all input",
 	}
 )
 

@@ -17,6 +17,7 @@
 - **Markdown Support**: Renders Markdown for easy-to-read formatted output.
 - **Multi-turn Sessions**: Engage in multiple rounds of conversation and manage session history.
 - **Command Agent Mode**: Let LLMs plan and execute commands with your confirmation.
+- **Plan Mode**: Review and approve the agent's proposed plan before execution.
 - **Model Context Protocol (MCP) Support**: Connect to external MCP servers to access additional tools and data sources.
 - **Token Usage Tracking**: Monitor your token consumption.
 - **Configuration Management**: Easily manage models, templates, system prompts, and search engines.
@@ -346,6 +347,14 @@ gllm "Read this file @build.sh and change function name"
 | Edit code with diff | Cancel an edit |
 |:-------------------:|:--------------:|
 | ![Edit Code Screenshot](screenshots/editcode.png) | ![Cancel Edit Screenshot](screenshots/editcode_cancel.png) |
+
+### Plan Mode
+
+Plan Mode allows you to review and approve the agent's proposed actions before they are executed. This is particularly useful for complex tasks where you want to ensure the agent's strategy aligns with your expectations.
+
+| Plan Mode - Process | Plan Mode - Approval |
+|:-------------------:|:--------------:|
+| ![Plan Mode 1](screenshots/plan_mode_1.png) | ![Plan Mode 2](screenshots/plan_mode_2.png) |
 
 ### Agentic Workflows
 

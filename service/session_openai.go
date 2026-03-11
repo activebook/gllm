@@ -37,6 +37,12 @@ func (s *OpenAISession) MarshalMessages(messages []openai.ChatCompletionMessage,
 	empty := ""
 	var data []byte
 	for _, msg := range messages {
+		// Never persist system messages — they are always injected fresh
+		// at request time from ag.SystemPrompt. Persisting them would cause bloat
+		// and stale-prompt drift across multi-turn sessions.
+		if msg.Role == openai.ChatMessageRoleSystem {
+			continue
+		}
 		// Copy message and clear tool content to save tokens
 		formatted := msg
 		if dropToolContent && msg.Role == openai.ChatMessageRoleTool {

@@ -36,6 +36,10 @@ func (s *OpenChatSession) MarshalMessages(messages []*model.ChatCompletionMessag
 	empty := ""
 	var data []byte
 	for _, msg := range messages {
+		// Never persist system messages — always injected fresh at request time.
+		if msg.Role == model.ChatMessageRoleSystem {
+			continue
+		}
 		// Copy message and clear tool content to save tokens
 		formatted := *msg
 		if dropToolContent && msg.Role == model.ChatMessageRoleTool {

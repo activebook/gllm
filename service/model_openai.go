@@ -44,11 +44,9 @@ func (ag *Agent) getOpenAIFilePart(file *FileData) *openai.ChatMessagePart {
 }
 
 /*
- * Sort the messages by order
- * 1. System Prompt -- always at the top
- * 2. History Prompts
- *    - User Prompt
- *    - Assistant Prompt
+ * Sort the messages by order:
+ *   History (user/assistant/tool turns only — no system message)
+ *   The system prompt is never persisted; it is injected fresh in process().
  */
 func (ag *Agent) SortOpenAIMessagesByOrder() error {
 	// Load previous messages if any
@@ -57,29 +55,8 @@ func (ag *Agent) SortOpenAIMessagesByOrder() error {
 		return err
 	}
 
-	// Get current history
+	// Get current history (pure dialogue, no system messages)
 	history, _ := ag.Session.GetMessages().([]openai.ChatCompletionMessage)
-
-	// Handle System Prompt
-	if len(history) > 0 && history[0].Role == openai.ChatMessageRoleSystem {
-		// Check for duplication
-		// If the new system prompt is not empty and not included in the old one, append it
-		if ag.SystemPrompt != "" && !strings.Contains(history[0].Content, ag.SystemPrompt) {
-			history[0].Content += "\n" + ag.SystemPrompt
-			Debugf("Modified System Prompt: %s", history[0].Content)
-		} else {
-			Debugf("Reuse System Prompt: %s", history[0].Content)
-		}
-	} else if ag.SystemPrompt != "" {
-		Debugf("New System Prompt: %s", ag.SystemPrompt)
-		// Prepend system prompt if provided
-		sysMsg := openai.ChatCompletionMessage{
-			Role:    openai.ChatMessageRoleSystem,
-			Content: ag.SystemPrompt,
-		}
-		// Always prepend system prompt at the beginning of the history
-		history = append([]openai.ChatCompletionMessage{sysMsg}, history...)
-	}
 
 	var userMessage openai.ChatCompletionMessage
 	// Add File parts if available
@@ -121,6 +98,22 @@ func (ag *Agent) SortOpenAIMessagesByOrder() error {
 	// Bugfix: save session after update messages
 	// Because the system message could be modified, and added user message
 	return ag.Session.Save()
+}
+
+// prependOpenAISystemMessage builds the final API messages slice by prepending
+// a fresh system message in-memory. Returns history unchanged when prompt is empty.
+func prependOpenAISystemMessage(systemPrompt string, history []openai.ChatCompletionMessage) []openai.ChatCompletionMessage {
+	if systemPrompt == "" {
+		return history
+	}
+	sysMsg := openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleSystem,
+		Content: systemPrompt,
+	}
+	messages := make([]openai.ChatCompletionMessage, 0, 1+len(history))
+	messages = append(messages, sysMsg)
+	messages = append(messages, history...)
+	return messages
 }
 
 // GenerateOpenAISync generates a single, non-streaming completion using OpenAI API.
@@ -260,14 +253,13 @@ func (oa *OpenAI) process(ag *Agent) error {
 		//Debugf("Processing session at times: %d\n", i)
 		oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusProcessing}, oa.op.proceed)
 
-		// Get all history messages - MUST be inside loop to pick up newly pushed messages
+		// Get all history messages - MUST be inside loop to pick up newly pushed messages.
+		// Session only holds pure dialogue (user/assistant/tool turns).
 		messages, _ := ag.Session.GetMessages().([]openai.ChatCompletionMessage)
 
-		// Apply context window management
-		// This ensures we don't exceed the model's context window
-		// check context limit and prune if needed
+		// Apply context window management.
 		Debugf("Context messages: [%d]", len(messages))
-		pruned, truncated, err := ag.Context.PruneMessages(messages, oa.tools)
+		pruned, truncated, err := ag.Context.PruneMessages(messages, ag.SystemPrompt, oa.tools)
 		if err != nil {
 			return fmt.Errorf("failed to prune context: %w", err)
 		}
@@ -276,10 +268,13 @@ func (oa *OpenAI) process(ag *Agent) error {
 		if truncated {
 			Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.", ag.Context.GetStrategy())
 			Debugf("Context messages after truncation: [%d]", len(messages))
-			// Update the session with truncated messages
+			// Save back only non-system messages to keep the session clean.
 			ag.Session.SetMessages(messages)
 			ag.Session.Save()
 		}
+
+		// Prepend the fresh system prompt in-memory only — never persisted.
+		messages = prependOpenAISystemMessage(ag.SystemPrompt, messages)
 
 		// Create the request
 		req := openai.ChatCompletionRequest{

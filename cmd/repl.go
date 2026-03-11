@@ -145,12 +145,10 @@ func (ri *ReplInfo) printWelcome() {
 
 	logo := ui.GetLogo(data.KeyHex, data.LabelHex, 0.5)
 	welcomeText := logo + "\nWelcome back!" + data.DetailColor + " (v" + version + ")" + data.ResetSeq
-	instructions := []string{
-		"• Ctrl+C to cancel, Ctrl+D to clear the input",
-		"• '/' for commands, '!' for local shell commands",
-		"• '@' for files and folders",
-		"• '/help' lists all available commands",
-		"• '/exit', '/quit' to end current session",
+	// use replSpecMap to instructions
+	instructions := []string{}
+	for cmd, desc := range replSpecMap {
+		instructions = append(instructions, "• "+cmd+": "+desc)
 	}
 
 	header := headerStyle.Render(welcomeText)
@@ -198,6 +196,7 @@ func (ri *ReplInfo) awaitInput() (string, error) {
 	planMode := service.IsPlanModeEnabled(agent.Capabilities)
 	data.EnablePlanModeInSession(planMode)
 
+	// build commands from replCommandMap
 	var commands []ui.Suggestion
 	for cmd, desc := range replCommandMap {
 		commands = append(commands, ui.Suggestion{Command: cmd, Description: desc})

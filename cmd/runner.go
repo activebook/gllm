@@ -22,11 +22,8 @@ func EnsureActiveAgent() (*data.AgentConfig, error) {
 
 	// Auto-detect provider if not set
 	if agent.Model.Provider == "" {
-		service.Debugf("Auto-detecting provider for %s", agent.Model.Model)
 		agent.Model.Provider = service.DetectModelProvider(agent.Model.Endpoint, agent.Model.Model)
 		store.SetModel(agent.Model.Name, &agent.Model)
-	} else {
-		service.Debugf("Provider: [%s]", agent.Model.Provider)
 	}
 
 	// Validate Model
