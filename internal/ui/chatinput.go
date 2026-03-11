@@ -113,7 +113,7 @@ func NewChatInputModel(commands []Suggestion, initialValue string, history []str
 		Bold(true)
 	planModeBanner = planModeStyle.Render("plan mode")
 	infoBanner := ""
-	if data.GetPlanModeInSession() {
+	if data.IsPlanModeInSessionEnabled() && data.GetPlanModeInSession() {
 		infoBanner = planModeBanner
 	}
 
@@ -302,11 +302,13 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case PlanModeMsg:
-		data.SetPlanModeInSession(msg.Active)
-		if msg.Active {
-			m.infoBanner = planModeBanner
-		} else {
-			m.infoBanner = ""
+		if data.IsPlanModeInSessionEnabled() {
+			data.SetPlanModeInSession(msg.Active)
+			if msg.Active {
+				m.infoBanner = planModeBanner
+			} else {
+				m.infoBanner = ""
+			}
 		}
 		return m, nil
 
@@ -357,13 +359,18 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case tea.KeyShiftTab:
-			if data.GetPlanModeInSession() {
-				data.SetPlanModeInSession(false)
-				m.infoBanner = ""
+			if data.IsPlanModeInSessionEnabled() {
+				if data.GetPlanModeInSession() {
+					data.SetPlanModeInSession(false)
+					m.infoBanner = ""
+				} else {
+					data.SetPlanModeInSession(true)
+					m.infoBanner = planModeBanner
+				}
 			} else {
-				data.SetPlanModeInSession(true)
-				m.infoBanner = planModeBanner
+				m.infoBanner = ""
 			}
+
 			return m, nil
 
 		case tea.KeyEsc:

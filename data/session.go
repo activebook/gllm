@@ -176,10 +176,16 @@ func sanitizeFileName(name string) string {
 	return replacer.Replace(name)
 }
 
+/**
+ * Global session plan mode settings
+ * Shared in current session
+ */
+
 var (
 	// Whether Plan Mode is enabled in the current session
 	// Agents and Subagents all share this mode
-	planModeInSession = false
+	planModeInSession        = false
+	planModeInSessionEnabled = false
 )
 
 /**
@@ -194,4 +200,12 @@ func SetPlanModeInSession(value bool) {
  */
 func GetPlanModeInSession() bool {
 	return planModeInSession
+}
+
+func EnablePlanModeInSession(enable bool) {
+	planModeInSessionEnabled = enable
+}
+
+func IsPlanModeInSessionEnabled() bool {
+	return planModeInSessionEnabled
 }

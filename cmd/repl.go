@@ -194,6 +194,10 @@ func (ri *ReplInfo) awaitInput() (string, error) {
 		return "", err
 	}
 
+	// Check whether plan mode is enabled or not
+	planMode := service.IsPlanModeEnabled(agent.Capabilities)
+	data.EnablePlanModeInSession(planMode)
+
 	var commands []ui.Suggestion
 	for cmd, desc := range replCommandMap {
 		commands = append(commands, ui.Suggestion{Command: cmd, Description: desc})

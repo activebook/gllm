@@ -80,6 +80,12 @@ func switchYoloMode() {
 
 // switchPlanMode toggles Plan mode
 func switchPlanMode() {
+	// The /plan command in the REPL should only be available if the "Plan Mode" feature is enabled for the current agent.
+	if !data.IsPlanModeInSessionEnabled() {
+		service.Warnln("Please enable Plan Mode feature first.")
+		return
+	}
+
 	plan := data.GetPlanModeInSession()
 	if plan {
 		fmt.Printf("Plan mode: %s -> %s\n", data.SwitchOnColor+"on"+data.ResetSeq, data.SwitchOffColor+"off"+data.ResetSeq)
