@@ -275,10 +275,19 @@ func (ga *GeminiAgent) GeminiMCPToolCall(call *genai.FunctionCall) (*genai.Funct
 		argsMap[k] = v
 	}
 
+	// Check permisson on mcp tools
+	if err := CheckToolPermission(call.Name, &argsMap); err != nil {
+		error := fmt.Sprintf("Error: MCP tool call failed: %v", err)
+		resp.Response = map[string]any{
+			"output": error,
+			"error":  error,
+		}
+		return &resp, err
+	}
+
 	// Call the MCP tool
 	result, err := ga.MCPClient.CallTool(call.Name, argsMap)
 	if err != nil {
-		// Wrap error in response
 		error := fmt.Sprintf("Error: MCP tool call failed: %v", err)
 		resp.Response = map[string]any{
 			"output": error,
@@ -791,6 +800,33 @@ func (ga *GeminiAgent) GeminiAskUserToolCall(call *genai.FunctionCall) (*genai.F
 	}
 
 	response, err := askUserToolCallImpl(&argsMap)
+	error := ""
+	if err != nil {
+		error = fmt.Sprintf("Error: %v", err)
+		if response == "" {
+			response = error
+		}
+	}
+
+	resp.Response = map[string]any{
+		"output": response,
+		"error":  error,
+	}
+	return &resp, err
+}
+
+func (ga *GeminiAgent) GeminiExitPlanModeToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+	resp := genai.FunctionResponse{
+		ID:   call.ID,
+		Name: call.Name,
+	}
+
+	argsMap := make(map[string]interface{})
+	for k, v := range call.Args {
+		argsMap[k] = v
+	}
+
+	response, err := exitPlanModeToolCallImpl(&argsMap, &ga.ToolsUse)
 	error := ""
 	if err != nil {
 		error = fmt.Sprintf("Error: %v", err)

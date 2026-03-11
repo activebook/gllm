@@ -9,6 +9,7 @@ const (
 	CapabilitySubAgents       = "sub_agents"
 	CapabilityWebSearch       = "web_search"
 	CapabilityAutoCompression = "auto_compression"
+	CapabilityPlanMode        = "plan_mode"
 )
 
 /*
@@ -161,4 +162,19 @@ func EnableAutoCompression(capabilities []string) []string {
 
 func DisableAutoCompression(capabilities []string) []string {
 	return disableCapability(capabilities, CapabilityAutoCompression)
+}
+
+/*
+ * Plan Mode
+ */
+func IsPlanModeEnabled(capabilities []string) bool {
+	return isCapabilityEnabled(capabilities, CapabilityPlanMode)
+}
+
+func EnablePlanMode(capabilities []string) []string {
+	return enableCapability(capabilities, CapabilityPlanMode)
+}
+
+func DisablePlanMode(capabilities []string) []string {
+	return disableCapability(capabilities, CapabilityPlanMode)
 }

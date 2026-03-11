@@ -217,10 +217,18 @@ func (op *OpenProcessor) OpenAIMCPToolCall(toolCall openai.ToolCall, argsMap *ma
 		}, err
 	}
 
+	// Check permisson on mcp tools
+	if err := CheckToolPermission(toolCall.Function.Name, argsMap); err != nil {
+		return openai.ChatCompletionMessage{
+			Role:       openai.ChatMessageRoleTool,
+			ToolCallID: toolCall.ID,
+			Content:    fmt.Sprintf("Error: MCP tool call failed: %v", err),
+		}, err
+	}
+
 	// Call the MCP tool
 	result, err := op.mcpClient.CallTool(toolCall.Function.Name, *argsMap)
 	if err != nil {
-		// Wrap error in response
 		return openai.ChatCompletionMessage{
 			Role:       openai.ChatMessageRoleTool,
 			ToolCallID: toolCall.ID,
@@ -386,6 +394,19 @@ func (op *OpenProcessor) OpenAIActivateSkillToolCall(toolCall openai.ToolCall, a
 
 func (op *OpenProcessor) OpenAIAskUserToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := askUserToolCallImpl(argsMap)
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	return openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Content:    response,
+	}, err
+}
+
+func (op *OpenProcessor) OpenAIExitPlanModeToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+	response, err := exitPlanModeToolCallImpl(argsMap, op.toolsUse)
 	if err != nil {
 		response = fmt.Sprintf("Error: %v", err)
 	}

@@ -49,6 +49,19 @@ func (op *OpenProcessor) OpenChatMCPToolCall(toolCall *model.ToolCall, argsMap *
 		return &toolMessage, err
 	}
 
+	// Check permisson on mcp tools
+	if err := CheckToolPermission(toolCall.Function.Name, argsMap); err != nil {
+		toolMessage := model.ChatCompletionMessage{
+			Role:       model.ChatMessageRoleTool,
+			ToolCallID: toolCall.ID,
+			Name:       Ptr(""),
+			Content: &model.ChatCompletionMessageContent{
+				StringValue: volcengine.String(fmt.Sprintf("Error: MCP tool call failed: %v", err)),
+			},
+		}
+		return &toolMessage, err
+	}
+
 	// Call the MCP tool
 	result, err := op.mcpClient.CallTool(toolCall.Function.Name, *argsMap)
 	if err != nil {
@@ -506,6 +519,23 @@ func (op *OpenProcessor) OpenChatActivateSkillToolCall(toolCall *model.ToolCall,
 
 func (op *OpenProcessor) OpenChatAskUserToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	response, err := askUserToolCallImpl(argsMap)
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolMessage := model.ChatCompletionMessage{
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Name:       Ptr(""),
+		Content: &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(response),
+		},
+	}
+	return &toolMessage, err
+}
+
+func (op *OpenProcessor) OpenChatExitPlanModeToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	response, err := exitPlanModeToolCallImpl(argsMap, op.toolsUse)
 	if err != nil {
 		response = fmt.Sprintf("Error: %v", err)
 	}

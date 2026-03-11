@@ -597,6 +597,7 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 		ToolListState:         oa.op.OpenAIListStateToolCall,
 		ToolActivateSkill:     oa.op.OpenAIActivateSkillToolCall,
 		ToolAskUser:           oa.op.OpenAIAskUserToolCall,
+		ToolExitPlanMode:      oa.op.OpenAIExitPlanModeToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {

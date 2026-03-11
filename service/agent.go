@@ -115,6 +115,49 @@ func constructSearchEngine(capabilities []string) *SearchEngine {
 	return &se
 }
 
+// construct all enabled tools including features tools
+func constructEnabledTools(tools []string, capabilities []string) []string {
+	enabledTools := tools
+
+	// Set up enabled tools list with skill automation
+	if IsAgentSkillsEnabled(capabilities) {
+		// Automatically add activate_skill if not already there
+		enabledTools = AppendSkillTools(enabledTools)
+	} else {
+		// Automatically remove activate_skill if skills are disabled
+		enabledTools = RemoveSkillTools(enabledTools)
+	}
+
+	// Memory tool injection
+	if IsAgentMemoryEnabled(capabilities) {
+		enabledTools = AppendMemoryTools(enabledTools)
+	} else {
+		enabledTools = RemoveMemoryTools(enabledTools)
+	}
+
+	// Subagents tool injection
+	if IsSubAgentsEnabled(capabilities) {
+		enabledTools = AppendSubagentTools(enabledTools)
+	} else {
+		enabledTools = RemoveSubagentTools(enabledTools)
+	}
+
+	// Web Search tool injection
+	if IsWebSearchEnabled(capabilities) {
+		enabledTools = AppendSearchTools(enabledTools)
+	} else {
+		enabledTools = RemoveSearchTools(enabledTools)
+	}
+
+	// Plan Mode tool injection
+	if IsPlanModeEnabled(capabilities) {
+		enabledTools = AppendPlanTools(enabledTools)
+	} else {
+		enabledTools = RemovePlanTools(enabledTools)
+	}
+	return enabledTools
+}
+
 func ConstructSessionManager(sessionName string, provider string) (SessionManager, error) {
 	switch provider {
 	case ModelProviderOpenAICompatible:
@@ -280,36 +323,8 @@ func CallAgent(op *AgentOptions) error {
 		}
 	}
 
-	// Set up enabled tools list with skill automation
-	enabledTools := op.EnabledTools
-	if IsAgentSkillsEnabled(op.Capabilities) {
-		// Automatically add activate_skill if not already there
-		enabledTools = AppendSkillTools(enabledTools)
-	} else {
-		// Automatically remove activate_skill if skills are disabled
-		enabledTools = RemoveSkillTools(enabledTools)
-	}
-
-	// Memory tool injection
-	if IsAgentMemoryEnabled(op.Capabilities) {
-		enabledTools = AppendMemoryTools(enabledTools)
-	} else {
-		enabledTools = RemoveMemoryTools(enabledTools)
-	}
-
-	// Subagents tool injection
-	if IsSubAgentsEnabled(op.Capabilities) {
-		enabledTools = AppendSubagentTools(enabledTools)
-	} else {
-		enabledTools = RemoveSubagentTools(enabledTools)
-	}
-
-	// Web Search tool injection
-	if IsWebSearchEnabled(op.Capabilities) {
-		enabledTools = AppendSearchTools(enabledTools)
-	} else {
-		enabledTools = RemoveSearchTools(enabledTools)
-	}
+	// Construct all enabled tools
+	enabledTools := constructEnabledTools(op.EnabledTools, op.Capabilities)
 
 	ag := Agent{
 		Model:         mi,

@@ -16,7 +16,7 @@ type SessionStore struct {
 // NewSessionStore creates a new sessionStore with the default directory.
 func NewSessionStore() *SessionStore {
 	return &SessionStore{
-		dir: GetSessionDirPath(),
+		dir: GetSessionsDirPath(),
 	}
 }
 
@@ -174,4 +174,38 @@ func sanitizeFileName(name string) string {
 		"|", "_",
 	)
 	return replacer.Replace(name)
+}
+
+/**
+ * Global session plan mode settings
+ * Shared in current session
+ */
+
+var (
+	// Whether Plan Mode is enabled in the current session
+	// Agents and Subagents all share this mode
+	planModeInSession        = false
+	planModeInSessionEnabled = false
+)
+
+/**
+ * Set plan mode in session
+ */
+func SetPlanModeInSession(value bool) {
+	planModeInSession = value
+}
+
+/**
+ * Get plan mode in session
+ */
+func GetPlanModeInSession() bool {
+	return planModeInSession
+}
+
+func EnablePlanModeInSession(enable bool) {
+	planModeInSessionEnabled = enable
+}
+
+func IsPlanModeInSessionEnabled() bool {
+	return planModeInSessionEnabled
 }

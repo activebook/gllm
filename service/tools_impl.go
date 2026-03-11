@@ -30,6 +30,10 @@ const (
 // These functions contain the actual logic that can be shared between OpenAI and OpenChat
 
 func readFileToolCallImpl(argsMap *map[string]interface{}) (string, error) {
+	if err := CheckToolPermission(ToolReadFile, argsMap); err != nil {
+		return "", err
+	}
+
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
@@ -77,6 +81,10 @@ func readFileToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 }
 
 func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse, showDiff func(diff string), closeDiff func()) (string, error) {
+	if err := CheckToolPermission(ToolWriteFile, argsMap); err != nil {
+		return "", err
+	}
+
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
@@ -139,6 +147,10 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tools
 }
 
 func createDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+	if err := CheckToolPermission(ToolCreateDirectory, argsMap); err != nil {
+		return "", err
+	}
+
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
@@ -175,6 +187,10 @@ func createDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data
 }
 
 func listDirectoryToolCallImpl(argsMap *map[string]interface{}) (string, error) {
+	if err := CheckToolPermission(ToolListDirectory, argsMap); err != nil {
+		return "", err
+	}
+
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
@@ -225,6 +241,10 @@ func listDirectoryToolCallImpl(argsMap *map[string]interface{}) (string, error) 
 }
 
 func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+	if err := CheckToolPermission(ToolDeleteFile, argsMap); err != nil {
+		return "", err
+	}
+
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
@@ -261,6 +281,10 @@ func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tool
 }
 
 func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+	if err := CheckToolPermission(ToolDeleteDirectory, argsMap); err != nil {
+		return "", err
+	}
+
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
@@ -297,6 +321,10 @@ func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data
 }
 
 func moveToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+	if err := CheckToolPermission(ToolMove, argsMap); err != nil {
+		return "", err
+	}
+
 	source, ok := (*argsMap)["source"].(string)
 	if !ok {
 		return "", fmt.Errorf("source not found in arguments")
@@ -338,6 +366,10 @@ func moveToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) 
 }
 
 func searchFilesToolCallImpl(argsMap *map[string]interface{}) (string, error) {
+	if err := CheckToolPermission(ToolSearchFiles, argsMap); err != nil {
+		return "", err
+	}
+
 	directory, ok := (*argsMap)["directory"].(string)
 	if !ok {
 		return "", fmt.Errorf("directory not found in arguments")
@@ -408,6 +440,10 @@ func searchFilesToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 }
 
 func searchTextInFileToolCallImpl(argsMap *map[string]interface{}) (string, error) {
+	if err := CheckToolPermission(ToolSearchTextInFile, argsMap); err != nil {
+		return "", err
+	}
+
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
@@ -508,6 +544,10 @@ func searchTextInFileToolCallImpl(argsMap *map[string]interface{}) (string, erro
 }
 
 func readMultipleFilesToolCallImpl(argsMap *map[string]interface{}) (string, error) {
+	if err := CheckToolPermission(ToolReadMultipleFiles, argsMap); err != nil {
+		return "", err
+	}
+
 	pathsInterface, ok := (*argsMap)["paths"].([]interface{})
 	if !ok {
 		return "", fmt.Errorf("paths not found in arguments or not an array")
@@ -572,6 +612,10 @@ func readMultipleFilesToolCallImpl(argsMap *map[string]interface{}) (string, err
 }
 
 func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+	if err := CheckToolPermission(ToolShell, argsMap); err != nil {
+		return "", err
+	}
+
 	cmdStr, ok := (*argsMap)["command"].(string)
 	if !ok {
 		return "", fmt.Errorf("command not found in arguments")
@@ -658,6 +702,10 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse)
 }
 
 func webFetchToolCallImpl(argsMap *map[string]interface{}) (string, error) {
+	if err := CheckToolPermission(ToolWebFetch, argsMap); err != nil {
+		return "", err
+	}
+
 	url, ok := (*argsMap)["url"].(string)
 	if !ok {
 		return "", fmt.Errorf("url not found in arguments")
@@ -677,6 +725,10 @@ func webFetchToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 }
 
 func webSearchToolCallImpl(argsMap *map[string]interface{}, queries *[]string, references *[]map[string]interface{}, search *SearchEngine) (string, error) {
+	if err := CheckToolPermission(ToolWebSearch, argsMap); err != nil {
+		return "", err
+	}
+
 	query, ok := (*argsMap)["query"].(string)
 	if !ok {
 		return "", fmt.Errorf("query not found in arguments")
@@ -720,6 +772,10 @@ func webSearchToolCallImpl(argsMap *map[string]interface{}, queries *[]string, r
 }
 
 func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse, showDiff func(diff string), closeDiff func()) (string, error) {
+	if err := CheckToolPermission(ToolEditFile, argsMap); err != nil {
+		return "", err
+	}
+
 	path, ok := (*argsMap)["path"].(string)
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
@@ -833,6 +889,10 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsU
 }
 
 func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+	if err := CheckToolPermission(ToolCopy, argsMap); err != nil {
+		return "", err
+	}
+
 	source, ok := (*argsMap)["source"].(string)
 	if !ok {
 		return "", fmt.Errorf("source not found in arguments")
@@ -945,6 +1005,10 @@ func copyFile(src, dst string) error {
 
 // listMemoryToolCallImpl handles the list_memory tool call
 func listMemoryToolCallImpl() (string, error) {
+	if err := CheckToolPermission(ToolListMemory, nil); err != nil {
+		return "", err
+	}
+
 	memories, err := data.NewMemoryStore().Load()
 	if err != nil {
 		return fmt.Sprintf("Error loading memories: %v", err), nil
@@ -966,6 +1030,10 @@ func listMemoryToolCallImpl() (string, error) {
 // saveMemoryToolCallImpl handles the save_memory tool call
 // Simplified design: takes complete memory content and replaces all memories
 func saveMemoryToolCallImpl(argsMap *map[string]interface{}) (string, error) {
+	if err := CheckToolPermission(ToolSaveMemory, argsMap); err != nil {
+		return "", err
+	}
+
 	memories, ok := (*argsMap)["memories"].(string)
 	if !ok {
 		return "", fmt.Errorf("memories parameter not found in arguments")
@@ -1011,6 +1079,10 @@ func saveMemoryToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 
 // switchAgentToolCallImpl handles the switch_agent tool call
 func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+	if err := CheckToolPermission(ToolSwitchAgent, argsMap); err != nil {
+		return "", err
+	}
+
 	name, ok := (*argsMap)["name"].(string)
 	if !ok {
 		return "", fmt.Errorf("agent name is required")
@@ -1093,6 +1165,10 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Too
 // listAgentToolCallImpl handles the list_agent tool call
 // Returns a formatted list of all available agents with their capabilities
 func listAgentToolCallImpl() (string, error) {
+	if err := CheckToolPermission(ToolListAgent, nil); err != nil {
+		return "", err
+	}
+
 	store := data.NewConfigStore()
 	agents := store.GetAllAgents()
 
@@ -1152,6 +1228,9 @@ func spawnSubAgentsToolCallImpl(
 	toolsUse *data.ToolsUse,
 	executor *SubAgentExecutor,
 ) (string, error) {
+	if err := CheckToolPermission(ToolSpawnSubAgents, argsMap); err != nil {
+		return "", err
+	}
 	if executor == nil {
 		return "", fmt.Errorf("sub-agent executor not initialized")
 	}
@@ -1258,6 +1337,9 @@ func getStateToolCallImpl(
 	argsMap *map[string]interface{},
 	state *data.SharedState,
 ) (string, error) {
+	if err := CheckToolPermission(ToolGetState, argsMap); err != nil {
+		return "", err
+	}
 	if state == nil {
 		return "", fmt.Errorf("shared state not initialized")
 	}
@@ -1293,6 +1375,9 @@ func setStateToolCallImpl(
 	agentName string,
 	state *data.SharedState,
 ) (string, error) {
+	if err := CheckToolPermission(ToolSetState, argsMap); err != nil {
+		return "", err
+	}
 	if state == nil {
 		return "", fmt.Errorf("shared state not initialized")
 	}
@@ -1324,6 +1409,10 @@ func setStateToolCallImpl(
 // listStateToolCallImpl handles the list_state tool call
 // Lists all keys and metadata in SharedState
 func listStateToolCallImpl(state *data.SharedState) (string, error) {
+	if err := CheckToolPermission(ToolListState, nil); err != nil {
+		return "", err
+	}
+
 	if state == nil {
 		return "", fmt.Errorf("shared state not initialized")
 	}
@@ -1333,6 +1422,10 @@ func listStateToolCallImpl(state *data.SharedState) (string, error) {
 
 // activateSkillToolCallImpl handles the activate_skill tool call.
 func activateSkillToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+	if err := CheckToolPermission(ToolActivateSkill, argsMap); err != nil {
+		return "", err
+	}
+
 	name, ok := (*argsMap)["name"].(string)
 	if !ok {
 		return "", fmt.Errorf("skill name not found in arguments")
@@ -1358,7 +1451,12 @@ func activateSkillToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.T
 	return skillDetails, nil
 }
 
+// askUserToolCallImpl handles the ask_user tool call.
 func askUserToolCallImpl(argsMap *map[string]interface{}) (string, error) {
+	if err := CheckToolPermission(ToolAskUser, argsMap); err != nil {
+		return "", err
+	}
+
 	question, _ := (*argsMap)["question"].(string)
 	qType, _ := (*argsMap)["question_type"].(string)
 
@@ -1387,4 +1485,33 @@ func askUserToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	// Encode answer back to the model
 	out, _ := json.Marshal(resp)
 	return string(out), nil
+}
+
+// exitPlanModeToolCallImpl handles the exit_plan_mode tool call.
+func exitPlanModeToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+	if err := CheckToolPermission(ToolExitPlanMode, argsMap); err != nil {
+		return "", err
+	}
+
+	// If auto approve, we still notify but we just go directly
+	if !toolsUse.AutoApprove {
+		// Get purpose if provided
+		purpose, _ := (*argsMap)["purpose"].(string)
+		if purpose == "" {
+			purpose = "exit Plan Mode and enter normal execution mode"
+		}
+		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
+		if toolsUse.Confirm == data.ToolConfirmCancel {
+			return "Operation cancelled by user: User denied exiting Plan Mode.", UserCancelError{Reason: UserCancelReasonDeny}
+		}
+	}
+
+	// Directly mutate session state — agent runs outside RunChatInput,
+	// so SendEvent is a no-op here. The next NewChatInputModel call will
+	// read the updated state and hide the banner automatically.
+	data.SetPlanModeInSession(false)
+	// Best-effort: if RunChatInput somehow is running concurrently, update banner.
+	ui.SendEvent(ui.PlanModeMsg{Active: false})
+
+	return "Successfully exited Plan Mode. Current session is now in normal execution mode.", nil
 }

@@ -204,6 +204,14 @@ func (op *OpenProcessor) AnthropicMCPToolCall(toolCall anthropic.ToolUseBlockPar
 		return anthropic.NewUserMessage(toolResult), err
 	}
 
+	// Check permisson on mcp tools
+	if err := CheckToolPermission(toolCall.Name, argsMap); err != nil {
+		response := fmt.Sprintf("Error: %v", err)
+		isError := err != nil
+		toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
+		return anthropic.NewUserMessage(toolResult), err
+	}
+
 	// Call the MCP tool
 	result, err := op.mcpClient.CallTool(toolCall.Name, *argsMap)
 	isError := err != nil
@@ -323,6 +331,17 @@ func (op *OpenProcessor) AnthropicActivateSkillToolCall(toolCall anthropic.ToolU
 
 func (op *OpenProcessor) AnthropicAskUserToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
 	response, err := askUserToolCallImpl(argsMap)
+	isError := err != nil
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
+	return anthropic.NewUserMessage(toolResult), err
+}
+
+func (op *OpenProcessor) AnthropicExitPlanModeToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
+	response, err := exitPlanModeToolCallImpl(argsMap, op.toolsUse)
 	isError := err != nil
 	if err != nil {
 		response = fmt.Sprintf("Error: %v", err)

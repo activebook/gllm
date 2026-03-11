@@ -519,6 +519,7 @@ func (ga *GeminiAgent) processGeminiToolCall(call *genai.FunctionCall) (*genai.C
 		ToolListState:         ga.GeminiListStateToolCall,
 		ToolActivateSkill:     ga.GeminiActivateSkillToolCall,
 		ToolAskUser:           ga.GeminiAskUserToolCall,
+		ToolExitPlanMode:      ga.GeminiExitPlanModeToolCall,
 	}
 
 	if handler, ok := toolHandlers[call.Name]; ok {

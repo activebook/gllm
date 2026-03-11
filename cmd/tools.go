@@ -174,6 +174,14 @@ func ListAllTools() {
 		}
 	}
 
+	// Add plan mode tools if plan mode is enabled
+	if service.IsPlanModeEnabled(agent.Capabilities) {
+		agentPlanModeTools := service.GetAllPlanModeTools()
+		for _, t := range agentPlanModeTools {
+			enabledSet[t] = true
+		}
+	}
+
 	enabledCount := 0
 	for range enabledSet {
 		enabledCount++

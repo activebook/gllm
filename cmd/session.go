@@ -41,7 +41,7 @@ var sessionListCmd = &cobra.Command{
 	Short:   "List all sessions",
 	Long:    `List all available sessions in sorted order.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		sessionDir := service.GetSessionDir()
+		sessionDir := service.GetSessionsDir()
 
 		// Check if directory exists
 		if _, err := os.Stat(sessionDir); os.IsNotExist(err) {
@@ -88,7 +88,7 @@ gllm session remove 10-20 --force
 gllm session remove "2 - 5" --force`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		sessionDir := service.GetSessionDir()
+		sessionDir := service.GetSessionsDir()
 		var matches []string
 		var pattern string
 		if len(args) > 0 {
@@ -281,7 +281,7 @@ Example:
 gllm session clear
 gllm session clear --force`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		sessionDir := service.GetSessionDir()
+		sessionDir := service.GetSessionsDir()
 		// Check if directory exists
 		if _, err := os.Stat(sessionDir); os.IsNotExist(err) {
 			fmt.Println("No sessions found.")
@@ -331,7 +331,7 @@ var sessionInfoCmd = &cobra.Command{
 	Long:    `Display detailed information about a specific session.`,
 	Args:    cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		sessionDir := service.GetSessionDir()
+		sessionDir := service.GetSessionsDir()
 		var sessionName string
 		if len(args) > 0 {
 			sessionName = args[0]
@@ -437,7 +437,7 @@ var sessionRenameCmd = &cobra.Command{
 	Long:  `Rename an existing session to a new name.`,
 	Args:  cobra.MaximumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		sessionDir := service.GetSessionDir()
+		sessionDir := service.GetSessionsDir()
 		var oldName, newName string
 
 		if len(args) >= 2 {
@@ -572,7 +572,7 @@ var sessionShareCmd = &cobra.Command{
 		}
 		sessionName = resolvedName
 
-		sessionDir := service.GetSessionDir()
+		sessionDir := service.GetSessionsDir()
 		sourcePath := service.GetFilePath(sessionDir, sessionName+".jsonl")
 
 		if _, err := os.Stat(sourcePath); os.IsNotExist(err) {

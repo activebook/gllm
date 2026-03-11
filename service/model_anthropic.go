@@ -528,6 +528,7 @@ func (a *Anthropic) processToolCall(toolCall anthropic.ToolUseBlockParam) (anthr
 		ToolListState:         a.op.AnthropicListStateToolCall,
 		ToolActivateSkill:     a.op.AnthropicActivateSkillToolCall,
 		ToolAskUser:           a.op.AnthropicAskUserToolCall,
+		ToolExitPlanMode:      a.op.AnthropicExitPlanModeToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Name]; ok {

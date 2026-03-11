@@ -38,26 +38,19 @@ func init() {
 func StartBackgroundUpdateCheck() {
 	go func() {
 		ss := data.GetSettingsStore()
+		// Check if 24 hours have elapsed since the last check.
 		if time.Since(ss.GetLastUpdateCheck()) < 24*time.Hour {
-			// time not elapsed, set notification as resolved
-			data.ResolveNotification()
 			return
 		}
 		// Perform the check quietly; do not log on error.
 		release, err := service.CheckLatest(version)
 		if err != nil {
-			// error occurred, set notification as resolved
-			data.ResolveNotification()
 			return
 		}
 		// Always record the time so we don't hammer GitHub on every start.
 		_ = ss.SetLastUpdateCheck(time.Now())
 		if release.Newer {
-			// newer version, store notification
-			data.StoreNotification(getUpdateBanner(release.Version))
-		} else {
-			// no newer version, set notification as resolved
-			data.ResolveNotification()
+			ui.SendEvent(ui.BannerMsg{Text: getUpdateBanner(release.Version)})
 		}
 	}()
 }
@@ -104,7 +97,7 @@ func runUpdate(interactive bool) error {
 		return err
 	}
 
-	notifyStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(data.HighCachedHex))
+	notifyStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(data.UpdateSuccessHex))
 	fmt.Println(notifyStyle.Render(fmt.Sprintf("✓ Successfully updated to %s!", release.Version)))
 	fmt.Println("Please restart gllm to use the new version.")
 	return nil
@@ -113,7 +106,7 @@ func runUpdate(interactive bool) error {
 // getUpdateBanner returns a non-intrusive update notification.
 func getUpdateBanner(latestVersion string) string {
 	style := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(data.MedCachedHex)).
+		Foreground(lipgloss.Color(data.UpdateAvailableHex)).
 		Bold(true)
 	return style.Render(fmt.Sprintf("⬆ Update available: %s → %s  (type /update to install)", version, latestVersion))
 }

@@ -33,7 +33,7 @@ type VerboseSettings struct {
 
 // UpdateSettings holds update-check-related settings.
 type UpdateSettings struct {
-	LastCheck time.Time `json:"last_check"`
+	CheckAt time.Time `json:"checkAt"`
 }
 
 // Settings represents the structure of settings.json.
@@ -302,13 +302,13 @@ func (s *SettingsStore) SetEditor(editor string) error {
 func (s *SettingsStore) GetLastUpdateCheck() time.Time {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.settings.Update.LastCheck
+	return s.settings.Update.CheckAt
 }
 
 // SetLastUpdateCheck persists the timestamp of the most recent update check.
 func (s *SettingsStore) SetLastUpdateCheck(t time.Time) error {
 	s.mu.Lock()
-	s.settings.Update.LastCheck = t
+	s.settings.Update.CheckAt = t
 	s.mu.Unlock()
 	return s.Save()
 }
