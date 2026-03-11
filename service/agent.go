@@ -115,6 +115,37 @@ func constructSearchEngine(capabilities []string) *SearchEngine {
 	return &se
 }
 
+// ConstructSystemPrompt constructs the system prompt by injecting memory and skills into the prompt
+func ConstructSystemPrompt(prompt string, capabilities []string) string {
+	sysPrompt := prompt
+
+	// Inject memory into system prompt
+	if IsAgentMemoryEnabled(capabilities) {
+		memStore := data.NewMemoryStore()
+		if memoryContent := memStore.GetAll(); memoryContent != "" {
+			sysPrompt += "\n\n" + memoryContent
+		}
+	}
+
+	// Inject skills into system prompt if any are available and enabled
+	if IsAgentSkillsEnabled(capabilities) {
+		// Load available skills metadata
+		sm := GetSkillManager() // Use singleton
+		if skillsXML := sm.GetAvailableSkills(); skillsXML != "" {
+			sysPrompt += "\n\n" + skillsXML
+		}
+	}
+
+	// Inject plan mode into system prompt if plan mode is enabled
+	if IsPlanModeEnabled(capabilities) {
+		if data.GetPlanModeInSession() {
+			sysPrompt += "\n\n" + data.PlanModeSystemPrompt
+		}
+	}
+
+	return sysPrompt
+}
+
 // construct all enabled tools including features tools
 func constructEnabledTools(tools []string, capabilities []string) []string {
 	enabledTools := tools
@@ -306,22 +337,8 @@ func CallAgent(op *AgentOptions) error {
 		tu = NewTokenUsage()
 	}
 
-	// Inject memory into system prompt
-	if IsAgentMemoryEnabled(op.Capabilities) {
-		memStore := data.NewMemoryStore()
-		if memoryContent := memStore.GetAll(); memoryContent != "" {
-			op.SysPrompt += "\n\n" + memoryContent
-		}
-	}
-
-	// Inject skills into system prompt if any are available and enabled
-	if IsAgentSkillsEnabled(op.Capabilities) {
-		// Load available skills metadata
-		sm := GetSkillManager() // Use singleton
-		if skillsXML := sm.GetAvailableSkills(); skillsXML != "" {
-			op.SysPrompt += "\n\n" + skillsXML
-		}
-	}
+	// Inject memory, skills, plan mode into system prompt
+	op.SysPrompt = ConstructSystemPrompt(op.SysPrompt, op.Capabilities)
 
 	// Construct all enabled tools
 	enabledTools := constructEnabledTools(op.EnabledTools, op.Capabilities)

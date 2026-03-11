@@ -188,6 +188,15 @@ var (
 	planModeInSessionEnabled = false
 )
 
+const (
+	PlanModeSystemPrompt = `<system-reminder>
+Plan mode is active. The user indicated that they do not want you to execute yet — you MUST NOT make any edits, run any non-readonly tools.
+Instead, you should: 
+1. Answer the user's query comprehensively 
+2. When you're done researching, present your plan by calling the exit_plan_mode tool.
+</system-reminder>`
+)
+
 /**
  * Set plan mode in session
  */

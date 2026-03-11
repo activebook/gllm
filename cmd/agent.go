@@ -881,12 +881,10 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 	store := data.NewConfigStore()
 	if agent.SystemPrompt != "" {
 		resolvedSysPrompt := store.GetSystemPrompt(agent.SystemPrompt)
-		// if len(resolvedSysPrompt) > 50 {
-		// 	fmt.Printf("%sSystem Prompt: %s...\n", spaceholder, resolvedSysPrompt[:47])
-		// } else {
-		// 	fmt.Printf("%sSystem Prompt: %s\n", spaceholder, resolvedSysPrompt)
-		// }
-		fmt.Printf("%sSystem Prompt: %s\n", spaceholder, resolvedSysPrompt)
+		// Inject memory, skills, plan mode into system prompt
+		resolvedSysPrompt = service.ConstructSystemPrompt(resolvedSysPrompt, agent.Capabilities)
+		// Show the resolved system prompt
+		fmt.Printf("%sSystem Prompt:\n\n%s\n\n", spaceholder, resolvedSysPrompt)
 	} else {
 		fmt.Printf("%sSystem Prompt: \n", spaceholder)
 	}
@@ -898,7 +896,7 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 		// } else {
 		// 	fmt.Printf("%sTemplate: %s\n", spaceholder, resolvedTemplate)
 		// }
-		fmt.Printf("%sTemplate: %s\n", spaceholder, resolvedTemplate)
+		fmt.Printf("%sTemplate:\n\n%s\n\n", spaceholder, resolvedTemplate)
 	} else {
 		fmt.Printf("%sTemplate: \n", spaceholder)
 	}
