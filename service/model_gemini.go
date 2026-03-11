@@ -493,6 +493,38 @@ func (ga *GeminiAgent) processGeminiToolCall(call *genai.FunctionCall) (*genai.C
 	var resp *genai.FunctionResponse
 	var err error
 
+	// Check permissions first (Note: Gemini passes args map via pointer to wrapper, but we can extract map directly since we parsed it earlier if needed, but Gemini API uses dynamic struct map parsing)
+	// Gemini gives us call.Args (map[string]any). We use filteredArgs map for logging, let's use call.Args to check.
+	callArgsMap := make(map[string]interface{})
+	for k, v := range call.Args {
+		callArgsMap[k] = v
+	}
+
+	if permissionErr := CheckToolPermission(call.Name, callArgsMap, ga.Agent.PlanMode); permissionErr != nil {
+		// Tool blocked by Plan Mode constraint - return error to model
+		resp = &genai.FunctionResponse{
+			ID:   call.ID,
+			Name: call.Name,
+			Response: map[string]any{
+				"content": nil,
+				"error":   fmt.Sprintf("Error: %v", permissionErr),
+			},
+		}
+		// Warn the user
+		ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Tool %s blocked by permission: %v", call.Name, permissionErr)}, nil)
+
+		// Function response only has one part
+		respPart := genai.Part{FunctionResponse: resp}
+		respContent := &genai.Content{
+			Role:  genai.RoleUser,
+			Parts: []*genai.Part{&respPart},
+		}
+
+		// Function call is over early
+		ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusFunctionCallingOver}, ga.ProceedChan)
+		return respContent, nil
+	}
+
 	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
 	toolHandlers := map[string]func(*genai.FunctionCall) (*genai.FunctionResponse, error){
 		ToolShell:             ga.GeminiShellToolCall,
@@ -519,6 +551,7 @@ func (ga *GeminiAgent) processGeminiToolCall(call *genai.FunctionCall) (*genai.C
 		ToolListState:         ga.GeminiListStateToolCall,
 		ToolActivateSkill:     ga.GeminiActivateSkillToolCall,
 		ToolAskUser:           ga.GeminiAskUserToolCall,
+		ToolExitPlanMode:      ga.GeminiExitPlanModeToolCall,
 	}
 
 	if handler, ok := toolHandlers[call.Name]; ok {

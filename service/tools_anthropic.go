@@ -331,3 +331,14 @@ func (op *OpenProcessor) AnthropicAskUserToolCall(toolCall anthropic.ToolUseBloc
 	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
 	return anthropic.NewUserMessage(toolResult), err
 }
+
+func (op *OpenProcessor) AnthropicExitPlanModeToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
+	response, err := exitPlanModeToolCallImpl(argsMap, op.toolsUse)
+	isError := err != nil
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
+	return anthropic.NewUserMessage(toolResult), err
+}

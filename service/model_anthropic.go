@@ -136,6 +136,7 @@ func (ag *Agent) GenerateAnthropicStream() error {
 		sharedState: ag.SharedState,
 		executor:    executor,
 		agentName:   ag.AgentName,
+		planMode:    &ag.PlanMode,
 	}
 
 	chat := &Anthropic{
@@ -501,6 +502,20 @@ func (a *Anthropic) processToolCall(toolCall anthropic.ToolUseBlockParam) (anthr
 	var msg anthropic.MessageParam
 	var err error
 
+	// Check permissions first
+	if err := CheckToolPermission(toolCall.Name, argsMap, *a.op.planMode); err != nil {
+		// Tool blocked by Plan Mode constraint - return error to model
+		errorMsg := fmt.Sprintf("Error: %v", err)
+		toolResult := anthropic.NewToolResultBlock(toolCall.ID, errorMsg, true)
+		msg = anthropic.NewUserMessage(toolResult)
+		// Warn the user
+		a.op.status.ChangeTo(a.op.notify, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Tool %s blocked by permission: %v", toolCall.Name, err)}, nil)
+
+		// Function call is over early
+		a.op.status.ChangeTo(a.op.notify, StreamNotify{Status: StatusFunctionCallingOver}, a.op.proceed)
+		return msg, nil
+	}
+
 	// Define tool handlers map
 	toolHandlers := map[string]func(anthropic.ToolUseBlockParam, *map[string]interface{}) (anthropic.MessageParam, error){
 		ToolShell:             a.op.AnthropicShellToolCall,
@@ -528,6 +543,7 @@ func (a *Anthropic) processToolCall(toolCall anthropic.ToolUseBlockParam) (anthr
 		ToolListState:         a.op.AnthropicListStateToolCall,
 		ToolActivateSkill:     a.op.AnthropicActivateSkillToolCall,
 		ToolAskUser:           a.op.AnthropicAskUserToolCall,
+		ToolExitPlanMode:      a.op.AnthropicExitPlanModeToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Name]; ok {

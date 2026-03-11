@@ -211,6 +211,7 @@ func (ag *Agent) GenerateOpenAIStream() error {
 		sharedState: ag.SharedState,
 		executor:    executor,
 		agentName:   ag.AgentName,
+		planMode:    &ag.PlanMode,
 	}
 	chat := &OpenAI{
 		client: client,
@@ -570,6 +571,22 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 	var msg openai.ChatCompletionMessage
 	var err error
 
+	// Check permissions first
+	if err := CheckToolPermission(toolCall.Function.Name, argsMap, *oa.op.planMode); err != nil {
+		// Tool blocked by Plan Mode constraint - return error to model
+		msg = openai.ChatCompletionMessage{
+			Role:       openai.ChatMessageRoleTool,
+			Content:    fmt.Sprintf("Error: %v", err),
+			ToolCallID: toolCall.ID,
+		}
+		// Warn the user
+		oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Tool %s blocked by permission: %v", toolCall.Function.Name, err)}, nil)
+
+		// Function call is over early
+		oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusFunctionCallingOver}, oa.op.proceed)
+		return msg, nil
+	}
+
 	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
 	toolHandlers := map[string]func(openai.ToolCall, *map[string]interface{}) (openai.ChatCompletionMessage, error){
 		ToolShell:             oa.op.OpenAIShellToolCall,
@@ -597,6 +614,7 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 		ToolListState:         oa.op.OpenAIListStateToolCall,
 		ToolActivateSkill:     oa.op.OpenAIActivateSkillToolCall,
 		ToolAskUser:           oa.op.OpenAIAskUserToolCall,
+		ToolExitPlanMode:      oa.op.OpenAIExitPlanModeToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {

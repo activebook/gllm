@@ -233,6 +233,7 @@ func (ag *Agent) GenerateOpenChatStream() error {
 		sharedState: ag.SharedState,
 		executor:    executor,
 		agentName:   ag.AgentName,
+		planMode:    &ag.PlanMode,
 	}
 	chat := &OpenChat{
 		client: client,
@@ -630,6 +631,24 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 	var msg *model.ChatCompletionMessage
 	var err error
 
+	// Check permissions first
+	if err := CheckToolPermission(toolCall.Function.Name, argsMap, *c.op.planMode); err != nil {
+		// Tool blocked by Plan Mode constraint - return error to model
+		msg = &model.ChatCompletionMessage{
+			Role: "tool",
+			Content: &model.ChatCompletionMessageContent{
+				StringValue: volcengine.String(fmt.Sprintf("Error: %v", err)),
+			},
+			ToolCallID: toolCall.ID,
+		}
+		// Warn the user
+		c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Tool %s blocked by permission: %v", toolCall.Function.Name, err)}, nil)
+
+		// Function call is over early
+		c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusFunctionCallingOver}, c.op.proceed)
+		return msg, nil
+	}
+
 	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
 	toolHandlers := map[string]func(*model.ToolCall, *map[string]interface{}) (*model.ChatCompletionMessage, error){
 		ToolShell:             c.op.OpenChatShellToolCall,
@@ -657,6 +676,7 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 		ToolListState:         c.op.OpenChatListStateToolCall,
 		ToolActivateSkill:     c.op.OpenChatActivateSkillToolCall,
 		ToolAskUser:           c.op.OpenChatAskUserToolCall,
+		ToolExitPlanMode:      c.op.OpenChatExitPlanModeToolCall,
 	}
 
 	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {

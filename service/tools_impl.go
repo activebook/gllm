@@ -1358,6 +1358,7 @@ func activateSkillToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.T
 	return skillDetails, nil
 }
 
+// askUserToolCallImpl handles the ask_user tool call.
 func askUserToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	question, _ := (*argsMap)["question"].(string)
 	qType, _ := (*argsMap)["question_type"].(string)
@@ -1387,4 +1388,29 @@ func askUserToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	// Encode answer back to the model
 	out, _ := json.Marshal(resp)
 	return string(out), nil
+}
+
+// exitPlanModeToolCallImpl handles the exit_plan_mode tool call.
+func exitPlanModeToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+	// If auto approve, we still notify but we just go directly
+	if !toolsUse.AutoApprove {
+		// Get purpose if provided
+		purpose, _ := (*argsMap)["purpose"].(string)
+		if purpose == "" {
+			purpose = "exit Plan Mode and enter normal execution mode"
+		}
+		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
+		if toolsUse.Confirm == data.ToolConfirmCancel {
+			return "Operation cancelled by user: User denied exiting Plan Mode.", UserCancelError{Reason: UserCancelReasonDeny}
+		}
+	}
+
+	// Directly mutate session state — agent runs outside RunChatInput,
+	// so SendEvent is a no-op here. The next NewChatInputModel call will
+	// read the updated state and hide the banner automatically.
+	data.SetPlanModeInSession(false)
+	// Best-effort: if RunChatInput somehow is running concurrently, update banner.
+	ui.SendEvent(ui.PlanModeMsg{Active: false})
+
+	return "Successfully exited Plan Mode. You are now in normal execution mode.", nil
 }

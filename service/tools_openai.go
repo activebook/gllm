@@ -396,3 +396,16 @@ func (op *OpenProcessor) OpenAIAskUserToolCall(toolCall openai.ToolCall, argsMap
 		Content:    response,
 	}, err
 }
+
+func (op *OpenProcessor) OpenAIExitPlanModeToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+	response, err := exitPlanModeToolCallImpl(argsMap, op.toolsUse)
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	return openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Content:    response,
+	}, err
+}

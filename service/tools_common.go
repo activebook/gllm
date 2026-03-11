@@ -44,6 +44,7 @@ const (
 	ToolGetState          = "get_state"
 	ToolSetState          = "set_state"
 	ToolListState         = "list_state"
+	ToolExitPlanMode      = "exit_plan_mode"
 )
 
 // OpenTool is a generic tool definition that is not tied to any specific model.
@@ -123,6 +124,27 @@ var (
 		ToolSetState,
 		ToolListState,
 	}
+	planTools = []string{
+		// Plan mode
+		ToolExitPlanMode,
+	}
+
+	readOnlyTools = map[string]bool{
+		ToolReadFile:          true,
+		ToolReadMultipleFiles: true,
+		ToolSearchFiles:       true,
+		ToolSearchTextInFile:  true,
+		ToolListDirectory:     true,
+		ToolWebFetch:          true,
+		ToolWebSearch:         true,
+		ToolAskUser:           true,
+		ToolExitPlanMode:      true,
+		ToolActivateSkill:     true,
+		ToolListMemory:        true,
+		ToolListAgent:         true,
+		ToolGetState:          true,
+		ToolListState:         true,
+	}
 )
 
 func GetAllEmbeddingTools() []string {
@@ -145,12 +167,17 @@ func GetAllSubagentTools() []string {
 	return subagentTools
 }
 
+func GetAllPlanModeTools() []string {
+	return planTools
+}
+
 func GetAllOpenTools() []string {
 	tools := GetAllEmbeddingTools()
 	tools = append(tools, GetAllSearchTools()...)
 	tools = append(tools, GetAllSkillTools()...)
 	tools = append(tools, GetAllMemoryTools()...)
 	tools = append(tools, GetAllSubagentTools()...)
+	tools = append(tools, GetAllPlanModeTools()...)
 	return tools
 }
 
@@ -162,7 +189,8 @@ func IsAvailableOpenTool(toolName string) bool {
 		AvailableSearchTool(toolName) ||
 		AvailableSkillTool(toolName) ||
 		AvailableMemoryTool(toolName) ||
-		AvailableSubagentTool(toolName)
+		AvailableSubagentTool(toolName) ||
+		AvailablePlanTool(toolName)
 }
 
 // AvailableEmbeddingTool checks if a tool is available in the embedding tools.
@@ -208,6 +236,16 @@ func AvailableMemoryTool(toolName string) bool {
 // AvailableSubagentTool checks if a tool is available in the subagent tools.
 func AvailableSubagentTool(toolName string) bool {
 	for _, tool := range subagentTools {
+		if tool == toolName {
+			return true
+		}
+	}
+	return false
+}
+
+// AvailablePlanTool checks if a tool is available in the plan tools.
+func AvailablePlanTool(toolName string) bool {
+	for _, tool := range planTools {
 		if tool == toolName {
 			return true
 		}
@@ -288,6 +326,26 @@ func AppendSearchTools(tools []string) []string {
 // RemoveSearchTools removes search tools from the given tools slice.
 func RemoveSearchTools(tools []string) []string {
 	for _, tool := range searchTools {
+		tools = slices.DeleteFunc(tools, func(t string) bool {
+			return t == tool
+		})
+	}
+	return tools
+}
+
+// AppendPlanTools appends plan tools to the given tools slice if they are not already present.
+func AppendPlanTools(tools []string) []string {
+	for _, tool := range planTools {
+		if !slices.Contains(tools, tool) {
+			tools = append(tools, tool)
+		}
+	}
+	return tools
+}
+
+// RemovePlanTools removes plan tools from the given tools slice.
+func RemovePlanTools(tools []string) []string {
+	for _, tool := range planTools {
 		tools = slices.DeleteFunc(tools, func(t string) bool {
 			return t == tool
 		})
@@ -588,6 +646,10 @@ func getOpenTools() []*OpenTool {
 	// activate_skill tool
 	activateSkillTool := getActivateSkillTool()
 	tools = append(tools, activateSkillTool)
+
+	// exit_plan_mode tool
+	exitPlanModeTool := getExitPlanModeTool()
+	tools = append(tools, exitPlanModeTool)
 
 	return tools
 }
@@ -1458,6 +1520,30 @@ func getAskUserTool() *OpenTool {
 	return &askUserTool
 }
 
+func getExitPlanModeTool() *OpenTool {
+	exitPlanModeFunc := OpenFunctionDefinition{
+		Name: ToolExitPlanMode,
+		Description: `Requests user confirmation to exit Plan Mode and enter normal execution mode.
+Use this when you have finished planning and are ready to execute tasks that require modifying code, files or running non-readonly commands.`,
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"purpose": map[string]interface{}{
+					"type": "string",
+					"description": "A clear, user-friendly explanation of why you want to exit Plan Mode and enter normal execution mode. " +
+						"This will be shown to the user for confirmation.",
+				},
+			},
+			"required": []string{"purpose"},
+		},
+	}
+	exitPlanModeTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &exitPlanModeFunc,
+	}
+	return &exitPlanModeTool
+}
+
 // OpenProcessor is the main processor for OpenAI-like models
 // For tools implementation
 // - It manages the context, notifications, data streaming, and tool usage
@@ -1478,6 +1564,7 @@ type OpenProcessor struct {
 	sharedState *data.SharedState // Shared state for inter-agent communication
 	executor    *SubAgentExecutor // Sub-agent executor for spawn_subagents tool
 	agentName   string            // Current agent name (for set_state metadata)
+	planMode    *bool             // Pointer to whether Plan Mode is active
 }
 
 // Diff confirm func

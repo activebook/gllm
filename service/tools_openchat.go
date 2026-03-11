@@ -520,3 +520,20 @@ func (op *OpenProcessor) OpenChatAskUserToolCall(toolCall *model.ToolCall, argsM
 	}
 	return &toolMessage, err
 }
+
+func (op *OpenProcessor) OpenChatExitPlanModeToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	response, err := exitPlanModeToolCallImpl(argsMap, op.toolsUse)
+	if err != nil {
+		response = fmt.Sprintf("Error: %v", err)
+	}
+
+	toolMessage := model.ChatCompletionMessage{
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: toolCall.ID,
+		Name:       Ptr(""),
+		Content: &model.ChatCompletionMessageContent{
+			StringValue: volcengine.String(response),
+		},
+	}
+	return &toolMessage, err
+}

@@ -22,6 +22,7 @@ var (
 		"/help":     "Show this help message",
 		"/history":  "Show recent session history",
 		"/clear":    "Clear session history",
+		"/plan":     "Toggle Plan Mode",
 		"/model":    "Manage models (list, switch, add, etc.)",
 		"/agent":    "Manage agents (list, switch, add, etc.)",
 		"/template": "Manage templates (list, switch, add, etc.)",
@@ -65,6 +66,7 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
+// switchYoloMode toggles YOLO mode
 func switchYoloMode() {
 	yolo := data.GetToolCallAutoApproveInSession()
 	if yolo {
@@ -74,6 +76,20 @@ func switchYoloMode() {
 		fmt.Printf("YOLO mode: %s -> %s\n", data.SwitchOffColor+"off"+data.ResetSeq, data.SwitchOnColor+"on"+data.ResetSeq)
 		data.SetToolCallAutoApproveInSession(true)
 	}
+}
+
+// switchPlanMode toggles Plan mode
+func switchPlanMode() {
+	plan := data.GetPlanModeInSession()
+	if plan {
+		fmt.Printf("Plan mode: %s -> %s\n", data.SwitchOnColor+"on"+data.ResetSeq, data.SwitchOffColor+"off"+data.ResetSeq)
+	} else {
+		fmt.Printf("Plan mode: %s -> %s\n", data.SwitchOffColor+"off"+data.ResetSeq, data.SwitchOnColor+"on"+data.ResetSeq)
+	}
+	data.SetPlanModeInSession(!plan)
+	// SendEvent is a best-effort signal; it's a no-op if RunChatInput isn't active,
+	// but the next NewChatInputModel call will read the updated session state anyway.
+	ui.SendEvent(ui.PlanModeMsg{Active: !plan})
 }
 
 // runCommand executes a command with arguments
@@ -169,6 +185,9 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 
 	case "/yolo":
 		switchYoloMode()
+
+	case "/plan":
+		switchPlanMode()
 
 	case "/session":
 		runCommand(sessionCmd, parts[1:])

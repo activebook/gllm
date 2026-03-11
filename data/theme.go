@@ -101,6 +101,11 @@ var (
 	LowCachedHex  string
 	OffCachedHex  string
 
+	UpdateSuccessHex   string
+	UpdateAvailableHex string
+
+	PlanModeHex string
+
 	// Functional Helpers (for backwards compatibility or convenience)
 	// These might wrap the strings above
 )
@@ -239,6 +244,11 @@ func applyTheme(t goghthemes.Theme) {
 	MedCachedHex = t.Yellow
 	LowCachedHex = t.Red
 	OffCachedHex = t.BrightBlack
+
+	UpdateSuccessHex = t.Green
+	UpdateAvailableHex = t.Yellow
+
+	PlanModeHex = t.BrightMagenta
 }
 
 // ListThemes returns a sorted list of all available theme names.

@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/activebook/gllm/data"
 	"github.com/charmbracelet/bubbles/textarea"
@@ -25,6 +24,25 @@ const (
 	maxSuggestions = 8  // Max suggestions to show
 	maxHistory     = 20 // Max history to keep
 )
+
+var (
+	planModeBanner string       // plan mode banner
+	activeProgram  *tea.Program // reference to the running program for external Send()
+)
+
+// BannerMsg carries a notification banner text to display above the input.
+type BannerMsg struct{ Text string }
+
+// PlanModeMsg signals a Plan Mode toggle to the UI.
+type PlanModeMsg struct{ Active bool }
+
+// SendEvent dispatches a message to the active chat input program.
+// Goroutine-safe; no-op when no program is running.
+func SendEvent(msg tea.Msg) {
+	if activeProgram != nil {
+		activeProgram.Send(msg)
+	}
+}
 
 // ChatInputResult holds the result of the chat input
 type ChatInputResult struct {
@@ -56,10 +74,8 @@ type ChatInputModel struct {
 	historyIndex     int          // current history index
 	currentInput     string       // current input value
 	pendingBanner    string       // update notification banner (if any)
+	infoBanner       string       // info banner (if any)
 }
-
-// tickMsg is for polling the background update check
-type tickMsg time.Time
 
 // NewChatInputModel creates a new chat input model
 func NewChatInputModel(commands []Suggestion, initialValue string, history []string) ChatInputModel {
@@ -91,28 +107,30 @@ func NewChatInputModel(commands []Suggestion, initialValue string, history []str
 		ta.SetCursor(len(initialValue))
 	}
 
+	// Initialize banner if plan mode is active
+	planModeStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(data.PlanModeHex)).
+		Bold(true)
+	planModeBanner = planModeStyle.Render("plan mode")
+	infoBanner := ""
+	if data.GetPlanModeInSession() {
+		infoBanner = planModeBanner
+	}
+
 	width := GetTerminalWidth()
 	return ChatInputModel{
-		textarea:     ta,
-		allCommands:  commands,
-		history:      history,
-		historyIndex: len(history),
-		width:        width,
+		textarea:      ta,
+		allCommands:   commands,
+		history:       history,
+		historyIndex:  len(history),
+		width:         width,
+		pendingBanner: "",
+		infoBanner:    infoBanner,
 	}
 }
 
 func (m ChatInputModel) Init() tea.Cmd {
-	return tea.Batch(
-		textarea.Blink,
-		tickPendingUpdate(),
-	)
-}
-
-// tickPendingUpdate periodically emits a tickMsg to check for background updates
-func tickPendingUpdate() tea.Cmd {
-	return tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
-		return tickMsg(t)
-	})
+	return textarea.Blink
 }
 
 // updateHistory updates the history with the given value
@@ -279,30 +297,25 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
-	case tickMsg:
-		// Safe, non-blocking poll.
-		if m.pendingBanner == "" {
-			text, resolved := data.GetNotification()
-			if resolved {
-				if text != "" {
-					m.pendingBanner = text
-				}
-				// Stop ticking! We already got the notification
-				return m, nil
-			} else {
-				// keep ticking until resolved
-				return m, tickPendingUpdate()
-			}
+	case BannerMsg:
+		m.pendingBanner = msg.Text
+		return m, nil
+
+	case PlanModeMsg:
+		data.SetPlanModeInSession(msg.Active)
+		if msg.Active {
+			m.infoBanner = planModeBanner
 		} else {
-			// Banner already shown(only shown one), no need to keep ticking.
-			return m, nil
+			m.infoBanner = ""
 		}
+		return m, nil
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		m.textarea.SetWidth(msg.Width)
 		// We don't set height here as we want it to auto-grow/shrink or be fixed small
+		// m.textarea.SetHeight(defaultHeight)
 
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -342,6 +355,16 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selectSuggestion()
 				return m, nil
 			}
+
+		case tea.KeyShiftTab:
+			if data.GetPlanModeInSession() {
+				data.SetPlanModeInSession(false)
+				m.infoBanner = ""
+			} else {
+				data.SetPlanModeInSession(true)
+				m.infoBanner = planModeBanner
+			}
+			return m, nil
 
 		case tea.KeyEsc:
 			if m.showSuggestions {
@@ -536,13 +559,16 @@ func (m ChatInputModel) View() string {
 
 	teaView := m.textarea.View()
 
-	// 1. Prepend update banner if we have one
-	if m.pendingBanner != "" {
-		teaView = m.pendingBanner + "\n\n" + teaView
-	}
-
+	// If no suggestions, just show the input with banners
 	if !m.showSuggestions || len(m.filteredCommands) == 0 {
-		return teaView
+		view := lipgloss.JoinVertical(lipgloss.Left, teaView)
+		if m.pendingBanner != "" {
+			view = lipgloss.JoinVertical(lipgloss.Left, m.pendingBanner, view)
+		}
+		// Always reserve the banner line — empty string when inactive
+		infoBannerLine := "\n" + m.infoBanner // "" when not active
+		view = lipgloss.JoinVertical(lipgloss.Left, view, infoBannerLine)
+		return view
 	}
 
 	// Render suggestions
@@ -613,9 +639,10 @@ func (m ChatInputModel) View() string {
 // RunChatInput runs the chat input program
 func RunChatInput(commands []Suggestion, initialValue string, history []string) (ChatInputResult, error) {
 	model := NewChatInputModel(commands, initialValue, history)
-	p := tea.NewProgram(model)
+	activeProgram = tea.NewProgram(model)
+	defer func() { activeProgram = nil }()
 
-	finalModel, err := p.Run()
+	finalModel, err := activeProgram.Run()
 	if err != nil {
 		return ChatInputResult{}, err
 	}

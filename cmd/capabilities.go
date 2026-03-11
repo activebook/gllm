@@ -13,14 +13,16 @@ import (
 )
 
 const (
-	AgentMCPTitle                   = "MCP (Model Context Protocol)"
-	AgentSkillsTitle                = "Agent Skills"
-	AgentMemoryTitle                = "Agent Memory"
-	AgentSubAgentsTitle             = "Sub Agents"
-	AgentWebSearchTitle             = "Web Search"
-	AgentTokenUsageTitle            = "Token usage"
-	AgentMarkdownTitle              = "Markdown output"
-	AgentAutoCompressTitle          = "Auto Compression"
+	AgentMCPTitle          = "MCP (Model Context Protocol)"
+	AgentSkillsTitle       = "Agent Skills"
+	AgentMemoryTitle       = "Agent Memory"
+	AgentSubAgentsTitle    = "Sub Agents"
+	AgentWebSearchTitle    = "Web Search"
+	AgentTokenUsageTitle   = "Token usage"
+	AgentMarkdownTitle     = "Markdown output"
+	AgentAutoCompressTitle = "Auto Compression"
+	AgentPlanModeTitle     = "Plan Mode"
+
 	AgentMCPTitleHighlight          = "[MCP (Model Context Protocol)]()"
 	AgentSkillsTitleHighlight       = "[Agent Skills]()"
 	AgentMemoryTitleHighlight       = "[Agent Memory]()"
@@ -29,6 +31,7 @@ const (
 	AgentTokenUsageTitleHighlight   = "[Token usage]()"
 	AgentMarkdownTitleHighlight     = "[Markdown output]()"
 	AgentAutoCompressTitleHighlight = "[Auto Compression]()"
+	AgentPlanModeTitleHighlight     = "[Plan Mode]()"
 
 	AgentMCPBody          = "enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."
 	AgentSkillsBody       = "are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.\nAfter integrating skills, **agent** will use skills automatically."
@@ -38,6 +41,7 @@ const (
 	AgentTokenUsageBody   = "allows agents to track their token usage.\nThis helps you to control the cost of using the agent."
 	AgentMarkdownBody     = "allows agents to generate final response in Markdown format.\nThis helps you to format the response in a more readable way."
 	AgentAutoCompressBody = "automatically compresses session context using a summary when context window limits are reached.\nThis provides an infinite context window continuity with minimal detail loss."
+	AgentPlanModeBody     = "allows agents to plan their work before executing tasks.\nUse for deepresearch, complex tasks, or collaborative work"
 
 	AgentMCPDescription          = AgentMCPTitle + " " + AgentMCPBody
 	AgentSkillsDescription       = AgentSkillsTitle + " " + AgentSkillsBody
@@ -47,6 +51,7 @@ const (
 	AgentTokenUsageDescription   = AgentTokenUsageTitle + " " + AgentTokenUsageBody
 	AgentMarkdownDescription     = AgentMarkdownTitle + " " + AgentMarkdownBody
 	AgentAutoCompressDescription = AgentAutoCompressTitle + " " + AgentAutoCompressBody
+	AgentPlanModeDescription     = AgentPlanModeTitle + " " + AgentPlanModeBody
 
 	// Agent Features Description Highlight
 	AgentMCPDescriptionHighlight          = AgentMCPTitleHighlight + AgentMCPBody
@@ -57,6 +62,7 @@ const (
 	AgentTokenUsageDescriptionHighlight   = AgentTokenUsageTitleHighlight + AgentTokenUsageBody
 	AgentMarkdownDescriptionHighlight     = AgentMarkdownTitleHighlight + AgentMarkdownBody
 	AgentAutoCompressDescriptionHighlight = AgentAutoCompressTitleHighlight + AgentAutoCompressBody
+	AgentPlanModeDescriptionHighlight     = AgentPlanModeTitleHighlight + AgentPlanModeBody
 )
 
 func init() {
@@ -165,6 +171,14 @@ var capsSwitchCmd = &cobra.Command{
 			options = append(options, huh.NewOption("Auto Compression", service.CapabilityAutoCompression))
 		}
 
+		// Plan Mode
+		if service.IsPlanModeEnabled(agent.Capabilities) {
+			options = append(options, huh.NewOption("Plan Mode", service.CapabilityPlanMode).Selected(true))
+			selected = append(selected, service.CapabilityPlanMode)
+		} else {
+			options = append(options, huh.NewOption("Plan Mode", service.CapabilityPlanMode))
+		}
+
 		// Sort with selected at top
 		ui.SortMultiOptions(options, selected)
 
@@ -200,6 +214,7 @@ var capsSwitchCmd = &cobra.Command{
 			service.CapabilityAgentMemory,
 			service.CapabilityWebSearch,
 			service.CapabilityAutoCompression,
+			service.CapabilityPlanMode,
 		}
 		for _, cap := range allCaps {
 			if selectedSet[cap] {
@@ -238,6 +253,8 @@ func getFeatureDescription(cap string) string {
 		return AgentWebSearchDescriptionHighlight
 	case service.CapabilityAutoCompression:
 		return AgentAutoCompressDescriptionHighlight
+	case service.CapabilityPlanMode:
+		return AgentPlanModeDescriptionHighlight
 	default:
 		return ""
 	}
@@ -255,6 +272,7 @@ func printCapSummary(caps []string) {
 	printCapStatus("Agent Memory", service.IsAgentMemoryEnabled(caps))
 	printCapStatus("Sub Agents", service.IsSubAgentsEnabled(caps))
 	printCapStatus("Auto Compression", service.IsAutoCompressionEnabled(caps))
+	printCapStatus("Plan Mode", service.IsPlanModeEnabled(caps))
 
 	fmt.Printf("%s = Enabled capability\n", ui.FormatEnabledIndicator(true))
 }
@@ -281,6 +299,8 @@ func printCapStatus(name string, enabled bool) {
 		desc = AgentMarkdownDescription
 	case "Auto Compression":
 		desc = AgentAutoCompressDescription
+	case "Plan Mode":
+		desc = AgentPlanModeDescription
 	}
 
 	if desc != "" {
