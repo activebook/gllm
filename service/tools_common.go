@@ -142,6 +142,7 @@ var (
 		ToolActivateSkill:     true,
 		ToolListMemory:        true,
 		ToolListAgent:         true,
+		ToolSpawnSubAgents:    true,
 		ToolGetState:          true,
 		ToolListState:         true,
 	}
@@ -1564,7 +1565,6 @@ type OpenProcessor struct {
 	sharedState *data.SharedState // Shared state for inter-agent communication
 	executor    *SubAgentExecutor // Sub-agent executor for spawn_subagents tool
 	agentName   string            // Current agent name (for set_state metadata)
-	planMode    *bool             // Pointer to whether Plan Mode is active
 }
 
 // Diff confirm func

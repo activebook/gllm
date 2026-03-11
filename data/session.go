@@ -175,3 +175,23 @@ func sanitizeFileName(name string) string {
 	)
 	return replacer.Replace(name)
 }
+
+var (
+	// Whether Plan Mode is enabled in the current session
+	// Agents and Subagents all share this mode
+	planModeInSession = false
+)
+
+/**
+ * Set plan mode in session
+ */
+func SetPlanModeInSession(value bool) {
+	planModeInSession = value
+}
+
+/**
+ * Get plan mode in session
+ */
+func GetPlanModeInSession() bool {
+	return planModeInSession
+}

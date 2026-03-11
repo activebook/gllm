@@ -204,6 +204,14 @@ func (op *OpenProcessor) AnthropicMCPToolCall(toolCall anthropic.ToolUseBlockPar
 		return anthropic.NewUserMessage(toolResult), err
 	}
 
+	// Check permisson on mcp tools
+	if err := CheckToolPermission(toolCall.Name, argsMap); err != nil {
+		response := fmt.Sprintf("Error: %v", err)
+		isError := err != nil
+		toolResult := anthropic.NewToolResultBlock(toolCall.ID, response, isError)
+		return anthropic.NewUserMessage(toolResult), err
+	}
+
 	// Call the MCP tool
 	result, err := op.mcpClient.CallTool(toolCall.Name, *argsMap)
 	isError := err != nil

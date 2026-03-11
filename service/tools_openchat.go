@@ -49,6 +49,19 @@ func (op *OpenProcessor) OpenChatMCPToolCall(toolCall *model.ToolCall, argsMap *
 		return &toolMessage, err
 	}
 
+	// Check permisson on mcp tools
+	if err := CheckToolPermission(toolCall.Function.Name, argsMap); err != nil {
+		toolMessage := model.ChatCompletionMessage{
+			Role:       model.ChatMessageRoleTool,
+			ToolCallID: toolCall.ID,
+			Name:       Ptr(""),
+			Content: &model.ChatCompletionMessageContent{
+				StringValue: volcengine.String(fmt.Sprintf("Error: MCP tool call failed: %v", err)),
+			},
+		}
+		return &toolMessage, err
+	}
+
 	// Call the MCP tool
 	result, err := op.mcpClient.CallTool(toolCall.Function.Name, *argsMap)
 	if err != nil {

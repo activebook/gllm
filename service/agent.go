@@ -60,7 +60,6 @@ type Agent struct {
 	SharedState *data.SharedState // Shared state for inter-agent communication
 	AgentName   string            // Current agent name for metadata tracking
 	Verbose     bool              // Whether verbose output mode is enabled
-	PlanMode    bool              // Whether Plan Mode is active
 }
 
 func constructModelInfo(model *data.Model) *ModelInfo {
@@ -220,7 +219,6 @@ type AgentOptions struct {
 	// Sub-agent orchestration fields
 	SharedState *data.SharedState // Shared state for inter-agent communication
 	AgentName   string            // Name of the agent running this task
-	PlanMode    bool              // Whether Plan Mode is active
 }
 
 func CallAgent(op *AgentOptions) error {
@@ -351,7 +349,6 @@ func CallAgent(op *AgentOptions) error {
 		SharedState:   op.SharedState,
 		AgentName:     op.AgentName,
 		Verbose:       verboseMode,
-		PlanMode:      op.PlanMode,
 	}
 
 	// Construct session manager

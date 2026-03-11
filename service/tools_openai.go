@@ -217,10 +217,18 @@ func (op *OpenProcessor) OpenAIMCPToolCall(toolCall openai.ToolCall, argsMap *ma
 		}, err
 	}
 
+	// Check permisson on mcp tools
+	if err := CheckToolPermission(toolCall.Function.Name, argsMap); err != nil {
+		return openai.ChatCompletionMessage{
+			Role:       openai.ChatMessageRoleTool,
+			ToolCallID: toolCall.ID,
+			Content:    fmt.Sprintf("Error: MCP tool call failed: %v", err),
+		}, err
+	}
+
 	// Call the MCP tool
 	result, err := op.mcpClient.CallTool(toolCall.Function.Name, *argsMap)
 	if err != nil {
-		// Wrap error in response
 		return openai.ChatCompletionMessage{
 			Role:       openai.ChatMessageRoleTool,
 			ToolCallID: toolCall.ID,

@@ -452,7 +452,6 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 		MCPConfig:     mcpConfig,
 		SharedState:   e.state,
 		AgentName:     task.AgentName,
-		PlanMode:      false, // Sub-agents run in normal mode
 	}
 
 	// Check for context cancellation

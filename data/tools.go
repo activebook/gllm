@@ -30,8 +30,6 @@ func (tu *ToolsUse) ConfirmCancel() {
 var (
 	// Whether tools can be used without user confirmation in the current session
 	toolCallAutoApproveInSession = false
-	// Whether Plan Mode is enabled in the current session
-	planModeInSession = false
 )
 
 /**
@@ -46,18 +44,4 @@ func SetToolCallAutoApproveInSession(value bool) {
  */
 func GetToolCallAutoApproveInSession() bool {
 	return toolCallAutoApproveInSession
-}
-
-/**
- * Set plan mode in session
- */
-func SetPlanModeInSession(value bool) {
-	planModeInSession = value
-}
-
-/**
- * Get plan mode in session
- */
-func GetPlanModeInSession() bool {
-	return planModeInSession
 }

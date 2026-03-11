@@ -275,10 +275,19 @@ func (ga *GeminiAgent) GeminiMCPToolCall(call *genai.FunctionCall) (*genai.Funct
 		argsMap[k] = v
 	}
 
+	// Check permisson on mcp tools
+	if err := CheckToolPermission(call.Name, &argsMap); err != nil {
+		error := fmt.Sprintf("Error: MCP tool call failed: %v", err)
+		resp.Response = map[string]any{
+			"output": error,
+			"error":  error,
+		}
+		return &resp, err
+	}
+
 	// Call the MCP tool
 	result, err := ga.MCPClient.CallTool(call.Name, argsMap)
 	if err != nil {
-		// Wrap error in response
 		error := fmt.Sprintf("Error: MCP tool call failed: %v", err)
 		resp.Response = map[string]any{
 			"output": error,
