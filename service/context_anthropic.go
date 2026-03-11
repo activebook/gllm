@@ -1,6 +1,8 @@
 package service
 
 import (
+	"sort"
+
 	anthropic "github.com/anthropics/anthropic-sdk-go"
 )
 
@@ -186,5 +188,6 @@ func (c *anthropicContext) gatherToolPair(messages []anthropic.MessageParam, cal
 			}
 		}
 	}
+	sort.Ints(indices)
 	return indices
 }

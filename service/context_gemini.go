@@ -1,6 +1,8 @@
 package service
 
 import (
+	"sort"
+
 	"google.golang.org/genai"
 )
 
@@ -190,5 +192,6 @@ func (c *geminiContext) gatherToolPair(messages []*genai.Content, callIndex int)
 			}
 		}
 	}
+	sort.Ints(indices)
 	return indices
 }

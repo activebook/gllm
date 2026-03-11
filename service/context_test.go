@@ -33,13 +33,13 @@ func TestPruneOpenAIMessagesNoTruncation(t *testing.T) {
 		},
 	}
 
+	systemPrompt := "You are a helpful assistant."
 	messages := []openai.ChatCompletionMessage{
-		{Role: openai.ChatMessageRoleSystem, Content: "You are a helpful assistant."},
 		{Role: openai.ChatMessageRoleUser, Content: "Hello"},
 		{Role: openai.ChatMessageRoleAssistant, Content: "Hi there!"},
 	}
 
-	resultAny, truncated, _ := cm.PruneMessages(messages, nil)
+	resultAny, truncated, _ := cm.PruneMessages(messages, systemPrompt, nil)
 	result := resultAny.([]openai.ChatCompletionMessage)
 
 	if truncated {
@@ -54,20 +54,20 @@ func TestPruneOpenAIMessagesNoTruncation(t *testing.T) {
 func TestPruneOpenAIMessagesWithTruncation(t *testing.T) {
 	cm := &openAIContext{
 		commonContext: commonContext{
-			maxInputTokens: 50,
+			maxInputTokens: 60,
 			strategy:       StrategyTruncateOldest,
 		},
 	}
 
+	systemPrompt := "You are a helpful assistant."
 	messages := []openai.ChatCompletionMessage{
-		{Role: openai.ChatMessageRoleSystem, Content: "You are a helpful assistant."},
 		{Role: openai.ChatMessageRoleUser, Content: "This is message one with some content."},
 		{Role: openai.ChatMessageRoleAssistant, Content: "This is response one with some content."},
 		{Role: openai.ChatMessageRoleUser, Content: "This is message two with some content."},
 		{Role: openai.ChatMessageRoleAssistant, Content: "This is response two with some content."},
 	}
 
-	resultAny, truncated, _ := cm.PruneMessages(messages, nil)
+	resultAny, truncated, _ := cm.PruneMessages(messages, systemPrompt, nil)
 	result := resultAny.([]openai.ChatCompletionMessage)
 
 	if !truncated {
@@ -79,8 +79,10 @@ func TestPruneOpenAIMessagesWithTruncation(t *testing.T) {
 			len(result), len(messages))
 	}
 
-	if len(result) > 0 && result[0].Role != openai.ChatMessageRoleSystem {
-		t.Error("System message should be preserved at index 0")
+	for _, msg := range result {
+		if msg.Role == openai.ChatMessageRoleSystem {
+			t.Error("System message should not be in the pruned dialogue result")
+		}
 	}
 }
 
@@ -92,12 +94,12 @@ func TestPruneOpenAIMessagesWithStrategyNone(t *testing.T) {
 		},
 	}
 
+	systemPrompt := "You are a helpful assistant with a long description."
 	messages := []openai.ChatCompletionMessage{
-		{Role: openai.ChatMessageRoleSystem, Content: "You are a helpful assistant with a long description."},
 		{Role: openai.ChatMessageRoleUser, Content: "Hello, this is a relatively long message."},
 	}
 
-	resultAny, truncated, _ := cm.PruneMessages(messages, nil)
+	resultAny, truncated, _ := cm.PruneMessages(messages, systemPrompt, nil)
 	result := resultAny.([]openai.ChatCompletionMessage)
 
 	if truncated {
@@ -136,7 +138,7 @@ func TestToolPairRemoval(t *testing.T) {
 		{Role: openai.ChatMessageRoleUser, Content: "Thanks! What about tomorrow?"},
 	}
 
-	resultAny, truncated, _ := cm.PruneMessages(messages, nil)
+	resultAny, truncated, _ := cm.PruneMessages(messages, "", nil)
 	result := resultAny.([]openai.ChatCompletionMessage)
 
 	if !truncated {
@@ -167,55 +169,33 @@ func TestToolPairRemoval(t *testing.T) {
 	}
 }
 
-func TestPreserveMultiSystemMessages(t *testing.T) {
+func TestOpenAISystemPromptAccounting(t *testing.T) {
 	ClearTokenCache()
 
+	// Set a very tight limit
 	cm := &openAIContext{
 		commonContext: commonContext{
-			maxInputTokens: 40,
+			maxInputTokens: 50,
 			strategy:       StrategyTruncateOldest,
 		},
 	}
 
-	sys1 := "System message 1 (Identity)"
-	sys2 := "System message 2 (Intermediate)"
-	sys3 := "System message 3 (Current Task)"
-
+	// Long system prompt should consume most of the budget
+	systemPrompt := "This is a very long system prompt that specifically designed to take up a significant portion of the token budget. We need to make sure that it is long enough so that when combined with the dialogue messages, it exceeds the tight limit of fifty tokens that we have set for this test case. By doing this, we can verify that the context manager correctly accounts for the system prompt overhead even when it is not part of the dialogue history slice itself. This is critical for our new architectural design where system prompts are handled out-of-band."
 	messages := []openai.ChatCompletionMessage{
-		{Role: openai.ChatMessageRoleSystem, Content: sys1},
-		{Role: openai.ChatMessageRoleUser, Content: "Msg A"},
-		{Role: openai.ChatMessageRoleAssistant, Content: "Msg B"},
-		{Role: openai.ChatMessageRoleSystem, Content: sys2},
-		{Role: openai.ChatMessageRoleUser, Content: "Msg C"},
-		{Role: openai.ChatMessageRoleAssistant, Content: "Msg D"},
-		{Role: openai.ChatMessageRoleSystem, Content: sys3},
-		{Role: openai.ChatMessageRoleUser, Content: "Msg E"},
+		{Role: openai.ChatMessageRoleUser, Content: "Some dialogue message"},
+		{Role: openai.ChatMessageRoleAssistant, Content: "Some dialogue response"},
 	}
 
-	resultAny, truncated, _ := cm.PruneMessages(messages, nil)
+	resultAny, truncated, _ := cm.PruneMessages(messages, systemPrompt, nil)
 	result := resultAny.([]openai.ChatCompletionMessage)
 
 	if !truncated {
-		t.Error("Expected truncation")
+		t.Error("Expected truncation due to system prompt overhead")
 	}
 
-	systemCount := 0
-	for _, msg := range result {
-		if msg.Role == openai.ChatMessageRoleSystem {
-			systemCount++
-		}
-	}
-	if systemCount != 1 {
-		t.Errorf("Expected exactly 1 system message, got %d", systemCount)
-	}
-
-	if result[0].Role != openai.ChatMessageRoleSystem {
-		t.Error("First message should be system message")
-	}
-
-	expectedContent := sys1 + "\n" + sys2 + "\n" + sys3
-	if result[0].Content != expectedContent {
-		t.Errorf("System content mismatch.\nGot: %q\nWant: %q", result[0].Content, expectedContent)
+	if len(result) >= len(messages) {
+		t.Errorf("Expected fewer messages, got %d", len(result))
 	}
 }
 
@@ -235,13 +215,8 @@ func TestPruneOpenChatMessagesNoTruncation(t *testing.T) {
 		},
 	}
 
+	systemPrompt := "You are a helpful assistant."
 	messages := []*model.ChatCompletionMessage{
-		{
-			Role: model.ChatMessageRoleSystem,
-			Content: &model.ChatCompletionMessageContent{
-				StringValue: strPtr("You are a helpful assistant."),
-			},
-		},
 		{
 			Role: model.ChatMessageRoleUser,
 			Content: &model.ChatCompletionMessageContent{
@@ -256,7 +231,7 @@ func TestPruneOpenChatMessagesNoTruncation(t *testing.T) {
 		},
 	}
 
-	resultAny, truncated, _ := cm.PruneMessages(messages, nil)
+	resultAny, truncated, _ := cm.PruneMessages(messages, systemPrompt, nil)
 	result := resultAny.([]*model.ChatCompletionMessage)
 
 	if truncated {
@@ -278,13 +253,8 @@ func TestPruneOpenChatMessagesWithTruncation(t *testing.T) {
 		},
 	}
 
+	systemPrompt := "You are a helpful assistant."
 	messages := []*model.ChatCompletionMessage{
-		{
-			Role: model.ChatMessageRoleSystem,
-			Content: &model.ChatCompletionMessageContent{
-				StringValue: strPtr("You are a helpful assistant."),
-			},
-		},
 		{
 			Role: model.ChatMessageRoleUser,
 			Content: &model.ChatCompletionMessageContent{
@@ -311,20 +281,17 @@ func TestPruneOpenChatMessagesWithTruncation(t *testing.T) {
 		},
 	}
 
-	resultAny, truncated, _ := cm.PruneMessages(messages, nil)
+	resultAny, truncated, _ := cm.PruneMessages(messages, systemPrompt, nil)
 	result := resultAny.([]*model.ChatCompletionMessage)
 
 	if !truncated {
 		t.Error("Expected truncation for messages exceeding limit")
 	}
 
-	if len(result) >= len(messages) {
-		t.Errorf("Expected fewer messages after truncation, got %d (original %d)",
-			len(result), len(messages))
-	}
-
-	if len(result) > 0 && result[0].Role != model.ChatMessageRoleSystem {
-		t.Error("System message should be preserved at index 0")
+	for _, msg := range result {
+		if msg.Role == model.ChatMessageRoleSystem {
+			t.Error("System message should not be in the pruned dialogue result")
+		}
 	}
 }
 
@@ -410,49 +377,41 @@ func TestOpenChatToolPairRemoval(t *testing.T) {
 	}
 }
 
-func TestOpenChatPreserveMultiSystemMessages(t *testing.T) {
+func TestOpenChatSystemPromptAccounting(t *testing.T) {
 	ClearTokenCache()
 
 	cm := &openChatContext{
 		commonContext: commonContext{
-			maxInputTokens: 20,
+			maxInputTokens: 50,
 			strategy:       StrategyTruncateOldest,
 		},
 	}
 
-	sys1 := "System message 1 (Identity)"
-	sys2 := "System message 2 (Intermediate)"
-	sys3 := "System message 3 (Current Task)"
-
+	systemPrompt := "This is a very long system prompt specifically designed to take up a significant portion of the token budget. We need to make sure that it is long enough so that when combined with the dialogue messages, it exceeds the tight limit of fifty tokens that we have set for this test case. By doing this, we can verify that the context manager correctly accounts for the system prompt overhead even when it is not part of the dialogue history slice itself."
 	messages := []*model.ChatCompletionMessage{
-		{Role: model.ChatMessageRoleSystem, Content: &model.ChatCompletionMessageContent{StringValue: strPtr(sys1)}},
-		{Role: model.ChatMessageRoleUser, Content: &model.ChatCompletionMessageContent{StringValue: strPtr("Msg A")}},
-		{Role: model.ChatMessageRoleSystem, Content: &model.ChatCompletionMessageContent{StringValue: strPtr(sys2)}},
-		{Role: model.ChatMessageRoleUser, Content: &model.ChatCompletionMessageContent{StringValue: strPtr("Msg B")}},
-		{Role: model.ChatMessageRoleSystem, Content: &model.ChatCompletionMessageContent{StringValue: strPtr(sys3)}},
-		{Role: model.ChatMessageRoleUser, Content: &model.ChatCompletionMessageContent{StringValue: strPtr("Msg C")}},
+		{
+			Role: model.ChatMessageRoleUser,
+			Content: &model.ChatCompletionMessageContent{
+				StringValue: strPtr("User message"),
+			},
+		},
+		{
+			Role: model.ChatMessageRoleAssistant,
+			Content: &model.ChatCompletionMessageContent{
+				StringValue: strPtr("Assistant response"),
+			},
+		},
 	}
 
-	resultAny, _, _ := cm.PruneMessages(messages, nil)
+	resultAny, truncated, _ := cm.PruneMessages(messages, systemPrompt, nil)
 	result := resultAny.([]*model.ChatCompletionMessage)
 
-	systemCount := 0
-	for _, msg := range result {
-		if msg.Role == model.ChatMessageRoleSystem {
-			systemCount++
-		}
-	}
-	if systemCount != 1 {
-		t.Errorf("Expected exactly 1 system message, got %d", systemCount)
+	if !truncated {
+		t.Error("Expected truncation due to system prompt overhead")
 	}
 
-	if result[0].Role != model.ChatMessageRoleSystem {
-		t.Error("First message should be system message")
-	}
-
-	expectedContent := sys1 + "\n" + sys2 + "\n" + sys3
-	if *result[0].Content.StringValue != expectedContent {
-		t.Errorf("System content mismatch.\nGot: %q\nWant: %q", *result[0].Content.StringValue, expectedContent)
+	if len(result) >= len(messages) {
+		t.Errorf("Expected fewer than %d messages, got %d", len(messages), len(result))
 	}
 }
 
