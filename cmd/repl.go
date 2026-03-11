@@ -238,8 +238,19 @@ func (ri *ReplInfo) awaitInput() (string, error) {
 		return commands[i].Command < commands[j].Command
 	})
 
+	// Define hooks for UI
+	hooks := ui.ChatInputHooks{
+		IsPlanModeActive: func() bool {
+			return data.IsPlanModeInSessionEnabled() && data.GetPlanModeInSession()
+		},
+		TogglePlanMode: func() {
+			// The /plan command in the REPL should only be available if the "Plan Mode" feature is enabled for the current agent.
+			switchPlanMode(nil)
+		},
+	}
+
 	// Run chat input
-	result, err := ui.RunChatInput(commands, ri.EditorInput, ri.History)
+	result, err := ui.RunChatInput(commands, ri.EditorInput, ri.History, hooks)
 	if err != nil {
 		return "", err
 	}

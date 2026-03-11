@@ -79,8 +79,17 @@ func switchYoloMode() {
 	}
 }
 
+func showPlanModeStatus() {
+	plan := data.GetPlanModeInSession()
+	if plan {
+		fmt.Printf("Plan mode: %s -> %s\n", data.SwitchOnColor+"on"+data.ResetSeq, data.SwitchOffColor+"off"+data.ResetSeq)
+	} else {
+		fmt.Printf("Plan mode: %s -> %s\n", data.SwitchOffColor+"off"+data.ResetSeq, data.SwitchOnColor+"on"+data.ResetSeq)
+	}
+}
+
 // switchPlanMode toggles Plan mode
-func switchPlanMode() {
+func switchPlanMode(showStatus func()) {
 	// The /plan command in the REPL should only be available if the "Plan Mode" feature is enabled for the current agent.
 	if !data.IsPlanModeInSessionEnabled() {
 		service.Warnln("Please enable Plan Mode feature first.")
@@ -88,15 +97,13 @@ func switchPlanMode() {
 	}
 
 	plan := data.GetPlanModeInSession()
-	if plan {
-		fmt.Printf("Plan mode: %s -> %s\n", data.SwitchOnColor+"on"+data.ResetSeq, data.SwitchOffColor+"off"+data.ResetSeq)
-	} else {
-		fmt.Printf("Plan mode: %s -> %s\n", data.SwitchOffColor+"off"+data.ResetSeq, data.SwitchOnColor+"on"+data.ResetSeq)
-	}
 	data.SetPlanModeInSession(!plan)
 	// SendEvent is a best-effort signal; it's a no-op if RunChatInput isn't active,
 	// but the next NewChatInputModel call will read the updated session state anyway.
 	ui.SendEvent(ui.PlanModeMsg{Active: !plan})
+	if showStatus != nil {
+		showStatus()
+	}
 }
 
 // runCommand executes a command with arguments
@@ -194,7 +201,7 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 		switchYoloMode()
 
 	case "/plan":
-		switchPlanMode()
+		switchPlanMode(showPlanModeStatus)
 
 	case "/session":
 		runCommand(sessionCmd, parts[1:])
