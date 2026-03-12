@@ -13,7 +13,7 @@ import (
  *
  */
 
-func (op *OpenProcessor) OpenChatSwitchAgentToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func (op *OpenProcessor) openChatSwitchAgentToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	response, err := switchAgentToolCallImpl(argsMap, op.toolsUse)
 
 	toolMessage := model.ChatCompletionMessage{
@@ -35,7 +35,7 @@ func (op *OpenProcessor) OpenChatSwitchAgentToolCall(toolCall *model.ToolCall, a
 	return &toolMessage, err
 }
 
-func (op *OpenProcessor) OpenChatMCPToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+func (op *OpenProcessor) openChatMCPToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	if op.mcpClient == nil {
 		err := fmt.Errorf("MCP client not initialized")
 		toolMessage := model.ChatCompletionMessage{
@@ -110,443 +110,92 @@ func (op *OpenProcessor) OpenChatMCPToolCall(toolCall *model.ToolCall, argsMap *
 	return &toolMessage, nil
 }
 
-// OpenChat tool implementations (wrapper functions)
-func (op *OpenProcessor) OpenChatReadFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := readFileToolCallImpl(argsMap)
+// runOpenChatTool runs fn and wraps the result into an OpenChat tool message.
+func runOpenChatTool(tc *model.ToolCall, fn ToolFunc) (*model.ChatCompletionMessage, error) {
+	response, err := fn()
 	if err != nil {
 		response = fmt.Sprintf("Error: %v", err)
 	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatWriteFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := writeFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatCreateDirectoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := createDirectoryToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatListDirectoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := listDirectoryToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatDeleteFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := deleteFileToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatDeleteDirectoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := deleteDirectoryToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatMoveToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := moveToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatSearchFilesToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := searchFilesToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatSearchTextInFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := searchTextInFileToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatReadMultipleFilesToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := readMultipleFilesToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatShellToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := shellToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatWebFetchToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := webFetchToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatWebSearchToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := webSearchToolCallImpl(argsMap, &op.queries, &op.references, op.search)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	// Create and return the tool response message
 	return &model.ChatCompletionMessage{
-		Role: model.ChatMessageRoleTool,
+		Role:       model.ChatMessageRoleTool,
+		ToolCallID: tc.ID,
+		Name:       Ptr(""), // Required by Volcengine SDK
 		Content: &model.ChatCompletionMessageContent{
 			StringValue: volcengine.String(response),
-		}, Name: Ptr(""),
-		ToolCallID: toolCall.ID,
+		},
 	}, err
 }
 
-func (op *OpenProcessor) OpenChatEditFileToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
+// dispatchOpenChatToolCall handles the routing of OpenChat tool calls to the correct implementation.
+func (op *OpenProcessor) dispatchOpenChatToolCall(toolCall *model.ToolCall, a *map[string]interface{}) (*model.ChatCompletionMessage, error) {
+	switch toolCall.Function.Name {
+	case ToolShell:
+		return runOpenChatTool(toolCall, func() (string, error) { return shellToolCallImpl(a, op.toolsUse) })
+	case ToolWebFetch:
+		return runOpenChatTool(toolCall, func() (string, error) { return webFetchToolCallImpl(a) })
+	case ToolWebSearch:
+		return runOpenChatTool(toolCall, func() (string, error) { return webSearchToolCallImpl(a, &op.queries, &op.references, op.search) })
+	case ToolReadFile:
+		return runOpenChatTool(toolCall, func() (string, error) { return readFileToolCallImpl(a) })
+	case ToolWriteFile:
+		return runOpenChatTool(toolCall, func() (string, error) {
+			return writeFileToolCallImpl(a, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
+		})
+	case ToolEditFile:
+		return runOpenChatTool(toolCall, func() (string, error) {
+			return editFileToolCallImpl(a, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
+		})
+	case ToolCreateDirectory:
+		return runOpenChatTool(toolCall, func() (string, error) { return createDirectoryToolCallImpl(a, op.toolsUse) })
+	case ToolListDirectory:
+		return runOpenChatTool(toolCall, func() (string, error) { return listDirectoryToolCallImpl(a) })
+	case ToolDeleteFile:
+		return runOpenChatTool(toolCall, func() (string, error) { return deleteFileToolCallImpl(a, op.toolsUse) })
+	case ToolDeleteDirectory:
+		return runOpenChatTool(toolCall, func() (string, error) { return deleteDirectoryToolCallImpl(a, op.toolsUse) })
+	case ToolMove:
+		return runOpenChatTool(toolCall, func() (string, error) { return moveToolCallImpl(a, op.toolsUse) })
+	case ToolCopy:
+		return runOpenChatTool(toolCall, func() (string, error) { return copyToolCallImpl(a, op.toolsUse) })
+	case ToolSearchFiles:
+		return runOpenChatTool(toolCall, func() (string, error) { return searchFilesToolCallImpl(a) })
+	case ToolSearchTextInFile:
+		return runOpenChatTool(toolCall, func() (string, error) { return searchTextInFileToolCallImpl(a) })
+	case ToolReadMultipleFiles:
+		return runOpenChatTool(toolCall, func() (string, error) { return readMultipleFilesToolCallImpl(a) })
+	case ToolListMemory:
+		return runOpenChatTool(toolCall, func() (string, error) { return listMemoryToolCallImpl() })
+	case ToolSaveMemory:
+		return runOpenChatTool(toolCall, func() (string, error) { return saveMemoryToolCallImpl(a) })
+	case ToolListAgent:
+		return runOpenChatTool(toolCall, func() (string, error) { return listAgentToolCallImpl() })
+	case ToolSpawnSubAgents:
+		return runOpenChatTool(toolCall, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op.toolsUse, op.executor) })
+	case ToolGetState:
+		return runOpenChatTool(toolCall, func() (string, error) { return getStateToolCallImpl(a, op.sharedState) })
+	case ToolSetState:
+		return runOpenChatTool(toolCall, func() (string, error) { return setStateToolCallImpl(a, op.agentName, op.sharedState) })
+	case ToolListState:
+		return runOpenChatTool(toolCall, func() (string, error) { return listStateToolCallImpl(op.sharedState) })
+	case ToolActivateSkill:
+		return runOpenChatTool(toolCall, func() (string, error) { return activateSkillToolCallImpl(a, op.toolsUse) })
+	case ToolAskUser:
+		return runOpenChatTool(toolCall, func() (string, error) { return askUserToolCallImpl(a) })
+	case ToolExitPlanMode:
+		return runOpenChatTool(toolCall, func() (string, error) { return exitPlanModeToolCallImpl(a, op.toolsUse) })
+	case ToolSwitchAgent:
+		return op.openChatSwitchAgentToolCall(toolCall, a)
+	default:
+		if op.mcpClient != nil && op.mcpClient.FindTool(toolCall.Function.Name) != nil {
+			return op.openChatMCPToolCall(toolCall, a)
+		}
+		errorMsg := fmt.Sprintf("Error: Unknown function '%s'. This function is not available. Please use one of the available functions from the tool list.", toolCall.Function.Name)
+		msg := &model.ChatCompletionMessage{
+			Role:       "tool",
+			ToolCallID: toolCall.ID,
+			Content:    &model.ChatCompletionMessageContent{StringValue: volcengine.String(errorMsg)},
+		}
+		op.status.ChangeTo(op.notify, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", toolCall.Function.Name)}, nil)
+		return msg, nil
 	}
-
-	response, err := editFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatCopyToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-	}
-
-	response, err := copyToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatListMemoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	// Call shared implementation (no args needed)
-	response, err := listMemoryToolCallImpl()
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(toolCall.Function.Name),
-	}
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatSaveMemoryToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	// Call shared implementation
-	response, err := saveMemoryToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(toolCall.Function.Name),
-	}
-	toolMessage.Content = &model.ChatCompletionMessageContent{
-		StringValue: volcengine.String(response),
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatListAgentToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := listAgentToolCallImpl()
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		},
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatSpawnSubAgentsToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := spawnSubAgentsToolCallImpl(argsMap, op.toolsUse, op.executor)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		},
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatGetStateToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := getStateToolCallImpl(argsMap, op.sharedState)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		},
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatSetStateToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := setStateToolCallImpl(argsMap, op.agentName, op.sharedState)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		},
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatListStateToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := listStateToolCallImpl(op.sharedState)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		},
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatActivateSkillToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := activateSkillToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		},
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatAskUserToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := askUserToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		},
-	}
-	return &toolMessage, err
-}
-
-func (op *OpenProcessor) OpenChatExitPlanModeToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := exitPlanModeToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	toolMessage := model.ChatCompletionMessage{
-		Role:       model.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Name:       Ptr(""),
-		Content: &model.ChatCompletionMessageContent{
-			StringValue: volcengine.String(response),
-		},
-	}
-	return &toolMessage, err
 }

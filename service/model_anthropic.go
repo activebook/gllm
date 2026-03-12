@@ -500,50 +500,8 @@ func (a *Anthropic) processToolCall(toolCall anthropic.ToolUseBlockParam) (anthr
 
 	var msg anthropic.MessageParam
 	var err error
-
-	// Define tool handlers map
-	toolHandlers := map[string]func(anthropic.ToolUseBlockParam, *map[string]interface{}) (anthropic.MessageParam, error){
-		ToolShell:             a.op.AnthropicShellToolCall,
-		ToolWebFetch:          a.op.AnthropicWebFetchToolCall,
-		ToolWebSearch:         a.op.AnthropicWebSearchToolCall,
-		ToolReadFile:          a.op.AnthropicReadFileToolCall,
-		ToolWriteFile:         a.op.AnthropicWriteFileToolCall,
-		ToolEditFile:          a.op.AnthropicEditFileToolCall,
-		ToolCreateDirectory:   a.op.AnthropicCreateDirectoryToolCall,
-		ToolListDirectory:     a.op.AnthropicListDirectoryToolCall,
-		ToolDeleteFile:        a.op.AnthropicDeleteFileToolCall,
-		ToolDeleteDirectory:   a.op.AnthropicDeleteDirectoryToolCall,
-		ToolMove:              a.op.AnthropicMoveToolCall,
-		ToolCopy:              a.op.AnthropicCopyToolCall,
-		ToolSearchFiles:       a.op.AnthropicSearchFilesToolCall,
-		ToolSearchTextInFile:  a.op.AnthropicSearchTextInFileToolCall,
-		ToolReadMultipleFiles: a.op.AnthropicReadMultipleFilesToolCall,
-		ToolListMemory:        a.op.AnthropicListMemoryToolCall,
-		ToolSaveMemory:        a.op.AnthropicSaveMemoryToolCall,
-		ToolSwitchAgent:       a.op.AnthropicSwitchAgentToolCall,
-		ToolListAgent:         a.op.AnthropicListAgentToolCall,
-		ToolSpawnSubAgents:    a.op.AnthropicSpawnSubAgentsToolCall,
-		ToolGetState:          a.op.AnthropicGetStateToolCall,
-		ToolSetState:          a.op.AnthropicSetStateToolCall,
-		ToolListState:         a.op.AnthropicListStateToolCall,
-		ToolActivateSkill:     a.op.AnthropicActivateSkillToolCall,
-		ToolAskUser:           a.op.AnthropicAskUserToolCall,
-		ToolExitPlanMode:      a.op.AnthropicExitPlanModeToolCall,
-	}
-
-	if handler, ok := toolHandlers[toolCall.Name]; ok {
-		msg, err = handler(toolCall, &argsMap)
-	} else if a.op.mcpClient != nil && a.op.mcpClient.FindTool(toolCall.Name) != nil {
-		// Handle MCP tool calls
-		msg, err = a.op.AnthropicMCPToolCall(toolCall, &argsMap)
-	} else {
-		errorMsg := fmt.Sprintf("Error: Unknown function '%s'. This function is not available. Please use one of the available functions from the tool list.", toolCall.Name)
-		toolResult := anthropic.NewToolResultBlock(toolCall.ID, errorMsg, true)
-		msg = anthropic.NewUserMessage(toolResult)
-		// Warn the user
-		a.op.status.ChangeTo(a.op.notify, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", toolCall.Name)}, nil)
-		err = nil // Error is captured in the tool result
-	}
+	// Dispatch tool call
+	msg, err = a.op.dispatchAnthropicToolCall(toolCall, &argsMap)
 
 	// Function call is done
 	a.op.status.ChangeTo(a.op.notify, StreamNotify{Status: StatusFunctionCallingOver}, a.op.proceed)
