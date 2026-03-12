@@ -27,20 +27,43 @@ const (
 
 var (
 	planModeBanner string       // plan mode banner
+	yoloModeBanner string       // yolo mode banner
 	activeProgram  *tea.Program // reference to the running program for external Send()
 )
+
+type SessionMode int
+
+const (
+	SessionModeNormal = iota
+	SessionModePlan
+	SessionModeYolo
+)
+
+// ChatInputHooks allows an external orchestrator to provide state and handle events
+type ChatInputHooks struct {
+	// IsPlanModeActive returns true if in plan mode
+	IsPlanModeActive func() bool
+
+	// IsYoloModeActive returns true if in yolo mode
+	IsYoloModeActive func() bool
+
+	// ToggleSessionMode toggles the session mode
+	ToggleSessionMode func()
+}
 
 // BannerMsg carries a notification banner text to display above the input.
 type BannerMsg struct{ Text string }
 
-// PlanModeMsg signals a Plan Mode toggle to the UI.
-type PlanModeMsg struct{ Active bool }
+// SessionModeMsg signals a session mode toggle to the UI.
+type SessionModeMsg struct{ Mode SessionMode }
 
 // SendEvent dispatches a message to the active chat input program.
 // Goroutine-safe; no-op when no program is running.
 func SendEvent(msg tea.Msg) {
 	if activeProgram != nil {
-		activeProgram.Send(msg)
+		go func() {
+			activeProgram.Send(msg)
+		}()
 	}
 }
 
@@ -59,6 +82,7 @@ type Suggestion struct {
 
 // ChatInputModel is the Bubble Tea model for the chat input with autocomplete
 type ChatInputModel struct {
+	hooks            ChatInputHooks
 	textarea         textarea.Model
 	allCommands      []Suggestion // all /commands
 	filteredCommands []Suggestion // filtered /commands and file paths
@@ -78,7 +102,7 @@ type ChatInputModel struct {
 }
 
 // NewChatInputModel creates a new chat input model
-func NewChatInputModel(commands []Suggestion, initialValue string, history []string) ChatInputModel {
+func NewChatInputModel(commands []Suggestion, initialValue string, history []string, hooks ChatInputHooks) ChatInputModel {
 	ta := textarea.New()
 	ta.KeyMap.InsertNewline = GetNewLineKeyBinding()
 	ta.Placeholder = "Type your message... (Use / for commands, @ for files, Enter to send)"
@@ -107,18 +131,30 @@ func NewChatInputModel(commands []Suggestion, initialValue string, history []str
 		ta.SetCursor(len(initialValue))
 	}
 
-	// Initialize banner if plan mode is active
+	// Initialize banner if plan/yolo mode is active
 	planModeStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(data.PlanModeHex)).
 		Bold(true)
+	yoloModeStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(data.YoloModeHex)).
+		Bold(true)
 	planModeBanner = planModeStyle.Render("plan mode")
+	yoloModeBanner = yoloModeStyle.Render("yolo mode")
+
 	infoBanner := ""
-	if data.IsPlanModeInSessionEnabled() && data.GetPlanModeInSession() {
+	// Check if plan mode is enabled
+	switch {
+	case hooks.IsPlanModeActive != nil && hooks.IsPlanModeActive():
 		infoBanner = planModeBanner
+	case hooks.IsYoloModeActive != nil && hooks.IsYoloModeActive():
+		infoBanner = yoloModeBanner
+	default:
+		infoBanner = ""
 	}
 
 	width := GetTerminalWidth()
 	return ChatInputModel{
+		hooks:         hooks,
 		textarea:      ta,
 		allCommands:   commands,
 		history:       history,
@@ -301,14 +337,14 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.pendingBanner = msg.Text
 		return m, nil
 
-	case PlanModeMsg:
-		if data.IsPlanModeInSessionEnabled() {
-			data.SetPlanModeInSession(msg.Active)
-			if msg.Active {
-				m.infoBanner = planModeBanner
-			} else {
-				m.infoBanner = ""
-			}
+	case SessionModeMsg:
+		switch msg.Mode {
+		case SessionModePlan:
+			m.infoBanner = planModeBanner
+		case SessionModeYolo:
+			m.infoBanner = yoloModeBanner
+		case SessionModeNormal:
+			m.infoBanner = ""
 		}
 		return m, nil
 
@@ -359,19 +395,10 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case tea.KeyShiftTab:
-			if data.IsPlanModeInSessionEnabled() {
-				if data.GetPlanModeInSession() {
-					data.SetPlanModeInSession(false)
-					m.infoBanner = ""
-				} else {
-					data.SetPlanModeInSession(true)
-					m.infoBanner = planModeBanner
-				}
-			} else {
-				m.infoBanner = ""
+			if m.hooks.ToggleSessionMode != nil {
+				m.hooks.ToggleSessionMode()
+				return m, nil
 			}
-
-			return m, nil
 
 		case tea.KeyEsc:
 			if m.showSuggestions {
@@ -644,8 +671,8 @@ func (m ChatInputModel) View() string {
 }
 
 // RunChatInput runs the chat input program
-func RunChatInput(commands []Suggestion, initialValue string, history []string) (ChatInputResult, error) {
-	model := NewChatInputModel(commands, initialValue, history)
+func RunChatInput(commands []Suggestion, initialValue string, history []string, hooks ChatInputHooks) (ChatInputResult, error) {
+	model := NewChatInputModel(commands, initialValue, history, hooks)
 	activeProgram = tea.NewProgram(model)
 	defer func() { activeProgram = nil }()
 

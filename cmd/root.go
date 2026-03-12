@@ -127,7 +127,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 			ui.GetIndicator().Start("")
 
 			// Set auto approve for the session
-			data.SetToolCallAutoApproveInSession(yoloFlag)
+			data.SetYoloModeInSession(yoloFlag)
 
 			// If session flag is provided, find the session file
 			if cmd.Flags().Changed("session") {

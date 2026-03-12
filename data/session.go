@@ -186,6 +186,7 @@ var (
 	// Agents and Subagents all share this mode
 	planModeInSession        = false
 	planModeInSessionEnabled = false
+	yoloModeInSession        = false
 )
 
 const (
@@ -211,10 +212,39 @@ func GetPlanModeInSession() bool {
 	return planModeInSession
 }
 
+/**
+ * Enable plan mode in session
+ */
 func EnablePlanModeInSession(enable bool) {
 	planModeInSessionEnabled = enable
 }
 
+/**
+ * Check if plan mode is enabled in session
+ */
 func IsPlanModeInSessionEnabled() bool {
 	return planModeInSessionEnabled
+}
+
+/**
+ * Set YOLO mode(tool calls auto approve) in session
+ */
+func SetYoloModeInSession(value bool) {
+	yoloModeInSession = value
+}
+
+/**
+ * Get YOLO mode in session
+ */
+func GetYoloModeInSession() bool {
+	return yoloModeInSession
+}
+
+/**
+ * Get session mode
+ *
+ * @return planModeInSession, yoloModeInSession
+ */
+func GetSessionMode() (bool, bool) {
+	return planModeInSession, yoloModeInSession
 }

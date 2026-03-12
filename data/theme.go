@@ -105,6 +105,7 @@ var (
 	UpdateAvailableHex string
 
 	PlanModeHex string
+	YoloModeHex string
 
 	// Functional Helpers (for backwards compatibility or convenience)
 	// These might wrap the strings above
@@ -249,6 +250,7 @@ func applyTheme(t goghthemes.Theme) {
 	UpdateAvailableHex = t.Yellow
 
 	PlanModeHex = t.BrightMagenta
+	YoloModeHex = t.BrightRed
 }
 
 // ListThemes returns a sorted list of all available theme names.

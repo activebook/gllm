@@ -22,7 +22,8 @@ var (
 		"/help":     "Show this help message",
 		"/history":  "Show recent session history",
 		"/clear":    "Clear session history",
-		"/plan":     "Toggle Plan Mode (shift+tab)",
+		"/plan":     "Toggle Plan Mode (shift+tab to cycle)",
+		"/yolo":     "Toggle YOLO mode (shift+tab to cycle)",
 		"/model":    "Manage models (list, switch, add, etc.)",
 		"/agent":    "Manage agents (list, switch, add, etc.)",
 		"/template": "Manage templates (list, switch, add, etc.)",
@@ -32,7 +33,6 @@ var (
 		"/mcp":      "Manage MCP servers (list, switch, etc.)",
 		"/skills":   "Manage agent skills (list, switch, install, etc.)",
 		"/memory":   "Manage memory (list, add, clear)",
-		"/yolo":     "Toggle YOLO mode",
 		"/session":  "Manage sessions (list, info, remove, etc.)",
 		"/compress": "Compresses the context by replacing it with a summary",
 		"/think":    "Set thinking level",
@@ -51,9 +51,9 @@ var (
 	replSpecMap = map[string]string{
 		"@path":     "Reference to files and folders",
 		"!bash":     "Execute local shell commands",
-		"shift+tab": "Toggle plan mode",
+		"shift+tab": "Toggle plan mode or yolo mode",
 		"ctrl+c":    "Cancel current generation or exit session",
-		"ctrl+d":    "Delete all input",
+		"ctrl+d":    "Clear all input",
 	}
 )
 
@@ -65,38 +65,6 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
-}
-
-// switchYoloMode toggles YOLO mode
-func switchYoloMode() {
-	yolo := data.GetToolCallAutoApproveInSession()
-	if yolo {
-		fmt.Printf("YOLO mode: %s -> %s\n", data.SwitchOnColor+"on"+data.ResetSeq, data.SwitchOffColor+"off"+data.ResetSeq)
-		data.SetToolCallAutoApproveInSession(false)
-	} else {
-		fmt.Printf("YOLO mode: %s -> %s\n", data.SwitchOffColor+"off"+data.ResetSeq, data.SwitchOnColor+"on"+data.ResetSeq)
-		data.SetToolCallAutoApproveInSession(true)
-	}
-}
-
-// switchPlanMode toggles Plan mode
-func switchPlanMode() {
-	// The /plan command in the REPL should only be available if the "Plan Mode" feature is enabled for the current agent.
-	if !data.IsPlanModeInSessionEnabled() {
-		service.Warnln("Please enable Plan Mode feature first.")
-		return
-	}
-
-	plan := data.GetPlanModeInSession()
-	if plan {
-		fmt.Printf("Plan mode: %s -> %s\n", data.SwitchOnColor+"on"+data.ResetSeq, data.SwitchOffColor+"off"+data.ResetSeq)
-	} else {
-		fmt.Printf("Plan mode: %s -> %s\n", data.SwitchOffColor+"off"+data.ResetSeq, data.SwitchOnColor+"on"+data.ResetSeq)
-	}
-	data.SetPlanModeInSession(!plan)
-	// SendEvent is a best-effort signal; it's a no-op if RunChatInput isn't active,
-	// but the next NewChatInputModel call will read the updated session state anyway.
-	ui.SendEvent(ui.PlanModeMsg{Active: !plan})
 }
 
 // runCommand executes a command with arguments
@@ -191,10 +159,10 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 		runCommand(memoryCmd, parts[1:])
 
 	case "/yolo":
-		switchYoloMode()
+		switchYoloMode(showYoloModeStatus)
 
 	case "/plan":
-		switchPlanMode()
+		switchPlanMode(showPlanModeStatus)
 
 	case "/session":
 		runCommand(sessionCmd, parts[1:])
@@ -608,4 +576,118 @@ func (ri *ReplInfo) executeSkill(command string, parts []string) bool {
 	// Set the content as input to be processed by the agent
 	ri.EditorInput = input
 	return true
+}
+
+/**
+ * This part is session mode switching
+ * [normal -> plan -> yolo -> normal]
+ * /plan -> switch to plan mode
+ * /yolo -> switch to yolo mode
+ * /plan and /yolo is exclusive, if both are enabled, it will switch to normal mode
+ */
+
+func showPlanModeStatus(plan bool) {
+	if plan {
+		fmt.Printf("Plan mode: %s -> %s\n", data.SwitchOffColor+"off"+data.ResetSeq, data.SwitchOnColor+"on"+data.ResetSeq)
+	} else {
+		fmt.Printf("Plan mode: %s -> %s\n", data.SwitchOnColor+"on"+data.ResetSeq, data.SwitchOffColor+"off"+data.ResetSeq)
+	}
+}
+
+func showYoloModeStatus(yolo bool) {
+	if yolo {
+		fmt.Printf("YOLO mode: %s -> %s\n", data.SwitchOffColor+"off"+data.ResetSeq, data.SwitchOnColor+"on"+data.ResetSeq)
+	} else {
+		fmt.Printf("YOLO mode: %s -> %s\n", data.SwitchOnColor+"on"+data.ResetSeq, data.SwitchOffColor+"off"+data.ResetSeq)
+	}
+}
+
+// switchYoloMode toggles YOLO mode
+func switchYoloMode(showStatus func(bool)) {
+	yolo := data.GetYoloModeInSession()
+	// Switch yolo mode
+	data.SetYoloModeInSession(!yolo)
+	// Always turn off plan mode
+	data.SetPlanModeInSession(false)
+	yolo = data.GetYoloModeInSession()
+	// SendEvent is a best-effort signal; it's a no-op if RunChatInput isn't active,
+	// but the next NewChatInputModel call will read the updated session state anyway.
+	if yolo {
+		ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModeYolo})
+	} else {
+		ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModeNormal})
+	}
+	if showStatus != nil {
+		showStatus(yolo)
+	}
+}
+
+// switchPlanMode toggles Plan mode
+func switchPlanMode(showStatus func(bool)) {
+	// The /plan command in the REPL should only be available if the "Plan Mode" feature is enabled for the current agent.
+	if !data.IsPlanModeInSessionEnabled() {
+		service.Warnln("Please enable Plan Mode feature first.")
+		return
+	}
+
+	plan := data.GetPlanModeInSession()
+	// Switch plan mode
+	data.SetPlanModeInSession(!plan)
+	// Always turn off yolo mode
+	data.SetYoloModeInSession(false)
+	plan = data.GetPlanModeInSession()
+	// SendEvent is a best-effort signal; it's a no-op if RunChatInput isn't active,
+	// but the next NewChatInputModel call will read the updated session state anyway.
+	if plan {
+		ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModePlan})
+	} else {
+		ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModeNormal})
+	}
+	if showStatus != nil {
+		showStatus(plan)
+	}
+}
+
+/**
+ * Switches the session mode to the next mode in the cycle [normal->plan->yolo->normal].
+ * If plan mode is enabled, it will switch to plan mode.
+ * If plan mode is disabled, it will switch to yolo mode.
+ * If both plan and yolo modes are enabled, it will switch to normal mode.
+ * If both plan and yolo modes are disabled, it will switch to normal mode.
+ */
+func switchSessionMode() {
+	// here we do a cycle [normal->plan->yolo->normal]
+	planModeInSession, yoloModeInSession := data.GetSessionMode()
+	planEnabled := data.IsPlanModeInSessionEnabled()
+
+	if !planModeInSession && !yoloModeInSession {
+		if planEnabled {
+			// normal -> plan
+			data.SetPlanModeInSession(true)
+			data.SetYoloModeInSession(false)
+			ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModePlan})
+		} else {
+			// plan disabled, skip to yolo
+			// normal -> yolo
+			data.SetPlanModeInSession(false)
+			data.SetYoloModeInSession(true)
+			ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModeYolo})
+		}
+	} else if planModeInSession && !yoloModeInSession {
+		// plan -> yolo
+		data.SetPlanModeInSession(false)
+		data.SetYoloModeInSession(true)
+		ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModeYolo})
+	} else if !planModeInSession && yoloModeInSession {
+		// yolo -> normal
+		data.SetPlanModeInSession(false)
+		data.SetYoloModeInSession(false)
+		ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModeNormal})
+	} else {
+		// back to normal
+		service.Warnf("Plan mode and yolo mode shouldn't be both turned on.")
+		data.SetPlanModeInSession(false)
+		data.SetYoloModeInSession(false)
+		ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModeNormal})
+	}
 }
