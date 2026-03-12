@@ -43,8 +43,11 @@ func StartBackgroundUpdateCheck() {
 			return
 		}
 		// Perform the check quietly; do not log on error.
+		service.Debugf("Current version is:%s\n", version)
 		release, err := service.CheckLatest(version)
 		if err != nil {
+			ss.SetLastUpdateCheck(time.Now())
+			service.Warnf("Update check failed: %v\n", err)
 			return
 		}
 		// Always record the time so we don't hammer GitHub on every start.
