@@ -27,14 +27,35 @@ const (
 
 var (
 	planModeBanner string       // plan mode banner
+	yoloModeBanner string       // yolo mode banner
 	activeProgram  *tea.Program // reference to the running program for external Send()
 )
+
+type SessionMode int
+
+const (
+	SessionModeNormal = iota
+	SessionModePlan
+	SessionModeYolo
+)
+
+// ChatInputHooks allows an external orchestrator to provide state and handle events
+type ChatInputHooks struct {
+	// IsPlanModeActive returns true if in plan mode
+	IsPlanModeActive func() bool
+
+	// IsYoloModeActive returns true if in yolo mode
+	IsYoloModeActive func() bool
+
+	// ToggleSessionMode toggles the session mode
+	ToggleSessionMode func()
+}
 
 // BannerMsg carries a notification banner text to display above the input.
 type BannerMsg struct{ Text string }
 
-// PlanModeMsg signals a Plan Mode toggle to the UI.
-type PlanModeMsg struct{ Active bool }
+// SessionModeMsg signals a session mode toggle to the UI.
+type SessionModeMsg struct{ Mode SessionMode }
 
 // SendEvent dispatches a message to the active chat input program.
 // Goroutine-safe; no-op when no program is running.
@@ -57,15 +78,6 @@ type ChatInputResult struct {
 type Suggestion struct {
 	Command     string
 	Description string
-}
-
-// ChatInputHooks allows an external orchestrator to provide state and handle events
-type ChatInputHooks struct {
-	// IsPlanModeActive returns true if in plan mode
-	IsPlanModeActive func() bool
-
-	// TogglePlanMode toggles the plan mode
-	TogglePlanMode func()
 }
 
 // ChatInputModel is the Bubble Tea model for the chat input with autocomplete
@@ -119,18 +131,25 @@ func NewChatInputModel(commands []Suggestion, initialValue string, history []str
 		ta.SetCursor(len(initialValue))
 	}
 
-	// Initialize banner if plan mode is active
+	// Initialize banner if plan/yolo mode is active
 	planModeStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(data.PlanModeHex)).
 		Bold(true)
+	yoloModeStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(data.YoloModeHex)).
+		Bold(true)
 	planModeBanner = planModeStyle.Render("plan mode")
-	infoBanner := ""
+	yoloModeBanner = yoloModeStyle.Render("yolo mode")
 
+	infoBanner := ""
 	// Check if plan mode is enabled
-	if hooks.IsPlanModeActive != nil {
-		if hooks.IsPlanModeActive() {
-			infoBanner = planModeBanner
-		}
+	switch {
+	case hooks.IsPlanModeActive != nil && hooks.IsPlanModeActive():
+		infoBanner = planModeBanner
+	case hooks.IsYoloModeActive != nil && hooks.IsYoloModeActive():
+		infoBanner = yoloModeBanner
+	default:
+		infoBanner = ""
 	}
 
 	width := GetTerminalWidth()
@@ -318,10 +337,13 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.pendingBanner = msg.Text
 		return m, nil
 
-	case PlanModeMsg:
-		if msg.Active {
+	case SessionModeMsg:
+		switch msg.Mode {
+		case SessionModePlan:
 			m.infoBanner = planModeBanner
-		} else {
+		case SessionModeYolo:
+			m.infoBanner = yoloModeBanner
+		case SessionModeNormal:
 			m.infoBanner = ""
 		}
 		return m, nil
@@ -373,8 +395,8 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case tea.KeyShiftTab:
-			if m.hooks.TogglePlanMode != nil {
-				m.hooks.TogglePlanMode()
+			if m.hooks.ToggleSessionMode != nil {
+				m.hooks.ToggleSessionMode()
 				return m, nil
 			}
 

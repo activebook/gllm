@@ -1511,7 +1511,7 @@ func exitPlanModeToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.To
 	// read the updated state and hide the banner automatically.
 	data.SetPlanModeInSession(false)
 	// Best-effort: if RunChatInput somehow is running concurrently, update banner.
-	ui.SendEvent(ui.PlanModeMsg{Active: false})
+	ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModeNormal})
 
 	return "Successfully exited Plan Mode. Current session is now in normal execution mode.", nil
 }

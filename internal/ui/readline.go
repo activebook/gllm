@@ -112,7 +112,13 @@ func NeedUserConfirmToolUse(info string, prompt string, description string, tool
 	switch choice {
 	case "All":
 		toolsUse.ConfirmAlways()
-		data.SetToolCallAutoApproveInSession(true)
+		// If user choose "All", it means user want to use tools without confirmation in this session
+		// So we need to set yolo mode in session
+		planModeInSession, yoloModeInSession := data.GetSessionMode()
+		// If user is in plan mode, don't set yolo mode
+		if !planModeInSession && !yoloModeInSession {
+			data.SetYoloModeInSession(true)
+		}
 	case "Yes":
 		toolsUse.ConfirmOnce()
 	default:

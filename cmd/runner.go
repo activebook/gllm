@@ -55,7 +55,7 @@ func RunAgent(prompt string, files []*service.FileData, sessionName string, outp
 		ui.GetIndicator().Start("")
 
 		// Get YOLO mode
-		yolo := data.GetToolCallAutoApproveInSession()
+		yolo := data.GetYoloModeInSession()
 
 		// Ensure Active Agent
 		agent, err := EnsureActiveAgent()

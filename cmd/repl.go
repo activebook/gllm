@@ -13,7 +13,6 @@ import (
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/huh"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -165,26 +164,6 @@ func (ri *ReplInfo) printWelcome() {
 	fmt.Println()
 }
 
-// This is the legacy awaitChat function, which uses huh, don't support auto-complete
-func (ri *ReplInfo) awaitChat_legacy() (string, error) {
-	var input string
-
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewText().
-				Title("Chat").
-				Value(&input).
-				Placeholder("Type your message..."),
-		),
-	).WithKeyMap(ui.GetHuhKeyMap()) // 4. CRITICAL: Apply the keymap to the FORM level
-
-	err := form.Run()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(input), nil
-}
-
 // This is the new awaitInput function, which uses bubbletea, support auto-complete
 func (ri *ReplInfo) awaitInput() (string, error) {
 	agent, err := EnsureActiveAgent()
@@ -243,9 +222,12 @@ func (ri *ReplInfo) awaitInput() (string, error) {
 		IsPlanModeActive: func() bool {
 			return data.IsPlanModeInSessionEnabled() && data.GetPlanModeInSession()
 		},
-		TogglePlanMode: func() {
-			// The /plan command in the REPL should only be available if the "Plan Mode" feature is enabled for the current agent.
-			switchPlanMode(nil)
+		IsYoloModeActive: func() bool {
+			return data.GetYoloModeInSession()
+		},
+		ToggleSessionMode: func() {
+			// here we do a cycle [normal->plan->yolo->normal]
+			switchSessionMode()
 		},
 	}
 
@@ -271,7 +253,7 @@ func (ri *ReplInfo) startREPL() {
 	defer ri.sharedState.Clear()
 
 	// Set auto approve for the session
-	data.SetToolCallAutoApproveInSession(yoloFlag)
+	data.SetYoloModeInSession(yoloFlag)
 
 	// Start the REPL
 	ri.printWelcome()
