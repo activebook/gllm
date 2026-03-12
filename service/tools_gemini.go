@@ -51,7 +51,7 @@ func (ga *GeminiAgent) getGeminiCodeExecTool() *genai.Tool {
 }
 
 // Diff confirm func
-func (ga *GeminiAgent) GeminiShowDiffConfirm(diff string) {
+func (ga *GeminiAgent) geminiShowDiffConfirm(diff string) {
 	// Function call is over
 	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusFunctionCallingOver}, ga.ProceedChan)
 
@@ -60,201 +60,12 @@ func (ga *GeminiAgent) GeminiShowDiffConfirm(diff string) {
 }
 
 // Diff close func
-func (ga *GeminiAgent) GeminiCloseDiffConfirm() {
+func (ga *GeminiAgent) geminiCloseDiffConfirm() {
 	// Confirm diff is over
 	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusDiffConfirmOver}, ga.ProceedChan)
 }
 
-// Tool implementation functions for Gemini
-
-/**
- * Bug note:
- * When only the error field is set without the output field.
- * The model often stops responding or returns empty responses in this scenario.
- * This appears to be a known problem with the Gemini API where:
- * - The model sometimes returns empty responses with finish_reason=STOP but no actual content
- * - This frequently happens during function calling, especially with error handling
- * - The API doesn't consistently handle cases where only error is set without output
- * Solution:
- * We need to ensure that the output field is always set, even if it's empty.
- * This is done by checking if the output is empty and setting it to the error message if it is.
- */
-
-func (ga *GeminiAgent) GeminiReadFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	// Convert genai.FunctionCall.Args to map[string]interface{}
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	// Call shared implementation
-	response, err := readFileToolCallImpl(&argsMap)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiWriteFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	// Convert genai.FunctionCall.Args to map[string]interface{}
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	// Call shared implementation
-	response, err := writeFileToolCallImpl(&argsMap, &ga.ToolsUse, ga.GeminiShowDiffConfirm, ga.GeminiCloseDiffConfirm)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiCreateDirectoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	// Convert genai.FunctionCall.Args to map[string]interface{}
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	// Call shared implementation
-	response, err := createDirectoryToolCallImpl(&argsMap, &ga.ToolsUse)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiListDirectoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	// Convert genai.FunctionCall.Args to map[string]interface{}
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	// Call shared implementation
-	response, err := listDirectoryToolCallImpl(&argsMap)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiDeleteFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	// Convert genai.FunctionCall.Args to map[string]interface{}
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	// Call shared implementation
-	response, err := deleteFileToolCallImpl(&argsMap, &ga.ToolsUse)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiDeleteDirectoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	// Convert genai.FunctionCall.Args to map[string]interface{}
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	// Call shared implementation
-	response, err := deleteDirectoryToolCallImpl(&argsMap, &ga.ToolsUse)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiMCPToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *GeminiAgent) geminiMCPToolCall(call *genai.FunctionCall, a *map[string]interface{}) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
@@ -269,14 +80,8 @@ func (ga *GeminiAgent) GeminiMCPToolCall(call *genai.FunctionCall) (*genai.Funct
 		return &resp, err
 	}
 
-	// Convert genai.FunctionCall.Args to map[string]interface{}
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
 	// Check permisson on mcp tools
-	if err := CheckToolPermission(call.Name, &argsMap); err != nil {
+	if err := CheckToolPermission(call.Name, a); err != nil {
 		error := fmt.Sprintf("Error: MCP tool call failed: %v", err)
 		resp.Response = map[string]any{
 			"output": error,
@@ -286,7 +91,7 @@ func (ga *GeminiAgent) GeminiMCPToolCall(call *genai.FunctionCall) (*genai.Funct
 	}
 
 	// Call the MCP tool
-	result, err := ga.MCPClient.CallTool(call.Name, argsMap)
+	result, err := ga.MCPClient.CallTool(call.Name, *a)
 	if err != nil {
 		error := fmt.Sprintf("Error: MCP tool call failed: %v", err)
 		resp.Response = map[string]any{
@@ -318,304 +123,14 @@ func (ga *GeminiAgent) GeminiMCPToolCall(call *genai.FunctionCall) (*genai.Funct
 	return &resp, nil
 }
 
-func (ga *GeminiAgent) GeminiMoveToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
+func (ga *GeminiAgent) geminiSwitchAgentToolCall(call *genai.FunctionCall, a *map[string]interface{}) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
-	}
-
-	// Convert genai.FunctionCall.Args to map[string]interface{}
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
 	}
 
 	// Call shared implementation
-	response, err := moveToolCallImpl(&argsMap, &ga.ToolsUse)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiSearchFilesToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	// Convert genai.FunctionCall.Args to map[string]interface{}
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	// Call shared implementation
-	response, err := searchFilesToolCallImpl(&argsMap)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiSearchTextInFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	// Convert genai.FunctionCall.Args to map[string]interface{}
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	// Call shared implementation
-	response, err := searchTextInFileToolCallImpl(&argsMap)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiReadMultipleFilesToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	// Convert genai.FunctionCall.Args to map[string]interface{}
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	// Call shared implementation
-	response, err := readMultipleFilesToolCallImpl(&argsMap)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiShellToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	// Convert genai.FunctionCall.Args to map[string]interface{}
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	// Call shared implementation
-	response, err := shellToolCallImpl(&argsMap, &ga.ToolsUse)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiWebFetchToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	// Convert genai.FunctionCall.Args to map[string]interface{}
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	// Call shared implementation
-	response, err := webFetchToolCallImpl(&argsMap)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiEditFileToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	// Convert genai.FunctionCall.Args to map[string]interface{}
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	// Call shared implementation
-	response, err := editFileToolCallImpl(&argsMap, &ga.ToolsUse, ga.GeminiShowDiffConfirm, ga.GeminiCloseDiffConfirm)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiCopyToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	// Convert genai.FunctionCall.Args to map[string]interface{}
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	// Call shared implementation
-	response, err := copyToolCallImpl(&argsMap, &ga.ToolsUse)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiListMemoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	// Call shared implementation (no args needed)
-	response, err := listMemoryToolCallImpl()
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiSaveMemoryToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	// Convert genai.FunctionCall.Args to map[string]interface{}
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	// Call shared implementation
-	response, err := saveMemoryToolCallImpl(&argsMap)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiSwitchAgentToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	// Convert genai.FunctionCall.Args to map[string]interface{}
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	// Call shared implementation
-	response, err := switchAgentToolCallImpl(&argsMap, &ga.ToolsUse)
+	response, err := switchAgentToolCallImpl(a, &ga.ToolsUse)
 	error := ""
 	if err != nil {
 		if IsSwitchAgentError(err) {
@@ -635,209 +150,99 @@ func (ga *GeminiAgent) GeminiSwitchAgentToolCall(call *genai.FunctionCall) (*gen
 	return &resp, err
 }
 
-func (ga *GeminiAgent) GeminiListAgentToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	response, err := listAgentToolCallImpl()
-	error := ""
+// runGeminiTool wraps a (string, error) result into a genai.FunctionResponse.
+// IMPORTANT: When only the error field is set with an empty output, the Gemini API
+// model often hangs or returns empty responses. We always ensure output is set.
+func (ga *GeminiAgent) runGeminiTool(call *genai.FunctionCall, fn ToolFunc) (*genai.FunctionResponse, error) {
+	response, err := fn()
+	errStr := ""
 	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
+		errStr = fmt.Sprintf("Error: %v", err)
 		if response == "" {
-			response = error
+			response = errStr // Gemini-specific: output MUST be non-empty
 		}
 	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
+	return &genai.FunctionResponse{
+		ID:   call.ID,
+		Name: call.Name,
+		Response: map[string]any{
+			"output": response,
+			"error":  errStr,
+		},
+	}, err
 }
 
-func (ga *GeminiAgent) GeminiSpawnSubAgentsToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	// Convert args
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	response, err := spawnSubAgentsToolCallImpl(&argsMap, &ga.ToolsUse, ga.executor)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
+// dispatchGeminiToolCall handles the routing of Gemini tool calls to the correct implementation.
+func (ga *GeminiAgent) dispatchGeminiToolCall(call *genai.FunctionCall, a *map[string]interface{}) (*genai.FunctionResponse, error) {
+	switch call.Name {
+	case ToolShell:
+		return ga.runGeminiTool(call, func() (string, error) { return shellToolCallImpl(a, &ga.ToolsUse) })
+	case ToolReadFile:
+		return ga.runGeminiTool(call, func() (string, error) { return readFileToolCallImpl(a) })
+	case ToolWriteFile:
+		return ga.runGeminiTool(call, func() (string, error) {
+			return writeFileToolCallImpl(a, &ga.ToolsUse, ga.geminiShowDiffConfirm, ga.geminiCloseDiffConfirm)
+		})
+	case ToolCreateDirectory:
+		return ga.runGeminiTool(call, func() (string, error) { return createDirectoryToolCallImpl(a, &ga.ToolsUse) })
+	case ToolListDirectory:
+		return ga.runGeminiTool(call, func() (string, error) { return listDirectoryToolCallImpl(a) })
+	case ToolDeleteFile:
+		return ga.runGeminiTool(call, func() (string, error) { return deleteFileToolCallImpl(a, &ga.ToolsUse) })
+	case ToolDeleteDirectory:
+		return ga.runGeminiTool(call, func() (string, error) { return deleteDirectoryToolCallImpl(a, &ga.ToolsUse) })
+	case ToolMove:
+		return ga.runGeminiTool(call, func() (string, error) { return moveToolCallImpl(a, &ga.ToolsUse) })
+	case ToolCopy:
+		return ga.runGeminiTool(call, func() (string, error) { return copyToolCallImpl(a, &ga.ToolsUse) })
+	case ToolSearchFiles:
+		return ga.runGeminiTool(call, func() (string, error) { return searchFilesToolCallImpl(a) })
+	case ToolSearchTextInFile:
+		return ga.runGeminiTool(call, func() (string, error) { return searchTextInFileToolCallImpl(a) })
+	case ToolReadMultipleFiles:
+		return ga.runGeminiTool(call, func() (string, error) { return readMultipleFilesToolCallImpl(a) })
+	case ToolWebFetch:
+		return ga.runGeminiTool(call, func() (string, error) { return webFetchToolCallImpl(a) })
+	case ToolEditFile:
+		return ga.runGeminiTool(call, func() (string, error) {
+			return editFileToolCallImpl(a, &ga.ToolsUse, ga.geminiShowDiffConfirm, ga.geminiCloseDiffConfirm)
+		})
+	case ToolListMemory:
+		return ga.runGeminiTool(call, func() (string, error) { return listMemoryToolCallImpl() })
+	case ToolSaveMemory:
+		return ga.runGeminiTool(call, func() (string, error) { return saveMemoryToolCallImpl(a) })
+	case ToolListAgent:
+		return ga.runGeminiTool(call, func() (string, error) { return listAgentToolCallImpl() })
+	case ToolSpawnSubAgents:
+		return ga.runGeminiTool(call, func() (string, error) { return spawnSubAgentsToolCallImpl(a, &ga.ToolsUse, ga.executor) })
+	case ToolGetState:
+		return ga.runGeminiTool(call, func() (string, error) { return getStateToolCallImpl(a, ga.SharedState) })
+	case ToolSetState:
+		return ga.runGeminiTool(call, func() (string, error) { return setStateToolCallImpl(a, ga.AgentName, ga.SharedState) })
+	case ToolListState:
+		return ga.runGeminiTool(call, func() (string, error) { return listStateToolCallImpl(ga.SharedState) })
+	case ToolActivateSkill:
+		return ga.runGeminiTool(call, func() (string, error) { return activateSkillToolCallImpl(a, &ga.ToolsUse) })
+	case ToolAskUser:
+		return ga.runGeminiTool(call, func() (string, error) { return askUserToolCallImpl(a) })
+	case ToolExitPlanMode:
+		return ga.runGeminiTool(call, func() (string, error) { return exitPlanModeToolCallImpl(a, &ga.ToolsUse) })
+	case ToolSwitchAgent:
+		return ga.geminiSwitchAgentToolCall(call, a)
+	default:
+		if ga.MCPClient != nil && ga.MCPClient.FindTool(call.Name) != nil {
+			return ga.geminiMCPToolCall(call, a)
 		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiGetStateToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	response, err := getStateToolCallImpl(&argsMap, ga.SharedState)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
+		// Unknown function
+		resp := &genai.FunctionResponse{
+			ID:   call.ID,
+			Name: call.Name,
+			Response: map[string]any{
+				"content": nil,
+				"error":   fmt.Sprintf("Error: Unknown function '%s'. This function is not available. Please use one of the available functions from the tool list.", call.Name),
+			},
 		}
+		ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", call.Name)}, nil)
+		return resp, nil
 	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiSetStateToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	response, err := setStateToolCallImpl(&argsMap, ga.AgentName, ga.SharedState)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiListStateToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	response, err := listStateToolCallImpl(ga.SharedState)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiActivateSkillToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	response, err := activateSkillToolCallImpl(&argsMap, &ga.ToolsUse)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiAskUserToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	response, err := askUserToolCallImpl(&argsMap)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
-}
-
-func (ga *GeminiAgent) GeminiExitPlanModeToolCall(call *genai.FunctionCall) (*genai.FunctionResponse, error) {
-	resp := genai.FunctionResponse{
-		ID:   call.ID,
-		Name: call.Name,
-	}
-
-	argsMap := make(map[string]interface{})
-	for k, v := range call.Args {
-		argsMap[k] = v
-	}
-
-	response, err := exitPlanModeToolCallImpl(&argsMap, &ga.ToolsUse)
-	error := ""
-	if err != nil {
-		error = fmt.Sprintf("Error: %v", err)
-		if response == "" {
-			response = error
-		}
-	}
-
-	resp.Response = map[string]any{
-		"output": response,
-		"error":  error,
-	}
-	return &resp, err
 }

@@ -564,54 +564,8 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 
 	var msg openai.ChatCompletionMessage
 	var err error
-
-	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
-	toolHandlers := map[string]func(openai.ToolCall, *map[string]interface{}) (openai.ChatCompletionMessage, error){
-		ToolShell:             oa.op.OpenAIShellToolCall,
-		ToolWebFetch:          oa.op.OpenAIWebFetchToolCall,
-		ToolWebSearch:         oa.op.OpenAIWebSearchToolCall,
-		ToolReadFile:          oa.op.OpenAIReadFileToolCall,
-		ToolWriteFile:         oa.op.OpenAIWriteFileToolCall,
-		ToolEditFile:          oa.op.OpenAIEditFileToolCall,
-		ToolCreateDirectory:   oa.op.OpenAICreateDirectoryToolCall,
-		ToolListDirectory:     oa.op.OpenAIListDirectoryToolCall,
-		ToolDeleteFile:        oa.op.OpenAIDeleteFileToolCall,
-		ToolDeleteDirectory:   oa.op.OpenAIDeleteDirectoryToolCall,
-		ToolMove:              oa.op.OpenAIMoveToolCall,
-		ToolCopy:              oa.op.OpenAICopyToolCall,
-		ToolSearchFiles:       oa.op.OpenAISearchFilesToolCall,
-		ToolSearchTextInFile:  oa.op.OpenAISearchTextInFileToolCall,
-		ToolReadMultipleFiles: oa.op.OpenAIReadMultipleFilesToolCall,
-		ToolListMemory:        oa.op.OpenAIListMemoryToolCall,
-		ToolSaveMemory:        oa.op.OpenAISaveMemoryToolCall,
-		ToolSwitchAgent:       oa.op.OpenAISwitchAgentToolCall,
-		ToolListAgent:         oa.op.OpenAIListAgentToolCall,
-		ToolSpawnSubAgents:    oa.op.OpenAISpawnSubAgentsToolCall,
-		ToolGetState:          oa.op.OpenAIGetStateToolCall,
-		ToolSetState:          oa.op.OpenAISetStateToolCall,
-		ToolListState:         oa.op.OpenAIListStateToolCall,
-		ToolActivateSkill:     oa.op.OpenAIActivateSkillToolCall,
-		ToolAskUser:           oa.op.OpenAIAskUserToolCall,
-		ToolExitPlanMode:      oa.op.OpenAIExitPlanModeToolCall,
-	}
-
-	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {
-		msg, err = handler(toolCall, &argsMap)
-	} else if oa.op.mcpClient != nil && oa.op.mcpClient.FindTool(toolCall.Function.Name) != nil {
-		// Handle MCP tool calls
-		msg, err = oa.op.OpenAIMCPToolCall(toolCall, &argsMap)
-	} else {
-		// Unknown function: return error message to model and warn user
-		errorMsg := fmt.Sprintf("Error: Unknown function '%s'. This function is not available. Please use one of the available functions from the tool list.", toolCall.Function.Name)
-		msg = openai.ChatCompletionMessage{
-			Role:       openai.ChatMessageRoleTool,
-			Content:    errorMsg,
-			ToolCallID: toolCall.ID,
-		}
-		// Warn the user
-		oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", toolCall.Function.Name)}, nil)
-		err = nil // Don't stop session - let model see the error and adjust
-	}
+	// Dispatch tool call
+	msg, err = oa.op.dispatchOpenAIToolCall(toolCall, &argsMap)
 
 	// Function call is done
 	oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusFunctionCallingOver}, oa.op.proceed)

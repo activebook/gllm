@@ -616,57 +616,8 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 
 	var msg *model.ChatCompletionMessage
 	var err error
-
-	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
-	toolHandlers := map[string]func(*model.ToolCall, *map[string]interface{}) (*model.ChatCompletionMessage, error){
-		ToolShell:             c.op.OpenChatShellToolCall,
-		ToolWebFetch:          c.op.OpenChatWebFetchToolCall,
-		ToolWebSearch:         c.op.OpenChatWebSearchToolCall,
-		ToolReadFile:          c.op.OpenChatReadFileToolCall,
-		ToolWriteFile:         c.op.OpenChatWriteFileToolCall,
-		ToolEditFile:          c.op.OpenChatEditFileToolCall,
-		ToolCreateDirectory:   c.op.OpenChatCreateDirectoryToolCall,
-		ToolListDirectory:     c.op.OpenChatListDirectoryToolCall,
-		ToolDeleteFile:        c.op.OpenChatDeleteFileToolCall,
-		ToolDeleteDirectory:   c.op.OpenChatDeleteDirectoryToolCall,
-		ToolMove:              c.op.OpenChatMoveToolCall,
-		ToolCopy:              c.op.OpenChatCopyToolCall,
-		ToolSearchFiles:       c.op.OpenChatSearchFilesToolCall,
-		ToolSearchTextInFile:  c.op.OpenChatSearchTextInFileToolCall,
-		ToolReadMultipleFiles: c.op.OpenChatReadMultipleFilesToolCall,
-		ToolListMemory:        c.op.OpenChatListMemoryToolCall,
-		ToolSaveMemory:        c.op.OpenChatSaveMemoryToolCall,
-		ToolSwitchAgent:       c.op.OpenChatSwitchAgentToolCall,
-		ToolListAgent:         c.op.OpenChatListAgentToolCall,
-		ToolSpawnSubAgents:    c.op.OpenChatSpawnSubAgentsToolCall,
-		ToolGetState:          c.op.OpenChatGetStateToolCall,
-		ToolSetState:          c.op.OpenChatSetStateToolCall,
-		ToolListState:         c.op.OpenChatListStateToolCall,
-		ToolActivateSkill:     c.op.OpenChatActivateSkillToolCall,
-		ToolAskUser:           c.op.OpenChatAskUserToolCall,
-		ToolExitPlanMode:      c.op.OpenChatExitPlanModeToolCall,
-	}
-
-	if handler, ok := toolHandlers[toolCall.Function.Name]; ok {
-		// Handle embedding tool calls
-		msg, err = handler(&toolCall, &argsMap)
-	} else if c.op.mcpClient != nil && c.op.mcpClient.FindTool(toolCall.Function.Name) != nil {
-		// Handle MCP tool calls
-		msg, err = c.op.OpenChatMCPToolCall(&toolCall, &argsMap)
-	} else {
-		// Unknown function: return error message to model and warn user
-		errorMsg := fmt.Sprintf("Error: Unknown function '%s'. This function is not available. Please use one of the available functions from the tool list.", toolCall.Function.Name)
-		msg = &model.ChatCompletionMessage{
-			Role: "tool",
-			Content: &model.ChatCompletionMessageContent{
-				StringValue: volcengine.String(errorMsg),
-			},
-			ToolCallID: toolCall.ID,
-		}
-		// Warn the user
-		c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", toolCall.Function.Name)}, nil)
-		err = nil // Don't stop session - let model see the error and adjust
-	}
+	// Dispatch tool call
+	msg, err = c.op.dispatchOpenChatToolCall(&toolCall, &argsMap)
 
 	// Function call is done
 	c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusFunctionCallingOver}, c.op.proceed)

@@ -14,6 +14,7 @@ import (
 )
 
 type ToolType string
+type ToolFunc func() (string, error)
 
 const (
 	ToolTypeFunction ToolType = "function"

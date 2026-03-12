@@ -492,54 +492,8 @@ func (ga *GeminiAgent) processGeminiToolCall(call *genai.FunctionCall) (*genai.C
 
 	var resp *genai.FunctionResponse
 	var err error
-
-	// Using a map for dispatch is cleaner and more extensible than a large switch statement.
-	toolHandlers := map[string]func(*genai.FunctionCall) (*genai.FunctionResponse, error){
-		ToolShell:             ga.GeminiShellToolCall,
-		ToolReadFile:          ga.GeminiReadFileToolCall,
-		ToolWriteFile:         ga.GeminiWriteFileToolCall,
-		ToolCreateDirectory:   ga.GeminiCreateDirectoryToolCall,
-		ToolListDirectory:     ga.GeminiListDirectoryToolCall,
-		ToolDeleteFile:        ga.GeminiDeleteFileToolCall,
-		ToolDeleteDirectory:   ga.GeminiDeleteDirectoryToolCall,
-		ToolMove:              ga.GeminiMoveToolCall,
-		ToolCopy:              ga.GeminiCopyToolCall,
-		ToolSearchFiles:       ga.GeminiSearchFilesToolCall,
-		ToolSearchTextInFile:  ga.GeminiSearchTextInFileToolCall,
-		ToolReadMultipleFiles: ga.GeminiReadMultipleFilesToolCall,
-		ToolWebFetch:          ga.GeminiWebFetchToolCall,
-		ToolEditFile:          ga.GeminiEditFileToolCall,
-		ToolListMemory:        ga.GeminiListMemoryToolCall,
-		ToolSaveMemory:        ga.GeminiSaveMemoryToolCall,
-		ToolSwitchAgent:       ga.GeminiSwitchAgentToolCall,
-		ToolListAgent:         ga.GeminiListAgentToolCall,
-		ToolSpawnSubAgents:    ga.GeminiSpawnSubAgentsToolCall,
-		ToolGetState:          ga.GeminiGetStateToolCall,
-		ToolSetState:          ga.GeminiSetStateToolCall,
-		ToolListState:         ga.GeminiListStateToolCall,
-		ToolActivateSkill:     ga.GeminiActivateSkillToolCall,
-		ToolAskUser:           ga.GeminiAskUserToolCall,
-		ToolExitPlanMode:      ga.GeminiExitPlanModeToolCall,
-	}
-
-	if handler, ok := toolHandlers[call.Name]; ok {
-		resp, err = handler(call)
-	} else if ga.MCPClient != nil && ga.MCPClient.FindTool(call.Name) != nil {
-		// Handle MCP tool calls
-		resp, err = ga.GeminiMCPToolCall(call)
-	} else {
-		// For web_search and other Google Search/CodeExecution tools that don't need special processing
-		resp, err = &genai.FunctionResponse{
-			ID:   call.ID,
-			Name: call.Name,
-			Response: map[string]any{
-				"content": nil,
-				"error":   fmt.Sprintf("Error: Unknown function '%s'. This function is not available. Please use one of the available functions from the tool list.", call.Name),
-			},
-		}, nil
-		// Warn the user
-		ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", call.Name)}, nil)
-	}
+	// Dispatch tool call - call.Args is map[string]any which is identical to map[string]interface{}
+	resp, err = ga.dispatchGeminiToolCall(call, &call.Args)
 
 	// Function response only has one part
 	respPart := genai.Part{FunctionResponse: resp}

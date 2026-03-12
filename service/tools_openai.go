@@ -8,206 +8,10 @@ import (
 
 /*
  * OpenAI tool call implements
- *
  */
 
-// OpenAI tool implementations (wrapper functions)
-func (op *OpenProcessor) OpenAIShellToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := shellToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIWebFetchToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := webFetchToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIWebSearchToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := webSearchToolCallImpl(argsMap, &op.queries, &op.references, op.search)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		Content:    response,
-		ToolCallID: toolCall.ID,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIReadFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := readFileToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIWriteFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := writeFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIEditFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := editFileToolCallImpl(argsMap, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAICreateDirectoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := createDirectoryToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIListDirectoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := listDirectoryToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIDeleteFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := deleteFileToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIDeleteDirectoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := deleteDirectoryToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIMoveToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := moveToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAICopyToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := copyToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAISearchFilesToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := searchFilesToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAISearchTextInFileToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := searchTextInFileToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIReadMultipleFilesToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := readMultipleFilesToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIMCPToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+// MCPToolCall has it's own logic
+func (op *OpenProcessor) openAIMCPToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	if op.mcpClient == nil {
 		err := fmt.Errorf("MCP client not initialized")
 		return openai.ChatCompletionMessage{
@@ -263,35 +67,8 @@ func (op *OpenProcessor) OpenAIMCPToolCall(toolCall openai.ToolCall, argsMap *ma
 	}, nil
 }
 
-func (op *OpenProcessor) OpenAIListMemoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	// Call shared implementation (no args needed)
-	response, err := listMemoryToolCallImpl()
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		Content:    response,
-		ToolCallID: toolCall.ID,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAISaveMemoryToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	// Call shared implementation
-	response, err := saveMemoryToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		Content:    response,
-		ToolCallID: toolCall.ID,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAISwitchAgentToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+// Switch agent tool call is special, it need to deal with IsSwitchAgentError
+func (op *OpenProcessor) openAISwitchAgentToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
 	response, err := switchAgentToolCallImpl(argsMap, op.toolsUse)
 
 	// Create the tool message anyway
@@ -312,108 +89,92 @@ func (op *OpenProcessor) OpenAISwitchAgentToolCall(toolCall openai.ToolCall, arg
 	return toolMessage, err
 }
 
-// OpenAI wrappers for new orchestration tools
-
-func (op *OpenProcessor) OpenAIListAgentToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := listAgentToolCallImpl()
+// runOpenAITool runs fn and wraps the (string, error) result into an OpenAI tool message.
+func runOpenAITool(tc openai.ToolCall, fn ToolFunc) (openai.ChatCompletionMessage, error) {
+	response, err := fn()
 	if err != nil {
 		response = fmt.Sprintf("Error: %v", err)
 	}
-
 	return openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
+		ToolCallID: tc.ID,
 		Content:    response,
 	}, err
 }
 
-func (op *OpenProcessor) OpenAISpawnSubAgentsToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := spawnSubAgentsToolCallImpl(argsMap, op.toolsUse, op.executor)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
+// dispatchOpenAIToolCall handles the routing of OpenAI tool calls to the correct implementation.
+func (op *OpenProcessor) dispatchOpenAIToolCall(toolCall openai.ToolCall, a *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+	switch toolCall.Function.Name {
+	case ToolShell:
+		return runOpenAITool(toolCall, func() (string, error) { return shellToolCallImpl(a, op.toolsUse) })
+	case ToolWebFetch:
+		return runOpenAITool(toolCall, func() (string, error) { return webFetchToolCallImpl(a) })
+	case ToolWebSearch:
+		return runOpenAITool(toolCall, func() (string, error) {
+			return webSearchToolCallImpl(a, &op.queries, &op.references, op.search)
+		})
+	case ToolReadFile:
+		return runOpenAITool(toolCall, func() (string, error) { return readFileToolCallImpl(a) })
+	case ToolWriteFile:
+		return runOpenAITool(toolCall, func() (string, error) {
+			return writeFileToolCallImpl(a, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
+		})
+	case ToolEditFile:
+		return runOpenAITool(toolCall, func() (string, error) {
+			return editFileToolCallImpl(a, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
+		})
+	case ToolCreateDirectory:
+		return runOpenAITool(toolCall, func() (string, error) { return createDirectoryToolCallImpl(a, op.toolsUse) })
+	case ToolListDirectory:
+		return runOpenAITool(toolCall, func() (string, error) { return listDirectoryToolCallImpl(a) })
+	case ToolDeleteFile:
+		return runOpenAITool(toolCall, func() (string, error) { return deleteFileToolCallImpl(a, op.toolsUse) })
+	case ToolDeleteDirectory:
+		return runOpenAITool(toolCall, func() (string, error) { return deleteDirectoryToolCallImpl(a, op.toolsUse) })
+	case ToolMove:
+		return runOpenAITool(toolCall, func() (string, error) { return moveToolCallImpl(a, op.toolsUse) })
+	case ToolCopy:
+		return runOpenAITool(toolCall, func() (string, error) { return copyToolCallImpl(a, op.toolsUse) })
+	case ToolSearchFiles:
+		return runOpenAITool(toolCall, func() (string, error) { return searchFilesToolCallImpl(a) })
+	case ToolSearchTextInFile:
+		return runOpenAITool(toolCall, func() (string, error) { return searchTextInFileToolCallImpl(a) })
+	case ToolReadMultipleFiles:
+		return runOpenAITool(toolCall, func() (string, error) { return readMultipleFilesToolCallImpl(a) })
+	case ToolListMemory:
+		return runOpenAITool(toolCall, func() (string, error) { return listMemoryToolCallImpl() })
+	case ToolSaveMemory:
+		return runOpenAITool(toolCall, func() (string, error) { return saveMemoryToolCallImpl(a) })
+	case ToolListAgent:
+		return runOpenAITool(toolCall, func() (string, error) { return listAgentToolCallImpl() })
+	case ToolSpawnSubAgents:
+		return runOpenAITool(toolCall, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op.toolsUse, op.executor) })
+	case ToolGetState:
+		return runOpenAITool(toolCall, func() (string, error) { return getStateToolCallImpl(a, op.sharedState) })
+	case ToolSetState:
+		return runOpenAITool(toolCall, func() (string, error) { return setStateToolCallImpl(a, op.agentName, op.sharedState) })
+	case ToolListState:
+		return runOpenAITool(toolCall, func() (string, error) { return listStateToolCallImpl(op.sharedState) })
+	case ToolActivateSkill:
+		return runOpenAITool(toolCall, func() (string, error) { return activateSkillToolCallImpl(a, op.toolsUse) })
+	case ToolAskUser:
+		return runOpenAITool(toolCall, func() (string, error) { return askUserToolCallImpl(a) })
+	case ToolExitPlanMode:
+		return runOpenAITool(toolCall, func() (string, error) { return exitPlanModeToolCallImpl(a, op.toolsUse) })
+	case ToolSwitchAgent:
+		return op.openAISwitchAgentToolCall(toolCall, a)
+	default:
+		if op.mcpClient != nil && op.mcpClient.FindTool(toolCall.Function.Name) != nil {
+			return op.openAIMCPToolCall(toolCall, a)
+		}
+		// Unknown function fallback
+		errorMsg := fmt.Sprintf("Error: Unknown function '%s'. This function is not available. Please use one of the available functions from the tool list.", toolCall.Function.Name)
+		msg := openai.ChatCompletionMessage{
+			Role:       openai.ChatMessageRoleTool,
+			Content:    errorMsg,
+			ToolCallID: toolCall.ID,
+		}
+		op.status.ChangeTo(op.notify, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", toolCall.Function.Name)}, nil)
+		return msg, nil
 	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIGetStateToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := getStateToolCallImpl(argsMap, op.sharedState)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAISetStateToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := setStateToolCallImpl(argsMap, op.agentName, op.sharedState)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIListStateToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := listStateToolCallImpl(op.sharedState)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIActivateSkillToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := activateSkillToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIAskUserToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := askUserToolCallImpl(argsMap)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
-}
-
-func (op *OpenProcessor) OpenAIExitPlanModeToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
-	response, err := exitPlanModeToolCallImpl(argsMap, op.toolsUse)
-	if err != nil {
-		response = fmt.Sprintf("Error: %v", err)
-	}
-
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}, err
 }
