@@ -106,6 +106,7 @@ var DefaultModelLimits = map[string]ModelLimits{
 	/*
 	 * xAI Models
 	 */
+	"grok-4.20":                   {ContextWindow: 2000000, MaxOutputTokens: 30000},
 	"grok-4.1-fast-non-reasoning": {ContextWindow: 2000000, MaxOutputTokens: 30000},
 	"grok-4.1-fast-reasoning":     {ContextWindow: 2000000, MaxOutputTokens: 30000},
 	"grok-code-fast-1":            {ContextWindow: 256000, MaxOutputTokens: 10000},
@@ -144,14 +145,17 @@ var DefaultModelLimits = map[string]ModelLimits{
 	"gpt-5.2-codex": {ContextWindow: 400000, MaxOutputTokens: 128000},
 	"gpt-5.1-codex": {ContextWindow: 400000, MaxOutputTokens: 128000},
 
+	"gpt-5.4-pro": {ContextWindow: 1050000, MaxOutputTokens: 128000},
 	"gpt-5.2-pro": {ContextWindow: 400000, MaxOutputTokens: 128000},
 	"gpt-5.1-pro": {ContextWindow: 400000, MaxOutputTokens: 128000},
 	"gpt-5-pro":   {ContextWindow: 400000, MaxOutputTokens: 128000},
 
+	"gpt-5.3-chat": {ContextWindow: 128000, MaxOutputTokens: 16384},
 	"gpt-5.2-chat": {ContextWindow: 128000, MaxOutputTokens: 16384},
 	"gpt-5.1-chat": {ContextWindow: 128000, MaxOutputTokens: 16384},
 	"gpt-5-chat":   {ContextWindow: 128000, MaxOutputTokens: 16384},
 
+	"gpt-5.4": {ContextWindow: 1050000, MaxOutputTokens: 128000},
 	"gpt-5.2": {ContextWindow: 400000, MaxOutputTokens: 128000},
 	"gpt-5.1": {ContextWindow: 400000, MaxOutputTokens: 128000},
 	"gpt-5":   {ContextWindow: 400000, MaxOutputTokens: 128000},
