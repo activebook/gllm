@@ -5,12 +5,14 @@ package cmd
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/activebook/gllm/service"
 )
@@ -91,8 +93,24 @@ func readContentFromPath(source string) ([]byte, error) {
 	if checkIsLink(source) {
 		// Fetch content from the URL
 		urls := []string{source}
-		datas := service.FetchProcess(urls)
-		return []byte(datas[0]), nil
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		results := service.FetchProcess(ctx, urls)
+		if len(results) == 0 {
+			return nil, fmt.Errorf("failed to fetch URL: no results returned")
+		}
+
+		res := results[0]
+		if res.Error != nil {
+			return nil, res.Error
+		}
+
+		if res.Content == "" {
+			return nil, fmt.Errorf("failed to fetch URL: content is empty")
+		}
+
+		return []byte(res.Content), nil
 	}
 	return os.ReadFile(source)
 }

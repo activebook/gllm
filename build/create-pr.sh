@@ -18,6 +18,7 @@ NC='\033[0m' # No Color
 # Configuration
 BASE_BRANCH="main"
 HEAD_BRANCH=""
+CLOSE_ISSUES=""
 
 ##############################################################################
 # Functions
@@ -44,11 +45,13 @@ Following GitHub best practices for PR creation.
 
 Options:
     -b, --base <branch>   Base branch to merge into (default: main)
+    -c, --close <issues>  Comma-separated list of issue numbers to close (e.g., "129,130")
     -h, --help            Show this help message
 
 Examples:
     $0                    # Create PR from current branch to main
     $0 --base develop     # Create PR from current branch to develop
+    $0 --close 129,130    # Create PR and close issues #129 and #130
 EOF
 }
 
@@ -97,6 +100,11 @@ while [[ $# -gt 0 ]]; do
             ;; 
         -b|--base)
             BASE_BRANCH="$2"
+            shift
+            shift
+            ;; 
+        -c|--close)
+            CLOSE_ISSUES="$2"
             shift
             shift
             ;; 
@@ -180,6 +188,16 @@ DEFAULT_TITLE="Merge $HEAD_BRANCH into $BASE_BRANCH - $(date +%Y-%m-%d)"
 COMMIT_COUNT=$(git rev-list --count "$BASE_BRANCH..$HEAD_BRANCH")
 print_step "Found $COMMIT_COUNT commit(s) to merge"
 
+# Handle closing issues
+CLOSE_BODY=""
+if [ -n "$CLOSE_ISSUES" ]; then
+    CLOSE_BODY=$'\n### 🔗 Linked Issues\n'
+    # Replace commas with spaces and iterate
+    for issue in ${CLOSE_ISSUES//,/ }; do
+        CLOSE_BODY="${CLOSE_BODY}Closes #$issue"$'\n'
+    done
+fi
+
 # Create a formatted description
 DESCRIPTION=$(cat <<EOF
 ## 🚀 Deployment PR
@@ -190,7 +208,7 @@ This PR merges the latest changes from \`$HEAD_BRANCH\` into \`$BASE_BRANCH\`.
 - **Commits**: $COMMIT_COUNT
 - **Base**: \`$BASE_BRANCH\`
 - **Head**: \`$HEAD_BRANCH\`
-
+$CLOSE_BODY
 ### 📝 Recent Changes
 $(git log "$BASE_BRANCH..$HEAD_BRANCH" --oneline --max-count=10 | sed 's/^/- /')
 

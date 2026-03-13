@@ -12,6 +12,7 @@ import (
 	//serp "github.com/serpapi/google-search-results-golang"
 	"google.golang.org/api/customsearch/v1"
 	"google.golang.org/api/option"
+	"time"
 )
 
 // Define a struct for each result in the Tavily API response.
@@ -162,7 +163,9 @@ func (s *SearchEngine) tavilyFormatResponse(tavilyResp *TavilyResponse) (map[str
 	}
 
 	// Fetch contents for all links
-	contents := FetchProcess(links)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	contents := FetchProcess(ctx, links)
 
 	// Convert results to map[string]any
 	for i, r := range tavilyResp.Results {
@@ -181,7 +184,11 @@ func (s *SearchEngine) tavilyFormatResponse(tavilyResp *TavilyResponse) (map[str
 
 		// Safely add content if it exists
 		if i < len(contents) {
-			resultMap["content"] = contents[i]
+			if contents[i].Error == nil {
+				resultMap["content"] = contents[i].Content
+			} else {
+				resultMap["content"] = fmt.Sprintf("Error fetching content: %v", contents[i].Error)
+			}
 		}
 
 		results = append(results, resultMap)
@@ -224,7 +231,9 @@ func (s *SearchEngine) GoogleSearch(query string) (map[string]any, error) {
 	}
 
 	// Fetch contents for all links
-	contents := FetchProcess(links)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	contents := FetchProcess(ctx, links)
 
 	// Convert results to map[string]any
 	results := make([]any, 0, len(resp.Items))
@@ -238,7 +247,11 @@ func (s *SearchEngine) GoogleSearch(query string) (map[string]any, error) {
 
 		// Safely add content if it exists
 		if i < len(contents) {
-			resultMap["content"] = contents[i]
+			if contents[i].Error == nil {
+				resultMap["content"] = contents[i].Content
+			} else {
+				resultMap["content"] = fmt.Sprintf("Error fetching content: %v", contents[i].Error)
+			}
 		}
 
 		results = append(results, resultMap)

@@ -203,16 +203,16 @@ func SyncModelLimits(modelKey, configModelName string) {
 		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, err)})
 	} else {
 		// Send banner notification
-		ui.SendEvent(ui.BannerMsg{Text: getModelUpdatedBanner(modelKey, contextLength, maxOutput)})
+		ui.SendEvent(ui.BannerMsg{Text: getModelUpdatedBanner(modelKey, normalizedName, contextLength, maxOutput)})
 	}
 }
 
 // getModelBanner returns a non-intrusive update notification.
-func getModelUpdatedBanner(modelKey string, contextLength int, maxOutput int) string {
+func getModelUpdatedBanner(modelKey string, modelName string, contextLength int, maxOutput int) string {
 	style := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(data.UpdateModelSuccessHex)).
 		Bold(true)
-	return style.Render(fmt.Sprintf("* Model %s updated: ContextLength=%d, MaxOutputTokens=%d", modelKey, contextLength, maxOutput))
+	return style.Render(fmt.Sprintf("* Model %s updated: context_length=%d, max_completion_tokens=%d for %s", modelKey, contextLength, maxOutput, modelName))
 }
 
 func getModelFailedBanner(modelKey string, err error) string {

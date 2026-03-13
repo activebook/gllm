@@ -698,6 +698,17 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse)
 	// Create a response that prompts the LLM to provide insightful analysis of the command output
 	finalResponse := fmt.Sprintf(ToolRespShellOutput, cmdStr, errorInfo, outputInfo)
 
+	// In verbose mode, also echo the output directly to the terminal so the user can see it.
+	if data.GetSettingsStore().GetVerboseEnabled() {
+		fmt.Fprintf(os.Stderr, "%s$ %s%s\n", data.ToolCallColor, cmdStr, data.ResetSeq)
+		if outStr != "" {
+			fmt.Fprintf(os.Stderr, "%s%s%s", data.ShellOutputColor, outStr, data.ResetSeq)
+		}
+		if errStr != "" {
+			fmt.Fprintf(os.Stderr, "%s%s%s\n", data.StatusErrorColor, errStr, data.ResetSeq)
+		}
+	}
+
 	return finalResponse, nil
 }
 
@@ -712,16 +723,26 @@ func webFetchToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	}
 
 	// Call the fetch function
-	results := FetchProcess([]string{url})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	results := FetchProcess(ctx, []string{url})
 
 	// Check if FetchProcess returned any results
 	if len(results) == 0 {
-		// If no content was fetched or extracted, create an error message for the user.
-		return fmt.Sprintf("Failed to fetch content from %s or no content was extracted. Please check the URL or try again.", url), nil
+		return fmt.Sprintf("Failed to fetch content from %s: no results returned.", url), nil
+	}
+
+	res := results[0]
+	if res.Error != nil {
+		return fmt.Sprintf("Error fetching content from %s: %v", url, res.Error), nil
+	}
+
+	if res.Content == "" {
+		return "Fetched content is empty.", nil
 	}
 
 	// Create and return the tool response message
-	return fmt.Sprintf("Fetched content from %s:\n%s", url, results[0]), nil
+	return fmt.Sprintf("Fetched content from %s:\n%s", url, res.Content), nil
 }
 
 func webSearchToolCallImpl(argsMap *map[string]interface{}, queries *[]string, references *[]map[string]interface{}, search *SearchEngine) (string, error) {

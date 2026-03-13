@@ -329,6 +329,10 @@ func CallAgent(op *AgentOptions) error {
 		if err != nil {
 			return fmt.Errorf("failed to load MCPServers: %v", err)
 		}
+		// We shouldn't clean up MCP client resources when agent exits
+		// Because next turn in repl mode, it would need to re-init the mcp client, which is wasteful and slow
+		// The singleton pattern with cleanup at application exit is the **correct** design pattern for shared resources like MCP client connections.
+		// defer mc.Close()
 	}
 
 	// Need to append markdown

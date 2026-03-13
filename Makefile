@@ -55,17 +55,17 @@ update: ## Update all dependencies to latest
 	@go get -u ./...
 	@go mod tidy
 
-create-pr: ## Create a pull request
+create-pr: ## Create a pull request (use CLOSE=129,130 to close issues)
 	@echo "  >  Creating pull request..."
-	@./build/create-pr.sh
+	@./build/create-pr.sh $(if $(CLOSE),--close $(CLOSE)) $(if $(BASE),--base $(BASE))
 
-close-pr: ## Close a pull request
+close-pr: ## Close a pull request (use PR=123)
 	@echo "  >  Closing pull request..."
-	@./build/close-pr.sh
+	@./build/close-pr.sh $(PR)
 
-merge-pr: ## Merge a pull request
+merge-pr: ## Merge a pull request (use PR=123)
 	@echo "  >  Merging pull request..."
-	@./build/merge-pr.sh
+	@./build/merge-pr.sh $(PR)
 
 release: ## Run the release script
 	@echo "  >  Releasing..."
