@@ -698,6 +698,19 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse)
 	// Create a response that prompts the LLM to provide insightful analysis of the command output
 	finalResponse := fmt.Sprintf(ToolRespShellOutput, cmdStr, errorInfo, outputInfo)
 
+	// In verbose mode, also echo the output directly to the terminal so the user can see it.
+	if data.GetSettingsStore().GetVerboseEnabled() {
+		fmt.Fprintf(os.Stderr, "%s$ %s%s\n", data.ToolCallColor, cmdStr, data.ResetSeq)
+		if outStr != "" {
+			fmt.Fprintf(os.Stderr, "%s%s%s", data.ShellOutputColor, outStr, data.ResetSeq)
+		} else {
+			fmt.Fprintf(os.Stderr, "%s<no output>%s\n", data.StatusInfoColor, data.ResetSeq)
+		}
+		if errStr != "" {
+			fmt.Fprintf(os.Stderr, "%s%s%s\n", data.StatusErrorColor, errStr, data.ResetSeq)
+		}
+	}
+
 	return finalResponse, nil
 }
 
