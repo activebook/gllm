@@ -14,6 +14,14 @@ const (
 	StrategyNone TruncationStrategy = "none"
 
 	// DefaultBufferPercent is the default safety buffer (80% of available space)
+	/*
+	 * Before context window fills up, you may run into "context rot,"
+	 * where model performance degrades as input length increases even when there's technically room left
+	 * — LLMs don't process all tokens equally, with attention concentrating on the beginning and end,
+	 * so information in the middle gets less reliable processing.
+	 *
+	 * 80% leaves room for the model to "breathe" and maintain high-quality reasoning.
+	 */
 	DefaultBufferPercent = 0.80
 )
 
@@ -56,7 +64,6 @@ func NewContextManager(ag *Agent, strategy TruncationStrategy) ContextManager {
 		maxInputTokens:  limits.MaxInputTokens(DefaultBufferPercent),
 		maxOutputTokens: limits.MaxOutputTokens,
 		strategy:        strategy,
-		bufferPercent:   DefaultBufferPercent,
 	}
 	switch ag.Model.Provider {
 	case ModelProviderOpenAI:
