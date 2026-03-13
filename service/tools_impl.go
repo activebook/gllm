@@ -712,16 +712,26 @@ func webFetchToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	}
 
 	// Call the fetch function
-	results := FetchProcess([]string{url})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	results := FetchProcess(ctx, []string{url})
 
 	// Check if FetchProcess returned any results
 	if len(results) == 0 {
-		// If no content was fetched or extracted, create an error message for the user.
-		return fmt.Sprintf("Failed to fetch content from %s or no content was extracted. Please check the URL or try again.", url), nil
+		return fmt.Sprintf("Failed to fetch content from %s: no results returned.", url), nil
+	}
+
+	res := results[0]
+	if res.Error != nil {
+		return fmt.Sprintf("Error fetching content from %s: %v", url, res.Error), nil
+	}
+
+	if res.Content == "" {
+		return "Fetched content is empty.", nil
 	}
 
 	// Create and return the tool response message
-	return fmt.Sprintf("Fetched content from %s:\n%s", url, results[0]), nil
+	return fmt.Sprintf("Fetched content from %s:\n%s", url, res.Content), nil
 }
 
 func webSearchToolCallImpl(argsMap *map[string]interface{}, queries *[]string, references *[]map[string]interface{}, search *SearchEngine) (string, error) {

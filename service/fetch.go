@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -40,7 +41,7 @@ var defaultConfig = ExtractorConfig{
 // - text/plain, text/markdown: returns content directly
 // - application/pdf: extracts text using PDF reader
 // - text/html: parses and extracts text with boilerplate removal
-func ExtractTextFromURL(url string, config *ExtractorConfig) ([]string, error) {
+func ExtractTextFromURL(ctx context.Context, url string, config *ExtractorConfig) ([]string, error) {
 	if config == nil {
 		config = &defaultConfig
 	}
@@ -53,7 +54,7 @@ func ExtractTextFromURL(url string, config *ExtractorConfig) ([]string, error) {
 	}
 
 	// Create request with headers
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -131,7 +132,7 @@ func extractPlainText(body io.Reader, minLength int) ([]string, error) {
 	var result []string
 	for _, line := range lines {
 		cleaned := strings.TrimSpace(line)
-		if len(cleaned) >= minLength || cleaned != "" {
+		if len(cleaned) >= minLength {
 			result = append(result, cleaned)
 		}
 	}
@@ -333,24 +334,26 @@ func cleanupText(text string) string {
 	return text
 }
 
-func fetchWorker(url string) string {
-	content, err := ExtractTextFromURL(url, nil)
-	if err != nil {
-		//Warnf("Can't extracting content from [%s]: %v", url, err)
-		Debugf("Error fetching URL [%s]: %v", url, err)
-		// Let user know something went wrong
-		// Especially if the URL is invalid, 401, 403 errors, etc.
-		return fmt.Sprintf("Error fetching URL [%s]: %v", url, err)
-	}
-	return strings.Join(content, "\n")
+type FetchResult struct {
+	Content string
+	Error   error
 }
 
-func FetchProcess(urls []string) []string {
+func fetchWorker(ctx context.Context, url string) (string, error) {
+	content, err := ExtractTextFromURL(ctx, url, nil)
+	if err != nil {
+		Debugf("Error fetching URL [%s]: %v", url, err)
+		return "", err
+	}
+	return strings.Join(content, "\n"), nil
+}
+
+func FetchProcess(ctx context.Context, urls []string) []FetchResult {
 	var wg sync.WaitGroup
-	results := make([]string, len(urls))
+	results := make([]FetchResult, len(urls))
 	resultCh := make(chan struct {
-		Index int
-		Text  string
+		Index  int
+		Result FetchResult
 	}, len(urls))
 
 	Debugf("Fetching %d URLs...", len(urls))
@@ -360,19 +363,33 @@ func FetchProcess(urls []string) []string {
 		Debugf("Fetching URL [%s]...", url)
 		go func(idx int, u string) {
 			defer wg.Done()
-			text := fetchWorker(u)
+
+			// Recover from panics in goroutines to prevent crashes
+			defer func() {
+				if r := recover(); r != nil {
+					Debugf("Panic in fetch goroutine for URL [%s]: %v", u, r)
+					resultCh <- struct {
+						Index  int
+						Result FetchResult
+					}{Index: idx, Result: FetchResult{Error: fmt.Errorf("panic while fetching URL [%s]: %v", u, r)}}
+				}
+			}()
+
+			text, err := fetchWorker(ctx, u)
 			resultCh <- struct {
-				Index int
-				Text  string
-			}{Index: idx, Text: text}
+				Index  int
+				Result FetchResult
+			}{Index: idx, Result: FetchResult{Content: text, Error: err}}
 		}(i, url)
 	}
 
-	wg.Wait()
-	close(resultCh)
+	go func() {
+		wg.Wait()
+		close(resultCh)
+	}()
 
 	for res := range resultCh {
-		results[res.Index] = res.Text
+		results[res.Index] = res.Result
 	}
 	return results
 }
