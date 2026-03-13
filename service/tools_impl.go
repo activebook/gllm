@@ -703,8 +703,6 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse)
 		fmt.Fprintf(os.Stderr, "%s$ %s%s\n", data.ToolCallColor, cmdStr, data.ResetSeq)
 		if outStr != "" {
 			fmt.Fprintf(os.Stderr, "%s%s%s", data.ShellOutputColor, outStr, data.ResetSeq)
-		} else {
-			fmt.Fprintf(os.Stderr, "%s<no output>%s\n", data.StatusInfoColor, data.ResetSeq)
 		}
 		if errStr != "" {
 			fmt.Fprintf(os.Stderr, "%s%s%s\n", data.StatusErrorColor, errStr, data.ResetSeq)
