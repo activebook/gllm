@@ -191,10 +191,10 @@ print_step "Found $COMMIT_COUNT commit(s) to merge"
 # Handle closing issues
 CLOSE_BODY=""
 if [ -n "$CLOSE_ISSUES" ]; then
-    CLOSE_BODY="\n### 🔗 Linked Issues\n"
+    CLOSE_BODY=$'\n### 🔗 Linked Issues\n'
     # Replace commas with spaces and iterate
     for issue in ${CLOSE_ISSUES//,/ }; do
-        CLOSE_BODY="${CLOSE_BODY}Closes #$issue\n"
+        CLOSE_BODY="${CLOSE_BODY}Closes #$issue"$'\n'
     done
 fi
 
