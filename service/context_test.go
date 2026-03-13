@@ -11,7 +11,7 @@ import (
 func TestNewContextManager(t *testing.T) {
 	limits := ModelLimits{ContextWindow: 128000, MaxOutputTokens: 16384}
 	expectedMax := limits.MaxInputTokens(DefaultBufferPercent)
-	ag := &Agent{Model: &ModelInfo{ModelName: "gpt-4o", Provider: ModelProviderOpenAI}}
+	ag := &Agent{Model: &ModelInfo{Model: "gpt-4o", Provider: ModelProviderOpenAI}}
 	cm := NewContextManager(ag, StrategyTruncateOldest)
 
 	if cm.GetStrategy() != StrategyTruncateOldest {

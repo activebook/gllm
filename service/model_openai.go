@@ -135,7 +135,7 @@ func (ag *Agent) GenerateOpenAISync(messages []openai.ChatCompletionMessage, sys
 	}}, messages...)
 
 	req := openai.ChatCompletionRequest{
-		Model:       ag.Model.ModelName,
+		Model:       ag.Model.Model,
 		Temperature: ag.Model.Temperature,
 		TopP:        ag.Model.TopP,
 		Messages:    messages,
@@ -278,7 +278,7 @@ func (oa *OpenAI) process(ag *Agent) error {
 
 		// Create the request
 		req := openai.ChatCompletionRequest{
-			Model:       ag.Model.ModelName,
+			Model:       ag.Model.Model,
 			Temperature: ag.Model.Temperature,
 			TopP:        ag.Model.TopP,
 			Messages:    messages,

@@ -50,7 +50,7 @@ func (ag *Agent) GenerateAnthropicSync(messages []anthropic.MessageParam, system
 	client := anthropic.NewClient(opts...)
 
 	params := anthropic.MessageNewParams{
-		Model:     anthropic.Model(ag.Model.ModelName),
+		Model:     anthropic.Model(ag.Model.Model),
 		Messages:  messages,
 		MaxTokens: int64(ag.Context.GetMaxOutputTokens()),
 	}
@@ -203,7 +203,7 @@ func (a *Anthropic) process(ag *Agent) error {
 
 		// Create params
 		params := anthropic.MessageNewParams{
-			Model:     anthropic.Model(ag.Model.ModelName),
+			Model:     anthropic.Model(ag.Model.Model),
 			Messages:  messages,
 			MaxTokens: int64(ag.Context.GetMaxOutputTokens()), // Use ContextManager limit
 			System: []anthropic.TextBlockParam{{

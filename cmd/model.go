@@ -597,6 +597,8 @@ var modelInfoCmd = &cobra.Command{
 			if modelConfig.Seed != nil {
 				fmt.Printf("Seed: %d\n", *modelConfig.Seed)
 			}
+			fmt.Printf("Context Length: %d\n", modelConfig.ContextLength)
+			fmt.Printf("Max Output Tokens: %d\n", modelConfig.MaxOutputTokens)
 			fmt.Println("---")
 			return nil
 		}

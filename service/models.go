@@ -1,8 +1,22 @@
 package service
 
 import (
-	"sort"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"strings"
+	"sync"
+	"time"
+
+	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
+	"github.com/charmbracelet/lipgloss"
+)
+
+const (
+	RemoteModelsIndexURL = "https://raw.githubusercontent.com/activebook/models/main/list.json"
+	RemoteModelsBaseURL  = "https://raw.githubusercontent.com/activebook/models/main/"
 )
 
 // ModelLimits contains context window configuration for a model
@@ -11,286 +25,10 @@ type ModelLimits struct {
 	MaxOutputTokens int // Maximum output tokens allowed
 }
 
-// DefaultModelLimits is the registry of known model limits.
-// Context window values must be from official documentation or verified by tests
-var DefaultModelLimits = map[string]ModelLimits{
-
-	/*
-	 * Aliyun Models
-	 */
-	"qwen3.5-plus":                   {ContextWindow: 1000000, MaxOutputTokens: 65536},
-	"qwen3.5-397b-a17b":              {ContextWindow: 262144, MaxOutputTokens: 65536},
-	"qwen3-235b-a22b":                {ContextWindow: 128000, MaxOutputTokens: 8192},
-	"qwen3-235b-a22b-instruct-2507":  {ContextWindow: 262144, MaxOutputTokens: 8192},
-	"qwen3-235b-a22b-thinking-2507":  {ContextWindow: 262144, MaxOutputTokens: 8192},
-	"qwen3-30b-a3b":                  {ContextWindow: 40000, MaxOutputTokens: 8192},
-	"qwen3-32b":                      {ContextWindow: 40000, MaxOutputTokens: 8192},
-	"qwen3-coder-480b-a35b-instruct": {ContextWindow: 262000, MaxOutputTokens: 8192},
-	"qwen3-coder-plus":               {ContextWindow: 128000, MaxOutputTokens: 8192},
-	"qwen3-max-thinking":             {ContextWindow: 256000, MaxOutputTokens: 65536},
-	"qwen3-max":                      {ContextWindow: 256000, MaxOutputTokens: 65536},
-	"qwen3-max-preview":              {ContextWindow: 256000, MaxOutputTokens: 65536},
-	"qwen3-next-80b-a3b-instruct":    {ContextWindow: 131072, MaxOutputTokens: 8192},
-	"qwen3-next-80b-a3b-thinking":    {ContextWindow: 131072, MaxOutputTokens: 8192},
-	"qwen3-vl-plus":                  {ContextWindow: 256000, MaxOutputTokens: 32768},
-	"qwen3-vl-flash":                 {ContextWindow: 256000, MaxOutputTokens: 32768},
-	"qwen3-omni-flash":               {ContextWindow: 64000, MaxOutputTokens: 16384},
-	"qwen-max-2025-01-25":            {ContextWindow: 128000, MaxOutputTokens: 8192},
-	"qwen-turbo":                     {ContextWindow: 1000000, MaxOutputTokens: 8192},
-	"qwen-vl-max-2025-01-25":         {ContextWindow: 128000, MaxOutputTokens: 8192},
-
-	/*
-	 * ByteDance Models
-	 */
-	"doubao-seed-2-0-pro":      {ContextWindow: 256000, MaxOutputTokens: 65536},
-	"doubao-seed-2-0-code":     {ContextWindow: 256000, MaxOutputTokens: 65536},
-	"doubao-seed-2-0-lite":     {ContextWindow: 256000, MaxOutputTokens: 32768},
-	"doubao-seed-2-0-mini":     {ContextWindow: 256000, MaxOutputTokens: 32768},
-	"doubao-seed-1-8":          {ContextWindow: 256000, MaxOutputTokens: 65536},
-	"doubao-seed-1-6":          {ContextWindow: 256000, MaxOutputTokens: 32768},
-	"doubao-seed-1.6":          {ContextWindow: 256000, MaxOutputTokens: 32768},
-	"doubao-seed-1.6-flash":    {ContextWindow: 256000, MaxOutputTokens: 32768},
-	"doubao-seed-1.6-thinking": {ContextWindow: 256000, MaxOutputTokens: 32768},
-	"doubao-1.5-pro-32k":       {ContextWindow: 128000, MaxOutputTokens: 8192},
-	"doubao-1.5-thinking-pro":  {ContextWindow: 128000, MaxOutputTokens: 8192},
-	"doubao-1.5-vision-pro":    {ContextWindow: 128000, MaxOutputTokens: 8192},
-	"doubao-1-5":               {ContextWindow: 128000, MaxOutputTokens: 16384},
-
-	/*
-	 * DeepSeek Models
-	 */
-	"deepseek-math-v2":                {ContextWindow: 160000, MaxOutputTokens: 8192},
-	"deepseek-v3.2-251201":            {ContextWindow: 128000, MaxOutputTokens: 8192},
-	"deepseek-v3.2-exp":               {ContextWindow: 128000, MaxOutputTokens: 8192},
-	"deepseek-v3.2-exp-thinking":      {ContextWindow: 128000, MaxOutputTokens: 8192},
-	"deepseek-v3-2":                   {ContextWindow: 128000, MaxOutputTokens: 32768},
-	"deepseek-v3.1-terminus":          {ContextWindow: 128000, MaxOutputTokens: 8192},
-	"deepseek-v3.1-terminus-thinking": {ContextWindow: 128000, MaxOutputTokens: 8192},
-	"deepseek-v3-1":                   {ContextWindow: 128000, MaxOutputTokens: 32768},
-	"deepseek-r1":                     {ContextWindow: 80000, MaxOutputTokens: 8192},
-	"deepseek-r1-0528":                {ContextWindow: 80000, MaxOutputTokens: 8192},
-	"deepseek-v3":                     {ContextWindow: 128000, MaxOutputTokens: 16384},
-	"deepseek-v3.1":                   {ContextWindow: 128000, MaxOutputTokens: 8192},
-	"deepseek-v3-0324":                {ContextWindow: 128000, MaxOutputTokens: 8192},
-
-	/*
-	 * Meituan Models
-	 */
-	"longcat-flash-chat":     {ContextWindow: 256000, MaxOutputTokens: 32768},
-	"longcat-flash-lite":     {ContextWindow: 320000, MaxOutputTokens: 32768},
-	"longcat-flash-thinking": {ContextWindow: 256000, MaxOutputTokens: 32768},
-
-	/*
-	 * Minimax Models
-	 */
-	"minimax-m2.5": {ContextWindow: 200000, MaxOutputTokens: 65536},
-	"minimax-m2.1": {ContextWindow: 200000, MaxOutputTokens: 65536},
-	"minimax-m2":   {ContextWindow: 200000, MaxOutputTokens: 65536},
-	"minimax-m1":   {ContextWindow: 1000000, MaxOutputTokens: 8192},
-
-	/*
-	 * Moonshot-Kimi Models
-	 */
-	"kimi-k2.5":        {ContextWindow: 256000, MaxOutputTokens: 65536},
-	"kimi-k2-0905":     {ContextWindow: 256000, MaxOutputTokens: 16384},
-	"kimi-k2-thinking": {ContextWindow: 256000, MaxOutputTokens: 16384},
-	"kimi-k2-turbo":    {ContextWindow: 256000, MaxOutputTokens: 16384},
-	"kimi-k2":          {ContextWindow: 128000, MaxOutputTokens: 8192},
-
-	/*
-	 * OpenAI Models
-	 */
-	"gpt-oss-120b": {ContextWindow: 128000, MaxOutputTokens: 8192},
-	"gpt-oss-20b":  {ContextWindow: 128000, MaxOutputTokens: 8192},
-
-	/*
-	 * xAI Models
-	 */
-	"grok-4.20":                   {ContextWindow: 2000000, MaxOutputTokens: 30000},
-	"grok-4.1-fast-non-reasoning": {ContextWindow: 2000000, MaxOutputTokens: 30000},
-	"grok-4.1-fast-reasoning":     {ContextWindow: 2000000, MaxOutputTokens: 30000},
-	"grok-code-fast-1":            {ContextWindow: 256000, MaxOutputTokens: 10000},
-	"grok-4-1-fast":               {ContextWindow: 2000000, MaxOutputTokens: 30000},
-	"grok-4-fast-non-reasoning":   {ContextWindow: 2000000, MaxOutputTokens: 30000},
-	"grok-4-fast-reasoning":       {ContextWindow: 2000000, MaxOutputTokens: 30000},
-	"grok-4-fast":                 {ContextWindow: 2000000, MaxOutputTokens: 30000},
-	"grok-4":                      {ContextWindow: 256000, MaxOutputTokens: 8192},
-
-	/*
-	 * Xiaomi Models
-	 */
-	"mimo-v2-flash": {ContextWindow: 256000, MaxOutputTokens: 32768},
-
-	/*
-	 * StepFun Models
-	 */
-	"step-3.5-flash": {ContextWindow: 256000, MaxOutputTokens: 32768},
-
-	/*
-	 * Kuaishou Models
-	 */
-	"kat-coder": {ContextWindow: 256000, MaxOutputTokens: 32768},
-
-	/*
-	 * zAI Models
-	 */
-	"glm-5":       {ContextWindow: 200000, MaxOutputTokens: 65536},
-	"glm-4.7":     {ContextWindow: 200000, MaxOutputTokens: 16384},
-	"glm-4.6":     {ContextWindow: 200000, MaxOutputTokens: 16384},
-	"glm-4.5":     {ContextWindow: 131000, MaxOutputTokens: 16384},
-	"glm-4.5-air": {ContextWindow: 131000, MaxOutputTokens: 16384},
-
-	// OpenAI Models
-	"gpt-5.3-codex": {ContextWindow: 400000, MaxOutputTokens: 128000},
-	"gpt-5.2-codex": {ContextWindow: 400000, MaxOutputTokens: 128000},
-	"gpt-5.1-codex": {ContextWindow: 400000, MaxOutputTokens: 128000},
-
-	"gpt-5.4-pro": {ContextWindow: 1050000, MaxOutputTokens: 128000},
-	"gpt-5.2-pro": {ContextWindow: 400000, MaxOutputTokens: 128000},
-	"gpt-5.1-pro": {ContextWindow: 400000, MaxOutputTokens: 128000},
-	"gpt-5-pro":   {ContextWindow: 400000, MaxOutputTokens: 128000},
-
-	"gpt-5.3-chat": {ContextWindow: 128000, MaxOutputTokens: 16384},
-	"gpt-5.2-chat": {ContextWindow: 128000, MaxOutputTokens: 16384},
-	"gpt-5.1-chat": {ContextWindow: 128000, MaxOutputTokens: 16384},
-	"gpt-5-chat":   {ContextWindow: 128000, MaxOutputTokens: 16384},
-
-	"gpt-5.4": {ContextWindow: 1050000, MaxOutputTokens: 128000},
-	"gpt-5.2": {ContextWindow: 400000, MaxOutputTokens: 128000},
-	"gpt-5.1": {ContextWindow: 400000, MaxOutputTokens: 128000},
-	"gpt-5":   {ContextWindow: 400000, MaxOutputTokens: 128000},
-
-	"gpt-4.1":       {ContextWindow: 1000000, MaxOutputTokens: 32768},
-	"gpt-4.1-mini":  {ContextWindow: 1000000, MaxOutputTokens: 32768},
-	"gpt-4o":        {ContextWindow: 128000, MaxOutputTokens: 16384},
-	"gpt-4o-mini":   {ContextWindow: 128000, MaxOutputTokens: 16384},
-	"gpt-4-turbo":   {ContextWindow: 128000, MaxOutputTokens: 4096},
-	"gpt-4":         {ContextWindow: 8192, MaxOutputTokens: 8192},
-	"gpt-3.5-turbo": {ContextWindow: 16385, MaxOutputTokens: 4096},
-	"o1":            {ContextWindow: 200000, MaxOutputTokens: 100000},
-	"o1-mini":       {ContextWindow: 128000, MaxOutputTokens: 65536},
-	"o1-pro":        {ContextWindow: 200000, MaxOutputTokens: 100000},
-	"o3":            {ContextWindow: 200000, MaxOutputTokens: 100000},
-	"o3-mini":       {ContextWindow: 200000, MaxOutputTokens: 100000},
-	"o3-mini-high":  {ContextWindow: 200000, MaxOutputTokens: 100000},
-	"o4":            {ContextWindow: 200000, MaxOutputTokens: 100000},
-	"o4-mini":       {ContextWindow: 200000, MaxOutputTokens: 100000},
-	"o4-mini-high":  {ContextWindow: 200000, MaxOutputTokens: 100000},
-
-	// Anthropic (verified)
-	"claude-opus-4.6": {ContextWindow: 1000000, MaxOutputTokens: 64000},
-	"claude-4.6-opus": {ContextWindow: 1000000, MaxOutputTokens: 64000},
-	"claude-opus-4.5": {ContextWindow: 200000, MaxOutputTokens: 64000},
-	"claude-4.5-opus": {ContextWindow: 200000, MaxOutputTokens: 64000},
-
-	"claude-sonnet-4.6": {ContextWindow: 1000000, MaxOutputTokens: 64000},
-	"claude-4.6-sonnet": {ContextWindow: 1000000, MaxOutputTokens: 64000},
-	"claude-sonnet-4.5": {ContextWindow: 1000000, MaxOutputTokens: 64000},
-	"claude-4.5-sonnet": {ContextWindow: 1000000, MaxOutputTokens: 64000},
-
-	"claude-haiku-4.5": {ContextWindow: 200000, MaxOutputTokens: 64000},
-	"claude-4.5-haiku": {ContextWindow: 200000, MaxOutputTokens: 64000},
-
-	// Google Gemini Models
-	"gemini-3.1-pro":           {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-3-pro":             {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-3-flash":           {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-3.1-flash-image":   {ContextWindow: 65536, MaxOutputTokens: 32768},
-	"gemini-3-pro-image":       {ContextWindow: 65536, MaxOutputTokens: 32768},
-	"gemini-3.1-flash-lite":    {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-flash-latest":      {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-flash-lite-latest": {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-2.5-pro":           {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-2.5-flash":         {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-2.5-flash-lite":    {ContextWindow: 1048576, MaxOutputTokens: 65536},
-	"gemini-2.0-flash":         {ContextWindow: 1048576, MaxOutputTokens: 8192},
-	"gemini-pro":               {ContextWindow: 32760, MaxOutputTokens: 8192},
-
-	// Mistral Models
-	"mistral-large-latest": {ContextWindow: 131072, MaxOutputTokens: 65536},
-	"mistral-small-latest": {ContextWindow: 131072, MaxOutputTokens: 65536},
-	"codestral-latest":     {ContextWindow: 262144, MaxOutputTokens: 65536},
-	"mistral-large":        {ContextWindow: 128000, MaxOutputTokens: 8192},
-	"mistral-medium":       {ContextWindow: 32000, MaxOutputTokens: 8192},
-	"mistral-small":        {ContextWindow: 32000, MaxOutputTokens: 8192},
-	"codestral":            {ContextWindow: 32000, MaxOutputTokens: 8192},
-	"magistral":            {ContextWindow: 128000, MaxOutputTokens: 40000},
-	"pixtral-large":        {ContextWindow: 128000, MaxOutputTokens: 8192},
-
-	// Chinese Models - DeepSeek
-	"deepseek-chat":     {ContextWindow: 128000, MaxOutputTokens: 8192},
-	"deepseek-reasoner": {ContextWindow: 128000, MaxOutputTokens: 32768},
-
-	// Chinese Models - Alibaba Qwen
-	"qwen2.5-vl-72b-instruct": {ContextWindow: 128000, MaxOutputTokens: 32768},
-	"qwen2.5-vl-7b-instruct":  {ContextWindow: 128000, MaxOutputTokens: 32768},
-	"qwen-plus":               {ContextWindow: 1000000, MaxOutputTokens: 32768},
-	"qwen-plus-latest":        {ContextWindow: 1000000, MaxOutputTokens: 32768},
-	"qwen-flash":              {ContextWindow: 1000000, MaxOutputTokens: 32768},
-	"qwen-max":                {ContextWindow: 32768, MaxOutputTokens: 8192},
-	"qwen-max-latest":         {ContextWindow: 131072, MaxOutputTokens: 8192},
-	"qwen-coder-plus":         {ContextWindow: 131072, MaxOutputTokens: 8192},
-	"qwen-vl-plus":            {ContextWindow: 131072, MaxOutputTokens: 8192},
-
-	// Chinese Models - ByteDance Doubao
-	"doubao-pro":       {ContextWindow: 128000, MaxOutputTokens: 4096},
-	"doubao-lite":      {ContextWindow: 32000, MaxOutputTokens: 4096},
-	"doubao-vision":    {ContextWindow: 128000, MaxOutputTokens: 4096},
-	"doubao-embedding": {ContextWindow: 32000, MaxOutputTokens: 4096},
-
-	// Chinese Models - Tencent (Added)
-	"hunyuan-2.0-thinking": {ContextWindow: 128000, MaxOutputTokens: 64000},
-	"hunyuan-2.0":          {ContextWindow: 100000, MaxOutputTokens: 8000},
-	"hunyuan":              {ContextWindow: 128000, MaxOutputTokens: 4096},
-
-	// Other Models(legacy)
-	// I don't think we need support for these models
-	// model improvements are so fast that legacy models are not useful
-}
-
-var DefaultLimitsModern = ModelLimits{
+var DefaultModelLimits = ModelLimits{
 	// Default for modern generation models
 	ContextWindow:   128000,
 	MaxOutputTokens: 8192,
-}
-
-// IsModelGemini3 checks if the model name is a Gemini 3 model
-func IsModelGemini3(modelName string) bool {
-	return strings.Contains(modelName, "gemini-3")
-}
-
-// GetModelLimits retrieves the limits for a given model name.
-// It performs exact match first, then pattern matching, then returns defaults.
-func GetModelLimits(modelName string) ModelLimits {
-	if modelName == "" {
-		return DefaultLimitsModern
-	}
-
-	modelNameLower := strings.ToLower(modelName)
-
-	// Try exact match first
-	if limits, ok := DefaultModelLimits[modelNameLower]; ok {
-		return limits
-	}
-
-	// Collect and sort patterns by length (longest first)
-	var patterns []string
-	for pattern := range DefaultModelLimits {
-		patterns = append(patterns, pattern)
-	}
-	sort.Slice(patterns, func(i, j int) bool {
-		return len(patterns[i]) > len(patterns[j])
-	})
-
-	// Try pattern matching with longest patterns first
-	for _, pattern := range patterns {
-		if strings.Contains(modelNameLower, pattern) {
-			return DefaultModelLimits[pattern]
-		}
-	}
-
-	// Return defaults for unknown models
-	return DefaultLimitsModern
 }
 
 // MaxInputTokens calculates the maximum input tokens with a safety buffer.
@@ -299,5 +37,168 @@ func (ml ModelLimits) MaxInputTokens(bufferPercent float64) int {
 	if bufferPercent <= 0 || bufferPercent > 1 {
 		bufferPercent = 0.8 // Default to 80% if invalid
 	}
+	// Input tokens and output tokens share the same context window pool.
 	return int(float64(ml.ContextWindow) * bufferPercent)
+}
+
+// IsModelGemini3 checks if the model name is a Gemini 3 model
+func IsModelGemini3(modelName string) bool {
+	return strings.Contains(modelName, "gemini-3")
+}
+
+// NormalizeModelName extracts the actual model name from a config string that might include a vendor prefix
+// e.g. "xiaomi/mimo-v2-flash:free" -> "mimo-v2-flash:free"
+func NormalizeModelName(configModelName string) string {
+	parts := strings.Split(configModelName, "/")
+	return parts[len(parts)-1]
+}
+
+var syncLocks sync.Map // To prevent multiple concurrent syncs for the same modelKey
+
+type remoteModelIndexEntry struct {
+	Name string `json:"name"`
+	File string `json:"file"`
+}
+
+type remoteModelDetails struct {
+	ContextLength int `json:"context_length"`
+	TopProvider   struct {
+		MaxCompletionTokens int `json:"max_completion_tokens"`
+	} `json:"top_provider"`
+}
+
+// SyncModelLimits fetches the latest model constraints from the remote repository
+// and updates the local config entry if valid info is found.
+// This function operates asynchronously and debounces multiple calls for the same key.
+func SyncModelLimits(modelKey, configModelName string) {
+	if modelKey == "" || configModelName == "" {
+		return
+	}
+
+	// Debounce: check if a sync is already in progress for this modelKey
+	if _, loaded := syncLocks.LoadOrStore(modelKey, struct{}{}); loaded {
+		// Already syncing
+		return
+	}
+
+	// We don't remove the lock after sync, so it will only sync once per session.
+	// Session-level cache to prevent re-triggering for failures
+	// defer syncLocks.Delete(modelKey)
+
+	// Clean up configModelName for matching
+	normalizedName := NormalizeModelName(configModelName)
+	normalizedLower := strings.ToLower(normalizedName)
+
+	// Fast timeout for background tasks to avoid hanging goroutines unnecessarily
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	// Fetch index
+	resp, err := client.Get(RemoteModelsIndexURL)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, err)})
+		return
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, err)})
+		return
+	}
+
+	var index []remoteModelIndexEntry
+	if err := json.Unmarshal(bodyBytes, &index); err != nil {
+		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, err)})
+		return
+	}
+
+	var bestMatch *remoteModelIndexEntry
+
+	// Phase 1: Exact Match
+	for i, entry := range index {
+		if strings.ToLower(entry.Name) == normalizedLower {
+			bestMatch = &index[i]
+			break
+		}
+	}
+
+	// Phase 2: Lossy Match (inclusion check) if no exact match
+	if bestMatch == nil {
+		for i, entry := range index {
+			entryLower := strings.ToLower(entry.Name)
+			if strings.Contains(normalizedLower, entryLower) || strings.Contains(entryLower, normalizedLower) {
+				bestMatch = &index[i]
+				break
+			}
+		}
+	}
+
+	if bestMatch == nil {
+		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, fmt.Errorf("no match found in remote model index for %s", normalizedName))})
+		return
+	}
+
+	// Fetch detail JSON
+	detailURL := fmt.Sprintf("%s%s", RemoteModelsBaseURL, bestMatch.File)
+	detailResp, err := client.Get(detailURL)
+	if err != nil || detailResp.StatusCode != http.StatusOK {
+		if detailResp != nil {
+			detailResp.Body.Close()
+		}
+		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, err)})
+		return
+	}
+	defer detailResp.Body.Close()
+
+	detailBytes, err := io.ReadAll(detailResp.Body)
+	if err != nil {
+		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, err)})
+		return
+	}
+
+	var details remoteModelDetails
+	if err := json.Unmarshal(detailBytes, &details); err != nil {
+		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, err)})
+		return
+	}
+
+	// Determine final limits
+	contextLength := details.ContextLength
+	if contextLength <= 0 {
+		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, fmt.Errorf("invalid ContextLength %d", contextLength))})
+		return
+	}
+
+	maxOutput := details.TopProvider.MaxCompletionTokens
+	if maxOutput <= 0 {
+		maxOutput = DefaultModelLimits.MaxOutputTokens
+	}
+
+	// Save to config
+	store := data.NewConfigStore()
+	err = store.SetModelLimits(modelKey, contextLength, maxOutput)
+	if err != nil {
+		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, err)})
+	} else {
+		// Send banner notification
+		ui.SendEvent(ui.BannerMsg{Text: getModelUpdatedBanner(modelKey, contextLength, maxOutput)})
+	}
+}
+
+// getModelBanner returns a non-intrusive update notification.
+func getModelUpdatedBanner(modelKey string, contextLength int, maxOutput int) string {
+	style := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(data.UpdateModelSuccessHex)).
+		Bold(true)
+	return style.Render(fmt.Sprintf("* Model %s updated: ContextLength=%d, MaxOutputTokens=%d", modelKey, contextLength, maxOutput))
+}
+
+func getModelFailedBanner(modelKey string, err error) string {
+	style := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(data.UpdateModelFailedHex)).
+		Bold(true)
+	return style.Render(fmt.Sprintf("* Model %s update failed: %v", modelKey, err))
 }
