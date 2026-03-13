@@ -3,8 +3,8 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -31,6 +31,14 @@ var DefaultModelLimits = ModelLimits{
 	MaxOutputTokens: 8192,
 }
 
+// stripDateStamp removes trailing date/version stamps from model names.
+// Handles patterns like: -2024-05-13, -08-2024, -2512, -0528, -20250514
+var dateStampRe = regexp.MustCompile(`(-\d{4}-\d{2}-\d{2}|-\d{2}-\d{4}|-\d{4,8})$`)
+
+func stripDateStamp(name string) string {
+	return dateStampRe.ReplaceAllString(name, "")
+}
+
 // MaxInputTokens calculates the maximum input tokens with a safety buffer.
 // The buffer ensures there's always room for the model's response.
 func (ml ModelLimits) MaxInputTokens(bufferPercent float64) int {
@@ -51,6 +59,48 @@ func IsModelGemini3(modelName string) bool {
 func NormalizeModelName(configModelName string) string {
 	parts := strings.Split(configModelName, "/")
 	return parts[len(parts)-1]
+}
+
+// findBestMatch searches the remote model index for the best matching entry.
+// Tiered strategy:
+//  1. Exact match (case-insensitive)
+//  2. Date-stamp-stripped match (strips trailing date patterns like -2024-05-13, -2512)
+//  3. Prefix match: input starts with index entry name — NOT the reverse, to prevent
+//     short/generic index entries ("free", "auto", "router") from spuriously matching.
+//     Entry name must be >= 6 chars as an additional guard.
+//
+// Returns nil if no confident match is found.
+func findBestModelMatch(name string, index []remoteModelIndexEntry) *remoteModelIndexEntry {
+	inputDateStripped := stripDateStamp(name)
+
+	// Phase 1: Exact match
+	for i, entry := range index {
+		if strings.ToLower(entry.Name) == name {
+			return &index[i]
+		}
+	}
+
+	// Phase 2: Match after stripping trailing date stamps
+	// e.g. "gpt-4o-2024-08-06" -> "gpt-4o" matches index entry "gpt-4o"
+	// e.g. "command-r-08-2024" -> "command-r" matches index entry "command-r"
+	for i, entry := range index {
+		entryDateStripped := stripDateStamp(strings.ToLower(entry.Name))
+		if entryDateStripped == inputDateStripped {
+			return &index[i]
+		}
+	}
+
+	// Phase 3: Input is a more specific variant of an index entry.
+	// e.g. "gpt-4o-mini-2024-07-18" starts with index entry "gpt-4o-mini"
+	// Guard: entry must be >= 6 chars to block generic names like "free", "auto", "router"
+	for i, entry := range index {
+		entryLower := strings.ToLower(entry.Name)
+		if len(entryLower) >= 6 && strings.HasPrefix(inputDateStripped, entryLower) {
+			return &index[i]
+		}
+	}
+
+	return nil
 }
 
 var syncLocks sync.Map // To prevent multiple concurrent syncs for the same modelKey
@@ -103,39 +153,14 @@ func SyncModelLimits(modelKey, configModelName string) {
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, err)})
-		return
-	}
-
 	var index []remoteModelIndexEntry
-	if err := json.Unmarshal(bodyBytes, &index); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&index); err != nil {
 		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, err)})
 		return
 	}
 
-	var bestMatch *remoteModelIndexEntry
-
-	// Phase 1: Exact Match
-	for i, entry := range index {
-		if strings.ToLower(entry.Name) == normalizedLower {
-			bestMatch = &index[i]
-			break
-		}
-	}
-
-	// Phase 2: Lossy Match (inclusion check) if no exact match
-	if bestMatch == nil {
-		for i, entry := range index {
-			entryLower := strings.ToLower(entry.Name)
-			if strings.Contains(normalizedLower, entryLower) || strings.Contains(entryLower, normalizedLower) {
-				bestMatch = &index[i]
-				break
-			}
-		}
-	}
-
+	// Find best match
+	bestMatch := findBestModelMatch(normalizedLower, index)
 	if bestMatch == nil {
 		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, fmt.Errorf("no match found in remote model index for %s", normalizedName))})
 		return
@@ -153,14 +178,8 @@ func SyncModelLimits(modelKey, configModelName string) {
 	}
 	defer detailResp.Body.Close()
 
-	detailBytes, err := io.ReadAll(detailResp.Body)
-	if err != nil {
-		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, err)})
-		return
-	}
-
 	var details remoteModelDetails
-	if err := json.Unmarshal(detailBytes, &details); err != nil {
+	if err := json.NewDecoder(detailResp.Body).Decode(&details); err != nil {
 		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, err)})
 		return
 	}
