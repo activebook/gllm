@@ -26,14 +26,16 @@ type AgentConfig struct {
 
 // Model represents a model definition.
 type Model struct {
-	Name     string  // Name is the key, not stored in YAML
-	Provider string  // Provider name (e.g., "openai", "gemini")
-	Endpoint string  // Model endpoint
-	Key      string  // Model key
-	Model    string  // Model name
-	Temp     float32 // Model temperature
-	TopP     float32 // Model top_p
-	Seed     *int32  // Model seed
+	Name            string  // Name is the key, not stored in YAML
+	Provider        string  // Provider name (e.g., "openai", "gemini")
+	Endpoint        string  // Model endpoint
+	Key             string  // Model key
+	Model           string  // Model name
+	Temp            float32 // Model temperature
+	TopP            float32 // Model top_p
+	Seed            *int32  // Model seed
+	ContextLength   int32   // Model context length
+	MaxOutputTokens int32   // Model max output tokens
 }
 
 // SearchEngine represents search engine configuration.
@@ -383,6 +385,36 @@ func (c *ConfigStore) GetModel(name string) *Model {
 	return nil
 }
 
+// SetModelLimits updates the context window and output token limits for a given model.
+// This allows the system to background-fetch limits and cache them in the config.
+func (c *ConfigStore) SetModelLimits(name string, contextLength, maxOutput int) error {
+	name = strings.ToLower(name)
+	modelsMap := c.v.GetStringMap("models")
+	if modelsMap == nil {
+		modelsMap = make(map[string]interface{})
+	}
+
+	val, exists := modelsMap[name]
+	if !exists {
+		// Model doesn't exist, cannot update
+		return fmt.Errorf("model '%s' not found", name)
+	}
+
+	modelConfigMap := toStringMap(val)
+	if modelConfigMap == nil {
+		modelConfigMap = make(map[string]interface{})
+	}
+
+	// Update only the limits
+	modelConfigMap["context_length"] = contextLength
+	modelConfigMap["max_output_tokens"] = maxOutput
+
+	modelsMap[name] = modelConfigMap
+	c.v.Set("models", modelsMap)
+
+	return c.Save()
+}
+
 // getModelFromAgentMap returns a single model's config.
 // for private use only
 func (c *ConfigStore) getModelFromAgentMap(m map[string]interface{}, key string) Model {
@@ -631,14 +663,16 @@ func (c *ConfigStore) modelToMap(model *Model) map[string]interface{} {
 // mapToModel converts a map to Model struct helper
 func (c *ConfigStore) mapToModel(name string, m map[string]interface{}) Model {
 	return Model{
-		Name:     name,
-		Provider: getString(m, "provider"),
-		Endpoint: getString(m, "endpoint"),
-		Key:      getString(m, "key"),
-		Model:    getString(m, "model"),
-		Temp:     getFloat(m, "temperature", 1.0),
-		TopP:     getFloat(m, "top_p", 1.0),
-		Seed:     getPtrInt(m, "seed"),
+		Name:            name,
+		Provider:        getString(m, "provider"),
+		Endpoint:        getString(m, "endpoint"),
+		Key:             getString(m, "key"),
+		Model:           getString(m, "model"),
+		Temp:            getFloat(m, "temperature", 1.0),
+		TopP:            getFloat(m, "top_p", 1.0),
+		Seed:            getPtrInt(m, "seed"),
+		ContextLength:   int32(getInt(m, "context_length", 0)),
+		MaxOutputTokens: int32(getInt(m, "max_output_tokens", 0)),
 	}
 }
 

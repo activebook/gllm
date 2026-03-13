@@ -23,13 +23,15 @@ type StreamData struct {
 }
 
 type ModelInfo struct {
-	ApiKey      string
-	EndPoint    string
-	ModelName   string
-	Provider    string
-	Temperature float32
-	TopP        float32 // Top-p sampling parameter
-	Seed        *int32  // Seed for deterministic generation
+	ApiKey          string
+	EndPoint        string
+	Model           string
+	Provider        string
+	Temperature     float32
+	TopP            float32 // Top-p sampling parameter
+	Seed            *int32  // Seed for deterministic generation
+	ContextLength   int32   // Model context length limit
+	MaxOutputTokens int32   // Model max output tokens
 }
 
 type Agent struct {
@@ -59,6 +61,7 @@ type Agent struct {
 	// Sub-agent orchestration
 	SharedState *data.SharedState // Shared state for inter-agent communication
 	AgentName   string            // Current agent name for metadata tracking
+	ModelName   string            // Current model name of current agent (agent model key)
 	Verbose     bool              // Whether verbose output mode is enabled
 }
 
@@ -72,13 +75,15 @@ func constructModelInfo(model *data.Model) *ModelInfo {
 	} else {
 		Debugf("Provider: [%s]", provider)
 	}
-	mi.ModelName = model.Model
+	mi.Model = model.Model
 	mi.Provider = provider
 	mi.EndPoint = model.Endpoint
 	mi.ApiKey = model.Key
 	mi.Temperature = model.Temp
 	mi.TopP = model.TopP
 	mi.Seed = model.Seed
+	mi.ContextLength = model.ContextLength
+	mi.MaxOutputTokens = model.MaxOutputTokens
 	return &mi
 }
 
@@ -250,6 +255,7 @@ type AgentOptions struct {
 	// Sub-agent orchestration fields
 	SharedState *data.SharedState // Shared state for inter-agent communication
 	AgentName   string            // Name of the agent running this task
+	ModelName   string            // Current model name of current agent (agent model key)
 }
 
 func CallAgent(op *AgentOptions) error {
@@ -365,6 +371,7 @@ func CallAgent(op *AgentOptions) error {
 		Status:        StatusStack{},
 		SharedState:   op.SharedState,
 		AgentName:     op.AgentName,
+		ModelName:     op.ModelName,
 		Verbose:       verboseMode,
 	}
 

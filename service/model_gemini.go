@@ -139,7 +139,7 @@ func (ag *Agent) GenerateGeminiSync(messages []*genai.Content, systemPrompt stri
 		config.SystemInstruction = &genai.Content{Parts: []*genai.Part{{Text: systemPrompt}}}
 	}
 
-	resp, err := ga.client.Models.GenerateContent(ga.ctx, ga.Model.ModelName, messages, config)
+	resp, err := ga.client.Models.GenerateContent(ga.ctx, ga.Model.Model, messages, config)
 	if err != nil {
 		return "", fmt.Errorf("sync chat completion error: %w", err)
 	}
@@ -172,7 +172,7 @@ func (ag *Agent) GenerateGeminiStream() error {
 	}
 
 	// Configure Model Parameters
-	thinking := ag.ThinkingLevel.ToGeminiConfig(ag.Model.ModelName)
+	thinking := ag.ThinkingLevel.ToGeminiConfig(ag.Model.Model)
 
 	// Create the model and generate content
 	config := genai.GenerateContentConfig{
@@ -389,7 +389,7 @@ func (ga *GeminiAgent) processGeminiStream(ctx context.Context,
 
 	// Stream the response
 	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusProcessing}, ga.ProceedChan)
-	iter := client.Models.GenerateContentStream(ctx, ga.Model.ModelName, messages, config)
+	iter := client.Models.GenerateContentStream(ctx, ga.Model.Model, messages, config)
 	// Wait for the main goroutine to tell sub-goroutine to proceed
 	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusStarted}, ga.ProceedChan)
 

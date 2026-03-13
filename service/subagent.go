@@ -452,6 +452,7 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 		MCPConfig:     mcpConfig,
 		SharedState:   e.state,
 		AgentName:     task.AgentName,
+		ModelName:     agentConfig.Model.Name,
 	}
 
 	// Check for context cancellation

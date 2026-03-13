@@ -154,7 +154,7 @@ func (ag *Agent) GenerateOpenChatSync(messages []*model.ChatCompletionMessage, s
 	}}, messages...)
 
 	req := model.CreateChatCompletionRequest{
-		Model:       ag.Model.ModelName,
+		Model:       ag.Model.Model,
 		Temperature: &ag.Model.Temperature,
 		TopP:        &ag.Model.TopP,
 		Messages:    messages,
@@ -302,7 +302,7 @@ func (c *OpenChat) process(ag *Agent) error {
 
 		// Create the request with thinking mode
 		req := model.CreateChatCompletionRequest{
-			Model:           ag.Model.ModelName,
+			Model:           ag.Model.Model,
 			Temperature:     &ag.Model.Temperature,
 			TopP:            &ag.Model.TopP,
 			Messages:        messages,

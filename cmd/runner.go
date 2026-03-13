@@ -34,6 +34,11 @@ func EnsureActiveAgent() (*data.AgentConfig, error) {
 	if model == nil {
 		return nil, fmt.Errorf("model %s not found", agent.Model.Name)
 	}
+	// Auto-detect model limits if not set
+	if model.ContextLength == 0 {
+		// Trigger background sync to cache it for next time
+		go service.SyncModelLimits(agent.Model.Name, agent.Model.Model)
+	}
 	return agent, nil
 }
 
@@ -105,6 +110,7 @@ func RunAgent(prompt string, files []*service.FileData, sessionName string, outp
 			// Sub-agent orchestration
 			SharedState: sharedState,
 			AgentName:   agent.Name,
+			ModelName:   agent.Model.Name,
 		}
 
 		// Execute

@@ -14,6 +14,14 @@ const (
 	StrategyNone TruncationStrategy = "none"
 
 	// DefaultBufferPercent is the default safety buffer (80% of available space)
+	/*
+	 * Before context window fills up, you may run into "context rot,"
+	 * where model performance degrades as input length increases even when there's technically room left
+	 * — LLMs don't process all tokens equally, with attention concentrating on the beginning and end,
+	 * so information in the middle gets less reliable processing.
+	 *
+	 * 80% leaves room for the model to "breathe" and maintain high-quality reasoning.
+	 */
 	DefaultBufferPercent = 0.80
 )
 
@@ -49,14 +57,33 @@ func (b *commonContext) GetMaxOutputTokens() int         { return b.maxOutputTok
 
 // NewContextManager constructs the correct provider-specific ContextManager for the agent.
 func NewContextManager(ag *Agent, strategy TruncationStrategy) ContextManager {
-	limits := GetModelLimits(ag.Model.ModelName)
-	Debugf("Context Quota: modelName=%s, limits=%v, strategy=%s", ag.Model.ModelName, limits, strategy)
+	var maxInputTokens int
+	var maxOutputTokens int
+
+	if ag.Model.ContextLength > 0 {
+		// Use limits from config if available (which might have been synced previously)
+		limits := ModelLimits{ContextWindow: int(ag.Model.ContextLength), MaxOutputTokens: int(ag.Model.MaxOutputTokens)}
+		maxInputTokens = limits.MaxInputTokens(DefaultBufferPercent)
+		maxOutputTokens = limits.MaxOutputTokens
+		if maxOutputTokens <= 0 {
+			maxOutputTokens = DefaultModelLimits.MaxOutputTokens
+		}
+	} else {
+		// Trigger background sync to cache it for next time
+		go SyncModelLimits(ag.ModelName, ag.Model.Model)
+
+		// Check hardcoded defaults first
+		limits := DefaultModelLimits
+		maxInputTokens = limits.MaxInputTokens(DefaultBufferPercent)
+		maxOutputTokens = limits.MaxOutputTokens
+	}
+
+	Debugf("Context Quota: modelName=%s, inputTokens=%d, outputTokens=%d, strategy=%s", ag.Model.Model, maxInputTokens, maxOutputTokens, strategy)
 	base := commonContext{
 		agent:           ag,
-		maxInputTokens:  limits.MaxInputTokens(DefaultBufferPercent),
-		maxOutputTokens: limits.MaxOutputTokens,
+		maxInputTokens:  maxInputTokens,
+		maxOutputTokens: maxOutputTokens,
 		strategy:        strategy,
-		bufferPercent:   DefaultBufferPercent,
 	}
 	switch ag.Model.Provider {
 	case ModelProviderOpenAI:

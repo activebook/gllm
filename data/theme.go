@@ -101,8 +101,10 @@ var (
 	LowCachedHex  string
 	OffCachedHex  string
 
-	UpdateSuccessHex   string
-	UpdateAvailableHex string
+	UpdateSuccessHex      string
+	UpdateAvailableHex    string
+	UpdateModelSuccessHex string
+	UpdateModelFailedHex  string
 
 	PlanModeHex string
 	YoloModeHex string
@@ -248,6 +250,8 @@ func applyTheme(t goghthemes.Theme) {
 
 	UpdateSuccessHex = t.Green
 	UpdateAvailableHex = t.Yellow
+	UpdateModelSuccessHex = t.BrightGreen
+	UpdateModelFailedHex = t.BrightRed
 
 	PlanModeHex = t.BrightMagenta
 	YoloModeHex = t.BrightRed
