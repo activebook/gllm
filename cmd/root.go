@@ -53,6 +53,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 		// PersistentPreRunE is usually a good place for things that need flags/config
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// This ensures setupLogging runs *after* flags are parsed and *after* initConfig
+			setupLogging()
 
 			// Check if we are running a help/version command or init itself
 			if cmd.Name() == "help" || cmd.Name() == "init" || cmd.Name() == "version" || versionFlag {
@@ -326,7 +327,6 @@ func init() {
 
 	// *** Placeholder for Log Configuration ***
 	// We will add log setup based on Viper settings later.
-	setupLogging()
 }
 
 // initConfig reads in config file and ENV variables if set.
