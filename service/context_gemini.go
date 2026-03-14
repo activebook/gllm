@@ -3,6 +3,7 @@ package service
 import (
 	"sort"
 
+	"github.com/activebook/gllm/util"
 	"google.golang.org/genai"
 )
 
@@ -44,7 +45,7 @@ func (c *geminiContext) pruneGeminiMessages(messages []*genai.Content, systemPro
 	totalOverhead := sysTokens + toolTokens
 
 	currentTokens := c.estimateTokens(messages) + totalOverhead
-	Debugf("Token count: %d MaxInputTokens[80%%]: %d", currentTokens, c.maxInputTokens)
+	util.Debugf("Token count: %d MaxInputTokens[80%%]: %d\n", currentTokens, c.maxInputTokens)
 	if currentTokens <= c.maxInputTokens {
 		return messages, false, nil
 	}

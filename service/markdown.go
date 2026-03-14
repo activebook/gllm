@@ -7,6 +7,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/glamour"
 )
 
@@ -116,7 +117,7 @@ func (mr *Markdown) Render(r ui.Render) {
 
 	out, err2 := tr.Render(output)
 	if err2 != nil {
-		Warnf("Cannot render Markdown correctly: %v", err2)
+		util.Warnf("Cannot render Markdown correctly: %v\n", err2)
 		return
 	}
 

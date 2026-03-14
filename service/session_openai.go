@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/activebook/gllm/util"
 	openai "github.com/sashabaranov/go-openai"
 )
 
@@ -52,7 +53,7 @@ func (s *OpenAISession) MarshalMessages(messages []openai.ChatCompletionMessage,
 		// Marshal to compact JSON
 		line, err := json.Marshal(formatted)
 		if err != nil {
-			Warnf("failed to serialize message: %v", err)
+			util.Warnf("failed to serialize message: %v\n", err)
 			continue
 		}
 

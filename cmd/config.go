@@ -8,7 +8,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/activebook/gllm/data"
-	"github.com/activebook/gllm/service"
+	"github.com/activebook/gllm/util"
 	"github.com/spf13/cobra"
 )
 
@@ -80,7 +80,7 @@ in the current directory.`,
 
 		// Write the configuration to the file using ConfigStore
 		if err := configStore.Export(exportPath); err != nil {
-			service.Errorf("Error exporting configuration: %s\n", err)
+			util.Errorf("Error exporting configuration: %s\n", err)
 			return
 		}
 
@@ -101,7 +101,7 @@ This will replace the current configuration with the settings from the specified
 
 		// Check if main config file exists
 		if _, err := os.Stat(importFile); os.IsNotExist(err) {
-			service.Errorf("Configuration file does not exist: %s\n", importFile)
+			util.Errorf("Configuration file does not exist: %s\n", importFile)
 			return
 		}
 
@@ -109,7 +109,7 @@ This will replace the current configuration with the settings from the specified
 
 		// Import the configuration using ConfigStore
 		if err := storeConfig.Import(importFile); err != nil {
-			service.Errorf("Error importing configuration: %s\n", err)
+			util.Errorf("Error importing configuration: %s\n", err)
 			return
 		}
 

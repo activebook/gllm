@@ -9,6 +9,7 @@ import (
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
+	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -45,7 +46,7 @@ var workflowListCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		wm := service.GetWorkflowManager()
 		if err := wm.LoadMetadata(replCommandMap); err != nil {
-			service.Errorf("Failed to load workflows: %v", err)
+			util.Errorf("Failed to load workflows: %v\n", err)
 			return
 		}
 
@@ -75,7 +76,7 @@ var workflowCreateCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		wm := service.GetWorkflowManager()
 		if err := wm.LoadMetadata(replCommandMap); err != nil {
-			service.Errorf("Failed to load workflows: %v", err)
+			util.Errorf("Failed to load workflows: %v\n", err)
 			return
 		}
 
@@ -117,7 +118,7 @@ var workflowCreateCmd = &cobra.Command{
 		editor := getPreferredEditor()
 		tempFile, err := createTempFile(workflowTempFile)
 		if err != nil {
-			service.Errorf("Failed to create temp file: %v", err)
+			util.Errorf("Failed to create temp file: %v\n", err)
 			return
 		}
 		defer os.Remove(tempFile)
@@ -128,13 +129,13 @@ var workflowCreateCmd = &cobra.Command{
 		cmdExec.Stderr = os.Stderr
 
 		if err := cmdExec.Run(); err != nil {
-			service.Errorf("Editor failed: %v", err)
+			util.Errorf("Editor failed: %v\n", err)
 			return
 		}
 
 		contentBytes, err := os.ReadFile(tempFile)
 		if err != nil {
-			service.Errorf("Failed to read content: %v", err)
+			util.Errorf("Failed to read content: %v\n", err)
 			return
 		}
 		content := strings.TrimSpace(string(contentBytes))
@@ -145,7 +146,7 @@ var workflowCreateCmd = &cobra.Command{
 		}
 
 		if err := wm.CreateWorkflow(name, description, content); err != nil {
-			service.Errorf("Failed to create workflow: %v", err)
+			util.Errorf("Failed to create workflow: %v\n", err)
 			return
 		}
 
@@ -161,7 +162,7 @@ var workflowRemoveCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		wm := service.GetWorkflowManager()
 		if err := wm.LoadMetadata(replCommandMap); err != nil {
-			service.Errorf("Failed to load workflows: %v", err)
+			util.Errorf("Failed to load workflows: %v\n", err)
 			return
 		}
 
@@ -207,7 +208,7 @@ var workflowRemoveCmd = &cobra.Command{
 		}
 
 		if err := wm.RemoveWorkflow(name); err != nil {
-			service.Errorf("Failed to remove workflow: %v", err)
+			util.Errorf("Failed to remove workflow: %v\n", err)
 			return
 		}
 
@@ -223,7 +224,7 @@ var workflowRenameCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		wm := service.GetWorkflowManager()
 		if err := wm.LoadMetadata(replCommandMap); err != nil {
-			service.Errorf("Failed to load workflows: %v", err)
+			util.Errorf("Failed to load workflows: %v\n", err)
 			return
 		}
 
@@ -284,7 +285,7 @@ var workflowRenameCmd = &cobra.Command{
 		}
 
 		if err := wm.RenameWorkflow(oldName, newName); err != nil {
-			service.Errorf("Failed to rename workflow: %v", err)
+			util.Errorf("Failed to rename workflow: %v\n", err)
 			return
 		}
 
@@ -300,7 +301,7 @@ var workflowInfoCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		wm := service.GetWorkflowManager()
 		if err := wm.LoadMetadata(replCommandMap); err != nil {
-			service.Errorf("Failed to load workflows: %v", err)
+			util.Errorf("Failed to load workflows: %v\n", err)
 			return
 		}
 
@@ -333,7 +334,7 @@ var workflowInfoCmd = &cobra.Command{
 
 		content, desc, err := wm.GetWorkflowByName(name)
 		if err != nil {
-			service.Errorf("%v", err)
+			util.Errorf("%v\n", err)
 			return
 		}
 
@@ -353,7 +354,7 @@ var workflowSetCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		wm := service.GetWorkflowManager()
 		if err := wm.LoadMetadata(replCommandMap); err != nil {
-			service.Errorf("Failed to load workflows: %v", err)
+			util.Errorf("Failed to load workflows: %v\n", err)
 			return
 		}
 
@@ -386,7 +387,7 @@ var workflowSetCmd = &cobra.Command{
 
 		content, desc, err := wm.GetWorkflowByName(name)
 		if err != nil {
-			service.Errorf("%v", err)
+			util.Errorf("%v\n", err)
 			return
 		}
 
@@ -406,13 +407,13 @@ var workflowSetCmd = &cobra.Command{
 		editor := getPreferredEditor()
 		tempFile, err := createTempFile(workflowTempFile)
 		if err != nil {
-			service.Errorf("Failed to create temp file: %v", err)
+			util.Errorf("Failed to create temp file: %v\n", err)
 			return
 		}
 		defer os.Remove(tempFile)
 
 		if err := os.WriteFile(tempFile, []byte(content), 0644); err != nil {
-			service.Errorf("Failed to write to temp file: %v", err)
+			util.Errorf("Failed to write to temp file: %v\n", err)
 			return
 		}
 
@@ -422,13 +423,13 @@ var workflowSetCmd = &cobra.Command{
 		cmdExec.Stderr = os.Stderr
 
 		if err := cmdExec.Run(); err != nil {
-			service.Errorf("Editor failed: %v", err)
+			util.Errorf("Editor failed: %v\n", err)
 			return
 		}
 
 		contentBytes, err := os.ReadFile(tempFile)
 		if err != nil {
-			service.Errorf("Failed to read content: %v", err)
+			util.Errorf("Failed to read content: %v\n", err)
 			return
 		}
 		newContent := strings.TrimSpace(string(contentBytes))
@@ -439,7 +440,7 @@ var workflowSetCmd = &cobra.Command{
 		}
 
 		if err := wm.UpdateWorkflow(name, newDescription, newContent); err != nil {
-			service.Errorf("Failed to update workflow: %v", err)
+			util.Errorf("Failed to update workflow: %v\n", err)
 			return
 		}
 

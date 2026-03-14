@@ -11,6 +11,7 @@ import (
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
+	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
@@ -73,7 +74,7 @@ func runCommand(cmd *cobra.Command, args []string) {
 		// No arguments, call the command directly
 		if cmd.RunE != nil {
 			if err := cmd.RunE(cmd, args); err != nil {
-				service.Errorf("%v\n", err)
+				util.Errorf("%v\n", err)
 			}
 		} else if cmd.Run != nil {
 			cmd.Run(cmd, args)
@@ -94,7 +95,7 @@ func runCommand(cmd *cobra.Command, args []string) {
 	// No subcommand found, call on current cmd with all args
 	if cmd.RunE != nil {
 		if err := cmd.RunE(cmd, args); err != nil {
-			service.Errorf("%v\n", err)
+			util.Errorf("%v\n", err)
 		}
 	} else if cmd.Run != nil {
 		cmd.Run(cmd, args)
@@ -347,7 +348,7 @@ func (ri *ReplInfo) handleEditorCommand() {
 	editor := getPreferredEditor()
 	tempFile, err := createTempFile(editTempFile)
 	if err != nil {
-		service.Errorf("Failed to create temp file: %v", err)
+		util.Errorf("Failed to create temp file: %v\n", err)
 		return
 	}
 	defer os.Remove(tempFile)
@@ -360,14 +361,14 @@ func (ri *ReplInfo) handleEditorCommand() {
 
 	fmt.Printf("Opening in %s...\n", editor)
 	if err := cmd.Run(); err != nil {
-		service.Errorf("Editor failed: %v", err)
+		util.Errorf("Editor failed: %v\n", err)
 		return
 	}
 
 	// Read back edited content
 	recv, err := os.ReadFile(tempFile)
 	if err != nil {
-		service.Errorf("Failed to read edited content: %v", err)
+		util.Errorf("Failed to read edited content: %v\n", err)
 		return
 	}
 
@@ -404,14 +405,14 @@ func (ri *ReplInfo) attachFiles(input string) {
 						fileInfo, err := os.Stat(filePath)
 						if err != nil {
 							if os.IsNotExist(err) {
-								service.Errorf("File not found: %s\n", filePath)
+								util.Errorf("File not found: %s\n", filePath)
 							} else {
-								service.Errorf("Error accessing file %s: %v\n", filePath, err)
+								util.Errorf("Error accessing file %s: %v\n", filePath, err)
 							}
 							return
 						}
 						if fileInfo.IsDir() {
-							service.Errorf("Cannot attach directory: %s\n", filePath)
+							util.Errorf("Cannot attach directory: %s\n", filePath)
 							return
 						}
 					}
@@ -427,14 +428,14 @@ func (ri *ReplInfo) attachFiles(input string) {
 					mu.Unlock()
 					// If file is already attached, skip processing
 					if found {
-						service.Warnf("File already attached: %s", filePath)
+						util.Warnf("File already attached: %s\n", filePath)
 						return
 					}
 
 					// Process the attachment
 					file := ProcessAttachment(filePath)
 					if file == nil {
-						service.Errorf("Error loading attachment: %s\n", filePath)
+						util.Errorf("Error loading attachment: %s\n", filePath)
 						return
 					}
 
@@ -626,7 +627,7 @@ func switchYoloMode(showStatus func(bool)) {
 func switchPlanMode(showStatus func(bool)) {
 	// The /plan command in the REPL should only be available if the "Plan Mode" feature is enabled for the current agent.
 	if !data.IsPlanModeInSessionEnabled() {
-		service.Warnln("Please enable Plan Mode feature first.")
+		util.Warnln("Please enable Plan Mode feature first.")
 		return
 	}
 
@@ -685,7 +686,7 @@ func switchSessionMode() {
 		ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModeNormal})
 	} else {
 		// back to normal
-		service.Warnf("Plan mode and yolo mode shouldn't be both turned on.")
+		util.Warnln("Plan mode and yolo mode shouldn't be both turned on.")
 		data.SetPlanModeInSession(false)
 		data.SetYoloModeInSession(false)
 		ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModeNormal})

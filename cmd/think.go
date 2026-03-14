@@ -6,6 +6,7 @@ import (
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
+	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -45,7 +46,7 @@ The actual behavior depends on the model provider:
 			level := service.ParseThinkingLevel(args[0])
 			agent.Think = string(level)
 			if err := store.SetAgent(agent.Name, agent); err != nil {
-				service.Errorf("failed to save thinking level: %v", err)
+				util.Errorf("failed to save thinking level: %v\n", err)
 				return
 			}
 			fmt.Printf("Thinking level: %s\n", level.Display())
@@ -101,7 +102,7 @@ var thinkSwitchCmd = &cobra.Command{
 		level := service.ParseThinkingLevel(selected)
 		agent.Think = string(level)
 		if err := store.SetAgent(agent.Name, agent); err != nil {
-			service.Errorf("failed to save thinking level: %v", err)
+			util.Errorf("failed to save thinking level: %v\n", err)
 			return
 		}
 		fmt.Printf("Thinking level: %s\n", level.Display())

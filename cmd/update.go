@@ -10,6 +10,7 @@ import (
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
+	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -43,11 +44,11 @@ func StartBackgroundUpdateCheck() {
 			return
 		}
 		// Perform the check quietly; do not log on error.
-		service.Debugf("Current version is:%s\n", version)
+		util.Debugf("Current version is:%s\n", version)
 		release, err := service.CheckLatest(version)
 		if err != nil {
 			ss.SetLastUpdateCheck(time.Now())
-			service.Warnf("Update check failed: %v\n", err)
+			util.Warnf("Update check failed: %v\n", err)
 			return
 		}
 		// Always record the time so we don't hammer GitHub on every start.
@@ -71,7 +72,7 @@ func runUpdate(interactive bool) error {
 	}
 
 	if !release.Newer {
-		service.Successf("You are already on the latest version (%s).\n", release.Version)
+		util.Successf("You are already on the latest version (%s).\n", release.Version)
 		printAlternativeUpdateInstructions()
 		return nil
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/activebook/gllm/util"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"github.com/volcengine/volcengine-go-sdk/volcengine"
 )
@@ -12,6 +13,8 @@ import (
  * OpenChat tool call implements
  *
  */
+
+func Ptr[T any](t T) *T { return &t }
 
 func (op *OpenProcessor) openChatSwitchAgentToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	response, err := switchAgentToolCallImpl(argsMap, op.toolsUse)
@@ -106,7 +109,7 @@ func (op *OpenProcessor) openChatMCPToolCall(toolCall *model.ToolCall, argsMap *
 		},
 	}
 
-	Debugf("OpenChatMCPToolCall Response: %s", *toolMessage.Content.StringValue)
+	util.Debugf("OpenChatMCPToolCall Response: %s\n", *toolMessage.Content.StringValue)
 	return &toolMessage, nil
 }
 

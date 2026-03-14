@@ -10,9 +10,11 @@ import (
 	"strings"
 
 	//serp "github.com/serpapi/google-search-results-golang"
+	"time"
+
+	"github.com/activebook/gllm/util"
 	"google.golang.org/api/customsearch/v1"
 	"google.golang.org/api/option"
-	"time"
 )
 
 // Define a struct for each result in the Tavily API response.
@@ -96,7 +98,7 @@ func (s *SearchEngine) TavilySearch(query string) (map[string]any, error) {
 	// Create a new POST request with the payload
 	req, err := http.NewRequest("POST", TavilyUrl, strings.NewReader(payload))
 	if err != nil {
-		Errorf("[Tavily]Error creating request: %v", err)
+		util.Errorf("[Tavily]Error creating request: %v\n", err)
 		return nil, fmt.Errorf("[Tavily]Error creating request: %v", err)
 	}
 
@@ -107,7 +109,7 @@ func (s *SearchEngine) TavilySearch(query string) (map[string]any, error) {
 	// Execute the request
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		Errorf("[Tavily]Error sending request: %v", err)
+		util.Errorf("[Tavily]Error sending request: %v\n", err)
 		return nil, fmt.Errorf("[Tavily]Error sending request: %v", err)
 	}
 	defer res.Body.Close()
@@ -115,27 +117,27 @@ func (s *SearchEngine) TavilySearch(query string) (map[string]any, error) {
 	// Read the response body
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		Errorf("[Tavily]Error reading response: %v", err)
+		util.Errorf("[Tavily]Error reading response: %v\n", err)
 		return nil, fmt.Errorf("[Tavily]Error reading response: %v", err)
 	}
 
 	if res.StatusCode != 200 {
 		var tavilyError TavilyError
 		if err := json.Unmarshal([]byte(body), &tavilyError); err != nil {
-			Errorf("[Tavily]Error parsing JSON: %v", err)
+			util.Errorf("[Tavily]Error parsing JSON: %v\n", err)
 		}
 		return nil, fmt.Errorf("[Tavily]Error: %s", tavilyError.Detail.Error)
 	}
 
 	var tavilyResp TavilyResponse
 	if err := json.Unmarshal([]byte(body), &tavilyResp); err != nil {
-		Errorf("[Tavily]Error parsing JSON: %v", err)
+		util.Errorf("[Tavily]Error parsing JSON: %v\n", err)
 		return nil, fmt.Errorf("[Tavily]Error parsing JSON: %v", err)
 	}
 
 	formatted, err := s.tavilyFormatResponse(&tavilyResp)
 	if err != nil {
-		Errorf("[Tavily]Error formatting response: %v", err)
+		util.Errorf("[Tavily]Error formatting response: %v\n", err)
 		return nil, fmt.Errorf("[Tavily]Error formatting response: %v", err)
 	}
 	return formatted, nil
@@ -207,13 +209,13 @@ func (s *SearchEngine) GoogleSearch(query string) (map[string]any, error) {
 	ctx := context.Background() // Required for NewService
 	svc, err := customsearch.NewService(ctx, option.WithAPIKey(s.ApiKey))
 	if err != nil {
-		Errorf("[Google]Error creating service: %v", err)
+		util.Errorf("[Google]Error creating service: %v\n", err)
 		return nil, fmt.Errorf("[Google]Error creating service: %v", err)
 	}
 
 	resp, err := svc.Cse.List().Safe("off").Num(10).Cx(s.CxKey).Q(query).Do()
 	if err != nil {
-		Errorf("[Google]Error making API call: %v", err)
+		util.Errorf("[Google]Error making API call: %v\n", err)
 		return nil, fmt.Errorf("[Google]Error making API call: %v", err)
 	}
 
@@ -321,10 +323,10 @@ func (s *SearchEngine) formatSerpAPIResponse(organic_results interface{}) (map[s
 		for _, r := range organicResults {
 			if result, ok := r.(map[string]interface{}); ok {
 				formattedResult := map[string]interface{}{
-					"title":       GetStringValue(result, "title"),
-					"link":        GetStringValue(result, "link"),
-					"displayLink": GetStringValue(result, "displayed_link"),
-					"snippet":     GetStringValue(result, "snippet"),
+					"title":       util.GetStringValue(result, "title"),
+					"link":        util.GetStringValue(result, "link"),
+					"displayLink": util.GetStringValue(result, "displayed_link"),
+					"snippet":     util.GetStringValue(result, "snippet"),
 				}
 				// Add source domain
 				if link, ok := result["link"].(string); ok {
@@ -390,8 +392,8 @@ func (s *SearchEngine) RetrieveReferences(references []map[string]any) string {
 							}
 							sb.WriteString(fmt.Sprintf("%d. **%s**  \n   Source: [%s](%s)\n",
 								index,
-								TruncateString(desc, 80),
-								TruncateString(source, 30),
+								util.TruncateString(desc, 80),
+								util.TruncateString(source, 30),
 								link,
 							))
 						}

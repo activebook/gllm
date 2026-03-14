@@ -14,6 +14,7 @@ import (
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
+	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -355,7 +356,7 @@ var mcpSetCmd = &cobra.Command{
 		// Ensure file exists
 		if _, err := os.Stat(configPath); os.IsNotExist(err) {
 			if err := store.CreateTemplate(); err != nil {
-				service.Errorf("Error creating MCP configuration file: %v\n", err)
+				util.Errorf("Error creating MCP configuration file: %v\n", err)
 				return
 			}
 		}
@@ -363,7 +364,7 @@ var mcpSetCmd = &cobra.Command{
 		// Read content
 		contentBytes, err := os.ReadFile(configPath)
 		if err != nil {
-			service.Errorf("Error reading config file: %v", err)
+			util.Errorf("Error reading config file: %v\n", err)
 			return
 		}
 		content := string(contentBytes)
@@ -391,7 +392,7 @@ var mcpSetCmd = &cobra.Command{
 
 			fmt.Printf("Opening in %s...\n", editor)
 			if err := cmdE.Run(); err != nil {
-				service.Errorf("Editor failed: %v", err)
+				util.Errorf("Editor failed: %v\n", err)
 				return
 			}
 			// Reload content
@@ -430,7 +431,7 @@ var mcpSetCmd = &cobra.Command{
 		// Validate JSON
 		var js map[string]interface{}
 		if err := json.Unmarshal([]byte(content), &js); err != nil {
-			service.Errorf("Invalid JSON content - %v", err)
+			util.Errorf("Invalid JSON content - %v\n", err)
 			return
 		}
 
@@ -441,7 +442,7 @@ var mcpSetCmd = &cobra.Command{
 
 		// Save content
 		if err := os.WriteFile(configPath, prettyJSON.Bytes(), 0644); err != nil {
-			service.Errorf("Error saving config file: %v", err)
+			util.Errorf("Error saving config file: %v\n", err)
 			return
 		}
 

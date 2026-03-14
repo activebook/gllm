@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/activebook/gllm/util"
 	"github.com/anthropics/anthropic-sdk-go"
 )
 
@@ -75,7 +76,7 @@ func (s *AnthropicSession) MarshalMessages(messages []anthropic.MessageParam, dr
 		// Marshal to compact JSON
 		line, err := json.Marshal(msgCopy)
 		if err != nil {
-			Warnf("failed to serialize message: %v", err)
+			util.Warnf("failed to serialize message: %v\n", err)
 			continue
 		}
 

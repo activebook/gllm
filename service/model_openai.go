@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/activebook/gllm/util"
 	openai "github.com/sashabaranov/go-openai"
 )
 
@@ -258,7 +259,7 @@ func (oa *OpenAI) process(ag *Agent) error {
 		messages, _ := ag.Session.GetMessages().([]openai.ChatCompletionMessage)
 
 		// Apply context window management.
-		Debugf("Context messages: [%d]", len(messages))
+		util.Debugf("Context messages: [%d]\n", len(messages))
 		pruned, truncated, err := ag.Context.PruneMessages(messages, ag.SystemPrompt, oa.tools)
 		if err != nil {
 			return fmt.Errorf("failed to prune context: %w", err)
@@ -266,8 +267,8 @@ func (oa *OpenAI) process(ag *Agent) error {
 		messages = pruned.([]openai.ChatCompletionMessage)
 
 		if truncated {
-			Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.", ag.Context.GetStrategy())
-			Debugf("Context messages after truncation: [%d]", len(messages))
+			util.Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.\n", ag.Context.GetStrategy())
+			util.Debugf("Context messages after truncation: [%d]\n", len(messages))
 			// Save back only non-system messages to keep the session clean.
 			ag.Session.SetMessages(messages)
 			ag.Session.Save()
@@ -456,7 +457,7 @@ func (oa *OpenAI) processStream(stream *openai.ChatCompletionStream) (openai.Cha
 					// Skip if not our expected function
 					// Because some model made up function name
 					if functionName != "" && !IsAvailableOpenTool(functionName) && !IsAvailableMCPTool(functionName, oa.op.mcpClient) {
-						Warnf("Skipping tool call with unknown function name: %s", functionName)
+						util.Warnf("Skipping tool call with unknown function name: %s\n", functionName)
 						continue
 					}
 
@@ -501,7 +502,7 @@ func (oa *OpenAI) processStream(stream *openai.ChatCompletionStream) (openai.Cha
 		// Extract <think> tags from content if present
 		// Some providers embed reasoning in <think>...</think> tags instead of
 		// using a separate reasoning_content field
-		if thinkContent, cleanedContent := ExtractThinkTags(content); thinkContent != "" {
+		if thinkContent, cleanedContent := util.ExtractThinkTags(content); thinkContent != "" {
 			// Prepend extracted thinking to existing reasoning content
 			if reasoning_content != "" {
 				assistantMessage.ReasoningContent = thinkContent + "\n" + reasoning_content

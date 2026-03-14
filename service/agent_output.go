@@ -7,6 +7,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -229,7 +230,7 @@ func (ag *Agent) WriteEnd() {
 	// the % character in shells like zsh when output doesn't end with newline
 	//if ag.Std != nil && ag.Markdown == nil && ag.TokenUsage == nil {
 	if ag.Std != nil {
-		if !EndWithNewline(ag.LastWrittenData) {
+		if !util.EndWithNewline(ag.LastWrittenData) {
 			ag.Std.Writeln(data.ResetSeq)
 		}
 	}
@@ -261,7 +262,7 @@ func (ag *Agent) Error(text string) {
 
 func (ag *Agent) Warn(text string) {
 	if ag.Std != nil {
-		Warnf("%s", text)
+		util.Warnf("%s\n", text)
 	}
 	if ag.OutputFile != nil {
 		ag.OutputFile.Writef("\n%s\n", text)

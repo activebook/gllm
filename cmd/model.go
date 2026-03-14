@@ -10,6 +10,7 @@ import (
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
+	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -880,7 +881,7 @@ var modelRenameCmd = &cobra.Command{
 
 		// Perform rename
 		if err := store.RenameModel(oldName, newName); err != nil {
-			service.Errorf("Failed to rename model: %v\n", err)
+			util.Errorf("Failed to rename model: %v\n", err)
 			return
 		}
 

@@ -7,7 +7,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
-	"github.com/activebook/gllm/service"
+	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -49,7 +49,7 @@ Example:
 		store := data.NewMemoryStore()
 		memories, err := store.Load()
 		if err != nil {
-			service.Errorf("Error loading memories: %v\n", err)
+			util.Errorf("Error loading memories: %v\n", err)
 			return
 		}
 
@@ -118,14 +118,14 @@ Examples:
 		}
 
 		if strings.TrimSpace(memory) == "" {
-			service.Errorf("Memory content cannot be empty\n")
+			util.Errorf("Memory content cannot be empty\n")
 			return
 		}
 
 		store := data.NewMemoryStore()
 		err := store.Add(memory)
 		if err != nil {
-			service.Errorf("Error adding memory: %v\n", err)
+			util.Errorf("Error adding memory: %v\n", err)
 			return
 		}
 
@@ -149,7 +149,7 @@ Example:
 			store := data.NewMemoryStore()
 			memories, err := store.Load()
 			if err != nil {
-				service.Errorf("Error loading memories: %v\n", err)
+				util.Errorf("Error loading memories: %v\n", err)
 				return
 			}
 
@@ -178,7 +178,7 @@ Example:
 		store := data.NewMemoryStore()
 		err := store.Clear()
 		if err != nil {
-			service.Errorf("Error clearing memories: %v\n", err)
+			util.Errorf("Error clearing memories: %v\n", err)
 			return
 		}
 
@@ -199,7 +199,7 @@ var memoryPathCmd = &cobra.Command{
 			// Create the file if it doesn't exist
 			err := store.Save([]string{})
 			if err != nil {
-				service.Errorf("Error initializing memory file: %v\n", err)
+				util.Errorf("Error initializing memory file: %v\n", err)
 				return
 			}
 			fmt.Printf("Memory file initialized at: %s\n", memoryPath)
