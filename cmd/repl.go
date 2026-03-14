@@ -12,6 +12,7 @@ import (
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
+	"github.com/activebook/gllm/util"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/charmbracelet/lipgloss"
@@ -288,7 +289,7 @@ func (ri *ReplInfo) startREPL() {
 				fmt.Println("\nSession ended.")
 				break
 			}
-			service.Errorf("%v\n", err)
+			util.Errorf("%v\n", err)
 			break
 		}
 		if input == "" {
@@ -342,19 +343,19 @@ func (ri *ReplInfo) startWithLocalCommand(line string) bool {
 func (ri *ReplInfo) clearContext() {
 	agent, err := EnsureActiveAgent()
 	if err != nil {
-		service.Errorf("%v", err)
+		util.Errorf("%v\n", err)
 		return
 	}
 	// Construct session manager
 	cm, err := service.ConstructSessionManager(sessionName, agent.Model.Provider)
 	if err != nil {
-		service.Errorf("Error constructing session manager: %v\n", err)
+		util.Errorf("Error constructing session manager: %v\n", err)
 		return
 	}
 	// Clear session history
 	err = cm.Clear()
 	if err != nil {
-		service.Errorf("Error clearing context: %v\n", err)
+		util.Errorf("Error clearing context: %v\n", err)
 		return
 	}
 	// Empty attachments
@@ -367,7 +368,7 @@ func (ri *ReplInfo) showHistory() {
 	// Get active agent
 	agent, err := EnsureActiveAgent()
 	if err != nil {
-		service.Errorf("%v", err)
+		util.Errorf("%v\n", err)
 		return
 	}
 
@@ -378,7 +379,7 @@ func (ri *ReplInfo) showHistory() {
 			fmt.Println("No available session yet.")
 			return
 		}
-		service.Errorf("%v", err)
+		util.Errorf("%v\n", err)
 		return
 	}
 
@@ -386,7 +387,7 @@ func (ri *ReplInfo) showHistory() {
 	isCompatible, provider, modelProvider := CheckSessionFormat(agent, sessionData)
 	if !isCompatible {
 		// Warn about potential incompatibility if providers differ
-		service.Warnf("Session '%s' [%s] is not compatible with the current model provider [%s].\n", sessionName, provider, modelProvider)
+		util.Warnf("Session '%s' [%s] is not compatible with the current model provider [%s].\n", sessionName, provider, modelProvider)
 	}
 
 	// Render session log
@@ -412,7 +413,7 @@ func (ri *ReplInfo) showHistory() {
 	// p := tea.NewProgram(m, tea.WithAltScreen())
 	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
-		service.Errorf("Error running viewport: %v", err)
+		util.Errorf("Error running viewport: %v\n", err)
 	}
 }
 
@@ -421,7 +422,7 @@ func (ri *ReplInfo) compressContext() {
 	// Get active agent
 	agent, err := EnsureActiveAgent()
 	if err != nil {
-		service.Errorf("%v", err)
+		util.Errorf("%v\n", err)
 		return
 	}
 
@@ -432,7 +433,7 @@ func (ri *ReplInfo) compressContext() {
 			fmt.Println("No available session yet.")
 			return
 		}
-		service.Errorf("%v", err)
+		util.Errorf("%v\n", err)
 		return
 	}
 
@@ -442,25 +443,25 @@ func (ri *ReplInfo) compressContext() {
 	ui.GetIndicator().Stop()
 
 	if err != nil {
-		service.Errorf("Failed to compress session: %v\n", err)
+		util.Errorf("Failed to compress session: %v\n", err)
 		return
 	}
 
 	// Build the new compressed session
 	newData, err := service.BuildCompressedSession(summary, agent.Model.Provider)
 	if err != nil {
-		service.Errorf("Failed to build compressed session: %v\n", err)
+		util.Errorf("Failed to build compressed session: %v\n", err)
 		return
 	}
 
 	// Save back to the file format
 	err = WriteSessionData(sessionName, newData, agent.Model.Provider)
 	if err != nil {
-		service.Errorf("Failed to save compressed session: %v\n", err)
+		util.Errorf("Failed to save compressed session: %v\n", err)
 		return
 	}
 
-	service.Successf("Compressed successfully!\nUse /history to view the compressed session.\n")
+	util.Successln("Compressed successfully!\nUse /history to view the compressed session.")
 }
 
 // copyLastMessage copies the last assistant response or its latest code block to the clipboard.
@@ -475,9 +476,9 @@ func (ri *ReplInfo) copyLastMessage() {
 	// Actually copy to clipboard using atotto/clipboard
 	err := data.WriteClipboardText(lastAssistantMessage)
 	if err != nil {
-		service.Errorf("Failed to copy to clipboard: %v", err)
+		util.Errorf("Failed to copy to clipboard: %v\n", err)
 	}
-	service.Successf("Copied the last response to clipboard.\n")
+	util.Successln("Copied the last response to clipboard.")
 }
 
 func (ri *ReplInfo) callAgent(input string) {
@@ -490,7 +491,7 @@ func (ri *ReplInfo) callAgent(input string) {
 	// Call agent using the shared runner, passing persisted SharedState
 	err := RunAgent(prompt, ri.Files, sessionName, ri.outputFile, ri.sharedState)
 	if err != nil {
-		service.Errorf("%v", err)
+		util.Errorf("%v\n", err)
 		return
 	}
 
@@ -519,9 +520,9 @@ func (ri *ReplInfo) executeShellCommand(command string) {
 	// Display error if command failed
 	if err != nil {
 		if exitError, ok := err.(*exec.ExitError); ok {
-			service.Errorf("Command failed with exit code %d", exitError.ExitCode())
+			util.Errorf("Command failed with exit code %d\n", exitError.ExitCode())
 		} else {
-			service.Errorf("Command failed: %v", err)
+			util.Errorf("Command failed: %v\n", err)
 		}
 	}
 

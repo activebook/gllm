@@ -10,6 +10,7 @@ import (
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
+	"github.com/activebook/gllm/util"
 )
 
 func EnsureActiveAgent() (*data.AgentConfig, error) {
@@ -119,10 +120,10 @@ func RunAgent(prompt string, files []*service.FileData, sessionName string, outp
 			// Switch agent signal
 			if service.IsSwitchAgentError(err) {
 				switchErr, _ := service.AsSwitchAgentError(err)
-				service.Infof("Already switched to agent [%s].", switchErr.TargetAgent)
+				util.Infof("Already switched to agent [%s].\n", switchErr.TargetAgent)
 				// Set instruction, shouldn't use the old prompt
 				prompt = switchErr.Instruction
-				service.Debugf("Switch agent instruction: %s", prompt)
+				util.Debugf("Switch agent instruction: %s\n", prompt)
 				// Clearup files
 				files = nil
 				if prompt == "" {
@@ -135,7 +136,7 @@ func RunAgent(prompt string, files []*service.FileData, sessionName string, outp
 			} else if service.IsUserCancelError(err) {
 				// User cancelled operation
 				userCancelErr, _ := service.AsUserCancelError(err)
-				service.Infof("%v", userCancelErr)
+				util.Infof("%v\n", userCancelErr)
 				break
 			} else {
 				// Other error, return
@@ -161,7 +162,7 @@ func buildFinalPrompt(agent *data.AgentConfig, input string) string {
 	atRefProcessor := service.NewAtRefProcessor()
 	processedPrompt, err := atRefProcessor.ProcessText(rawPrompt)
 	if err != nil {
-		service.Warnf("Skip processing @ references in prompt: %v", err)
+		util.Warnf("Skip processing @ references in prompt: %v\n", err)
 		return rawPrompt
 	}
 	return processedPrompt
@@ -234,7 +235,7 @@ func EnsureSessionCompatibility(agent *data.AgentConfig, sessionName string) err
 	// 2. Check Compatibility
 	isCompatible, provider, modelProvider := CheckSessionFormat(agent, sessionData)
 	if !isCompatible {
-		service.Debugf("session '%s' [%s] is not compatible with the current model provider [%s].\n", sessionName, provider, modelProvider)
+		util.Debugf("session '%s' [%s] is not compatible with the current model provider [%s].\n", sessionName, provider, modelProvider)
 
 		// 3. Convert Data
 		convertData, err := service.ConvertMessages(sessionData, provider, modelProvider)
@@ -246,7 +247,7 @@ func EnsureSessionCompatibility(agent *data.AgentConfig, sessionName string) err
 		if err := WriteSessionData(sessionName, convertData, modelProvider); err != nil {
 			return err
 		}
-		service.Debugf("session '%s' converted to compatible format [%s].\n", sessionName, modelProvider)
+		util.Debugf("session '%s' converted to compatible format [%s].\n", sessionName, modelProvider)
 	}
 
 	return nil

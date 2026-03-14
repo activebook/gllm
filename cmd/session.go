@@ -9,6 +9,7 @@ import (
 
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
+	"github.com/activebook/gllm/util"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -511,8 +512,8 @@ var sessionRenameCmd = &cobra.Command{
 			oldName = sessions[index-1].Name
 		}
 
-		oldPath := service.GetFilePath(sessionDir, oldName+".jsonl")
-		newPath := service.GetFilePath(sessionDir, newName+".jsonl")
+		oldPath := util.GetFilePath(sessionDir, oldName+".jsonl")
+		newPath := util.GetFilePath(sessionDir, newName+".jsonl")
 
 		// Check if source exists
 		if _, err := os.Stat(oldPath); os.IsNotExist(err) {
@@ -573,7 +574,7 @@ var sessionShareCmd = &cobra.Command{
 		sessionName = resolvedName
 
 		sessionDir := service.GetSessionsDir()
-		sourcePath := service.GetFilePath(sessionDir, sessionName+".jsonl")
+		sourcePath := util.GetFilePath(sessionDir, sessionName+".jsonl")
 
 		if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
 			return fmt.Errorf("session '%s' not found", sessionName)

@@ -10,6 +10,7 @@ import (
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
+	"github.com/activebook/gllm/util"
 	log "github.com/sirupsen/logrus" // Import logrus
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -18,9 +19,6 @@ import (
 var (
 	versionFlag bool // To hold the version flag value
 	debugMode   bool // Flag to enable debug logging
-
-	// Global logger instance, configured by setupLogging
-	logger *log.Logger
 
 	agentName   string   // gllm "What is Go?" -agent(-g) plan
 	attachments []string // gllm "Summarize this" --attachment(-a) report.txt
@@ -90,7 +88,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 		Run: func(cmd *cobra.Command, args []string) {
 			// Your main command logic goes here
 			// For example, you can print a message or perform some action
-			service.Debugf("Start processing...\n")
+			util.Debugf("Start processing...\n")
 			//service.Debugf("Arguments received: %#v\n", args)
 
 			// If no arguments and no relevant flags are set, show help instead
@@ -103,7 +101,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 				// Default to interactive REPL mode when no prompt or subcommand is provided.
 				// -g/--agent and -s/--session are forwarded via shared package-level globals.
 				if err := replCmd.RunE(replCmd, args); err != nil {
-					service.Errorf("%v", err)
+					util.Errorf("%v\n", err)
 				}
 				return
 			}
@@ -134,7 +132,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 				// Bugfix: When sessionName is an index number, and use it to find session file
 				name, err := service.FindSessionByIndex(sessionName)
 				if err != nil {
-					service.Errorf("error finding session: %v\n", err)
+					util.Errorf("error finding session: %v\n", err)
 					return
 				}
 				if name != "" {
@@ -147,7 +145,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 			if cmd.Flags().Changed("agent") {
 				// Check if agent exists
 				if store.GetAgent(agentName) == nil {
-					service.Errorf("Agent %s does not exist", agentName)
+					util.Errorf("Agent %s does not exist\n", agentName)
 					return
 				}
 				store.SetActiveAgent(agentName)
@@ -155,7 +153,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 			// Get active agent
 			activeAgent := store.GetActiveAgent()
 			if activeAgent == nil {
-				service.Errorf("No active agent found")
+				util.Errorf("No active agent found\n")
 				return
 			}
 
@@ -171,7 +169,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 			// Call agent using the shared runner, passing nil for SharedState (single turn)
 			err := RunAgent(prompt, files, sessionName, "", nil)
 			if err != nil {
-				service.Errorf("%v", err)
+				util.Errorf("%v\n", err)
 				return
 			}
 		},
@@ -190,7 +188,7 @@ func Execute() {
 	// consider a more robust lifecycle management strategy.
 	defer service.GetMCPClient().Close()
 	if err := rootCmd.Execute(); err != nil {
-		service.Errorf("'%s'\n", err)
+		util.Errorf("'%s'\n", err)
 		os.Exit(1)
 	}
 }
@@ -326,10 +324,9 @@ func init() {
 	rootCmd.Flags().BoolVarP(&yoloFlag, "yolo", "y", false, "Enable yolo mode (non-interactive)")
 	rootCmd.Flags().BoolVarP(&versionFlag, "version", "v", false, "Print the version number of gllm")
 
-	// Set logrus defaults before configuration is loaded
-	logger = service.GetLogger()
-	// This ensures basic logging works even if config fails
-	service.InitLogger()
+	// *** Placeholder for Log Configuration ***
+	// We will add log setup based on Viper settings later.
+	setupLogging()
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -351,14 +348,14 @@ func initConfig() {
 
 	// Load the configured theme (or default to Dracula if not set)
 	data.LoadTheme(data.GetThemeFromConfig())
-
-	// *** Placeholder for Log Configuration ***
-	// We will add log setup based on Viper settings later.
-	setupLogging()
 }
 
 // setupLogging configures the global logger based on Viper settings and flags.
 func setupLogging() {
+	// Set logrus defaults before configuration is loaded
+	// This ensures basic logging works even if config fails
+	util.InitLogger()
+
 	logLevelStr := viper.GetString("log.level")
 
 	// --- Determine Log Level ---
@@ -372,14 +369,14 @@ func setupLogging() {
 		var err error
 		level, err = log.ParseLevel(logLevelStr)
 		if err != nil {
-			service.Warnf("Invalid log level '%s' in config, using 'info': %v", logLevelStr, err)
+			util.Warnf("Invalid log level '%s' in config, using 'info': %v\n", logLevelStr, err)
 			level = log.InfoLevel
 			logLevelStr = "info (due to invalid config value)"
 		} else {
 		}
 	}
-	logger.SetLevel(level)
+	util.SetLoggerLevel(level)
 
 	// Log the final configuration being used (at Debug level)
-	service.Debugf("Logger initialized: level=%s ", logLevelStr)
+	util.Debugf("Logger initialized: level=%s\n", logLevelStr)
 }

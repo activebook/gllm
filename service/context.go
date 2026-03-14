@@ -1,5 +1,7 @@
 package service
 
+import "github.com/activebook/gllm/util"
+
 // TruncationStrategy defines how to handle context overflow
 type TruncationStrategy string
 
@@ -78,7 +80,7 @@ func NewContextManager(ag *Agent, strategy TruncationStrategy) ContextManager {
 		maxOutputTokens = limits.MaxOutputTokens
 	}
 
-	Debugf("Context Quota: modelName=%s, inputTokens=%d, outputTokens=%d, strategy=%s", ag.Model.Model, maxInputTokens, maxOutputTokens, strategy)
+	util.Debugf("Context Quota: modelName=%s, inputTokens=%d, outputTokens=%d, strategy=%s\n", ag.Model.Model, maxInputTokens, maxOutputTokens, strategy)
 	base := commonContext{
 		agent:           ag,
 		maxInputTokens:  maxInputTokens,

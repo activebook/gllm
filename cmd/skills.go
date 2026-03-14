@@ -11,7 +11,6 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
-	"github.com/activebook/gllm/service"
 	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -51,7 +50,7 @@ var skillsListCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		skills, err := data.ScanSkills()
 		if err != nil {
-			service.Errorf("Failed to scan skills: %v", err)
+			util.Errorf("Failed to scan skills: %v\n", err)
 			return
 		}
 
@@ -102,7 +101,7 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 			// Create temp dir
 			tempDir, err := os.MkdirTemp("", "gllm-skill-clone-*")
 			if err != nil {
-				service.Errorf("Failed to create temp directory: %v", err)
+				util.Errorf("Failed to create temp directory: %v\n", err)
 				return
 			}
 			cleanup = func() { os.RemoveAll(tempDir) }
@@ -115,18 +114,18 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 				gitCmd.Stdout = os.Stdout
 				gitCmd.Stderr = os.Stderr
 				if err := gitCmd.Run(); err != nil {
-					service.Errorf("Failed to clone repository: %v", err)
+					util.Errorf("Failed to clone repository: %v\n", err)
 					return
 				}
 			} else if util.IsGitHubURL(source) {
 				fmt.Printf("Downloading archive from %s...\n", source)
 				zipURL := util.GetGitHubZipURL(source)
 				if err := util.DownloadAndExtractZip(zipURL, tempDir); err != nil {
-					service.Errorf("Failed to download and extract skill: %v", err)
+					util.Errorf("Failed to download and extract skill: %v\n", err)
 					return
 				}
 			} else {
-				service.Errorf("Git is not installed, and the source is not a standard GitHub repository. Please install Git to use this skill URL.")
+				util.Errorf("Git is not installed, and the source is not a standard GitHub repository. Please install Git to use this skill URL.\n")
 				return
 			}
 
@@ -141,7 +140,7 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 			var err error
 			absPath, err = filepath.Abs(source)
 			if err != nil {
-				service.Errorf("Invalid path: %v", err)
+				util.Errorf("Invalid path: %v\n", err)
 				return
 			}
 		}
@@ -149,30 +148,30 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 		// Check if source exists and is a directory
 		info, err := os.Stat(absPath)
 		if err != nil {
-			service.Errorf("Cannot access path: %v", err)
+			util.Errorf("Cannot access path: %v\n", err)
 			return
 		}
 		if !info.IsDir() {
-			service.Errorf("Path must be a directory containing SKILL.md")
+			util.Errorf("Path must be a directory containing SKILL.md\n")
 			return
 		}
 
 		// Validate SKILL.md exists
 		skillFilePath := filepath.Join(absPath, data.SkillFile)
 		if _, err := os.Stat(skillFilePath); err != nil {
-			service.Errorf("SKILL.md not found in %s", absPath)
+			util.Errorf("SKILL.md not found in %s\n", absPath)
 			return
 		}
 
 		// Parse and validate frontmatter
 		meta, err := data.ParseSkillFrontmatter(skillFilePath)
 		if err != nil {
-			service.Errorf("Invalid SKILL.md: %v", err)
+			util.Errorf("Invalid SKILL.md: %v\n", err)
 			return
 		}
 
 		if meta.Name == "" {
-			service.Errorf("SKILL.md must have a 'name' field in frontmatter")
+			util.Errorf("SKILL.md must have a 'name' field in frontmatter\n")
 			return
 		}
 
@@ -194,14 +193,14 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 			}
 			// Remove existing
 			if err := os.RemoveAll(destDir); err != nil {
-				service.Errorf("Failed to remove existing skill: %v", err)
+				util.Errorf("Failed to remove existing skill: %v\n", err)
 				return
 			}
 		}
 
 		// Copy directory
 		if err := copyDir(absPath, destDir); err != nil {
-			service.Errorf("Failed to copy skill: %v", err)
+			util.Errorf("Failed to copy skill: %v\n", err)
 			return
 		}
 
@@ -224,7 +223,7 @@ var skillsUninstallCmd = &cobra.Command{
 			// Interactive select
 			skills, err := data.ScanSkills()
 			if err != nil {
-				service.Errorf("Failed to scan skills: %v", err)
+				util.Errorf("Failed to scan skills: %v\n", err)
 				return
 			}
 			if len(skills) == 0 {
@@ -255,7 +254,7 @@ var skillsUninstallCmd = &cobra.Command{
 		// Find skill directory
 		skills, err := data.ScanSkills()
 		if err != nil {
-			service.Errorf("Failed to scan skills: %v", err)
+			util.Errorf("Failed to scan skills: %v\n", err)
 			return
 		}
 
@@ -269,7 +268,7 @@ var skillsUninstallCmd = &cobra.Command{
 		}
 
 		if skillPath == "" {
-			service.Errorf("Skill '%s' not found", skillName)
+			util.Errorf("Skill '%s' not found\n", skillName)
 			return
 		}
 
@@ -288,7 +287,7 @@ var skillsUninstallCmd = &cobra.Command{
 
 		// Remove directory
 		if err := os.RemoveAll(skillPath); err != nil {
-			service.Errorf("Failed to remove skill: %v", err)
+			util.Errorf("Failed to remove skill: %v\n", err)
 			return
 		}
 
@@ -309,7 +308,7 @@ var skillsSwCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		skills, err := data.ScanSkills()
 		if err != nil {
-			service.Errorf("Failed to scan skills: %v", err)
+			util.Errorf("Failed to scan skills: %v\n", err)
 			return
 		}
 

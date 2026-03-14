@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/activebook/gllm/util"
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/anthropics/anthropic-sdk-go/packages/param"
@@ -186,7 +187,7 @@ func (a *Anthropic) process(ag *Agent) error {
 		messages, _ := ag.Session.GetMessages().([]anthropic.MessageParam)
 
 		// check context limit and prune if needed
-		Debugf("Context messages: [%d]", len(messages))
+		util.Debugf("Context messages: [%d]\n", len(messages))
 		pruned, truncated, err := ag.Context.PruneMessages(messages, ag.SystemPrompt, a.tools)
 		if err != nil {
 			return fmt.Errorf("failed to prune context: %w", err)
@@ -194,8 +195,8 @@ func (a *Anthropic) process(ag *Agent) error {
 		messages = pruned.([]anthropic.MessageParam)
 
 		if truncated {
-			Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.", ag.Context.GetStrategy())
-			Debugf("Context messages after truncation: [%d]", len(messages))
+			util.Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.\n", ag.Context.GetStrategy())
+			util.Debugf("Context messages after truncation: [%d]\n", len(messages))
 			// Update the session with truncated messages
 			ag.Session.SetMessages(messages)
 			ag.Session.Save()
@@ -219,7 +220,7 @@ func (a *Anthropic) process(ag *Agent) error {
 			if params.Thinking.OfEnabled.BudgetTokens > params.MaxTokens {
 				params.Thinking.OfEnabled.BudgetTokens = params.MaxTokens * 1 / 2
 			}
-			Debugf("Anthropic MaxTokens: %d, Thinking BudgetTokens: %d\n", params.MaxTokens, params.Thinking.OfEnabled.BudgetTokens)
+			util.Debugf("Anthropic MaxTokens: %d, Thinking BudgetTokens: %d\n", params.MaxTokens, params.Thinking.OfEnabled.BudgetTokens)
 		}
 
 		// Temperature/TopP
@@ -357,7 +358,7 @@ func (a *Anthropic) processStream(stream *ssestream.Stream[anthropic.MessageStre
 				functionID := block.ID
 				functionName := block.Name
 				if functionName != "" && !IsAvailableOpenTool(functionName) && !IsAvailableMCPTool(functionName, a.op.mcpClient) {
-					Warnf("Skipping tool call with unknown function name: %s", functionName)
+					util.Warnf("Skipping tool call with unknown function name: %s\n", functionName)
 					continue
 				}
 				// ContentBlockStartEventContentBlockUnion fields are embedded.

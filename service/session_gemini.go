@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/activebook/gllm/util"
 	"google.golang.org/genai"
 )
 
@@ -106,7 +107,7 @@ func (s *GeminiSession) MarshalMessages(messages []*genai.Content, dropToolConte
 		// Marshal to JSON (compact, no indent for JSONL)
 		line, err := json.Marshal(formatted)
 		if err != nil {
-			Warnf("failed to serialize message: %v", err)
+			util.Warnf("failed to serialize message: %v\n", err)
 			continue
 		}
 

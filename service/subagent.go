@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/util"
 )
 
 // SubAgentStatus represents the execution status of a sub-agent task
@@ -413,7 +414,7 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 	// Use TaskKey in filename for better traceability
 	keyPart := ""
 	if task.TaskKey != "" {
-		keyPart = "_" + GetSanitizeTitle(task.TaskKey)
+		keyPart = "_" + util.GetSanitizeTitle(task.TaskKey)
 	}
 	outputFile := data.GenerateTaskFilePath(fmt.Sprintf("subagent_%s%s", task.AgentName, keyPart), ".md")
 	result.OutputFile = outputFile
@@ -428,9 +429,9 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 				// Convert value to string representation
 				contentStr := fmt.Sprintf("%v", val)
 				// Append to instruction with clear separation
-				finalInstruction += fmt.Sprintf("\n## Output from '%s':\n%s\n", GetSanitizeTitle(key), contentStr)
+				finalInstruction += fmt.Sprintf("\n## Output from '%s':\n%s\n", util.GetSanitizeTitle(key), contentStr)
 			} else {
-				Warnf("Sub-agent input key '%s' not found in SharedState, skipping.", key)
+				util.Warnf("Sub-agent input key '%s' not found in SharedState, skipping.\n", key)
 			}
 		}
 	}
@@ -483,7 +484,7 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 
 		// Store output in SharedState if TaskKey is specified
 		if task.TaskKey != "" && e.state != nil {
-			content, err := GetFileContent(outputFile)
+			content, err := util.GetFileContent(outputFile)
 			if err == nil {
 				e.state.Set(task.TaskKey, content, task.AgentName)
 			}

@@ -2,6 +2,8 @@ package service
 
 import (
 	"strings"
+
+	"github.com/activebook/gllm/util"
 )
 
 const (
@@ -83,7 +85,7 @@ var modelPatterns = map[string]string{
 // This dual detection handles Chinese models hosted on US platforms (AWS, CoreWeave, etc.)
 func DetectModelProvider(endPoint string, modelName string) string {
 	if endPoint == "" && len(modelName) == 0 {
-		Debugf("Model Provider[%s] - Model[%s]\n", ModelProviderOpenAICompatible, modelName)
+		util.Debugf("Model Provider[%s] - Model[%s]\n", ModelProviderOpenAICompatible, modelName)
 		return ModelProviderOpenAICompatible
 	}
 
@@ -93,7 +95,7 @@ func DetectModelProvider(endPoint string, modelName string) string {
 	// Check endpoint domain first (more specific)
 	for domain, provider := range providerDomains {
 		if strings.Contains(endPointLower, domain) {
-			Debugf("Model Provider[%s] - Model[%s]\n", provider, modelName)
+			util.Debugf("Model Provider[%s] - Model[%s]\n", provider, modelName)
 			return provider
 		}
 	}
@@ -104,12 +106,12 @@ func DetectModelProvider(endPoint string, modelName string) string {
 		modelNameLower := strings.ToLower(modelName)
 		for pattern, provider := range modelPatterns {
 			if strings.Contains(modelNameLower, pattern) {
-				Debugf("Model Provider[%s] - Model[%s]\n", provider, modelName)
+				util.Debugf("Model Provider[%s] - Model[%s]\n", provider, modelName)
 				return provider
 			}
 		}
 	}
 
-	Debugf("Model Provider[%s] - Model[%s]\n", ModelProviderOpenAICompatible, modelName)
+	util.Debugf("Model Provider[%s] - Model[%s]\n", ModelProviderOpenAICompatible, modelName)
 	return ModelProviderOpenAICompatible
 }

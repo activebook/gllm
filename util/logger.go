@@ -1,4 +1,4 @@
-package service
+package util
 
 import (
 	"os"
@@ -12,25 +12,34 @@ var (
 	indicatorActive bool // Tracks if indicator was active before logging
 )
 
-func NewLogger() *log.Logger {
-	logger = log.New()
-	return logger
-}
+// func NewLogger() *log.Logger {
+// 	logger = log.New()
+// 	return logger
+// }
 
-func GetLogger() *log.Logger {
-	if logger == nil {
-		logger = NewLogger()
-	}
-	return logger
-}
+// func GetLogger() *log.Logger {
+// 	if logger == nil {
+// 		logger = NewLogger()
+// 	}
+// 	return logger
+// }
 
 func InitLogger() {
-	logger.SetOutput(os.Stderr)
-	logger.SetLevel(log.InfoLevel) // Default to Info level initially
-	logger.SetFormatter(&log.TextFormatter{
-		DisableColors:    false,
-		DisableTimestamp: true, // Remove timestamp numbers like [0000]
-	})
+	if logger == nil {
+		logger = log.New()
+		logger.SetOutput(os.Stderr)
+		logger.SetLevel(log.InfoLevel) // Default to Info level initially
+		logger.SetFormatter(&log.TextFormatter{
+			DisableColors:    false,
+			DisableTimestamp: true, // Remove timestamp numbers like [0000]
+		})
+	}
+}
+
+func SetLoggerLevel(level log.Level) {
+	if logger != nil {
+		logger.SetLevel(level)
+	}
 }
 
 func BeforeLog() {

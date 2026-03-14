@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/util"
 )
 
 // SkillManager handles skill operations
@@ -55,7 +56,7 @@ func (sm *SkillManager) LoadMetadata() error {
 func (sm *SkillManager) GetAvailableSkillsMetadata() []data.SkillMetadata {
 	if err := sm.LoadMetadata(); err != nil {
 		// Log warning but don't fail - skills are optional
-		Warnf("Failed to load skills: %v", err)
+		util.Warnf("Failed to load skills: %v\n", err)
 		return nil
 	}
 
@@ -84,7 +85,7 @@ func (sm *SkillManager) GetAvailableSkillsMetadata() []data.SkillMetadata {
 func (sm *SkillManager) GetAvailableSkills() string {
 	if err := sm.LoadMetadata(); err != nil {
 		// Log warning but don't fail - skills are optional
-		Warnf("Failed to load skills: %v", err)
+		util.Warnf("Failed to load skills: %v\n", err)
 		return ""
 	}
 

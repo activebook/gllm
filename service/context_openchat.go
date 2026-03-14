@@ -3,6 +3,7 @@ package service
 import (
 	"sort"
 
+	"github.com/activebook/gllm/util"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 )
 
@@ -45,7 +46,7 @@ func (c *openChatContext) pruneOpenChatMessages(messages []*model.ChatCompletion
 	totalOverhead := sysTokens + toolTokens
 
 	currentTokens := c.estimateTokens(messages) + totalOverhead
-	Debugf("Token count: %d MaxInputTokens[80%%]: %d", currentTokens, c.maxInputTokens)
+	util.Debugf("Token count: %d MaxInputTokens[80%%]: %d\n", currentTokens, c.maxInputTokens)
 	if currentTokens <= c.maxInputTokens {
 		return messages, false, nil
 	}

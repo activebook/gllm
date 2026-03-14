@@ -6,6 +6,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/util"
 )
 
 type StreamDataType int
@@ -70,10 +71,10 @@ func constructModelInfo(model *data.Model) *ModelInfo {
 	provider := model.Provider
 	if provider == "" {
 		// Auto-detect provider if not set
-		Debugf("Auto-detecting provider for %s", model.Model)
+		util.Debugf("Auto-detecting provider for %s\n", model.Model)
 		provider = DetectModelProvider(model.Endpoint, model.Model)
 	} else {
-		Debugf("Provider: [%s]", provider)
+		util.Debugf("Provider: [%s]\n", provider)
 	}
 	mi.Model = model.Model
 	mi.Provider = provider
@@ -116,7 +117,7 @@ func constructSearchEngine(capabilities []string) *SearchEngine {
 		}
 	}
 
-	Debugf("Search engine: %v, %v", se.Name, se.UseSearch)
+	util.Debugf("Search engine: %v, %v\n", se.Name, se.UseSearch)
 	return &se
 }
 
@@ -283,7 +284,7 @@ func CallAgent(op *AgentOptions) error {
 	if op.MaxRecursions < 0 {
 		op.MaxRecursions = math.MaxInt
 	}
-	Debugf("Max session turns:%d\n", op.MaxRecursions)
+	util.Debugf("Max session turns:%d\n", op.MaxRecursions)
 
 	// Create a channel to receive notifications
 	notifyCh := make(chan StreamNotify, 10) // Buffer to prevent blocking(used for status updates)

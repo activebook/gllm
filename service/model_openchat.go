@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/activebook/gllm/util"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/utils"
@@ -37,14 +38,14 @@ func (ag *Agent) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessag
 	} else if IsVideoMIMEType(format) {
 		// Create and append video part
 		base64Data := base64.StdEncoding.EncodeToString(file.Data())
-		Debugf("Processing video file: format=%s, data length=%d, base64 length=%d", format, len(file.Data()), len(base64Data))
+		util.Debugf("Processing video file: format=%s, data length=%d, base64 length=%d\n", format, len(file.Data()), len(base64Data))
 		part = &model.ChatCompletionMessageContentPart{
 			Type: model.ChatCompletionMessageContentPartTypeVideoURL,
 			VideoURL: &model.ChatMessageVideoURL{
 				URL: fmt.Sprintf("data:%s;base64,%s", format, base64Data),
 			},
 		}
-		Debugf("Created video part with type=%s, URL prefix=%s", part.Type, part.VideoURL.URL[:50])
+		util.Debugf("Created video part with type=%s, URL prefix=%s\n", part.Type, part.VideoURL.URL[:50])
 	} else if IsTextMIMEType(format) {
 		// Create and append text part
 		part = &model.ChatCompletionMessageContentPart{
@@ -279,7 +280,7 @@ func (c *OpenChat) process(ag *Agent) error {
 		messages, _ := ag.Session.GetMessages().([]*model.ChatCompletionMessage)
 
 		// Apply context window management.
-		Debugf("Context messages: [%d]", len(messages))
+		util.Debugf("Context messages: [%d]\n", len(messages))
 		pruned, truncated, err := ag.Context.PruneMessages(messages, ag.SystemPrompt, c.tools)
 		if err != nil {
 			return fmt.Errorf("failed to prune context: %w", err)
@@ -287,8 +288,8 @@ func (c *OpenChat) process(ag *Agent) error {
 		messages = pruned.([]*model.ChatCompletionMessage)
 
 		if truncated {
-			Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.", ag.Context.GetStrategy())
-			Debugf("Context messages after truncation: [%d]", len(messages))
+			util.Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.\n", ag.Context.GetStrategy())
+			util.Debugf("Context messages after truncation: [%d]\n", len(messages))
 			// Session write-back is clean: system message not yet prepended at this point.
 			ag.Session.SetMessages(messages)
 			ag.Session.Save()
@@ -471,12 +472,12 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 				}
 			default:
 				// If reasoning content is not empty, switch to reasoning state
-				if HasContent(delta.ReasoningContent) {
+				if util.HasContent(delta.ReasoningContent) {
 					c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusReasoning}, c.op.proceed)
 				}
 			}
 
-			if HasContent(delta.ReasoningContent) {
+			if util.HasContent(delta.ReasoningContent) {
 				// For reasoning model
 				text := *delta.ReasoningContent
 				reasoningBuffer.WriteString(text)
@@ -496,7 +497,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 					// Skip if not our expected function
 					// Because some model made up function name
 					if functionName != "" && !IsAvailableOpenTool(functionName) && !IsAvailableMCPTool(functionName, c.op.mcpClient) {
-						Warnf("Skipping tool call with unknown function name: %s", functionName)
+						util.Warnf("Skipping tool call with unknown function name: %s\n", functionName)
 						continue
 					}
 
@@ -541,7 +542,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 		// Extract <think> tags from content if present
 		// Some providers embed reasoning in <think>...</think> tags instead of
 		// using a separate reasoning_content field
-		if thinkContent, cleanedContent := ExtractThinkTags(content); thinkContent != "" {
+		if thinkContent, cleanedContent := util.ExtractThinkTags(content); thinkContent != "" {
 			// Prepend extracted thinking to existing reasoning content
 			if reasoning_content != "" {
 				fullReasoning := thinkContent + "\n" + reasoning_content
@@ -569,7 +570,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 			// Sanitize arguments to handle cases like "}{" or trailing garbage
 			cleanedArgs := sanitizeToolArgs(tc.Function.Arguments)
 			if cleanedArgs != tc.Function.Arguments {
-				Debugf("Sanitized tool arguments for %s: %s -> %s", tc.Function.Name, tc.Function.Arguments, cleanedArgs)
+				util.Debugf("Sanitized tool arguments for %s: %s -> %s\n", tc.Function.Name, tc.Function.Arguments, cleanedArgs)
 				tc.Function.Arguments = cleanedArgs
 				// Update the map as well so local execution uses the clean version
 				toolCalls[id] = tc
@@ -593,7 +594,7 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 
 	if err := json.Unmarshal([]byte(argsStr), &argsMap); err != nil {
 		// Log the malformed JSON for debugging
-		Debugf("Failed to parse tool call arguments. Function: %s, Raw arguments: %s", toolCall.Function.Name, toolCall.Function.Arguments)
+		util.Debugf("Failed to parse tool call arguments. Function: %s, Raw arguments: %s\n", toolCall.Function.Name, toolCall.Function.Arguments)
 		return nil, fmt.Errorf("error parsing arguments: %v (raw: %s)", err, toolCall.Function.Arguments)
 	}
 
