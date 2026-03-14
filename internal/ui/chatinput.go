@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/activebook/gllm/data"
 	"github.com/charmbracelet/bubbles/textarea"
@@ -26,10 +27,11 @@ const (
 )
 
 var (
-	planModeBanner   string       // plan mode banner
-	yoloModeBanner   string       // yolo mode banner
-	backgroundStatus string       // background status
-	activeProgram    *tea.Program // reference to the running program for external Send()
+	planModeBanner     string       // plan mode banner
+	yoloModeBanner     string       // yolo mode banner
+	backgroundStatus   string       // background status
+	backgroundStatusMu sync.RWMutex // protects backgroundStatus(reading and writing to a string variable simultaneously from two different goroutines without a lock is a Data Race. )
+	activeProgram      *tea.Program // reference to the running program for external Send()
 )
 
 type SessionMode int
@@ -65,8 +67,17 @@ type SessionModeMsg struct{ Mode SessionMode }
 type StatusMsg struct{ Text string }
 
 // SendEvent dispatches a message to the active chat input program.
-// Goroutine-safe; no-op when no program is running.
+// Goroutine-safe; saves status globally even if no program is running.
 func SendEvent(msg tea.Msg) {
+	if status, ok := msg.(StatusMsg); ok {
+		// We must here set the background status,
+		// otherwise it will not be displayed if activeProgram == nil
+		// and the status will be lost when the program is reloaded.
+		backgroundStatusMu.Lock()
+		backgroundStatus = status.Text
+		backgroundStatusMu.Unlock()
+	}
+
 	if activeProgram != nil {
 		go func() {
 			activeProgram.Send(msg)
@@ -345,7 +356,10 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case StatusMsg:
+		// SendEvent already sets the global, but this ensures re-render
+		backgroundStatusMu.Lock()
 		backgroundStatus = msg.Text
+		backgroundStatusMu.Unlock()
 		return m, nil
 
 	case SessionModeMsg:
@@ -611,11 +625,15 @@ func (m ChatInputModel) View() string {
 			view = lipgloss.JoinVertical(lipgloss.Left, m.pendingBanner, view)
 		}
 
+		backgroundStatusMu.RLock()
+		statusText := backgroundStatus
+		backgroundStatusMu.RUnlock()
+
 		// Build the split status line
-		if m.infoBanner != "" || backgroundStatus != "" {
-			rightWidth := lipgloss.Width(backgroundStatus) + 4
+		if m.infoBanner != "" || statusText != "" {
+			rightWidth := lipgloss.Width(statusText) + 4
 			rightStyle := lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color(data.BackgroundStatusHex)).Faint(true)
-			rightStr := rightStyle.Render(backgroundStatus)
+			rightStr := rightStyle.Render(statusText)
 
 			leftWidth := m.width - rightWidth
 			if leftWidth < 0 {
