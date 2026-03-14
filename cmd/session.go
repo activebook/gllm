@@ -512,8 +512,8 @@ var sessionRenameCmd = &cobra.Command{
 			oldName = sessions[index-1].Name
 		}
 
-		oldPath := util.GetFilePath(sessionDir, oldName+".jsonl")
-		newPath := util.GetFilePath(sessionDir, newName+".jsonl")
+		oldPath := util.JoinFilePath(sessionDir, oldName+".jsonl")
+		newPath := util.JoinFilePath(sessionDir, newName+".jsonl")
 
 		// Check if source exists
 		if _, err := os.Stat(oldPath); os.IsNotExist(err) {
@@ -574,7 +574,7 @@ var sessionShareCmd = &cobra.Command{
 		sessionName = resolvedName
 
 		sessionDir := service.GetSessionsDir()
-		sourcePath := util.GetFilePath(sessionDir, sessionName+".jsonl")
+		sourcePath := util.JoinFilePath(sessionDir, sessionName+".jsonl")
 
 		if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
 			return fmt.Errorf("session '%s' not found", sessionName)

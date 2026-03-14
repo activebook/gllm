@@ -46,7 +46,7 @@ func MakeUserSubDir(subparts ...string) string {
 	return subDir
 }
 
-func GetFilePath(dir string, filename string) string {
+func JoinFilePath(dir string, filename string) string {
 	return filepath.Join(dir, filename)
 }
 

@@ -40,7 +40,7 @@ func (s *BaseSession) SetPath(title string) {
 		return
 	}
 	dir := GetSessionsDir()
-	s.Path = util.GetFilePath(dir, title+".jsonl")
+	s.Path = util.JoinFilePath(dir, title+".jsonl")
 }
 
 func (s *BaseSession) GetPath() string {
@@ -194,7 +194,7 @@ func ClearEmptySessionsAsync() {
 		}
 		for _, file := range files {
 			if !file.IsDir() && strings.HasSuffix(file.Name(), ".jsonl") {
-				fullPath := util.GetFilePath(GetSessionsDir(), file.Name())
+				fullPath := util.JoinFilePath(GetSessionsDir(), file.Name())
 				info, err := file.Info()
 				if err != nil {
 					continue
@@ -249,7 +249,7 @@ func ListSortedSessions(sessionDir string, onlyNonEmpty bool, detectProvider boo
 	for _, file := range files {
 		if !file.IsDir() && strings.HasSuffix(file.Name(), ".jsonl") {
 			title := strings.TrimSuffix(file.Name(), ".jsonl")
-			fullPath := util.GetFilePath(sessionDir, file.Name())
+			fullPath := util.JoinFilePath(sessionDir, file.Name())
 
 			// Use file.Info() instead of os.Stat()
 			info, err := file.Info()
