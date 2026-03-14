@@ -315,3 +315,24 @@ func CheckSessionFormat(agent *data.AgentConfig, sessionData []byte) (isCompatib
 
 	return isCompatible, provider, modelProvider
 }
+
+// StartLoadMCPServer launches background MCP preloading (non-blocking).
+func StartLoadMCPServer(agent *data.AgentConfig) {
+	go func() {
+		if !service.IsMCPServersEnabled(agent.Capabilities) {
+			return
+		}
+
+		mcpStore := data.NewMCPStore()
+		mcpConfig, err := mcpStore.Load()
+		if err != nil {
+			return
+		}
+
+		mc := service.GetMCPClient()
+		mc.PreloadAsync(mcpConfig, service.MCPLoadOption{
+			LoadAll:   false,
+			LoadTools: true,
+		})
+	}()
+}

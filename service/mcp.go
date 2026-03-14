@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/ui"
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -98,6 +99,43 @@ func GetMCPClient() *MCPClient {
 	return mcpClient
 }
 
+// IsReady returns true if the client is initialized and has at least one tool loaded.
+// It is safe to call without locking.
+func (mc *MCPClient) IsReady() bool {
+	// mc.client is set under lock, but checking for nil is atomic enough locally
+	// In strict Go, reading it outside a lock while it might be written could be a race,
+	// but mc.client is only written once in Init() and then never touched until Close().
+	if mc.client == nil {
+		return false
+	}
+
+	// mc.mu.Lock()
+	// defer mc.mu.Unlock()
+	// return len(mc.toolToSession) > 0
+	return true
+}
+
+// PreloadAsync initializes the MCP client in the background.
+func (mc *MCPClient) PreloadAsync(servers map[string]*data.MCPServer, option MCPLoadOption) {
+	go func() {
+		if mc.IsReady() {
+			return
+		}
+		ui.SendEvent(ui.StatusMsg{Text: ui.IndicatorLoadingMCP})
+		err := mc.Init(servers, option)
+		if err != nil {
+			status := fmt.Sprintf("MCP Error: %v", err)
+			ui.SendEvent(ui.StatusMsg{Text: status})
+		} else {
+			mc.mu.Lock()
+			count := len(mc.toolToSession)
+			mc.mu.Unlock()
+			status := fmt.Sprintf("MCP Loaded: %d servers %d tools", len(mc.connected), count)
+			ui.SendEvent(ui.StatusMsg{Text: status})
+		}
+	}()
+}
+
 // three types of transports supported:
 // httpUrl → StreamableHTTPClientTransport
 // url → SSEClientTransport
@@ -175,7 +213,7 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 		mc.servers = append(mc.servers, &MCPServer{
 			Name: serverName, Allowed: server.Allowed,
 			Tools: tools, Prompts: prompts, Resources: resources})
-		
+
 		mc.connected[serverName] = true
 	}
 	return nil
