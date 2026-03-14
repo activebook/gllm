@@ -219,6 +219,10 @@ func (ri *ReplInfo) awaitInput() (string, error) {
 
 	// Define hooks for UI
 	hooks := ui.ChatInputHooks{
+		// Start load MCP server when chat input is ready
+		EventChatInputReady: func() {
+			StartLoadMCPServer(agent)
+		},
 		IsPlanModeActive: func() bool {
 			return data.IsPlanModeInSessionEnabled() && data.GetPlanModeInSession()
 		},

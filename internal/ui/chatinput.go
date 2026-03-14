@@ -26,9 +26,10 @@ const (
 )
 
 var (
-	planModeBanner string       // plan mode banner
-	yoloModeBanner string       // yolo mode banner
-	activeProgram  *tea.Program // reference to the running program for external Send()
+	planModeBanner   string       // plan mode banner
+	yoloModeBanner   string       // yolo mode banner
+	backgroundStatus string       // background status
+	activeProgram    *tea.Program // reference to the running program for external Send()
 )
 
 type SessionMode int
@@ -41,6 +42,9 @@ const (
 
 // ChatInputHooks allows an external orchestrator to provide state and handle events
 type ChatInputHooks struct {
+	// EventChatInputReady is called when the chat input is ready
+	EventChatInputReady func()
+
 	// IsPlanModeActive returns true if in plan mode
 	IsPlanModeActive func() bool
 
@@ -56,6 +60,9 @@ type BannerMsg struct{ Text string }
 
 // SessionModeMsg signals a session mode toggle to the UI.
 type SessionModeMsg struct{ Mode SessionMode }
+
+// StatusMsg carries a background status update for the right-side banner.
+type StatusMsg struct{ Text string }
 
 // SendEvent dispatches a message to the active chat input program.
 // Goroutine-safe; no-op when no program is running.
@@ -337,6 +344,10 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.pendingBanner = msg.Text
 		return m, nil
 
+	case StatusMsg:
+		backgroundStatus = msg.Text
+		return m, nil
+
 	case SessionModeMsg:
 		switch msg.Mode {
 		case SessionModePlan:
@@ -599,9 +610,27 @@ func (m ChatInputModel) View() string {
 		if m.pendingBanner != "" {
 			view = lipgloss.JoinVertical(lipgloss.Left, m.pendingBanner, view)
 		}
-		// Always reserve the banner line — empty string when inactive
-		infoBannerLine := "\n" + m.infoBanner // "" when not active
-		view = lipgloss.JoinVertical(lipgloss.Left, view, infoBannerLine)
+
+		// Build the split status line
+		if m.infoBanner != "" || backgroundStatus != "" {
+			rightWidth := lipgloss.Width(backgroundStatus) + 4
+			rightStyle := lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color(data.BackgroundStatusHex)).Faint(true)
+			rightStr := rightStyle.Render(backgroundStatus)
+
+			leftWidth := m.width - rightWidth
+			if leftWidth < 0 {
+				leftWidth = 0
+			}
+			leftStr := lipgloss.NewStyle().Padding(0, 1).Width(leftWidth).Render(m.infoBanner)
+
+			// Use idiomatic lipgloss join for horizontal alignment
+			statusLine := lipgloss.JoinHorizontal(lipgloss.Top, leftStr, rightStr)
+			view = lipgloss.JoinVertical(lipgloss.Left, view, "\n"+statusLine)
+		} else {
+			// Always reserve the banner line to prevent UI jitter
+			view = lipgloss.JoinVertical(lipgloss.Left, view, "\n")
+		}
+
 		return view
 	}
 
@@ -675,6 +704,10 @@ func RunChatInput(commands []Suggestion, initialValue string, history []string, 
 	model := NewChatInputModel(commands, initialValue, history, hooks)
 	activeProgram = tea.NewProgram(model)
 	defer func() { activeProgram = nil }()
+
+	if hooks.EventChatInputReady != nil {
+		hooks.EventChatInputReady()
+	}
 
 	finalModel, err := activeProgram.Run()
 	if err != nil {
