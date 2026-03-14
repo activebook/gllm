@@ -12,6 +12,7 @@ import (
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
+	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -107,13 +108,25 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 			cleanup = func() { os.RemoveAll(tempDir) }
 			defer cleanup()
 
-			fmt.Printf("Cloning %s...\n", source)
-			// Clone git repo
-			gitCmd := exec.Command("git", "clone", source, tempDir)
-			gitCmd.Stdout = os.Stdout
-			gitCmd.Stderr = os.Stderr
-			if err := gitCmd.Run(); err != nil {
-				service.Errorf("Failed to clone repository: %v", err)
+			if util.HasGit() {
+				fmt.Printf("Cloning %s...\n", source)
+				// Clone git repo
+				gitCmd := exec.Command("git", "clone", source, tempDir)
+				gitCmd.Stdout = os.Stdout
+				gitCmd.Stderr = os.Stderr
+				if err := gitCmd.Run(); err != nil {
+					service.Errorf("Failed to clone repository: %v", err)
+					return
+				}
+			} else if util.IsGitHubURL(source) {
+				fmt.Printf("Downloading archive from %s...\n", source)
+				zipURL := util.GetGitHubZipURL(source)
+				if err := util.DownloadAndExtractZip(zipURL, tempDir); err != nil {
+					service.Errorf("Failed to download and extract skill: %v", err)
+					return
+				}
+			} else {
+				service.Errorf("Git is not installed, and the source is not a standard GitHub repository. Please install Git to use this skill URL.")
 				return
 			}
 
