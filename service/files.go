@@ -239,11 +239,25 @@ func IsVideoMIMEType(mimeType string) bool {
 }
 
 func IsTextMIMEType(mimeType string) bool {
+	// Normalize: strip params, lowercase
+	mimeType = strings.ToLower(strings.TrimSpace(strings.SplitN(mimeType, ";", 2)[0]))
+
 	if strings.HasPrefix(mimeType, "text/") {
 		return true
 	}
+
+	// Common structured text suffixes
+	if strings.HasSuffix(mimeType, "+json") || strings.HasSuffix(mimeType, "+xml") {
+		return true
+	}
+
 	switch mimeType {
-	case "application/json",
+	case
+		"application/json",
+		"application/ld+json",
+		"application/manifest+json",
+		"application/geo+json",
+		"application/graphql",
 		"application/xml",
 		"application/javascript",
 		"application/x-javascript",
@@ -256,23 +270,17 @@ func IsTextMIMEType(mimeType string) bool {
 		"application/x-bash",
 		"application/x-awk",
 		"application/x-sql",
+		"application/sql",
 		"application/x-php",
 		"application/x-httpd-php",
 		"application/x-ruby",
 		"application/x-markdown",
-		"text/html",
-		"text/plain",
-		"text/csv",
-		"text/rtf",
-		"text/xml",
-		"text/css",
-		"text/yaml",
-		"text/md",
-		"text/markdown",
-		"text/java",
-		"text/go":
+		"application/x-yaml",
+		"application/toml",
+		"application/x-www-form-urlencoded":
 		return true
 	}
+
 	// Exclude known binary types
 	if IsImageMIMEType(mimeType) || IsPDFMIMEType(mimeType) || IsExcelMIMEType(mimeType) || IsAudioMIMEType(mimeType) {
 		return false

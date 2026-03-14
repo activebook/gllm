@@ -66,10 +66,12 @@ type MCPSession struct {
 }
 
 type MCPClient struct {
+	mu            sync.Mutex
 	ctx           context.Context
 	client        *mcp.Client
 	sessions      []*MCPSession
 	servers       []*MCPServer
+	connected     map[string]bool
 	toolToSession map[string]*MCPSession
 }
 type MCPLoadOption struct {
@@ -102,24 +104,26 @@ func GetMCPClient() *MCPClient {
 // command → StdioClientTransport
 // Only want list all servers, unless loadAll is false, then only load allowed servers
 func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOption) error {
-	if mc.client != nil {
-		// already initialized
-		return nil
+	mc.mu.Lock()
+	defer mc.mu.Unlock()
+
+	if mc.client == nil {
+		mc.ctx = context.Background()
+		mc.toolToSession = make(map[string]*MCPSession)
+		mc.connected = make(map[string]bool)
+		// Create a new client, with no features.
+		mc.client = mcp.NewClient(&mcp.Implementation{Name: "mcp-client", Version: "v1.0.0"}, nil)
 	}
 
-	mc.ctx = context.Background()
-	mc.toolToSession = make(map[string]*MCPSession)
-
-	// Create a new client, with no features.
-	mc.client = mcp.NewClient(&mcp.Implementation{Name: "mcp-client", Version: "v1.0.0"}, nil)
-
-	// Load mcp servers
-	mcServers := []*MCPServer{}
 	// Connect to each server based on its type
 	for serverName, server := range servers {
 		// Skip if not in allowed list (if allow list is not empty)
 		if !server.Allowed && !option.LoadAll {
 			continue
+		}
+
+		if mc.connected[serverName] {
+			continue // Already connected, skip
 		}
 
 		// Connect and add session
@@ -168,20 +172,25 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 		}
 
 		// Add server to servers
-		mcServers = append(mcServers, &MCPServer{
+		mc.servers = append(mc.servers, &MCPServer{
 			Name: serverName, Allowed: server.Allowed,
 			Tools: tools, Prompts: prompts, Resources: resources})
+		
+		mc.connected[serverName] = true
 	}
-	mc.servers = mcServers
 	return nil
 }
 
 func (mc *MCPClient) Close() {
+	mc.mu.Lock()
+	defer mc.mu.Unlock()
 	for _, session := range mc.sessions {
 		session.cs.Close()
 	}
 	mc.sessions = []*MCPSession{}
+	mc.servers = []*MCPServer{}
 	mc.toolToSession = nil
+	mc.connected = nil
 	mc.client = nil
 	mc.ctx = nil
 }
