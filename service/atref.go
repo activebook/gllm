@@ -136,13 +136,7 @@ func (p *AtRefProcessor) processFile(fullPath string, info os.FileInfo) (string,
 			info.Size(), p.maxFileSize, fullPath)
 	}
 
-	// Read file content
-	content, err := os.ReadFile(fullPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file: %v", err)
-	}
-
-	// Get MIME type
+	// Get MIME type first
 	mimeType := GetMIMEType(fullPath)
 
 	// Format the output
@@ -152,10 +146,22 @@ func (p *AtRefProcessor) processFile(fullPath string, info os.FileInfo) (string,
 	// Add metadata
 	result.WriteString(fmt.Sprintf("Size: %d bytes, Type: %s\n", info.Size(), mimeType))
 
-	// Add content
-	result.WriteString("```\n")
-	result.WriteString(string(content))
-	result.WriteString("\n```\n")
+	// Check if file is text type
+	if IsTextMIMEType(mimeType) {
+		// Read file content for text files
+		content, err := os.ReadFile(fullPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to read file: %v", err)
+		}
+
+		// Add content
+		result.WriteString("```\n")
+		result.WriteString(string(content))
+		result.WriteString("\n```\n")
+	} else {
+		// For non-text files, just note it's binary
+		result.WriteString("[Binary file - content omitted]\n")
+	}
 
 	return result.String(), nil
 }
