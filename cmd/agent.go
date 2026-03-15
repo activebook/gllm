@@ -902,12 +902,11 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 		fmt.Printf("%sTemplate: \n", spaceholder)
 	}
 
-	toolsSlice := ""
-	for _, tool := range agent.Tools {
-		toolsSlice += fmt.Sprintf("\n%s  - %s", spaceholder, tool)
-	}
-	fmt.Printf("%sTools:%s\n", spaceholder, toolsSlice)
 	fmt.Printf("%sThink: %v\n", spaceholder, agent.Think)
+
+	fmt.Printf("%sTools:\n", spaceholder)
+	toolsList := GetAllTools(agent)
+	fmt.Println(toolsList)
 
 	// capabilities
 	capsSlice := ""

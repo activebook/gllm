@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
@@ -15,6 +16,29 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
+
+var (
+	// skillsInstallPaths holds the paths flag values
+	skillsInstallPaths []string
+
+	// skillsUpdateAll holds the --all flag value
+	skillsUpdateAll bool
+
+	// skillsInstallAll holds the --all flag for install
+	skillsInstallAll bool
+)
+
+func init() {
+	rootCmd.AddCommand(skillsCmd)
+	skillsCmd.AddCommand(skillsListCmd)
+	skillsCmd.AddCommand(skillsInstallCmd)
+	skillsInstallCmd.Flags().StringSliceVar(&skillsInstallPaths, "path", []string{}, "Paths to the skill directories within the git repository (comma separated or multiple flags)")
+	skillsInstallCmd.Flags().BoolVar(&skillsInstallAll, "all", false, "Install all skills from the repository")
+	skillsCmd.AddCommand(skillsUninstallCmd)
+	skillsCmd.AddCommand(skillsSwCmd)
+	skillsCmd.AddCommand(skillsUpdateCmd)
+	skillsUpdateCmd.Flags().BoolVarP(&skillsUpdateAll, "all", "a", false, "Update all installed skills that have source tracking")
+}
 
 // skillsCmd represents the skills subcommand
 var skillsCmd = &cobra.Command{
@@ -77,9 +101,6 @@ var skillsListCmd = &cobra.Command{
 	},
 }
 
-// skillsInstallPath holds the path flag value
-var skillsInstallPath string
-
 // skillsInstallCmd installs a skill from a path
 var skillsInstallCmd = &cobra.Command{
 	Use:     "install <path|url>",
@@ -92,14 +113,21 @@ You can use the --path flag to specify a subdirectory within the git repository.
 The source (local or resolved git path) must contain a valid SKILL.md file with frontmatter.`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		// Stop any global indicator to prevent UI interference
+		ui.GetIndicator().Stop()
+
 		source := args[0]
-		var absPath string
+		var tempDir string
 		var cleanup func()
+		var isRemote bool // Whether this skill is installed from remote
 
 		// Check if source is a URL (starts with http/https or ends with .git)
 		if strings.HasPrefix(source, "http") || strings.HasSuffix(source, ".git") {
+			isRemote = true
+
 			// Create temp dir
-			tempDir, err := os.MkdirTemp("", "gllm-skill-clone-*")
+			var err error
+			tempDir, err = os.MkdirTemp("", "gllm-skill-clone-*")
 			if err != nil {
 				util.Errorf("Failed to create temp directory: %v\n", err)
 				return
@@ -107,82 +135,44 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 			cleanup = func() { os.RemoveAll(tempDir) }
 			defer cleanup()
 
-			if util.HasGit() {
-				fmt.Printf("Cloning %s...\n", source)
-				// Clone git repo
-				gitCmd := exec.Command("git", "clone", source, tempDir)
-				gitCmd.Stdout = os.Stdout
-				gitCmd.Stderr = os.Stderr
-				if err := gitCmd.Run(); err != nil {
-					util.Errorf("Failed to clone repository: %v\n", err)
-					return
-				}
-			} else if util.IsGitHubURL(source) {
-				fmt.Printf("Downloading archive from %s...\n", source)
-				zipURL := util.GetGitHubZipURL(source)
-				if err := util.DownloadAndExtractZip(zipURL, tempDir); err != nil {
-					util.Errorf("Failed to download and extract skill: %v\n", err)
-					return
-				}
-			} else {
-				util.Errorf("Git is not installed, and the source is not a standard GitHub repository. Please install Git to use this skill URL.\n")
+			if err := downloadRepo(source, tempDir); err != nil {
+				util.Errorf("%v\n", err)
 				return
-			}
-
-			// Determine path within repo
-			if skillsInstallPath != "" {
-				absPath = filepath.Join(tempDir, skillsInstallPath)
-			} else {
-				absPath = tempDir
 			}
 		} else {
 			// Local path
 			var err error
-			absPath, err = filepath.Abs(source)
+			tempDir, err = filepath.Abs(source)
 			if err != nil {
 				util.Errorf("Invalid path: %v\n", err)
 				return
 			}
 		}
 
-		// Check if source exists and is a directory
-		info, err := os.Stat(absPath)
+		// Discover skills in the specified paths
+		targetSubPaths, err := discoverSkills(tempDir, skillsInstallPaths)
 		if err != nil {
-			util.Errorf("Cannot access path: %v\n", err)
-			return
-		}
-		if !info.IsDir() {
-			util.Errorf("Path must be a directory containing SKILL.md\n")
+			util.Errorf("Discovery failed: %v\n", err)
 			return
 		}
 
-		// Validate SKILL.md exists
-		skillFilePath := filepath.Join(absPath, data.SkillFile)
-		if _, err := os.Stat(skillFilePath); err != nil {
-			util.Errorf("SKILL.md not found in %s\n", absPath)
-			return
-		}
+		// If multiple skills are found, prompt for confirmation
+		if len(targetSubPaths) > 1 {
+			var names []string
+			for _, p := range targetSubPaths {
+				// Just show the subpath/name for clarity
+				if p == "" {
+					names = append(names, "(root)")
+				} else {
+					names = append(names, p)
+				}
+			}
+			sort.Strings(names)
 
-		// Parse and validate frontmatter
-		meta, err := data.ParseSkillFrontmatter(skillFilePath)
-		if err != nil {
-			util.Errorf("Invalid SKILL.md: %v\n", err)
-			return
-		}
-
-		if meta.Name == "" {
-			util.Errorf("SKILL.md must have a 'name' field in frontmatter\n")
-			return
-		}
-
-		// Use the skill name from frontmatter as destination folder name
-		destDir := filepath.Join(data.GetSkillsDirPath(), meta.Name)
-
-		// Check if skill already exists
-		if _, err := os.Stat(destDir); err == nil {
 			var confirm bool
 			err := huh.NewConfirm().
-				Title(fmt.Sprintf("Skill '%s' already exists. Overwrite?", meta.Name)).
+				Title(fmt.Sprintf("Discovered %d skills. Install all?", len(targetSubPaths))).
+				Description(strings.Join(names, ", ")).
 				Affirmative("Yes").
 				Negative("No").
 				Value(&confirm).
@@ -191,21 +181,153 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 				fmt.Println("Aborted.")
 				return
 			}
-			// Remove existing
-			if err := os.RemoveAll(destDir); err != nil {
-				util.Errorf("Failed to remove existing skill: %v\n", err)
-				return
+		}
+
+		successCount := 0
+		failCount := 0
+
+		for _, subPath := range targetSubPaths {
+			absSkillDir := tempDir
+			if subPath != "" {
+				absSkillDir = filepath.Join(tempDir, subPath)
+			}
+
+			if len(targetSubPaths) > 1 {
+				fmt.Printf("Installing: %s\n", subPath)
+			}
+
+			if err := installSingleSkill(absSkillDir, isRemote, source, subPath); err != nil {
+				util.Errorf("Failed to install skill from path '%s': %v\n", subPath, err)
+				failCount++
+			} else {
+				successCount++
 			}
 		}
 
-		// Copy directory
-		if err := copyDir(absPath, destDir); err != nil {
-			util.Errorf("Failed to copy skill: %v\n", err)
-			return
+		if len(targetSubPaths) > 1 {
+			if failCount > 0 {
+				fmt.Printf("Installation complete. Successfully installed %d skills. %d failures.\n", successCount, failCount)
+			} else {
+				fmt.Printf("Installation complete. Successfully installed %d skills.\n", successCount)
+			}
+		}
+	},
+}
+
+// installSingleSkill handles the validation, copying, and metadata saving of a single skill directory
+func installSingleSkill(absSkillDirPath string, isRemote bool, sourceURL string, subPath string) error {
+	// Check if source exists and is a directory
+	info, err := os.Stat(absSkillDirPath)
+	if err != nil {
+		return fmt.Errorf("cannot access path: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("path must be a directory containing %s", data.SkillFile)
+	}
+
+	// Validate SKILL.md exists
+	skillFilePath := filepath.Join(absSkillDirPath, data.SkillFile)
+	if _, err := os.Stat(skillFilePath); err != nil {
+		return fmt.Errorf("%s not found in %s", data.SkillFile, absSkillDirPath)
+	}
+
+	// Parse and validate frontmatter
+	meta, err := data.ParseSkillFrontmatter(skillFilePath)
+	if err != nil {
+		return fmt.Errorf("invalid %s: %w", data.SkillFile, err)
+	}
+
+	if meta.Name == "" {
+		return fmt.Errorf("%s must have a 'name' field in frontmatter", data.SkillFile)
+	}
+
+	// Use the skill name from frontmatter as destination folder name
+	destDir := filepath.Join(data.GetSkillsDirPath(), meta.Name)
+
+	// Check if skill already exists
+	if _, err := os.Stat(destDir); err == nil {
+		var confirm bool
+		err := huh.NewConfirm().
+			Title(fmt.Sprintf("Skill '%s' already exists. Overwrite?", meta.Name)).
+			Affirmative("Yes").
+			Negative("No").
+			Value(&confirm).
+			Run()
+		if err != nil || !confirm {
+			util.Warnf("user aborted overwrite for skill '%s'", meta.Name)
+			return nil
+		}
+		// Remove existing
+		if err := os.RemoveAll(destDir); err != nil {
+			return fmt.Errorf("failed to remove existing skill: %w", err)
+		}
+	}
+
+	// Copy directory
+	if err := copyDir(absSkillDirPath, destDir); err != nil {
+		return fmt.Errorf("failed to copy skill: %w", err)
+	}
+
+	// Save metadata if installed from a remote source
+	if isRemote {
+		sourceMeta := &data.SkillSourceMeta{
+			SourceURL:   sourceURL,
+			SubPath:     subPath,
+			InstallDate: time.Now().UTC().Format(time.RFC3339),
+		}
+		if err := data.SaveSkillSourceMeta(destDir, sourceMeta); err != nil {
+			// Don't fail the whole installation, but warn the user
+			util.Warnf("Failed to save source tracking metadata: %v\n", err)
+		}
+	}
+
+	fmt.Printf("Skill '%s' installed successfully.\n", meta.Name)
+	return nil
+}
+
+// discoverSkills scans the provided paths (or root) for SKILL.md files.
+// If a path is not a skill itself, it scans its immediate subdirectories.
+func discoverSkills(tempDir string, initialPaths []string) ([]string, error) {
+	if len(initialPaths) == 0 {
+		initialPaths = []string{""}
+	}
+
+	var targetSubPaths []string
+	for _, sp := range initialPaths {
+		fullPathToSub := filepath.Join(tempDir, sp)
+
+		// 1. Check if the path itself is a skill
+		if _, err := os.Stat(filepath.Join(fullPathToSub, data.SkillFile)); err == nil {
+			targetSubPaths = append(targetSubPaths, sp)
+			continue
 		}
 
-		fmt.Printf("Skill '%s' installed successfully.\n", meta.Name)
-	},
+		// 2. If not, try to discover skills in immediate subdirectories
+		entries, err := os.ReadDir(fullPathToSub)
+		if err != nil {
+			// If we can't read it, we'll just add it and let the installation loop handle the error
+			targetSubPaths = append(targetSubPaths, sp)
+			continue
+		}
+
+		discoveredCount := 0
+		for _, entry := range entries {
+			if entry.IsDir() {
+				if _, err := os.Stat(filepath.Join(fullPathToSub, entry.Name(), data.SkillFile)); err == nil {
+					targetSubPaths = append(targetSubPaths, filepath.Join(sp, entry.Name()))
+					discoveredCount++
+				}
+			}
+		}
+
+		// If no skills were found in subdirectories, still include the original path
+		// so that the main installation logic can report the "SKILL.md not found" error properly.
+		if discoveredCount == 0 {
+			targetSubPaths = append(targetSubPaths, sp)
+		}
+	}
+
+	return targetSubPaths, nil
 }
 
 // skillsUninstallCmd removes an installed skill
@@ -356,7 +478,7 @@ var skillsSwCmd = &cobra.Command{
 		).Run()
 
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
+			util.Errorf("%v\n", err)
 			return
 		}
 
@@ -381,13 +503,250 @@ var skillsSwCmd = &cobra.Command{
 	},
 }
 
-func init() {
-	rootCmd.AddCommand(skillsCmd)
-	skillsCmd.AddCommand(skillsListCmd)
-	skillsCmd.AddCommand(skillsInstallCmd)
-	skillsInstallCmd.Flags().StringVar(&skillsInstallPath, "path", "", "Path to the skill directory within the git repository")
-	skillsCmd.AddCommand(skillsUninstallCmd)
-	skillsCmd.AddCommand(skillsSwCmd)
+// skillsUpdateCmd updates an installed skill
+var skillsUpdateCmd = &cobra.Command{
+	Use:     "update [name]",
+	Aliases: []string{"up"},
+	Short:   "Update an installed skill from its original source",
+	Long: `Update a skill by re-downloading it from its original source (e.g., a GitHub repository).
+This command requires that the skill was originally installed from a remote URL.
+
+Use 'gllm skills update <name>' to update a specific skill.
+Use 'gllm skills update --all' to update all skills that support updating.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		// Stop any global indicator to prevent UI interference
+		ui.GetIndicator().Stop()
+
+		if !skillsUpdateAll && len(args) == 0 {
+			util.Errorf("You must specify a skill name or use the --all flag.\n")
+			return
+		}
+		if skillsUpdateAll && len(args) > 0 {
+			util.Errorf("Cannot specify both a skill name and the --all flag.\n")
+			return
+		}
+
+		skills, err := data.ScanSkills()
+		if err != nil {
+			util.Errorf("Failed to scan skills: %v\n", err)
+			return
+		}
+
+		// Filter skills that actually have update metadata
+		var updatableSkills []data.SkillMetadata
+		for _, s := range skills {
+			if s.SourceMeta != nil {
+				updatableSkills = append(updatableSkills, s)
+			}
+		}
+
+		if len(updatableSkills) == 0 {
+			fmt.Println("No updatable skills found. (Only skills installed from a URL can be updated)")
+			return
+		}
+
+		if skillsUpdateAll {
+			// Update all skills with batched processing
+			// First prompt: Summary
+			var names []string
+			for _, s := range updatableSkills {
+				names = append(names, s.Name)
+			}
+			sort.Strings(names)
+
+			var confirm1 bool
+			err := huh.NewConfirm().
+				Title(fmt.Sprintf("Found %d skills with source tracking. Update all?", len(updatableSkills))).
+				Description(fmt.Sprintf("%s", strings.Join(names, ", "))).
+				Affirmative("Yes").
+				Negative("No").
+				Value(&confirm1).
+				Run()
+			if err != nil || !confirm1 {
+				fmt.Println("Aborted.")
+				return
+			}
+
+			// Second prompt: Destructive warning
+			var confirm2 bool
+			err = huh.NewConfirm().
+				Title("WARNING: This will overwrite any local modifications in ALL selected skills. Are you absolutely sure?").
+				Affirmative("Yes, overwrite all").
+				Negative("No, abort").
+				Value(&confirm2).
+				Run()
+			if err != nil || !confirm2 {
+				fmt.Println("Aborted.")
+				return
+			}
+
+			// Execute batch update - all skills processed together efficiently
+			if err := executeSkillUpdate(updatableSkills...); err != nil {
+				util.Errorf("Update failed: %v\n", err)
+			}
+
+		} else {
+			// Single skill update
+			skillName := args[0]
+			var targetSkill *data.SkillMetadata
+
+			for _, s := range updatableSkills {
+				if strings.EqualFold(s.Name, skillName) {
+					targetSkill = &s
+					break
+				}
+			}
+
+			if targetSkill == nil {
+				// Check if it exists but just doesn't have metadata to give a better error message
+				for _, s := range skills {
+					if strings.EqualFold(s.Name, skillName) {
+						util.Errorf("Skill holds no origin metadata (likely installed from a local path) and cannot be updated.\n")
+						return
+					}
+				}
+				util.Errorf("Skill '%s' not found.\n", skillName)
+				return
+			}
+
+			var confirm bool
+			err := huh.NewConfirm().
+				Title(fmt.Sprintf("Updating will overwrite any local modifications to '%s'. Proceed?", targetSkill.Name)).
+				Affirmative("Yes, overwrite").
+				Negative("No, abort").
+				Value(&confirm).
+				Run()
+			if err != nil || !confirm {
+				fmt.Println("Aborted.")
+				return
+			}
+
+			// Single skill update
+			if err := executeSkillUpdate(*targetSkill); err != nil {
+				util.Errorf("Failed to update %s: %v\n", targetSkill.Name, err)
+			} else {
+				// Success message already printed by executeSkillUpdate
+			}
+		}
+	},
+}
+
+// downloadRepo downloads or clones a repository to a temporary directory
+// This is a shared helper for both install and update commands
+func downloadRepo(sourceURL, destDir string) error {
+	if util.HasGit() {
+		fmt.Printf("Cloning %s...\n", sourceURL)
+		gitCmd := exec.Command("git", "clone", sourceURL, destDir)
+		gitCmd.Stdout = os.Stdout
+		gitCmd.Stderr = os.Stderr
+		if err := gitCmd.Run(); err != nil {
+			return fmt.Errorf("failed to clone repository: %w", err)
+		}
+	} else if util.IsGitHubURL(sourceURL) {
+		fmt.Printf("Downloading archive from %s...\n", sourceURL)
+		zipURL := util.GetGitHubZipURL(sourceURL)
+		if err := util.DownloadAndExtractZip(zipURL, destDir); err != nil {
+			return fmt.Errorf("failed to download and extract skill: %w", err)
+		}
+	} else {
+		return fmt.Errorf("Git is not installed, and the source is not a standard GitHub repository")
+	}
+	return nil
+}
+
+// executeSkillUpdate handles the download/replace logic for one or more skills
+// Uses batch processing for efficiency when multiple skills share the same source URL
+func executeSkillUpdate(skills ...data.SkillMetadata) error {
+	if len(skills) == 0 {
+		return fmt.Errorf("no skills to update")
+	}
+
+	// Group skills by SourceURL
+	skillsByURL := make(map[string][]data.SkillMetadata)
+	for _, skill := range skills {
+		if skill.SourceMeta == nil {
+			continue
+		}
+		sourceURL := skill.SourceMeta.SourceURL
+		skillsByURL[sourceURL] = append(skillsByURL[sourceURL], skill)
+	}
+
+	if len(skillsByURL) == 0 {
+		return fmt.Errorf("no valid source metadata found")
+	}
+
+	// Process each source URL once
+	for sourceURL, groupSkills := range skillsByURL {
+		if len(groupSkills) > 1 {
+			fmt.Printf("\nProcessing %d skills from %s...\n", len(groupSkills), sourceURL)
+		}
+
+		// Create temp directory for this source
+		tempDir, err := os.MkdirTemp("", "gllm-skill-update-*")
+		if err != nil {
+			util.Errorf("Failed to create temp directory for %s: %v\n", sourceURL, err)
+			continue
+		}
+
+		// Download/clone once per source URL
+		if err := downloadRepo(sourceURL, tempDir); err != nil {
+			util.Errorf("Failed to download source from %s: %v\n", sourceURL, err)
+			os.RemoveAll(tempDir)
+			continue
+		}
+
+		// Update all skills from this source
+		for i, skill := range groupSkills {
+			if len(groupSkills) > 1 {
+				fmt.Printf("[%d/%d] Updating %s...\n", i+1, len(groupSkills), skill.Name)
+			}
+
+			meta := skill.SourceMeta
+			if meta == nil {
+				util.Errorf("Missing source metadata for %s\n", skill.Name)
+				continue
+			}
+
+			destDir := filepath.Dir(skill.Location)
+
+			// Resolve sub-path
+			absPath := tempDir
+			if meta.SubPath != "" {
+				absPath = filepath.Join(tempDir, meta.SubPath)
+			}
+
+			// Validate new skill
+			skillFilePath := filepath.Join(absPath, data.SkillFile)
+			if _, err := os.Stat(skillFilePath); err != nil {
+				util.Errorf("New version of %s does not contain %s\n", skill.Name, data.SkillFile)
+				continue
+			}
+
+			// Remove old and copy new
+			if err := os.RemoveAll(destDir); err != nil {
+				util.Errorf("Failed to clean existing directory for %s: %v\n", skill.Name, err)
+				continue
+			}
+
+			if err := copyDir(absPath, destDir); err != nil {
+				util.Errorf("Failed to copy new files for %s: %v\n", skill.Name, err)
+				continue
+			}
+
+			// Update metadata timestamp
+			meta.InstallDate = time.Now().UTC().Format(time.RFC3339)
+			if err := data.SaveSkillSourceMeta(destDir, meta); err != nil {
+				util.Warnf("Failed to update metadata for %s: %v\n", skill.Name, err)
+			}
+
+			fmt.Printf("Skill '%s' updated successfully.\n", skill.Name)
+		}
+
+		// Cleanup temp directory after processing all skills from this source
+		os.RemoveAll(tempDir)
+	}
+
+	return nil
 }
 
 // printSkillMeta prints a skill in a formatted way

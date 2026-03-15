@@ -1,6 +1,7 @@
 package data
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,14 +11,23 @@ import (
 )
 
 const (
-	SkillFile = "SKILL.md"
+	SkillFile     = "SKILL.md"
+	SkillMetaFile = "skill.meta.json"
 )
+
+// SkillSourceMeta tracks the origin of an installed skill for update purposes.
+type SkillSourceMeta struct {
+	SourceURL   string `json:"source_url"`         // Essential for remote skills
+	SubPath     string `json:"sub_path,omitempty"` // Essential for nested skill installs
+	InstallDate string `json:"install_date"`       // Essential for update tracking
+}
 
 // SkillMetadata represents the metadata for a single skill.
 type SkillMetadata struct {
-	Name        string `yaml:"name"`
-	Description string `yaml:"description"`
-	Location    string `yaml:"-"` // Full path to SKILL.md, not in YAML
+	Name        string           `yaml:"name"`
+	Description string           `yaml:"description"`
+	Location    string           `yaml:"-"` // Full path to SKILL.md, not in YAML
+	SourceMeta  *SkillSourceMeta `yaml:"-"` // Loaded from skill.meta.json, not in YAML
 }
 
 // EnsureSkillsDir creates the skills directory if it doesn't exist.
@@ -75,8 +85,10 @@ func ScanSkills() ([]SkillMetadata, error) {
 			continue
 		}
 
+		singleSkillDir := filepath.Join(skillsDir, entry.Name())
+
 		// resolve the path to full path
-		skillPath := filepath.Join(skillsDir, entry.Name(), SkillFile)
+		skillPath := filepath.Join(singleSkillDir, SkillFile)
 		if _, err := os.Stat(skillPath); err != nil {
 			continue // Skip directories without SKILL.md
 		}
@@ -85,10 +97,50 @@ func ScanSkills() ([]SkillMetadata, error) {
 		if err != nil {
 			// Log error but continue scanning other skills
 			fmt.Printf("Warning: Skipping invalid skill at %s: %v\n", skillPath, err)
+			continue
 		}
+
+		// Attempt to load source metadata
+		sourceMeta, _ := LoadSkillSourceMeta(singleSkillDir)
+		meta.SourceMeta = sourceMeta
 
 		skills = append(skills, *meta)
 	}
 
 	return skills, nil
+}
+
+// LoadSkillSourceMeta reads the source metadata for a skill from its directory.
+// It returns nil, nil if the file does not exist.
+func LoadSkillSourceMeta(skillDir string) (*SkillSourceMeta, error) {
+	metaPath := filepath.Join(skillDir, SkillMetaFile)
+	content, err := os.ReadFile(metaPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil // Not an error, just an untracked/local skill
+		}
+		return nil, fmt.Errorf("failed to read skill metadata file: %w", err)
+	}
+
+	var meta SkillSourceMeta
+	if err := json.Unmarshal(content, &meta); err != nil {
+		return nil, fmt.Errorf("failed to parse skill metadata: %w", err)
+	}
+
+	return &meta, nil
+}
+
+// SaveSkillSourceMeta writes the source metadata to the skill's directory.
+func SaveSkillSourceMeta(skillDir string, meta *SkillSourceMeta) error {
+	metaPath := filepath.Join(skillDir, SkillMetaFile)
+	content, err := json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal skill metadata: %w", err)
+	}
+
+	if err := os.WriteFile(metaPath, content, 0644); err != nil {
+		return fmt.Errorf("failed to write skill metadata file: %w", err)
+	}
+
+	return nil
 }
