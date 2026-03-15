@@ -672,6 +672,16 @@ func getReadFileTool() *OpenTool {
 					"description": "Whether to include line numbers in the output.",
 					"default":     false,
 				},
+				"offset": map[string]interface{}{
+					"type":        "integer",
+					"description": "The starting line number (1-indexed). If omitted, starts from line 1.",
+					"minimum":     1,
+				},
+				"limit": map[string]interface{}{
+					"type":        "integer",
+					"description": "The maximum number of lines to read. If omitted, reads the entire file.",
+					"minimum":     1,
+				},
 			},
 			"required": []string{"path"},
 		},

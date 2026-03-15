@@ -63,18 +63,89 @@ func readFileToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 		return fmt.Sprintf("Error reading file %s: %v", path, err), nil
 	}
 
-	var response string
-	if includeLineNumbers {
-		// Add line numbers to the output
-		lines := strings.Split(string(content), "\n")
-		var numberedContent strings.Builder
-		for i, line := range lines {
-			numberedContent.WriteString(fmt.Sprintf("%4d | %s\n", i+1, line))
+	// Parse optional offset and limit parameters
+	offset := 0
+	limit := -1 // -1 means read all lines
+	needRangeReading := false
+
+	if offsetVal, exists := (*argsMap)["offset"]; exists {
+		switch v := offsetVal.(type) {
+		case float64:
+			offset = int(v)
+		case int:
+			offset = v
 		}
-		response = fmt.Sprintf("Content of %s (with line numbers):\n%s", path, numberedContent.String())
+		if offset > 0 {
+			needRangeReading = true
+			offset-- // Convert from 1-indexed to 0-indexed
+		}
+	}
+
+	// Support both 'limit' and 'lines' parameter names (learned from model behavior)
+	for _, paramName := range []string{"limit", "lines"} {
+		if limitVal, exists := (*argsMap)[paramName]; exists {
+			switch v := limitVal.(type) {
+			case float64:
+				limit = int(v)
+			case int:
+				limit = v
+			}
+			needRangeReading = true
+			break // Use first found parameter
+		}
+	}
+
+	var response string
+	
+	if needRangeReading {
+		// Range-based reading with offset and limit
+		lines := strings.Split(string(content), "\n")
+		totalLines := len(lines)
+
+		// Validate offset
+		if offset >= totalLines {
+			return fmt.Sprintf("Error: Offset %d exceeds total lines (%d) in file %s", offset+1, totalLines, path), nil
+		}
+
+		// Calculate end index
+		end := totalLines
+		if limit > 0 && offset+limit < totalLines {
+			end = offset + limit
+		}
+
+		selectedLines := lines[offset:end]
+
+		// Build response header
+		if limit > 0 {
+			response = fmt.Sprintf("Content of %s (lines %d-%d of %d):\n", path, offset+1, end, totalLines)
+		} else {
+			response = fmt.Sprintf("Content of %s (from line %d of %d):\n", path, offset+1, totalLines)
+		}
+
+		if includeLineNumbers {
+			var numberedContent strings.Builder
+			for i, line := range selectedLines {
+				numberedContent.WriteString(fmt.Sprintf("%4d | %s\n", offset+i+1, line))
+			}
+			response += numberedContent.String()
+		} else {
+			response += strings.Join(selectedLines, "\n")
+		}
 	} else {
-		// Original format without line numbers
-		response = fmt.Sprintf("Content of %s:\n%s", path, string(content))
+		// Full file reading
+		if includeLineNumbers {
+			// Add line numbers to the output
+			lines := strings.Split(string(content), "\n")
+			var numberedContent strings.Builder
+			for i, line := range lines {
+				numberedContent.WriteString(fmt.Sprintf("%4d | %s\n", i+1, line))
+			}
+			response = fmt.Sprintf("Content of %s (%d lines, with line numbers):\n%s", path, len(lines), numberedContent.String())
+		} else {
+			// Original format without line numbers
+			lines := strings.Split(string(content), "\n")
+			response = fmt.Sprintf("Content of %s (%d lines):\n%s", path, len(lines), string(content))
+		}
 	}
 
 	return response, nil
