@@ -25,7 +25,7 @@
 - **Context-Aware Agent Switching**: Agents can hand off tasks to other specialized agents with full context and instructions across different LLM providers.
 - **Context Compression**: Auto compress session history to avoid exceeding the model's context window by using summarization or truncate oldest messages.
 - **Agentic Workflow**: Orchestrate sophisticated multi-agent behaviors using state-of-the-art models for parallel task execution and save context window.
-- **Agent Skills**: Support agent skills, switch skills on and off, and install from git or local path.
+- **Agent Skills**: Support agent skills, switch skills on and off, install from Git/local paths with smart discovery, and update from remote sources.
 - **@ Reference Support**: Reference files and directories directly in prompts using @ syntax for seamless context inclusion.
 - **Workflow & Skills Commands**: Define and execute workflows and skills as commands for streamlined operations.
 - **Colorful Themes**: Supports hundreds of popular themes, compatible with light and dark modes, ANSI-color, and full true-color.
@@ -423,12 +423,33 @@ You can manage skills using the `gllm skills` command:
   gllm skills install ./path/to/skill
   ```
 
-- **Install a skill from a Git repository:**
+- **Install from a Git repository (with Multi-Path & Discovery):**
 
   ```sh
+  # Single skill
   gllm skills install https://github.com/user/skill-repo.git
-  # Or specify a subdirectory within the repo
+
+  # Specific subdirectory
   gllm skills install https://github.com/user/skill-repo.git --path sub/dir
+
+  # Multiple subdirectories
+  gllm skills install https://github.com/user/skill-repo.git --path skill1,skill2
+
+  # Smart Discovery: Scan for all skills in a repository
+  gllm skills install https://github.com/user/skill-collection-repo.git
+  ```
+
+  > [!TIP]
+  > If a provided path doesn't contain a `SKILL.md` file directly, `gllm` will automatically scan its immediate subdirectories to discover and install all available skills.
+
+- **Update installed skills:**
+
+  ```sh
+  # Update a specific skill
+  gllm skills update skill-name
+
+  # Update all skills installed from remote sources
+  gllm skills update --all
   ```
 
 - **Enable/Disable skills interactively:**
