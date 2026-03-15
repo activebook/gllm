@@ -132,25 +132,8 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 			cleanup = func() { os.RemoveAll(tempDir) }
 			defer cleanup()
 
-			if util.HasGit() {
-				fmt.Printf("Cloning %s...\n", source)
-				// Clone git repo
-				gitCmd := exec.Command("git", "clone", source, tempDir)
-				gitCmd.Stdout = os.Stdout
-				gitCmd.Stderr = os.Stderr
-				if err := gitCmd.Run(); err != nil {
-					util.Errorf("Failed to clone repository: %v\n", err)
-					return
-				}
-			} else if util.IsGitHubURL(source) {
-				fmt.Printf("Downloading archive from %s...\n", source)
-				zipURL := util.GetGitHubZipURL(source)
-				if err := util.DownloadAndExtractZip(zipURL, tempDir); err != nil {
-					util.Errorf("Failed to download and extract skill: %v\n", err)
-					return
-				}
-			} else {
-				util.Errorf("Git is not installed, and the source is not a standard GitHub repository. Please install Git to use this skill URL.\n")
+			if err := downloadRepo(source, tempDir); err != nil {
+				util.Errorf("%v\n", err)
 				return
 			}
 		} else {
