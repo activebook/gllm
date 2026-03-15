@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
@@ -15,6 +16,25 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
+
+var (
+	// skillsInstallPath holds the path flag value
+	skillsInstallPath string
+
+	// skillsUpdateAll holds the --all flag value
+	skillsUpdateAll bool
+)
+
+func init() {
+	rootCmd.AddCommand(skillsCmd)
+	skillsCmd.AddCommand(skillsListCmd)
+	skillsCmd.AddCommand(skillsInstallCmd)
+	skillsInstallCmd.Flags().StringVar(&skillsInstallPath, "path", "", "Path to the skill directory within the git repository")
+	skillsCmd.AddCommand(skillsUninstallCmd)
+	skillsCmd.AddCommand(skillsSwCmd)
+	skillsCmd.AddCommand(skillsUpdateCmd)
+	skillsUpdateCmd.Flags().BoolVarP(&skillsUpdateAll, "all", "a", false, "Update all installed skills that have source tracking")
+}
 
 // skillsCmd represents the skills subcommand
 var skillsCmd = &cobra.Command{
@@ -77,9 +97,6 @@ var skillsListCmd = &cobra.Command{
 	},
 }
 
-// skillsInstallPath holds the path flag value
-var skillsInstallPath string
-
 // skillsInstallCmd installs a skill from a path
 var skillsInstallCmd = &cobra.Command{
 	Use:     "install <path|url>",
@@ -95,9 +112,19 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 		source := args[0]
 		var absPath string
 		var cleanup func()
+		var isRemote bool // Whether this skill is installed from remote
+		var sourceMeta *data.SkillSourceMeta
 
 		// Check if source is a URL (starts with http/https or ends with .git)
 		if strings.HasPrefix(source, "http") || strings.HasSuffix(source, ".git") {
+			isRemote = true
+
+			// Track source metadata right away
+			sourceMeta = &data.SkillSourceMeta{
+				SourceURL: source,
+				SubPath:   skillsInstallPath,
+			}
+
 			// Create temp dir
 			tempDir, err := os.MkdirTemp("", "gllm-skill-clone-*")
 			if err != nil {
@@ -202,6 +229,15 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 		if err := copyDir(absPath, destDir); err != nil {
 			util.Errorf("Failed to copy skill: %v\n", err)
 			return
+		}
+
+		// Save metadata if installed from a remote source
+		if isRemote && sourceMeta != nil {
+			sourceMeta.InstallDate = time.Now().UTC().Format(time.RFC3339)
+			if err := data.SaveSkillSourceMeta(destDir, sourceMeta); err != nil {
+				// Don't fail the whole installation, but warn the user
+				fmt.Printf("Warning: Failed to save source tracking metadata: %v\n", err)
+			}
 		}
 
 		fmt.Printf("Skill '%s' installed successfully.\n", meta.Name)
@@ -381,13 +417,202 @@ var skillsSwCmd = &cobra.Command{
 	},
 }
 
-func init() {
-	rootCmd.AddCommand(skillsCmd)
-	skillsCmd.AddCommand(skillsListCmd)
-	skillsCmd.AddCommand(skillsInstallCmd)
-	skillsInstallCmd.Flags().StringVar(&skillsInstallPath, "path", "", "Path to the skill directory within the git repository")
-	skillsCmd.AddCommand(skillsUninstallCmd)
-	skillsCmd.AddCommand(skillsSwCmd)
+// skillsUpdateCmd updates an installed skill
+var skillsUpdateCmd = &cobra.Command{
+	Use:     "update [name]",
+	Aliases: []string{"up"},
+	Short:   "Update an installed skill from its original source",
+	Long: `Update a skill by re-downloading it from its original source (e.g., a GitHub repository).
+This command requires that the skill was originally installed from a remote URL.
+
+Use 'gllm skills update <name>' to update a specific skill.
+Use 'gllm skills update --all' to update all skills that support updating.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if !skillsUpdateAll && len(args) == 0 {
+			util.Errorf("You must specify a skill name or use the --all flag.\n")
+			return
+		}
+		if skillsUpdateAll && len(args) > 0 {
+			util.Errorf("Cannot specify both a skill name and the --all flag.\n")
+			return
+		}
+
+		skills, err := data.ScanSkills()
+		if err != nil {
+			util.Errorf("Failed to scan skills: %v\n", err)
+			return
+		}
+
+		// Filter skills that actually have update metadata
+		var updatableSkills []data.SkillMetadata
+		for _, s := range skills {
+			if s.SourceMeta != nil {
+				updatableSkills = append(updatableSkills, s)
+			}
+		}
+
+		if skillsUpdateAll {
+			if len(updatableSkills) == 0 {
+				fmt.Println("No updatable skills found. (Only skills installed from a URL can be updated)")
+				return
+			}
+
+			// First prompt: Summary
+			var names []string
+			for _, s := range updatableSkills {
+				names = append(names, s.Name)
+			}
+			sort.Strings(names)
+
+			var confirm1 bool
+			err := huh.NewConfirm().
+				Title(fmt.Sprintf("Found %d skills with source tracking. Update all?", len(updatableSkills))).
+				Description(fmt.Sprintf("%s", strings.Join(names, ", "))).
+				Affirmative("Yes").
+				Negative("No").
+				Value(&confirm1).
+				Run()
+			if err != nil || !confirm1 {
+				fmt.Println("Aborted.")
+				return
+			}
+
+			// Second prompt: Destructive warning
+			var confirm2 bool
+			err = huh.NewConfirm().
+				Title("WARNING: This will overwrite any local modifications in ALL selected skills. Are you absolutely sure?").
+				Affirmative("Yes, overwrite all").
+				Negative("No, abort").
+				Value(&confirm2).
+				Run()
+			if err != nil || !confirm2 {
+				fmt.Println("Aborted.")
+				return
+			}
+
+			successCount := 0
+			failCount := 0
+			for _, skill := range updatableSkills {
+				fmt.Printf("\n--- Updating %s ---\n", skill.Name)
+				if err := executeSkillUpdate(skill); err != nil {
+					util.Errorf("Failed to update %s: %v\n", skill.Name, err)
+					failCount++
+				} else {
+					successCount++
+				}
+			}
+
+			fmt.Printf("\nUpdate complete. Successfully updated %d skills. %d failures.\n", successCount, failCount)
+
+		} else {
+			// Single skill update
+			skillName := args[0]
+			var targetSkill *data.SkillMetadata
+
+			for _, s := range updatableSkills {
+				if strings.EqualFold(s.Name, skillName) {
+					targetSkill = &s
+					break
+				}
+			}
+
+			if targetSkill == nil {
+				// Check if it exists but just doesn't have metadata to give a better error message
+				for _, s := range skills {
+					if strings.EqualFold(s.Name, skillName) {
+						util.Errorf("Skill holds no origin metadata (likely installed from a local path) and cannot be updated.\n")
+						return
+					}
+				}
+				util.Errorf("Skill '%s' not found.\n", skillName)
+				return
+			}
+
+			var confirm bool
+			err := huh.NewConfirm().
+				Title(fmt.Sprintf("Updating will overwrite any local modifications to '%s'. Proceed?", targetSkill.Name)).
+				Affirmative("Yes, overwrite").
+				Negative("No, abort").
+				Value(&confirm).
+				Run()
+			if err != nil || !confirm {
+				fmt.Println("Aborted.")
+				return
+			}
+
+			if err := executeSkillUpdate(*targetSkill); err != nil {
+				util.Errorf("Failed to update %s: %v\n", targetSkill.Name, err)
+			} else {
+				fmt.Println()
+				fmt.Printf("Skill '%s' updated successfully.\n", targetSkill.Name)
+			}
+		}
+	},
+}
+
+// executeSkillUpdate handles the actual download/replace logic for a single skill
+func executeSkillUpdate(skill data.SkillMetadata) error {
+	meta := skill.SourceMeta
+	if meta == nil {
+		return fmt.Errorf("missing source metadata")
+	}
+
+	destDir := filepath.Dir(skill.Location) // Location points to SKILL.md
+
+	// Create a temporary directory for the staging
+	tempDir, err := os.MkdirTemp("", "gllm-skill-update-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	if util.HasGit() {
+		fmt.Printf("Cloning latest from %s...\n", meta.SourceURL)
+		gitCmd := exec.Command("git", "clone", meta.SourceURL, tempDir)
+		gitCmd.Stdout = os.Stdout
+		gitCmd.Stderr = os.Stderr
+		if err := gitCmd.Run(); err != nil {
+			return fmt.Errorf("failed to clone repository: %w", err)
+		}
+	} else if util.IsGitHubURL(meta.SourceURL) {
+		zipURL := util.GetGitHubZipURL(meta.SourceURL)
+		if err := util.DownloadAndExtractZip(zipURL, tempDir); err != nil {
+			return fmt.Errorf("failed to download and extract skill: %w", err)
+		}
+	} else {
+		return fmt.Errorf("Git is not installed, and the source is not a standard GitHub repository. Unable to update.")
+	}
+
+	// Resolve the sub-path if it was used during installation
+	absPath := tempDir
+	if meta.SubPath != "" {
+		absPath = filepath.Join(tempDir, meta.SubPath)
+	}
+
+	// Validate it's still a valid skill
+	skillFilePath := filepath.Join(absPath, data.SkillFile)
+	if _, err := os.Stat(skillFilePath); err != nil {
+		return fmt.Errorf("new version does not contain %s", data.SkillFile)
+	}
+
+	// We overwrite the existing directory directly. Because we are inside it, we have to be careful not to delete ourselves.
+	// Actually, standard practice is to remove the old one entirely then copy the new one over.
+	if err := os.RemoveAll(destDir); err != nil {
+		return fmt.Errorf("failed to clean existing skill directory: %w", err)
+	}
+
+	if err := copyDir(absPath, destDir); err != nil {
+		return fmt.Errorf("failed to copy new skill files: %w", err)
+	}
+
+	// Re-save the metadata with a new timestamp
+	meta.InstallDate = time.Now().UTC().Format(time.RFC3339)
+	if err := data.SaveSkillSourceMeta(destDir, meta); err != nil {
+		// Log warning but return success
+		fmt.Printf("Warning: Failed to touch metadata file post-update: %v\n", err)
+	}
+
+	return nil
 }
 
 // printSkillMeta prints a skill in a formatted way
