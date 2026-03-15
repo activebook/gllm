@@ -18,8 +18,8 @@ import (
 )
 
 var (
-	// skillsInstallPath holds the path flag value
-	skillsInstallPath string
+	// skillsInstallPaths holds the paths flag values
+	skillsInstallPaths []string
 
 	// skillsUpdateAll holds the --all flag value
 	skillsUpdateAll bool
@@ -29,7 +29,7 @@ func init() {
 	rootCmd.AddCommand(skillsCmd)
 	skillsCmd.AddCommand(skillsListCmd)
 	skillsCmd.AddCommand(skillsInstallCmd)
-	skillsInstallCmd.Flags().StringVar(&skillsInstallPath, "path", "", "Path to the skill directory within the git repository")
+	skillsInstallCmd.Flags().StringSliceVar(&skillsInstallPaths, "path", []string{}, "Paths to the skill directories within the git repository (comma separated or multiple flags)")
 	skillsCmd.AddCommand(skillsUninstallCmd)
 	skillsCmd.AddCommand(skillsSwCmd)
 	skillsCmd.AddCommand(skillsUpdateCmd)
@@ -110,23 +110,17 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		source := args[0]
-		var absPath string
+		var tempDir string
 		var cleanup func()
 		var isRemote bool // Whether this skill is installed from remote
-		var sourceMeta *data.SkillSourceMeta
 
 		// Check if source is a URL (starts with http/https or ends with .git)
 		if strings.HasPrefix(source, "http") || strings.HasSuffix(source, ".git") {
 			isRemote = true
 
-			// Track source metadata right away
-			sourceMeta = &data.SkillSourceMeta{
-				SourceURL: source,
-				SubPath:   skillsInstallPath,
-			}
-
 			// Create temp dir
-			tempDir, err := os.MkdirTemp("", "gllm-skill-clone-*")
+			var err error
+			tempDir, err = os.MkdirTemp("", "gllm-skill-clone-*")
 			if err != nil {
 				util.Errorf("Failed to create temp directory: %v\n", err)
 				return
@@ -155,93 +149,124 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 				util.Errorf("Git is not installed, and the source is not a standard GitHub repository. Please install Git to use this skill URL.\n")
 				return
 			}
-
-			// Determine path within repo
-			if skillsInstallPath != "" {
-				absPath = filepath.Join(tempDir, skillsInstallPath)
-			} else {
-				absPath = tempDir
-			}
 		} else {
 			// Local path
 			var err error
-			absPath, err = filepath.Abs(source)
+			tempDir, err = filepath.Abs(source)
 			if err != nil {
 				util.Errorf("Invalid path: %v\n", err)
 				return
 			}
 		}
 
-		// Check if source exists and is a directory
-		info, err := os.Stat(absPath)
-		if err != nil {
-			util.Errorf("Cannot access path: %v\n", err)
-			return
-		}
-		if !info.IsDir() {
-			util.Errorf("Path must be a directory containing SKILL.md\n")
-			return
+		// Ensure at least one loop iteration
+		var targetSubPaths []string
+		if len(skillsInstallPaths) > 0 {
+			targetSubPaths = skillsInstallPaths
+		} else {
+			targetSubPaths = []string{""}
 		}
 
-		// Validate SKILL.md exists
-		skillFilePath := filepath.Join(absPath, data.SkillFile)
-		if _, err := os.Stat(skillFilePath); err != nil {
-			util.Errorf("SKILL.md not found in %s\n", absPath)
-			return
-		}
+		successCount := 0
+		failCount := 0
 
-		// Parse and validate frontmatter
-		meta, err := data.ParseSkillFrontmatter(skillFilePath)
-		if err != nil {
-			util.Errorf("Invalid SKILL.md: %v\n", err)
-			return
-		}
-
-		if meta.Name == "" {
-			util.Errorf("SKILL.md must have a 'name' field in frontmatter\n")
-			return
-		}
-
-		// Use the skill name from frontmatter as destination folder name
-		destDir := filepath.Join(data.GetSkillsDirPath(), meta.Name)
-
-		// Check if skill already exists
-		if _, err := os.Stat(destDir); err == nil {
-			var confirm bool
-			err := huh.NewConfirm().
-				Title(fmt.Sprintf("Skill '%s' already exists. Overwrite?", meta.Name)).
-				Affirmative("Yes").
-				Negative("No").
-				Value(&confirm).
-				Run()
-			if err != nil || !confirm {
-				fmt.Println("Aborted.")
-				return
+		for _, subPath := range targetSubPaths {
+			absSkillDir := tempDir
+			if subPath != "" {
+				absSkillDir = filepath.Join(tempDir, subPath)
 			}
-			// Remove existing
-			if err := os.RemoveAll(destDir); err != nil {
-				util.Errorf("Failed to remove existing skill: %v\n", err)
-				return
+
+			if len(targetSubPaths) > 1 {
+				fmt.Printf("\n--- Installing path: %s ---\n", subPath)
+			}
+
+			if err := installSingleSkill(absSkillDir, isRemote, source, subPath); err != nil {
+				util.Errorf("Failed to install skill from path '%s': %v\n", subPath, err)
+				failCount++
+			} else {
+				successCount++
 			}
 		}
 
-		// Copy directory
-		if err := copyDir(absPath, destDir); err != nil {
-			util.Errorf("Failed to copy skill: %v\n", err)
-			return
-		}
-
-		// Save metadata if installed from a remote source
-		if isRemote && sourceMeta != nil {
-			sourceMeta.InstallDate = time.Now().UTC().Format(time.RFC3339)
-			if err := data.SaveSkillSourceMeta(destDir, sourceMeta); err != nil {
-				// Don't fail the whole installation, but warn the user
-				fmt.Printf("Warning: Failed to save source tracking metadata: %v\n", err)
+		if len(targetSubPaths) > 1 {
+			if failCount > 0 {
+				fmt.Printf("\nInstallation complete. Successfully installed %d skills. %d failures.\n", successCount, failCount)
+			} else {
+				fmt.Printf("\nInstallation complete. Successfully installed %d skills.\n", successCount)
 			}
 		}
-
-		fmt.Printf("Skill '%s' installed successfully.\n", meta.Name)
 	},
+}
+
+// installSingleSkill handles the validation, copying, and metadata saving of a single skill directory
+func installSingleSkill(absSkillDirPath string, isRemote bool, sourceURL string, subPath string) error {
+	// Check if source exists and is a directory
+	info, err := os.Stat(absSkillDirPath)
+	if err != nil {
+		return fmt.Errorf("cannot access path: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("path must be a directory containing %s", data.SkillFile)
+	}
+
+	// Validate SKILL.md exists
+	skillFilePath := filepath.Join(absSkillDirPath, data.SkillFile)
+	if _, err := os.Stat(skillFilePath); err != nil {
+		return fmt.Errorf("%s not found in %s", data.SkillFile, absSkillDirPath)
+	}
+
+	// Parse and validate frontmatter
+	meta, err := data.ParseSkillFrontmatter(skillFilePath)
+	if err != nil {
+		return fmt.Errorf("invalid %s: %w", data.SkillFile, err)
+	}
+
+	if meta.Name == "" {
+		return fmt.Errorf("%s must have a 'name' field in frontmatter", data.SkillFile)
+	}
+
+	// Use the skill name from frontmatter as destination folder name
+	destDir := filepath.Join(data.GetSkillsDirPath(), meta.Name)
+
+	// Check if skill already exists
+	if _, err := os.Stat(destDir); err == nil {
+		var confirm bool
+		err := huh.NewConfirm().
+			Title(fmt.Sprintf("Skill '%s' already exists. Overwrite?", meta.Name)).
+			Affirmative("Yes").
+			Negative("No").
+			Value(&confirm).
+			Run()
+		if err != nil || !confirm {
+			util.Warnf("user aborted overwrite for skill '%s'", meta.Name)
+			return nil
+		}
+		// Remove existing
+		if err := os.RemoveAll(destDir); err != nil {
+			return fmt.Errorf("failed to remove existing skill: %w", err)
+		}
+	}
+
+	// Copy directory
+	if err := copyDir(absSkillDirPath, destDir); err != nil {
+		return fmt.Errorf("failed to copy skill: %w", err)
+	}
+
+	// Save metadata if installed from a remote source
+	if isRemote {
+		sourceMeta := &data.SkillSourceMeta{
+			SourceURL:   sourceURL,
+			SubPath:     subPath,
+			InstallDate: time.Now().UTC().Format(time.RFC3339),
+		}
+		if err := data.SaveSkillSourceMeta(destDir, sourceMeta); err != nil {
+			// Don't fail the whole installation, but warn the user
+			util.Warnf("Failed to save source tracking metadata: %v\n", err)
+		}
+	}
+
+	fmt.Printf("Skill '%s' installed successfully.\n", meta.Name)
+	return nil
 }
 
 // skillsUninstallCmd removes an installed skill
