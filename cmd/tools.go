@@ -115,14 +115,7 @@ var toolsSwCmd = &cobra.Command{
 	},
 }
 
-func ListAllTools() {
-	store := data.NewConfigStore()
-	agent := store.GetActiveAgent()
-	if agent == nil {
-		fmt.Println("No active agent found")
-		return
-	}
-
+func GetAllTools(agent *data.AgentConfig) string {
 	allTools := service.GetAllOpenTools()
 
 	// Sort for consistent display
@@ -182,11 +175,7 @@ func ListAllTools() {
 		}
 	}
 
-	enabledCount := 0
-	for range enabledSet {
-		enabledCount++
-	}
-
+	var toolsList string
 	// Append char ' behind the tool name of those non-embedding tools
 	// to tell user those tools are not switchable
 	// they are built-in capabilities tools
@@ -196,8 +185,21 @@ func ListAllTools() {
 			displayName += "'"
 		}
 		indicator := ui.FormatEnabledIndicator(enabledSet[tool])
-		fmt.Printf("%s %s\n", indicator, displayName)
+		toolsList += fmt.Sprintf("%s %s\n", indicator, displayName)
 	}
-	fmt.Printf("\n%d tool(s) enabled for current agent.\n", enabledCount)
+
+	return toolsList
+}
+
+func ListAllTools() {
+	store := data.NewConfigStore()
+	agent := store.GetActiveAgent()
+	if agent == nil {
+		fmt.Println("No active agent found")
+		return
+	}
+
+	toolsList := GetAllTools(agent)
+	fmt.Println(toolsList)
 	fmt.Println("' behind the tool name means it is a built-in capabilities tool which can be switched on/off in agent capabilities settings.")
 }
