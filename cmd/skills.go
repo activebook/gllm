@@ -113,6 +113,9 @@ You can use the --path flag to specify a subdirectory within the git repository.
 The source (local or resolved git path) must contain a valid SKILL.md file with frontmatter.`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		// Stop any global indicator to prevent UI interference
+		ui.GetIndicator().Stop()
+
 		source := args[0]
 		var tempDir string
 		var cleanup func()
@@ -146,12 +149,38 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 			}
 		}
 
-		// Ensure at least one loop iteration
-		var targetSubPaths []string
-		if len(skillsInstallPaths) > 0 {
-			targetSubPaths = skillsInstallPaths
-		} else {
-			targetSubPaths = []string{""}
+		// Discover skills in the specified paths
+		targetSubPaths, err := discoverSkills(tempDir, skillsInstallPaths)
+		if err != nil {
+			util.Errorf("Discovery failed: %v\n", err)
+			return
+		}
+
+		// If multiple skills are found, prompt for confirmation
+		if len(targetSubPaths) > 1 {
+			var names []string
+			for _, p := range targetSubPaths {
+				// Just show the subpath/name for clarity
+				if p == "" {
+					names = append(names, "(root)")
+				} else {
+					names = append(names, p)
+				}
+			}
+			sort.Strings(names)
+
+			var confirm bool
+			err := huh.NewConfirm().
+				Title(fmt.Sprintf("Discovered %d skills. Install all?", len(targetSubPaths))).
+				Description(strings.Join(names, ", ")).
+				Affirmative("Yes").
+				Negative("No").
+				Value(&confirm).
+				Run()
+			if err != nil || !confirm {
+				fmt.Println("Aborted.")
+				return
+			}
 		}
 
 		successCount := 0
@@ -254,6 +283,51 @@ func installSingleSkill(absSkillDirPath string, isRemote bool, sourceURL string,
 
 	fmt.Printf("Skill '%s' installed successfully.\n", meta.Name)
 	return nil
+}
+
+// discoverSkills scans the provided paths (or root) for SKILL.md files.
+// If a path is not a skill itself, it scans its immediate subdirectories.
+func discoverSkills(tempDir string, initialPaths []string) ([]string, error) {
+	if len(initialPaths) == 0 {
+		initialPaths = []string{""}
+	}
+
+	var targetSubPaths []string
+	for _, sp := range initialPaths {
+		fullPathToSub := filepath.Join(tempDir, sp)
+
+		// 1. Check if the path itself is a skill
+		if _, err := os.Stat(filepath.Join(fullPathToSub, data.SkillFile)); err == nil {
+			targetSubPaths = append(targetSubPaths, sp)
+			continue
+		}
+
+		// 2. If not, try to discover skills in immediate subdirectories
+		entries, err := os.ReadDir(fullPathToSub)
+		if err != nil {
+			// If we can't read it, we'll just add it and let the installation loop handle the error
+			targetSubPaths = append(targetSubPaths, sp)
+			continue
+		}
+
+		discoveredCount := 0
+		for _, entry := range entries {
+			if entry.IsDir() {
+				if _, err := os.Stat(filepath.Join(fullPathToSub, entry.Name(), data.SkillFile)); err == nil {
+					targetSubPaths = append(targetSubPaths, filepath.Join(sp, entry.Name()))
+					discoveredCount++
+				}
+			}
+		}
+
+		// If no skills were found in subdirectories, still include the original path
+		// so that the main installation logic can report the "SKILL.md not found" error properly.
+		if discoveredCount == 0 {
+			targetSubPaths = append(targetSubPaths, sp)
+		}
+	}
+
+	return targetSubPaths, nil
 }
 
 // skillsUninstallCmd removes an installed skill
@@ -404,7 +478,7 @@ var skillsSwCmd = &cobra.Command{
 		).Run()
 
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
+			util.Errorf("%v\n", err)
 			return
 		}
 
@@ -440,6 +514,9 @@ This command requires that the skill was originally installed from a remote URL.
 Use 'gllm skills update <name>' to update a specific skill.
 Use 'gllm skills update --all' to update all skills that support updating.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// Stop any global indicator to prevent UI interference
+		ui.GetIndicator().Stop()
+
 		if !skillsUpdateAll && len(args) == 0 {
 			util.Errorf("You must specify a skill name or use the --all flag.\n")
 			return
