@@ -50,7 +50,7 @@ different AI assistant setups with different models, tools, and settings.`,
 			return
 		}
 		fmt.Println("Current agent configuration:")
-		printAgentConfigDetails(activeAgent, "  ")
+		printAgentConfigDetails(activeAgent, "")
 		fmt.Println()
 
 		// Then show the list of available agents
@@ -763,7 +763,7 @@ var agentInfoCmd = &cobra.Command{
 
 		fmt.Printf("Agent '%s' configuration:\n", name)
 		// Display configuration using the same formatting as add/set commands
-		printAgentConfigDetails(agentConfig, "  ")
+		printAgentConfigDetails(agentConfig, "")
 		return nil
 	},
 }

@@ -192,7 +192,7 @@ var mcpListCmd = &cobra.Command{
 				statusSuffix = data.SwitchOffColor + "(blocked)" + data.ResetSeq
 			}
 
-			fmt.Printf("  %s %-18s %-7s %s\n", enableIndicator, name, server.Type, statusSuffix)
+			fmt.Printf("%s %-18s %-7s %s\n", enableIndicator, name, server.Type, statusSuffix)
 		}
 
 		fmt.Printf("\n%s = Allowed MCP server\n", ui.FormatEnabledIndicator(true))

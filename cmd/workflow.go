@@ -61,9 +61,9 @@ var workflowListCmd = &cobra.Command{
 		for _, name := range names {
 			_, desc, _ := wm.GetWorkflowByName(name)
 			if desc != "" {
-				fmt.Printf("  /%s - %s\n", name, desc)
+				fmt.Printf("/%s - %s\n", name, desc)
 			} else {
-				fmt.Printf("  /%s\n", name)
+				fmt.Printf("/%s\n", name)
 			}
 		}
 	},

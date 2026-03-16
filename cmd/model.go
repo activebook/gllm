@@ -116,7 +116,7 @@ var modelListCmd = &cobra.Command{
 			if isDefault {
 				pname = data.HighlightColor + name + data.ResetSeq
 			}
-			fmt.Printf(" %s %s\n", indicator, pname)
+			fmt.Printf("%s %s\n", indicator, pname)
 
 			if verbose {
 				if modelConfig := modelsMap[modelName]; modelConfig != nil {

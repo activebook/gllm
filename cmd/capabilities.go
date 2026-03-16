@@ -279,7 +279,7 @@ func printCapSummary(caps []string) {
 
 func printCapStatus(name string, enabled bool) {
 	indicator := ui.FormatEnabledIndicator(enabled)
-	fmt.Printf("  %s %s\n", indicator, name)
+	fmt.Printf("%s %s\n", indicator, name)
 
 	var desc string
 	switch name {
@@ -307,7 +307,7 @@ func printCapStatus(name string, enabled bool) {
 		lines := strings.Split(desc, "\n")
 		for _, line := range lines {
 			if strings.TrimSpace(line) != "" {
-				fmt.Printf("  %s%s%s\n", data.DetailColor, line, data.ResetSeq)
+				fmt.Printf("%s%s%s\n", data.DetailColor, line, data.ResetSeq)
 			}
 		}
 	}
