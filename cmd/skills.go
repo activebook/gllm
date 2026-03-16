@@ -23,9 +23,6 @@ var (
 
 	// skillsUpdateAll holds the --all flag value
 	skillsUpdateAll bool
-
-	// skillsInstallAll holds the --all flag for install
-	skillsInstallAll bool
 )
 
 func init() {
@@ -33,7 +30,6 @@ func init() {
 	skillsCmd.AddCommand(skillsListCmd)
 	skillsCmd.AddCommand(skillsInstallCmd)
 	skillsInstallCmd.Flags().StringSliceVar(&skillsInstallPaths, "path", []string{}, "Paths to the skill directories within the git repository (comma separated or multiple flags)")
-	skillsInstallCmd.Flags().BoolVar(&skillsInstallAll, "all", false, "Install all skills from the repository")
 	skillsCmd.AddCommand(skillsUninstallCmd)
 	skillsCmd.AddCommand(skillsSwCmd)
 	skillsCmd.AddCommand(skillsUpdateCmd)

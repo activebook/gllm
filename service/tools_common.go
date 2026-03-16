@@ -659,7 +659,7 @@ func getOpenTools() []*OpenTool {
 func getReadFileTool() *OpenTool {
 	readFileFunc := OpenFunctionDefinition{
 		Name:        ToolReadFile,
-		Description: "Read the contents of a file from the filesystem. Optionally include line numbers for easier referencing.",
+		Description: "Read the contents of a file from the filesystem. Supports range reading via offset and limit (or lines).",
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -671,6 +671,21 @@ func getReadFileTool() *OpenTool {
 					"type":        "boolean",
 					"description": "Whether to include line numbers in the output.",
 					"default":     false,
+				},
+				"offset": map[string]interface{}{
+					"type":        "integer",
+					"description": "The starting line number (1-indexed). If omitted, starts from line 1.",
+					"minimum":     1,
+				},
+				"limit": map[string]interface{}{
+					"type":        "integer",
+					"description": "The maximum number of lines to read. If omitted, reads the entire file.",
+					"minimum":     1,
+				},
+				"lines": map[string]interface{}{
+					"type":        "integer",
+					"description": "The maximum number of lines to read (alias for limit).",
+					"minimum":     1,
 				},
 			},
 			"required": []string{"path"},
