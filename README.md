@@ -452,6 +452,8 @@ You can manage skills using the `gllm skills` command:
   gllm skills update --all
   ```
 
+  ![Update Skills](screenshots/update_skills.png)
+
 - **Enable/Disable skills interactively:**
 
   ```sh
