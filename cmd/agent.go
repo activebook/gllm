@@ -9,6 +9,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/io"
 	"github.com/activebook/gllm/service"
 	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
@@ -49,7 +50,7 @@ different AI assistant setups with different models, tools, and settings.`,
 			return
 		}
 		fmt.Println("Current agent configuration:")
-		printAgentConfigDetails(activeAgent, "  ")
+		printAgentConfigDetails(activeAgent, "")
 		fmt.Println()
 
 		// Then show the list of available agents
@@ -128,7 +129,7 @@ var agentAddCmd = &cobra.Command{
 		)
 
 		// Initial defaults
-		height := ui.GetTermFitHeight(100) // algo would use term height/2
+		height := io.GetTermFitHeight(100) // algo would use term height/2
 
 		// Get available options from data layer
 		store := data.NewConfigStore()
@@ -358,7 +359,7 @@ var agentSetCmd = &cobra.Command{
 			}
 			// Sort names alphabetically and keep selected agent at top if exists
 			ui.SortOptions(options, name)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent to Edit").
@@ -618,7 +619,7 @@ var agentRemoveCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent to Remove").
@@ -691,7 +692,7 @@ tools, search settings, and other preferences to match the selected agent.`,
 			}
 			// Sort names alphabetically and keep selected agent at top if exists
 			ui.SortOptions(options, name)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent").
@@ -741,7 +742,7 @@ var agentInfoCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent to Check").
@@ -762,7 +763,7 @@ var agentInfoCmd = &cobra.Command{
 
 		fmt.Printf("Agent '%s' configuration:\n", name)
 		// Display configuration using the same formatting as add/set commands
-		printAgentConfigDetails(agentConfig, "  ")
+		printAgentConfigDetails(agentConfig, "")
 		return nil
 	},
 }
@@ -796,7 +797,7 @@ var agentRenameCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, store.GetActiveAgentName())
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Agent to Rename").

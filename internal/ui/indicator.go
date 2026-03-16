@@ -30,7 +30,6 @@ func FormatEnabledIndicator(enabled bool) string {
 // For long-running operations, we can use a spinner indicator
 
 const (
-	IndicatorThinking           = "Thinking..."
 	IndicatorLoadingMCP         = "Loading MCP servers..."
 	IndicatorCompressingContext = "Compressing context..."
 	IndicatorCheckingUpdate     = "Checking for updates..."

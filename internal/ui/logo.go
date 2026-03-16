@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/io"
 	"github.com/superstarryeyes/bit/ansifonts"
 )
 
@@ -21,7 +22,7 @@ func GetLogo(textColor string, gradientColor string, scale float64) string {
 	}
 
 	// Only use gradient if terminal supports TrueColor
-	useGradient := TerminalSupportsTrueColor()
+	useGradient := io.TerminalSupportsTrueColor()
 	if !useGradient {
 		textColor = data.ForegroundColor
 		gradientColor = textColor
@@ -60,7 +61,7 @@ func PrintLogo(textColor string, gradientColor string, scale float64) {
 	}
 
 	// Only use gradient if terminal supports TrueColor
-	useGradient := TerminalSupportsTrueColor()
+	useGradient := io.TerminalSupportsTrueColor()
 	if !useGradient {
 		textColor = data.ForegroundColor
 		gradientColor = textColor

@@ -6,6 +6,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/io"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -84,7 +85,7 @@ var toolsSwCmd = &cobra.Command{
 		}
 		// Sort: selected items first, then alphabetically within each group
 		ui.SortMultiOptions(options, enabledTools)
-		height := ui.GetTermFitHeight(len(options))
+		height := io.GetTermFitHeight(len(options))
 
 		var selectedTools []string
 		err := huh.NewForm(

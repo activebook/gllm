@@ -5,7 +5,8 @@ import (
 	"math"
 
 	"github.com/activebook/gllm/data"
-	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/internal/event"
+	"github.com/activebook/gllm/io"
 	"github.com/activebook/gllm/util"
 )
 
@@ -52,8 +53,8 @@ type Agent struct {
 	MaxRecursions   int                 // Maximum number of recursions for model calls
 	Markdown        *Markdown           // Markdown renderer
 	TokenUsage      *TokenUsage         // Token usage metainfo
-	Std             *ui.StdRenderer     // Standard renderer
-	OutputFile      *ui.FileRenderer    // File renderer
+	StdOutput       io.Output           // Standard I/O
+	FileOutput      io.Output           // File I/O
 	Status          StatusStack         // Stack to manage streaming status
 	Session         SessionManager      // Session manager
 	Context         ContextManager      // Context manager
@@ -119,6 +120,26 @@ func constructSearchEngine(capabilities []string) *SearchEngine {
 
 	util.Debugf("Search engine: %v, %v\n", se.Name, se.UseSearch)
 	return &se
+}
+
+func constructIO(quiet bool, outputFile string) (io.Output, io.Output) {
+	// Provide StdRenderer from options
+	var stdIO io.Output
+	if !quiet {
+		stdIO = io.NewStdOutput()
+	}
+
+	// Need to output a file
+	var fileIO io.Output
+	if outputFile != "" {
+		var err error
+		fileIO, err = io.NewFileOutput(outputFile)
+		if err != nil {
+			util.Warnf("failed to create output file %s: %v\n", outputFile, err)
+			return nil, nil
+		}
+	}
+	return stdIO, fileIO
 }
 
 // ConstructSystemPrompt constructs the system prompt by injecting memory and skills into the prompt
@@ -248,8 +269,8 @@ type AgentOptions struct {
 	EnabledTools  []string // List of enabled embedding tools
 	Capabilities  []string // List of enabled capabilities
 	YoloMode      bool     // Whether to automatically approve tools
-	OutputFile    string
-	QuietMode     bool
+	QuietMode     bool     // If Quiet mode then don't print to console
+	OutputFile    string   // If OutputFile is set then write to file
 	SessionName   string
 	MCPConfig     map[string]*data.MCPServer
 
@@ -295,22 +316,15 @@ func CallAgent(op *AgentOptions) error {
 	activeNotifyCh := notifyCh
 	activeDataCh := dataCh
 
-	// Only create StdRenderer if not in quiet mode
-	var std *ui.StdRenderer
-	if !op.QuietMode {
-		std = ui.NewStdRenderer()
+	// Provide StdRenderer from options
+	// Bug: Before we assigned a nil pointer to an interface, that created an interface with (type=*io.StdOutput, value=nil).
+	// Bugfix: use interfaces, not concrete types
+	stdIO, fileIO := constructIO(op.QuietMode, op.OutputFile)
+	if stdIO != nil {
+		defer stdIO.Close()
 	}
-
-	// Need to output a file
-	var fileRenderer *ui.FileRenderer
-	if op.OutputFile != "" {
-		var err error
-		fileRenderer, err = ui.NewFileRenderer(op.OutputFile)
-		if err != nil {
-			err := fmt.Errorf("failed to create output file %s: %v", op.OutputFile, err)
-			return err
-		}
-		defer fileRenderer.Close()
+	if fileIO != nil {
+		defer fileIO.Close()
 	}
 
 	// Set up MCP client
@@ -318,14 +332,14 @@ func CallAgent(op *AgentOptions) error {
 	if IsMCPServersEnabled(op.Capabilities) {
 		mc = GetMCPClient() // use the shared instance
 		if !op.QuietMode {
-			ui.GetIndicator().Start(ui.IndicatorLoadingMCP)
+			event.StartIndicator("")
 		}
 		err := mc.Init(op.MCPConfig, MCPLoadOption{
 			LoadAll:   false,
 			LoadTools: true, // only load tools
 		}) // Load only allowed servers
 		if !op.QuietMode {
-			ui.GetIndicator().Stop()
+			event.StopIndicator()
 		}
 		if err != nil {
 			return fmt.Errorf("failed to load MCPServers: %v", err)
@@ -371,8 +385,8 @@ func CallAgent(op *AgentOptions) error {
 		MaxRecursions: op.MaxRecursions,
 		Markdown:      markdown,
 		TokenUsage:    tu,
-		Std:           std,
-		OutputFile:    fileRenderer,
+		StdOutput:     stdIO,
+		FileOutput:    fileIO,
 		Status:        StatusStack{},
 		SharedState:   op.SharedState,
 		AgentName:     op.AgentName,

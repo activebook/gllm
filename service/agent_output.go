@@ -6,24 +6,31 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
-	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/internal/event"
+	"github.com/activebook/gllm/io"
 	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/lipgloss"
+)
+
+const (
+	StartThinking = "Thinking ↓"
+	InTheThinking = "Thinking..."
+	EndThinking   = "✓"
 )
 
 /*
 WriteText writes the given text to the Agent's Std, Markdown, and OutputFile writers if they are set.
 */
 func (ag *Agent) WriteText(text string) {
-	if ag.Std != nil {
-		ag.Std.Writef("%s", text)
+	if ag.StdOutput != nil {
+		ag.StdOutput.Writef("%s", text)
 		ag.LastWrittenData = text
 	}
 	if ag.Markdown != nil {
 		ag.Markdown.Writef("%s", text)
 	}
-	if ag.OutputFile != nil {
-		ag.OutputFile.Writef("%s", text)
+	if ag.FileOutput != nil {
+		ag.FileOutput.Writef("%s", text)
 	}
 }
 
@@ -32,35 +39,35 @@ StartReasoning notifies the user and logs to file that the agent has started thi
 It writes a status message to both Std and OutputFile if they are available.
 */
 func (ag *Agent) StartReasoning() {
-	if ag.Std != nil {
+	if ag.StdOutput != nil {
 		if ag.Verbose {
-			ag.Std.Writeln(data.ReasoningActiveColor + "Thinking ↓")
+			ag.StdOutput.Writeln(data.ReasoningActiveColor + StartThinking)
 		} else {
 			// Only output thinking indicator under non-verbose mode
 			// ag.Std.Writeln(data.ReasoningActiveColor + "Thinking..." + data.ResetSeq)
 
 			// bug: we cannot use indicator, because some models would generate tool calls
 			// inside reasoning, before reasoning end
-			ui.GetIndicator().Start(ui.IndicatorThinking)
+			event.StartIndicator(InTheThinking)
 		}
 	}
-	if ag.OutputFile != nil {
-		ag.OutputFile.Writeln("Thinking ↓")
+	if ag.FileOutput != nil {
+		ag.FileOutput.Writeln(StartThinking)
 	}
 }
 
 func (ag *Agent) CompleteReasoning() {
-	if ag.Std != nil {
+	if ag.StdOutput != nil {
 		if ag.Verbose {
-			ag.Std.Writeln(data.ResetSeq + data.ReasoningActiveColor + "✓" + data.ResetSeq)
+			ag.StdOutput.Writeln(data.ResetSeq + data.ReasoningActiveColor + EndThinking + data.ResetSeq)
 		} else {
 			// bugfix: some models such as gemini, would do tool calls before reasoning end
-			ui.GetIndicator().Stop()
+			event.StopIndicator()
 			// ag.Std.Writeln()
 		}
 	}
-	if ag.OutputFile != nil {
-		ag.OutputFile.Writeln("✓")
+	if ag.FileOutput != nil {
+		ag.FileOutput.Writeln(EndThinking)
 	}
 }
 
@@ -68,29 +75,29 @@ func (ag *Agent) CompleteReasoning() {
 WriteReasoning writes the provided reasoning text to both the standard output and an output file, applying specific formatting to each if they are available.
 */
 func (ag *Agent) WriteReasoning(text string) {
-	if ag.Std != nil {
+	if ag.StdOutput != nil {
 		// Only output reasoning content under verbose
 		if ag.Verbose {
-			ag.Std.Writef("%s%s", data.ReasoningDoneColor, text)
+			ag.StdOutput.Writef("%s%s", data.ReasoningDoneColor, text)
 			ag.LastWrittenData = text
 		} else {
 			// bugfix: reasoning maybe continue after tool calls
-			if !ui.GetIndicator().IsActive() {
+			if !event.IsIndicatorActive() {
 				// Restart thinking indicator
-				ui.GetIndicator().Start(ui.IndicatorThinking)
+				event.StartIndicator(InTheThinking)
 			}
 		}
 	}
-	if ag.OutputFile != nil {
-		ag.OutputFile.Writef("%s", text)
+	if ag.FileOutput != nil {
+		ag.FileOutput.Writef("%s", text)
 	}
 }
 
 func (ag *Agent) WriteMarkdown() {
 	// Render the markdown
 	if ag.Markdown != nil {
-		if ag.Std != nil {
-			ag.Markdown.Render(ag.Std)
+		if ag.StdOutput != nil {
+			ag.Markdown.Render(ag.StdOutput)
 		}
 	}
 }
@@ -98,21 +105,21 @@ func (ag *Agent) WriteMarkdown() {
 func (ag *Agent) WriteUsage() {
 	// Render the token usage
 	if ag.TokenUsage != nil {
-		if ag.Std != nil {
-			ag.TokenUsage.Render(ag.Std)
+		if ag.StdOutput != nil {
+			ag.TokenUsage.Render(ag.StdOutput)
 		}
 	}
 }
 
 func (ag *Agent) WriteDiffConfirm(text string) {
 	// Only write to stdout
-	if ag.Std != nil {
-		ag.Std.Writeln(text)
+	if ag.StdOutput != nil {
+		ag.StdOutput.Writeln(text)
 	}
 }
 
 func (ag *Agent) WriteFunctionCall(text string) {
-	if ag.Std != nil {
+	if ag.StdOutput != nil {
 		// Attempt to parse text as JSON
 		// The text is expected to be in format "function_name(arguments)" or just raw text
 		// But in our new implementation, we will pass a JSON string: {"function": name, "args": args}
@@ -138,7 +145,7 @@ func (ag *Agent) WriteFunctionCall(text string) {
 			Margin(0, 0)
 
 		// Make sure we have enough space for the border
-		tcol := ui.GetTerminalWidth() - 8
+		tcol := io.GetTerminalWidth() - 8
 
 		// Structured data available
 		titleStyle := lipgloss.NewStyle().
@@ -201,23 +208,27 @@ func (ag *Agent) WriteFunctionCall(text string) {
 				content = fmt.Sprintf("%s\n%s", titleStyle.Render(toolData.Function), argsStyle.Render(detail))
 			}
 			output = style.Render(content)
-
-			// Bugfix: tool call could be inside reasoning block
-			if ui.GetIndicator().IsActive() {
-				// Stop thinking indicator
-				ui.GetIndicator().Stop()
-			}
 		}
 
-		ag.Std.Writeln(output)
+		// If true, indicator spinning, so we need to stop, print, then start
+		wasIndicatorActive := event.IsIndicatorActive()
+		if wasIndicatorActive {
+			event.StopIndicator()
+		}
+
+		ag.StdOutput.Writeln(output)
+
+		if wasIndicatorActive {
+			event.StartIndicator("")
+		}
 	}
-	if ag.OutputFile != nil {
-		ag.OutputFile.Writef("\n%s\n", text)
+	if ag.FileOutput != nil {
+		ag.FileOutput.Writef("\n%s\n", text)
 	}
 }
 
 func (ag *Agent) WriteFunctionCallOver() {
-	if ag.Std != nil {
+	if ag.StdOutput != nil {
 		if !ag.Verbose {
 			// Add a newline to separate the function call from the output
 			// ag.Std.Writeln()
@@ -229,24 +240,24 @@ func (ag *Agent) WriteEnd() {
 	// Ensure output ends with a newline to prevent shell from displaying %
 	// the % character in shells like zsh when output doesn't end with newline
 	//if ag.Std != nil && ag.Markdown == nil && ag.TokenUsage == nil {
-	if ag.Std != nil {
+	if ag.StdOutput != nil {
 		if !util.EndWithNewline(ag.LastWrittenData) {
-			ag.Std.Writeln(data.ResetSeq)
+			ag.StdOutput.Writeln(data.ResetSeq)
 		}
 	}
 }
 
 func (ag *Agent) StartIndicator(text string) {
-	if ag.Std != nil {
+	if ag.StdOutput != nil {
 		// fmt.Println("Start Indicator From Agent")
-		ui.GetIndicator().Start(text)
+		event.StartIndicator(text)
 	}
 }
 
 func (ag *Agent) StopIndicator() {
-	if ag.Std != nil {
+	if ag.StdOutput != nil {
 		// fmt.Println("Stop Indicator From Agent")
-		ui.GetIndicator().Stop()
+		event.StopIndicator()
 	}
 }
 
@@ -255,17 +266,17 @@ func (ag *Agent) Error(text string) {
 	// if ag.Std != nil {
 	// 	Errorf("Agent: %v\n", text)
 	// }
-	if ag.OutputFile != nil {
-		ag.OutputFile.Writef("\n%s\n", text)
+	if ag.FileOutput != nil {
+		ag.FileOutput.Writef("\n%s\n", text)
 	}
 }
 
 func (ag *Agent) Warn(text string) {
-	if ag.Std != nil {
+	if ag.StdOutput != nil {
 		util.Warnf("%s\n", text)
 	}
-	if ag.OutputFile != nil {
-		ag.OutputFile.Writef("\n%s\n", text)
+	if ag.FileOutput != nil {
+		ag.FileOutput.Writef("\n%s\n", text)
 	}
 }
 

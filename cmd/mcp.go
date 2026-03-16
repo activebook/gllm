@@ -13,6 +13,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/io"
 	"github.com/activebook/gllm/service"
 	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
@@ -191,7 +192,7 @@ var mcpListCmd = &cobra.Command{
 				statusSuffix = data.SwitchOffColor + "(blocked)" + data.ResetSeq
 			}
 
-			fmt.Printf("  %s %-18s %-7s %s\n", enableIndicator, name, server.Type, statusSuffix)
+			fmt.Printf("%s %-18s %-7s %s\n", enableIndicator, name, server.Type, statusSuffix)
 		}
 
 		fmt.Printf("\n%s = Allowed MCP server\n", ui.FormatEnabledIndicator(true))
@@ -319,7 +320,7 @@ var mcpSwitchCmd = &cobra.Command{
 
 		// Sort options by name alphabetically and keep selected ones at top
 		ui.SortMultiOptions(options, selected)
-		height := ui.GetTermFitHeight(len(options))
+		height := io.GetTermFitHeight(len(options))
 
 		err = huh.NewMultiSelect[string]().
 			Title("Select MCP servers to allow").

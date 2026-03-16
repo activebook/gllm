@@ -6,6 +6,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/io"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -37,7 +38,7 @@ var themeCmd = &cobra.Command{
 	Use:   "theme",
 	Short: "Manage and switch themes",
 	Run: func(cmd *cobra.Command, args []string) {
-		termWidth := ui.GetTerminalWidth()
+		termWidth := io.GetTerminalWidth()
 		safeWidth := max(40, termWidth-4)
 
 		borderStyle := lipgloss.NewStyle().
@@ -142,7 +143,7 @@ var themeSwitchCmd = &cobra.Command{
 				options[i] = huh.NewOption(t, t)
 			}
 			ui.SortOptions(options, data.CurrentThemeName)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Theme").

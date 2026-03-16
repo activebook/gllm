@@ -8,6 +8,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/io"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -53,7 +54,7 @@ var editorSwitchCmd = &cobra.Command{
 				options = append(options, huh.NewOption(ed, ed))
 			}
 			ui.SortOptions(options, name)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Preferred Editor").

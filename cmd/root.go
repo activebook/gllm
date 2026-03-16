@@ -180,6 +180,9 @@ Configure your API keys and preferred models, then start chatting or executing c
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+	// Start the UI event bus listener before executing any commands
+	ui.StartUIEventListener()
+
 	// Ensure MCPClient resources are cleaned up on exit
 	// This is a safeguard; the shared instance should ideally be closed only once
 	// when the application is truly exiting, not after every command execution.

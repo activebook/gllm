@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/io"
 	"github.com/activebook/gllm/service"
 	"github.com/activebook/gllm/util"
 	tea "github.com/charmbracelet/bubbletea"
@@ -64,9 +65,9 @@ var sessionListCmd = &cobra.Command{
 		for index, session := range sessions {
 			// Display with title if available
 			if session.Provider != "" {
-				fmt.Printf("  - [%d] %s [%s]\n", index+1, session.Name, session.Provider)
+				fmt.Printf("- [%d] %s [%s]\n", index+1, session.Name, session.Provider)
 			} else {
-				fmt.Printf("  - [%d] %s\n", index+1, session.Name)
+				fmt.Printf("- [%d] %s\n", index+1, session.Name)
 			}
 		}
 		return nil
@@ -110,7 +111,7 @@ gllm session remove "2 - 5" --force`,
 				}
 				options = append(options, huh.NewOption(label, c.Name))
 			}
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 
 			var selected []string
 			err = huh.NewMultiSelect[string]().
@@ -352,7 +353,7 @@ var sessionInfoCmd = &cobra.Command{
 				}
 				options = append(options, huh.NewOption(label, c.Name))
 			}
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 
 			err = huh.NewSelect[string]().
 				Title("Select Session").
@@ -463,7 +464,7 @@ var sessionRenameCmd = &cobra.Command{
 					}
 					options = append(options, huh.NewOption(label, c.Name))
 				}
-				height := ui.GetTermFitHeight(len(options))
+				height := io.GetTermFitHeight(len(options))
 
 				err = huh.NewSelect[string]().
 					Title("Select Session to Rename").
