@@ -46,8 +46,10 @@ Agent Skills are a lightweight, open format for extending AI agent capabilities 
 
 Use 'gllm skills switch' to switch skills on/off.
 Use 'gllm skills list' to list all installed skills.
-Use 'gllm skills install <path>' to install a skill.
-Use 'gllm skills uninstall <name>' to uninstall a skill.`,
+Use 'gllm skills install --path' to install a skill(s).
+Use 'gllm skills uninstall name' to uninstall a skill.
+Use 'gllm skills update --all' to update all installed skills that have source tracking.
+`,
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
 			return []string{"list", "install", "uninstall", "switch"}, cobra.ShellCompDirectiveNoFileComp
@@ -752,12 +754,12 @@ func printSkillMeta(skill data.SkillMetadata) {
 	enabled := !settingsStore.IsSkillDisabled(skill.Name)
 	indicator := ui.FormatEnabledIndicator(enabled)
 
-	fmt.Printf("  %s %s\n", indicator, skill.Name)
+	fmt.Printf("%s %s\n", indicator, skill.Name)
 	if skill.Description != "" {
 		lines := strings.Split(skill.Description, "\n")
 		for _, line := range lines {
 			if strings.TrimSpace(line) != "" {
-				fmt.Printf("  %s%s%s\n", data.DetailColor, line, data.ResetSeq)
+				fmt.Printf("%s%s%s\n", data.DetailColor, line, data.ResetSeq)
 			}
 		}
 	}

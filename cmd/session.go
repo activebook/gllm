@@ -65,9 +65,9 @@ var sessionListCmd = &cobra.Command{
 		for index, session := range sessions {
 			// Display with title if available
 			if session.Provider != "" {
-				fmt.Printf("  - [%d] %s [%s]\n", index+1, session.Name, session.Provider)
+				fmt.Printf("- [%d] %s [%s]\n", index+1, session.Name, session.Provider)
 			} else {
-				fmt.Printf("  - [%d] %s\n", index+1, session.Name)
+				fmt.Printf("- [%d] %s\n", index+1, session.Name)
 			}
 		}
 		return nil
