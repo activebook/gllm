@@ -17,6 +17,7 @@ type BannerEvent struct {
 type IndicatorEvent struct {
 	Action IndicatorAction
 	Text   string
+	Done   chan struct{}
 }
 
 type IndicatorAction int

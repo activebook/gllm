@@ -22,6 +22,9 @@ func StartUIEventListener() {
 				case event.IndicatorStop:
 					GetIndicator().Stop()
 				}
+				if ev.Done != nil {
+					close(ev.Done)
+				}
 			case ev := <-bus.Session:
 				SendEvent(SessionModeMsg{Mode: SessionMode(ev.Mode)})
 			}
