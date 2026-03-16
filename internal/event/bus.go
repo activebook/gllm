@@ -59,7 +59,10 @@ func StartIndicator(text string) {
 
 func StopIndicator() {
 	GetBus().indicatorActive.Store(false)
-	GetBus().Indicator <- IndicatorEvent{Action: IndicatorStop}
+	done := make(chan struct{})
+	// bugfix: if we don't wait for done, the indicator won't stop before the next event is sent
+	GetBus().Indicator <- IndicatorEvent{Action: IndicatorStop, Done: done}
+	<-done
 }
 
 func IsIndicatorActive() bool {

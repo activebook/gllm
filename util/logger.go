@@ -3,12 +3,27 @@ package util
 import (
 	"os"
 
-	"github.com/activebook/gllm/internal/ui"
 	log "github.com/sirupsen/logrus"
 )
 
+// LoggerHook defines an interface for external components to intercept logging
+// and handle UI-specific tasks like stopping/restarting indicators.
+type LoggerHook interface {
+	BeforeLog() bool // Returns true if indicator was active
+	AfterLog(wasActive bool)
+}
+
 var (
-	logger          *log.Logger
+	logger     *log.Logger
+	globalHook LoggerHook
+)
+
+// RegisterLoggerHook registers a hook to be called before and after logging.
+func RegisterLoggerHook(h LoggerHook) {
+	globalHook = h
+}
+
+var (
 	indicatorActive bool // Tracks if indicator was active before logging
 )
 
@@ -43,21 +58,14 @@ func SetLoggerLevel(level log.Level) {
 }
 
 func BeforeLog() {
-	if logger != nil {
-		// Stop indicator to avoid overlap
-		indicatorActive = ui.GetIndicator().IsActive()
-		// fmt.Println("logger before log")
-		ui.GetIndicator().Stop()
+	if logger != nil && globalHook != nil {
+		indicatorActive = globalHook.BeforeLog()
 	}
 }
 
 func AfterLog() {
-	if logger != nil {
-		// Restart indicator if it was active
-		if indicatorActive {
-			// fmt.Println("logger after log")
-			ui.GetIndicator().Start("")
-		}
+	if logger != nil && globalHook != nil {
+		globalHook.AfterLog(indicatorActive)
 	}
 }
 
