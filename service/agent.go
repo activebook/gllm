@@ -122,15 +122,15 @@ func constructSearchEngine(capabilities []string) *SearchEngine {
 	return &se
 }
 
-func constructIO(quiet bool, outputFile string) (*io.StdOutput, *io.FileOutput) {
+func constructIO(quiet bool, outputFile string) (io.Output, io.Output) {
 	// Provide StdRenderer from options
-	var stdIO *io.StdOutput
+	var stdIO io.Output
 	if !quiet {
 		stdIO = io.NewStdOutput()
 	}
 
 	// Need to output a file
-	var fileIO *io.FileOutput
+	var fileIO io.Output
 	if outputFile != "" {
 		var err error
 		fileIO, err = io.NewFileOutput(outputFile)
@@ -317,6 +317,8 @@ func CallAgent(op *AgentOptions) error {
 	activeDataCh := dataCh
 
 	// Provide StdRenderer from options
+	// Bug: Before we assigned a nil pointer to an interface, that created an interface with (type=*io.StdOutput, value=nil).
+	// Bugfix: use interfaces, not concrete types
 	stdIO, fileIO := constructIO(op.QuietMode, op.OutputFile)
 	if stdIO != nil {
 		defer stdIO.Close()
