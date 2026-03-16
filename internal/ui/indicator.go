@@ -10,6 +10,7 @@ import (
 	"github.com/briandowns/spinner"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/util"
 )
 
 func init() {
@@ -139,6 +140,7 @@ func (i *Indicator) setupSpinner() {
 	// so the spinner actually starts. The library silently bails in Start()
 	// if it thinks it's not in a terminal.
 	i.s.Enable()
+	i.s.Stop()
 
 	// Setup the pre-update hook for word rotation
 	i.s.PreUpdate = func(s *spinner.Spinner) {
@@ -200,11 +202,31 @@ func (i *Indicator) Start(text string) {
 	// Set the suffix BEFORE starting
 	i.s.Suffix = fmt.Sprintf(" %s", text)
 
-	// Start the spinner
-	i.s.Start()
+	// Start Indicator
 	// fmt.Println("Start Indicator")
+	i.s.Start()
 
 	// Give the spinner goroutine time to actually start and display
 	// This is crucial - without this, the spinner may not appear
 	time.Sleep(1 * time.Millisecond)
+}
+
+// LoggerHook implementation to satisfy util.LoggerHook interface
+func (i *Indicator) BeforeLog() bool {
+	active := i.IsActive()
+	if active {
+		i.Stop()
+	}
+	return active
+}
+
+func (i *Indicator) AfterLog(wasActive bool) {
+	if wasActive {
+		i.Start("")
+	}
+}
+
+// RegisterIndicatorHook registers the global indicator as a logger hook
+func RegisterIndicatorHook() {
+	util.RegisterLoggerHook(GetIndicator())
 }

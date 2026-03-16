@@ -359,6 +359,9 @@ func setupLogging() {
 	// This ensures basic logging works even if config fails
 	util.InitLogger()
 
+	// Register UI indicator hook to prevent overlap
+	ui.RegisterIndicatorHook()
+
 	logLevelStr := viper.GetString("log.level")
 
 	// --- Determine Log Level ---
