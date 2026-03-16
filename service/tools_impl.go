@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/activebook/gllm/data"
-	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/internal/event"
 )
 
 // Tool robustness constants
@@ -184,7 +184,7 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tools
 		}
 
 		// Show diff if we have current content
-		diff := ui.Diff(currentContent, content, "", "", 3)
+		diff := event.RequestDiff(currentContent, content, 3)
 		showDiff(diff)
 
 		// Get purpose if provided
@@ -194,7 +194,7 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tools
 		}
 
 		// Prompt user for confirmation
-		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
+		event.RequestConfirm(purpose, toolsUse)
 		closeDiff() // Close the diff
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: write to file %s", path), UserCancelError{Reason: UserCancelReasonDeny}
@@ -241,7 +241,7 @@ func createDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data
 		}
 
 		// Prompt user for confirmation
-		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
+		event.RequestConfirm(purpose, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: create directory %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -335,7 +335,7 @@ func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tool
 		}
 
 		// Prompt user for confirmation
-		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
+		event.RequestConfirm(purpose, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: delete file %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -375,7 +375,7 @@ func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data
 		}
 
 		// Prompt user for confirmation
-		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
+		event.RequestConfirm(purpose, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: delete directory %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -420,7 +420,7 @@ func moveToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) 
 		}
 
 		// Prompt user for confirmation
-		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
+		event.RequestConfirm(purpose, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: move %s to %s", source, destination), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -716,7 +716,7 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse)
 			descStr = ""
 		}
 		// Use the command string as the info for confirmation
-		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, descStr, toolsUse)
+		event.RequestConfirm(descStr, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: shell command '%s'", cmdStr), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -948,7 +948,7 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsU
 	// If confirmation is needed, show the diff and ask the user
 	if needConfirm && !toolsUse.AutoApprove {
 		// Show the diff
-		diff := ui.Diff(content, modifiedContent, "", "", 3)
+		diff := event.RequestDiff(content, modifiedContent, 3)
 		showDiff(diff)
 
 		// Get purpose if provided
@@ -958,7 +958,7 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsU
 		}
 
 		// Response with a prompt to let user confirm
-		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
+		event.RequestConfirm(purpose, toolsUse)
 		closeDiff() // Close the diff
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf(ToolRespDiscardEditFile, path), UserCancelError{Reason: UserCancelReasonDeny}
@@ -1013,7 +1013,7 @@ func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) 
 		}
 
 		// Prompt user for confirmation
-		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
+		event.RequestConfirm(purpose, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: copy %s to %s", source, destination), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -1235,7 +1235,7 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Too
 
 	if needConfirm && !toolsUse.AutoApprove {
 		purpose := fmt.Sprintf("switch to agent '%s'", name)
-		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
+		event.RequestConfirm(purpose, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: switch to agent %s", name), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -1364,7 +1364,7 @@ func spawnSubAgentsToolCallImpl(
 				taskDesc.WriteString(fmt.Sprintf("- Task %d: %s (Agent: %s)", i+1, tm["task_key"], tm["agent"]))
 			}
 		}
-		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, taskDesc.String(), toolsUse)
+		event.RequestConfirm(taskDesc.String(), toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return "Operation cancelled by user: spawn sub-agents", UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -1537,7 +1537,7 @@ func activateSkillToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.T
 	// Check if confirmation is needed (default logic: always confirm unless AutoApprove is true)
 	if !toolsUse.AutoApprove {
 		description := "Activate Skill:\n" + name + "\n\nDescription:\n" + desc + "\n\nResources:\n" + tree
-		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, description, toolsUse)
+		event.RequestConfirm(description, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: activate skill %s", name), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -1565,14 +1565,14 @@ func askUserToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	}
 	placeholder, _ := (*argsMap)["placeholder"].(string)
 
-	req := ui.AskUserRequest{
+	req := event.AskUserRequest{
 		Question:     question,
-		QuestionType: ui.QuestionType(qType),
+		QuestionType: qType,
 		Options:      options,
 		Placeholder:  placeholder,
 	}
 
-	resp, err := ui.RunAskUser(req)
+	resp, err := event.RequestAskUser(req)
 	if err != nil {
 		return "", err
 	}
@@ -1595,7 +1595,7 @@ func exitPlanModeToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.To
 		if purpose == "" {
 			purpose = "exit Plan Mode and enter normal execution mode"
 		}
-		ui.NeedUserConfirmToolUse("", ToolUserConfirmPrompt, purpose, toolsUse)
+		event.RequestConfirm(purpose, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
 			return "Operation cancelled by user: User denied exiting Plan Mode.", UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -1606,7 +1606,7 @@ func exitPlanModeToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.To
 	// read the updated state and hide the banner automatically.
 	data.SetPlanModeInSession(false)
 	// Best-effort: if RunChatInput somehow is running concurrently, update banner.
-	ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModeNormal})
+	event.GetBus().Session <- event.SessionModeEvent{Mode: 0}
 
 	return "Successfully exited Plan Mode. Current session is now in normal execution mode.", nil
 }

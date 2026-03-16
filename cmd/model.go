@@ -9,6 +9,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/io"
 	"github.com/activebook/gllm/service"
 	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
@@ -379,7 +380,7 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 				options = append(options, huh.NewOption(m, m))
 			}
 			ui.SortOptions(options, name)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Edit").
@@ -564,7 +565,7 @@ var modelInfoCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Check").
@@ -640,7 +641,7 @@ gllm model remove gpt4 --force`,
 				options = append(options, huh.NewOption(m, m))
 			}
 			ui.SortOptions(options, name)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Remove").
@@ -761,7 +762,7 @@ to the specified one for all subsequent operations.`,
 				options = append(options, huh.NewOption(m, m))
 			}
 			ui.SortOptions(options, name)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 			err := huh.NewSelect[string]().
 				Title("Select Model").
 				Description("Choose which model to use for subsequent operations").
@@ -832,7 +833,7 @@ var modelRenameCmd = &cobra.Command{
 				currentName = activeAgent.Model.Name
 			}
 			ui.SortOptions(options, currentName)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Model to Rename").

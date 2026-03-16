@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/activebook/gllm/io"
 	"github.com/charmbracelet/huh"
 )
 
@@ -59,7 +60,7 @@ func runSelect(req AskUserRequest) (AskUserResponse, error) {
 	for i, o := range req.Options {
 		opts[i] = huh.NewOption(o, o)
 	}
-	height := GetTermFitHeight(len(opts))
+	height := io.GetTermFitHeight(len(opts))
 	var answer string
 	err := huh.NewForm(
 		huh.NewGroup(

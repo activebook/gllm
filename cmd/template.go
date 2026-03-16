@@ -8,6 +8,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/io"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -189,7 +190,7 @@ Example:
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Template to Edit").
@@ -257,7 +258,7 @@ var templateInfoCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Template to Check").
@@ -305,7 +306,7 @@ var templateRemoveCmd = &cobra.Command{
 				options = append(options, huh.NewOption(n, n))
 			}
 			ui.SortOptions(options, name)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 
 			err := huh.NewSelect[string]().
 				Title("Select Template to Remove").
@@ -393,7 +394,7 @@ var templateSwitchCmd = &cobra.Command{
 				options = append(options, huh.NewOption("None", " "))
 			}
 			ui.SortOptions(options, currentName)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 
 			name = currentName
 

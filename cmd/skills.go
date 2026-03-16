@@ -12,6 +12,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/io"
 	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -354,7 +355,7 @@ var skillsUninstallCmd = &cobra.Command{
 				options = append(options, huh.NewOption(s.Name, s.Name))
 			}
 			ui.SortOptions(options, "")
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 
 			err = huh.NewSelect[string]().
 				Title("Select skill to uninstall").
@@ -449,7 +450,7 @@ var skillsSwCmd = &cobra.Command{
 		}
 
 		ui.SortMultiOptions(options, enabledSkills)
-		height := ui.GetTermFitHeight(len(options))
+		height := io.GetTermFitHeight(len(options))
 
 		var selectedSkills []string
 		multiSelect := huh.NewMultiSelect[string]().

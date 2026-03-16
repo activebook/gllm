@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/io"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -170,7 +171,7 @@ func NewChatInputModel(commands []Suggestion, initialValue string, history []str
 		infoBanner = ""
 	}
 
-	width := GetTerminalWidth()
+	width := io.GetTerminalWidth()
 	return ChatInputModel{
 		hooks:         hooks,
 		textarea:      ta,
@@ -656,7 +657,7 @@ func (m ChatInputModel) View() string {
 	style := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(data.BorderHex)).
-		Width(GetTerminalWidth()-2).
+		Width(io.GetTerminalWidth()-2).
 		Padding(0, 1)
 
 	var listItems []string

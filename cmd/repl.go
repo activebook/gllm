@@ -11,6 +11,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/io"
 	"github.com/activebook/gllm/service"
 	"github.com/activebook/gllm/util"
 	tea "github.com/charmbracelet/bubbletea"
@@ -110,7 +111,7 @@ type ReplInfo struct {
 }
 
 func (ri *ReplInfo) printWelcome() {
-	termWidth := ui.GetTerminalWidth()
+	termWidth := io.GetTerminalWidth()
 	safeWidth := max(40, termWidth-4)
 
 	borderStyle := lipgloss.NewStyle().
@@ -268,7 +269,7 @@ func (ri *ReplInfo) startREPL() {
 	StartBackgroundUpdateCheck()
 
 	// Define prompt style
-	tcol := ui.GetTerminalWidth()
+	tcol := io.GetTerminalWidth()
 	promptStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color(data.CurrentTheme.Background)).
 		Foreground(lipgloss.Color(data.CurrentTheme.Foreground)).

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/io"
 	"github.com/pmezard/go-difflib/difflib"
 )
 
@@ -45,7 +46,7 @@ func Diff(content1, content2, file1, file2 string, contextLines int) string {
 			output.WriteString(cyan(line) + "\n")
 		case strings.HasPrefix(line, "@@"):
 			// Hunk header - use a simple separator instead of complex line numbers
-			separator := strings.Repeat("═", (GetTerminalWidth()*3)/4)
+			separator := strings.Repeat("═", (io.GetTerminalWidth()*3)/4)
 			output.WriteString(dim(separator + "\n"))
 
 			// Parse the hunk header to extract starting line numbers for both files

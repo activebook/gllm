@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/activebook/gllm/data"
-	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/internal/event"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -148,21 +148,21 @@ func SyncModelLimits(modelKey, configModelName string) {
 		if resp != nil {
 			resp.Body.Close()
 		}
-		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, err)})
+		event.SendBanner(getModelFailedBanner(modelKey, err))
 		return
 	}
 	defer resp.Body.Close()
 
 	var index []remoteModelIndexEntry
 	if err := json.NewDecoder(resp.Body).Decode(&index); err != nil {
-		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, err)})
+		event.SendBanner(getModelFailedBanner(modelKey, err))
 		return
 	}
 
 	// Find best match
 	bestMatch := findBestModelMatch(normalizedLower, index)
 	if bestMatch == nil {
-		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, fmt.Errorf("no match found in remote model index for %s", normalizedName))})
+		event.SendBanner(getModelFailedBanner(modelKey, fmt.Errorf("no match found in remote model index for %s", normalizedName)))
 		return
 	}
 
@@ -173,21 +173,21 @@ func SyncModelLimits(modelKey, configModelName string) {
 		if detailResp != nil {
 			detailResp.Body.Close()
 		}
-		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, err)})
+		event.SendBanner(getModelFailedBanner(modelKey, err))
 		return
 	}
 	defer detailResp.Body.Close()
 
 	var details remoteModelDetails
 	if err := json.NewDecoder(detailResp.Body).Decode(&details); err != nil {
-		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, err)})
+		event.SendBanner(getModelFailedBanner(modelKey, err))
 		return
 	}
 
 	// Determine final limits
 	contextLength := details.ContextLength
 	if contextLength <= 0 {
-		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, fmt.Errorf("invalid ContextLength %d", contextLength))})
+		event.SendBanner(getModelFailedBanner(modelKey, fmt.Errorf("invalid ContextLength %d", contextLength)))
 		return
 	}
 
@@ -200,10 +200,10 @@ func SyncModelLimits(modelKey, configModelName string) {
 	store := data.NewConfigStore()
 	err = store.SetModelLimits(modelKey, contextLength, maxOutput)
 	if err != nil {
-		ui.SendEvent(ui.BannerMsg{Text: getModelFailedBanner(modelKey, err)})
+		event.SendBanner(getModelFailedBanner(modelKey, err))
 	} else {
 		// Send banner notification
-		ui.SendEvent(ui.BannerMsg{Text: getModelUpdatedBanner(modelKey, normalizedName, contextLength, maxOutput)})
+		event.SendBanner(getModelUpdatedBanner(modelKey, normalizedName, contextLength, maxOutput))
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/io"
 	"github.com/activebook/gllm/service"
 	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/lipgloss"
@@ -247,7 +248,7 @@ func (ri *ReplInfo) showHelp() {
 	style := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(data.BorderHex)).
-		Width(ui.GetTerminalWidth()-2).
+		Width(io.GetTerminalWidth()-2).
 		Padding(0, 1)
 
 	var listItems []string

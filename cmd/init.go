@@ -6,6 +6,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/io"
 	"github.com/activebook/gllm/service"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
@@ -59,7 +60,7 @@ func RunInitWizard() error {
 		selectedThinkingLevel string
 	)
 
-	height := ui.GetTermFitHeight(100) // algo would use term height/2
+	height := io.GetTermFitHeight(100) // algo would use term height/2
 
 	store := data.NewConfigStore()
 	if store.ConfigFileUsed() != "" {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/io"
 	"github.com/activebook/gllm/service"
 	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
@@ -180,7 +181,7 @@ var workflowRemoveCmd = &cobra.Command{
 				options[i] = huh.NewOption("/"+n, n)
 			}
 			ui.SortOptions(options, name)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 			err := huh.NewSelect[string]().
 				Title("Remove Workflow").
 				Description("Select a workflow to remove").
@@ -247,7 +248,7 @@ var workflowRenameCmd = &cobra.Command{
 				options[i] = huh.NewOption("/"+n, n)
 			}
 			ui.SortOptions(options, oldName)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 			err := huh.NewSelect[string]().
 				Title("Rename Workflow").
 				Description("Select a workflow to rename").
@@ -319,7 +320,7 @@ var workflowInfoCmd = &cobra.Command{
 				options[i] = huh.NewOption("/"+n, n)
 			}
 			ui.SortOptions(options, name)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 			err := huh.NewSelect[string]().
 				Title("Workflow Information").
 				Description("Select a workflow to view details").
@@ -372,7 +373,7 @@ var workflowSetCmd = &cobra.Command{
 				options[i] = huh.NewOption("/"+n, n)
 			}
 			ui.SortOptions(options, name)
-			height := ui.GetTermFitHeight(len(options))
+			height := io.GetTermFitHeight(len(options))
 			err := huh.NewSelect[string]().
 				Title("Modify Workflow").
 				Description("Select a workflow to modify").

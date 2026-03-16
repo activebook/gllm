@@ -5,14 +5,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"net/http"
+	"net/http" // Retained as it's used by headerTransport
 	"os"
-	"os/exec"
+	"os/exec" // Retained as it's used by AddStdServer
 	"strings"
 	"sync"
 
 	"github.com/activebook/gllm/data"
-	"github.com/activebook/gllm/internal/ui"
+	"github.com/activebook/gllm/internal/event"
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -121,17 +121,16 @@ func (mc *MCPClient) PreloadAsync(servers map[string]*data.MCPServer, option MCP
 		if mc.IsReady() {
 			return
 		}
-		ui.SendEvent(ui.StatusMsg{Text: ui.IndicatorLoadingMCP})
+		event.SendStatus("Loading MCP servers...")
 		err := mc.Init(servers, option)
 		if err != nil {
 			status := fmt.Sprintf("MCP Error: %v", err)
-			ui.SendEvent(ui.StatusMsg{Text: status})
+			event.SendStatus(status)
 		} else {
 			mc.mu.Lock()
 			count := len(mc.toolToSession)
 			mc.mu.Unlock()
-			status := fmt.Sprintf("MCP Loaded: %d servers %d tools", len(mc.connected), count)
-			ui.SendEvent(ui.StatusMsg{Text: status})
+			event.SendStatus(fmt.Sprintf("MCP Loaded: %d servers %d tools", len(mc.connected), count))
 		}
 	}()
 }
