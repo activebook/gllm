@@ -115,12 +115,15 @@ jobs:
       # ── 4. Create annotated tag (mirrors `git tag -a` in release.sh) ─────
       - name: Create and push annotated tag
         if: steps.meta.outputs.skip == 'false'
+        # Use env: to inject outputs as literal environment variables.
+        # This prevents shell injection when commit messages contain backticks
+        # or other special characters (e.g. `ToolEditFile: command not found`).
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+          CHANGELOG: ${{ steps.meta.outputs.changelog }}
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          TAG="${{ steps.meta.outputs.tag }}"
-          CHANGELOG="${{ steps.meta.outputs.changelog }}"
 
           # Annotated tag with two -m flags, identical to release.sh
           git tag -a "$TAG" \
