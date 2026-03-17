@@ -1582,6 +1582,38 @@ func askUserToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	return string(out), nil
 }
 
+// enterPlanModeToolCallImpl handles the enter_plan_mode tool call.
+func enterPlanModeToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+	if err := CheckToolPermission(ToolEnterPlanMode, argsMap); err != nil {
+		return "", err
+	}
+
+	// Check if already in plan mode
+	if data.GetPlanModeInSession() {
+		return "Already in Plan Mode. Current session was already in Plan Mode.", nil
+	}
+
+	// Request user confirmation before entering Plan Mode
+	if !toolsUse.AutoApprove {
+		// Get purpose (required parameter)
+		purpose, ok := (*argsMap)["purpose"].(string)
+		if !ok || purpose == "" {
+			return "", fmt.Errorf("purpose is required")
+		}
+		event.RequestConfirm(purpose, toolsUse)
+		if toolsUse.Confirm == data.ToolConfirmCancel {
+			return "Operation cancelled by user: User denied entering Plan Mode.", UserCancelError{Reason: UserCancelReasonDeny}
+		}
+	}
+
+	// Switch to plan mode
+	data.SetPlanModeInSession(true)
+	// Notify UI to update banner
+	event.GetBus().Session <- event.SessionModeEvent{Mode: 1}
+
+	return "Successfully switched to Plan Mode. You can now use read-only tools to research and plan. Use exit_plan_mode when you're ready to execute.", nil
+}
+
 // exitPlanModeToolCallImpl handles the exit_plan_mode tool call.
 func exitPlanModeToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
 	if err := CheckToolPermission(ToolExitPlanMode, argsMap); err != nil {

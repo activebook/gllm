@@ -227,6 +227,8 @@ func (ga *GeminiAgent) dispatchGeminiToolCall(call *genai.FunctionCall, a *map[s
 		return ga.runGeminiTool(call, func() (string, error) { return askUserToolCallImpl(a) })
 	case ToolExitPlanMode:
 		return ga.runGeminiTool(call, func() (string, error) { return exitPlanModeToolCallImpl(a, &ga.ToolsUse) })
+	case ToolEnterPlanMode:
+		return ga.runGeminiTool(call, func() (string, error) { return enterPlanModeToolCallImpl(a, &ga.ToolsUse) })
 	case ToolSwitchAgent:
 		return ga.geminiSwitchAgentToolCall(call, a)
 	default:

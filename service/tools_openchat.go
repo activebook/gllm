@@ -186,6 +186,8 @@ func (op *OpenProcessor) dispatchOpenChatToolCall(toolCall *model.ToolCall, a *m
 		return runOpenChatTool(toolCall, func() (string, error) { return askUserToolCallImpl(a) })
 	case ToolExitPlanMode:
 		return runOpenChatTool(toolCall, func() (string, error) { return exitPlanModeToolCallImpl(a, op.toolsUse) })
+	case ToolEnterPlanMode:
+		return runOpenChatTool(toolCall, func() (string, error) { return enterPlanModeToolCallImpl(a, op.toolsUse) })
 	case ToolSwitchAgent:
 		return op.openChatSwitchAgentToolCall(toolCall, a)
 	default:
