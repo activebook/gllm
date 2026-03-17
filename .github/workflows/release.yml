@@ -1,0 +1,141 @@
+# Release pipeline – mirrors the logic in build/release.sh.
+#
+# Fires when a PR is merged into `main`, or manually via workflow_dispatch.
+#
+# What this replicates from build/release.sh:
+#   1. Fetch the latest git tag (defaults to v0.0.0 when none exists).
+#   2. Auto-increment the PATCH component  (e.g. v1.2.3 → v1.2.4).
+#   3. Guard: skip if the derived tag already exists (idempotency).
+#   4. Build a changelog from commits since the previous tag.
+#   5. Create an annotated tag with the changelog as the tag body.
+#   6. Push the tag, then run `goreleaser release --clean`.
+#
+# Prerequisites (GitHub repository secret):
+#   GH_TOKEN – a PAT with `repo` scope.
+#              The built-in GITHUB_TOKEN cannot push to the external tap repos
+#              (activebook/homebrew-gllm, activebook/scoop-gllm) that
+#              .goreleaser.yaml references, so a PAT is required.
+
+name: Release
+
+on:
+  push:
+    branches:
+      - main          # fires after every merged PR
+  workflow_dispatch:  # allows manual triggering from the Actions UI
+    inputs:
+      version:
+        description: |
+          Target release version (e.g. v1.16.0).
+          Leave blank to auto-increment the patch digit of the latest tag.
+        required: false
+        default: ''
+
+permissions:
+  contents: write   # required to create GitHub Releases and push tags
+
+jobs:
+  release:
+    name: GoReleaser Release
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Full checkout (all tags + history for changelog & git describe) ──
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ── 2. Go toolchain – version pinned to go.mod ───────────────────────
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # ── 3. Derive next version + build changelog ─────────────────────────
+      #
+      # Replicates the core logic of build/release.sh:
+      #   • Honour an explicit version from workflow_dispatch input (minor/major bumps)
+      #   • Otherwise auto-increment the patch digit of the latest tag
+      #   • Guard against duplicate tags
+      #   • Build a changelog from commits since the previous tag
+      - name: Derive next version and build changelog
+        id: meta
+        run: |
+          # ── latest tag (default v0.0.0 when repo has no tags yet) ──────
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+
+          # ── honour an explicit version from workflow_dispatch ────────────
+          INPUT_VERSION="${{ github.event.inputs.version }}"
+
+          if [ -n "$INPUT_VERSION" ]; then
+            # Normalise: ensure a leading 'v'
+            NEXT_TAG="v${INPUT_VERSION#v}"
+            echo "Using manually supplied version: $NEXT_TAG"
+          else
+            # ── auto-increment patch (mirrors increment_version in release.sh)
+            if [[ "$LATEST_TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+              MAJOR="${BASH_REMATCH[1]}"
+              MINOR="${BASH_REMATCH[2]}"
+              PATCH="${BASH_REMATCH[3]}"
+              NEXT_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+            else
+              NEXT_TAG="v0.0.1"
+            fi
+            echo "Auto-incremented tag: $NEXT_TAG"
+          fi
+
+          # ── idempotency guard ────────────────────────────────────────────
+          if git rev-parse "$NEXT_TAG" >/dev/null 2>&1; then
+            echo "Tag $NEXT_TAG already exists – skipping release."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # ── changelog (mirrors the git log in release.sh) ────────────────
+          if [ "$LATEST_TAG" != "v0.0.0" ]; then
+            CHANGELOG=$(git log --pretty=format:"- %s" "${LATEST_TAG}..HEAD")
+          else
+            CHANGELOG=$(git log --pretty=format:"- %s" -n 10)
+          fi
+
+          echo "skip=false"          >> "$GITHUB_OUTPUT"
+          echo "tag=$NEXT_TAG"       >> "$GITHUB_OUTPUT"
+          echo "latest=$LATEST_TAG"  >> "$GITHUB_OUTPUT"
+
+          # Multi-line output requires a heredoc delimiter
+          {
+            echo "changelog<<GORELEASER_EOF"
+            echo "$CHANGELOG"
+            echo "GORELEASER_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      # ── 4. Create annotated tag (mirrors `git tag -a` in release.sh) ─────
+      - name: Create and push annotated tag
+        if: steps.meta.outputs.skip == 'false'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          TAG="${{ steps.meta.outputs.tag }}"
+          CHANGELOG="${{ steps.meta.outputs.changelog }}"
+
+          # Annotated tag with two -m flags, identical to release.sh
+          git tag -a "$TAG" \
+            -m "Release $TAG" \
+            -m "$CHANGELOG"
+
+          git push origin "$TAG"
+
+      # ── 5. GoReleaser ────────────────────────────────────────────────────
+      - name: Run GoReleaser
+        if: steps.meta.outputs.skip == 'false'
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"       # matches `version: 2` in .goreleaser.yaml
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
