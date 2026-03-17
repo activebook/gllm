@@ -342,7 +342,9 @@ func CallAgent(op *AgentOptions) error {
 			event.StopIndicator()
 		}
 		if err != nil {
-			return fmt.Errorf("failed to load MCPServers: %v", err)
+			// MCP load failed, warn but continue without MCP tools
+			util.Warnf("MCP servers unavailable: %v\n", err)
+			mc = nil
 		}
 		// We shouldn't clean up MCP client resources when agent exits
 		// Because next turn in repl mode, it would need to re-init the mcp client, which is wasteful and slow
