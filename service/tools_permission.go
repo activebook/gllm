@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	toolPermissionDenied = "Current session is in plan mode now. you MUST NOT make any edits or run any non-readonly tools."
+	toolPermissionDenied   = "Current session is in plan mode now. you MUST NOT make any edits or run any non-readonly tools."
+	toolPermissionPlanPath = "You can only create or edit plans, todos and related files under this directory"
 )
 
 // readOnlyPrefixes and readOnlySuffixes cover common MCP tool naming patterns
@@ -61,6 +62,7 @@ func CheckToolPermission(toolName string, args *map[string]interface{}) error {
 	// Explicitly define conditional write tools
 	writeTools := map[string]bool{
 		ToolWriteFile:       true,
+		ToolEditFile:        true,
 		ToolCreateDirectory: true,
 	}
 
@@ -84,7 +86,7 @@ func CheckToolPermission(toolName string, args *map[string]interface{}) error {
 
 		// Ensure the resulting path is strongly inside the 'plans' folder
 		if !strings.HasPrefix(absPath, plansDir+string(filepath.Separator)) && absPath != plansDir {
-			return fmt.Errorf("%s You can only create plans under this directory: %s", toolPermissionDenied, plansDir)
+			return fmt.Errorf("%s %s: %s", toolPermissionDenied, toolPermissionPlanPath, plansDir)
 		}
 
 		return nil
