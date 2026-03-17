@@ -46,6 +46,7 @@ const (
 	ToolSetState          = "set_state"
 	ToolListState         = "list_state"
 	ToolExitPlanMode      = "exit_plan_mode"
+	ToolEnterPlanMode     = "enter_plan_mode"
 )
 
 // OpenTool is a generic tool definition that is not tied to any specific model.
@@ -128,6 +129,7 @@ var (
 	planTools = []string{
 		// Plan mode
 		ToolExitPlanMode,
+		ToolEnterPlanMode,
 	}
 
 	readOnlyTools = map[string]bool{
@@ -140,6 +142,7 @@ var (
 		ToolWebSearch:         true,
 		ToolAskUser:           true,
 		ToolExitPlanMode:      true,
+		ToolEnterPlanMode:     true,
 		ToolActivateSkill:     true,
 		ToolListMemory:        true,
 		ToolListAgent:         true,
@@ -648,6 +651,10 @@ func getOpenTools() []*OpenTool {
 	// activate_skill tool
 	activateSkillTool := getActivateSkillTool()
 	tools = append(tools, activateSkillTool)
+
+	// enter_plan_mode tool
+	enterPlanModeTool := getEnterPlanModeTool()
+	tools = append(tools, enterPlanModeTool)
 
 	// exit_plan_mode tool
 	exitPlanModeTool := getExitPlanModeTool()
@@ -1535,6 +1542,40 @@ func getAskUserTool() *OpenTool {
 		Function: &askUserFunc,
 	}
 	return &askUserTool
+}
+
+func getEnterPlanModeTool() *OpenTool {
+	enterPlanModeFunc := OpenFunctionDefinition{
+		Name: ToolEnterPlanMode,
+		// 		Description: `Requests user confirmation to enter Plan Mode for safe research and planning.
+		// Use this when the user asks to "start a plan", the task involves complex multi-step changes, or you need to research before executing.`,
+		Description: `Switches the current session into Plan Mode, creating a safe environment for research and planning.
+Use this tool when:
+- The user asks to "start a plan", "plan before executing", or similar
+- The task involves complex multi-step changes that benefit from a structured approach
+- You need to research and explore code/files before committing to changes
+- The user wants to review and approve your strategy before execution
+In Plan Mode:
+- You retain access to all read-only tools (file reading, search, web fetch, etc.)
+- File writes are restricted to the plans directory only (for plan documents, todo lists, etc.)
+- You cannot execute shell commands, edit files outside plans, or make destructive changes
+- Use exit_plan_mode tool when planning is complete and you're ready to execute`,
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"purpose": map[string]interface{}{
+					"type":        "string",
+					"description": "A clear, user-friendly explanation of why Plan Mode is being entered (e.g., 'Planning a complex feature implementation', 'Analyzing codebase before refactoring'). This will be shown to the user for confirmation.",
+				},
+			},
+			"required": []string{"purpose"},
+		},
+	}
+	enterPlanModeTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &enterPlanModeFunc,
+	}
+	return &enterPlanModeTool
 }
 
 func getExitPlanModeTool() *OpenTool {

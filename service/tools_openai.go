@@ -161,6 +161,8 @@ func (op *OpenProcessor) dispatchOpenAIToolCall(toolCall openai.ToolCall, a *map
 		return runOpenAITool(toolCall, func() (string, error) { return askUserToolCallImpl(a) })
 	case ToolExitPlanMode:
 		return runOpenAITool(toolCall, func() (string, error) { return exitPlanModeToolCallImpl(a, op.toolsUse) })
+	case ToolEnterPlanMode:
+		return runOpenAITool(toolCall, func() (string, error) { return enterPlanModeToolCallImpl(a, op.toolsUse) })
 	case ToolSwitchAgent:
 		return op.openAISwitchAgentToolCall(toolCall, a)
 	default:

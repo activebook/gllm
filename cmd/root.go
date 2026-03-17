@@ -190,7 +190,9 @@ func Execute() {
 	// If you create separate MCPClient instances elsewhere, ensure they are closed too.
 	// If the application grows more complex (e.g., with subcommands that run indefinitely),
 	// consider a more robust lifecycle management strategy.
-	defer service.GetMCPClient().Close()
+
+	// Actually, we don't need to Close it, because the process would exit
+	// defer service.GetMCPClient().Close()
 	if err := rootCmd.Execute(); err != nil {
 		util.Errorf("'%s'\n", err)
 		os.Exit(1)
