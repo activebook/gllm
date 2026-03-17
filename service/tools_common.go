@@ -1554,7 +1554,7 @@ Use this tool when:
 - The user asks to "start a plan", "plan before executing", or similar
 - The task involves complex multi-step changes that benefit from a structured approach
 - You need to research and explore code/files before committing to changes
-- The user wants to review and approve your strategy before execution
+- The user explicitly requests to review and approve your strategic approach prior to execution
 In Plan Mode:
 - You retain access to all read-only tools (file reading, search, web fetch, etc.)
 - File writes are restricted to the plans directory only (for plan documents, todo lists, etc.)
@@ -1581,8 +1581,8 @@ In Plan Mode:
 func getExitPlanModeTool() *OpenTool {
 	exitPlanModeFunc := OpenFunctionDefinition{
 		Name: ToolExitPlanMode,
-		Description: `Requests user confirmation to exit Plan Mode and enter normal execution mode.
-Use this when you have finished planning and are ready to execute tasks that require modifying code, files or running non-readonly commands.`,
+		Description: `Requests user confirmation to exit Plan Mode and restore the session to normal execution mode.
+Use this tool when your planning phase is complete, and you require the reinstatement of full operational capabilities. Exiting Plan Mode removes the restrictions previously imposed, thereby granting you the authorization to execute shell commands, edit arbitrary files outside the 'plans/' directory, and perform other state-mutating operations. You should ideally present a summary of your proposed plan to the user prior to invoking this tool.`,
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
