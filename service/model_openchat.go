@@ -542,7 +542,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 		if thinkContent, cleanedContent := util.ExtractThinkTags(content); thinkContent != "" {
 			// Prepend extracted thinking to existing reasoning content
 			if reasoningContent != "" {
-				fullReasoning := thinkContent + "\n" + reasoningContent
+				fullReasoning := reasoningContent + "\n" + thinkContent
 				assistantMessage.ReasoningContent = &fullReasoning
 			} else {
 				assistantMessage.ReasoningContent = &thinkContent

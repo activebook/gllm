@@ -512,12 +512,17 @@ func (oa *OpenAI) processStream(stream *ssestream.Stream[openai.ChatCompletionCh
 		// Also try extracting inline <think> tags (DeepSeek / Qwen streaming format)
 		if thinkContent, cleanedContent := util.ExtractThinkTags(content); thinkContent != "" {
 			if reasoningContent != "" {
-				reasoningContent = thinkContent + "\n" + reasoningContent
+				reasoningContent = reasoningContent + "\n" + thinkContent
 			} else {
 				reasoningContent = thinkContent
 			}
 			content = cleanedContent
 		}
+
+		// Inject reasoning back into the content wrapped in think tags
+		// This preserves it natively in the session file without custom wrappers,
+		// and passes it back to the model context seamlessly!
+		content = util.InjectThinkTags(content, reasoningContent)
 
 		if content != "" && !strings.HasSuffix(content, "\n") {
 			content = content + "\n"
