@@ -464,31 +464,23 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 		if len(response.Choices) > 0 {
 			delta := (response.Choices[0].Delta)
 
-			// State transitions
-			switch c.op.status.Peek() {
-			case StatusReasoning:
-				// If reasoning content is empty, switch back to normal state
-				// This is to handle the case where reasoning content is empty but we already have content
-				// Aka, the model is done with reasoning content and starting to output normal content
-				if delta.ReasoningContent == nil ||
-					(*delta.ReasoningContent == "" && delta.Content != "") {
-					c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusReasoningOver}, c.op.proceed)
-				}
-			default:
-				// If reasoning content is not empty, switch to reasoning state
-				if util.HasContent(delta.ReasoningContent) {
-					c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusReasoning}, c.op.proceed)
-				}
-			}
-
 			if util.HasContent(delta.ReasoningContent) {
-				// For reasoning model
 				text := *delta.ReasoningContent
 				reasoningBuffer.WriteString(text)
+				if c.op.status.Peek() != StatusReasoning {
+					// If reasoning content is not empty, switch to reasoning state
+					c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusReasoning}, c.op.proceed)
+				}
 				c.op.data <- StreamData{Text: text, Type: DataTypeReasoning}
-			} else if delta.Content != "" {
+			}
+
+			if delta.Content != "" {
 				text := delta.Content
 				contentBuffer.WriteString(text)
+				if c.op.status.Peek() == StatusReasoning {
+					// If regular content arrives while we're reasoning, transition away
+					c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusReasoningOver}, c.op.proceed)
+				}
 				c.op.data <- StreamData{Text: text, Type: DataTypeNormal}
 			}
 
