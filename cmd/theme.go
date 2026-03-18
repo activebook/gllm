@@ -48,79 +48,93 @@ var themeCmd = &cobra.Command{
 			Margin(0, 1).
 			Padding(1, 1, 0)
 
-		// Calculate inner width by subtracting frame (borders + padding)
 		innerWidth := safeWidth - borderStyle.GetHorizontalFrameSize()
 
-		headerStyle := lipgloss.NewStyle().
+		// Split into left (~55%) and right (~45%) columns
+		separatorWidth := 0
+		leftWidth := (innerWidth - separatorWidth) * 55 / 100
+		rightWidth := innerWidth - leftWidth - separatorWidth
+
+		// --- Left panel: logo + theme info ---
+		logo := ui.GetLogo(data.KeyHex, data.LabelHex, 0.5)
+
+		leftParts := []string{}
+		leftParts = append(leftParts, lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color(data.KeyHex)).
-			Width(innerWidth).
+			Width(leftWidth).
+			Padding(0, 1).
 			Align(lipgloss.Center).
-			MarginTop(0).
-			MarginBottom(1).
-			Padding(0, 0)
+			Render(logo+"\n"+data.CurrentThemeName))
 
-		contentStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color(data.LabelHex)).
-			Width(innerWidth).
-			Align(lipgloss.Left).
-			Padding(0, 2)
+		leftParts = append(leftParts, lipgloss.NewStyle().
+			Foreground(lipgloss.Color(data.KeyHex)).
+			Width(leftWidth).
+			Render(strings.Repeat("─", leftWidth-4)))
 
-		logo := ui.GetLogo(data.KeyHex, data.LabelHex, 0.5)
-		welcomeText := logo + "\nCurrent Theme: " + data.CurrentThemeName
-		header := headerStyle.Render(welcomeText)
-
-		var samples []string
-
-		// 1. Enable/Disable
-		samples = append(samples, fmt.Sprintf("%-20s: %sEnabled%s / %sDisabled%s", "Toggle State", data.SwitchOnColor, data.ResetSeq, data.SwitchOffColor, data.ResetSeq))
-
-		// 2. Status Levels
-		samples = append(samples, fmt.Sprintf("%-20s: %sInfo%s | %sWarn%s | %sSuccess%s | %sDebug%s | %sError%s",
+		leftParts = append(leftParts, fmt.Sprintf("%-14s: %sEnabled%s / %sDisabled%s", "Toggle State", data.SwitchOnColor, data.ResetSeq, data.SwitchOffColor, data.ResetSeq))
+		leftParts = append(leftParts, fmt.Sprintf("%-14s: %sInfo%s | %sWarn%s | %sSuccess%s | %sDebug%s | %sError%s",
 			"Status Levels",
 			data.StatusInfoColor, data.ResetSeq,
 			data.StatusWarnColor, data.ResetSeq,
 			data.StatusSuccessColor, data.ResetSeq,
 			data.StatusDebugColor, data.ResetSeq,
 			data.StatusErrorColor, data.ResetSeq))
+		leftParts = append(leftParts, fmt.Sprintf("%-14s: %sToken Count%s\n", "Labels", data.LabelColor, data.ResetSeq))
+		leftParts = append(leftParts, fmt.Sprintf("%-14s: %sThinking ↓%s", "Thinking State", data.ReasoningActiveColor, data.ResetSeq))
+		leftParts = append(leftParts, fmt.Sprintf("%-14s: %sInner Thinking...%s", "Thinking Msg", data.ReasoningDoneColor, data.ResetSeq))
+		leftParts = append(leftParts, fmt.Sprintf("%-14s: %sHigh%s | %sMed%s | %sLow%s | %sMin%s | %sOff%s\n",
+			"Thinking Effort",
+			data.ReasoningHighColor, data.ResetSeq,
+			data.ReasoningMedColor, data.ResetSeq,
+			data.ReasoningLowColor, data.ResetSeq,
+			data.ReasoningMinColor, data.ResetSeq,
+			data.ReasoningOffColor, data.ResetSeq))
+		leftParts = append(leftParts, fmt.Sprintf("%-14s: Assistant Response", "Normal Msg"))
+		leftParts = append(leftParts, fmt.Sprintf("%-14s: %s[✓] Task Completed%s\n", "Completion", data.TaskCompleteColor, data.ResetSeq))
+		leftParts = append(leftParts, fmt.Sprintf("%-14s: %s[TOOL] exec_cmd()%s", "Tool Call", data.ToolCallColor, data.ResetSeq))
 
-		samples = append(samples, fmt.Sprintf("%-20s: %sToken Count%s", "Labels", data.LabelColor, data.ResetSeq))
+		leftContent := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(data.LabelHex)).
+			Width(leftWidth).
+			Align(lipgloss.Left).
+			Padding(1, 1).
+			Render(strings.Join(leftParts, "\n"))
 
-		// 3. Normal / Thinking
-		samples = append(samples, fmt.Sprintf("%-20s: %sThinking ↓%s", "Thinking State", data.ReasoningActiveColor, data.ResetSeq))
-		samples = append(samples, fmt.Sprintf("%-20s: %sInner Thinking...%s", "Thinking Message", data.ReasoningDoneColor, data.ResetSeq))
-
-		// Thinking Effort
-		samples = append(samples, fmt.Sprintf("%-20s: %sHigh%s | %sMedium%s | %sLow%s | %sOff%s", "Thinking Effort", data.ReasoningHighColor, data.ResetSeq, data.ReasoningMedColor, data.ResetSeq, data.ReasoningLowColor, data.ResetSeq, data.ReasoningOffColor, data.ResetSeq))
-
-		// Normal Message
-		samples = append(samples, fmt.Sprintf("%-20s: Assistant Response", "Normal Message"))
-
-		// 4. Task Complete
-		samples = append(samples, fmt.Sprintf("%-20s: %s[✓] Task Completed%s", "Completion", data.TaskCompleteColor, data.ResetSeq))
-
-		// 5. Tool Call
-		samples = append(samples, fmt.Sprintf("%-20s: %s[TOOL] execute_command()%s", "Tool Call", data.ToolCallColor, data.ResetSeq))
-
-		// 6. Markdown
+		// --- Right panel: markdown preview ---
 		glamourStyle := data.MostSimilarGlamourStyle()
 		tr, _ := glamour.NewTermRenderer(
 			glamour.WithStandardStyle(glamourStyle),
-			glamour.WithWordWrap(innerWidth),
+			glamour.WithWordWrap(rightWidth),
 		)
-		md := fmt.Sprintf("\n\n"+markdownSample, glamourStyle)
+		md := fmt.Sprintf(markdownSample, glamourStyle)
 		out, _ := tr.Render(md)
 		out = strings.TrimSuffix(out, "\n")
-		samples = append(samples, fmt.Sprintf("%-20s:\n%s", "Markdown", out))
 
-		content := contentStyle.Render(strings.Join(samples, "\n"))
+		rightParts := []string{}
+		rightParts = append(rightParts, lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color(data.KeyHex)).
+			Width(rightWidth).
+			Align(lipgloss.Center).
+			Padding(0, 0, 0, 1).
+			Render("Markdown"))
+		rightParts = append(rightParts, out)
 
-		banner := borderStyle.Render(lipgloss.JoinVertical(
-			lipgloss.Center,
-			header,
-			content,
-		))
+		rightContent := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(data.LabelHex)).
+			Width(rightWidth).
+			Align(lipgloss.Left).
+			Render(strings.Join(rightParts, "\n"))
 
+		// --- Combine panels horizontally ---
+		inner := lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			leftContent,
+			rightContent,
+		)
+
+		banner := borderStyle.Render(inner)
 		fmt.Println(banner)
 	},
 }
