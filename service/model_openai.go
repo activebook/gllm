@@ -22,8 +22,8 @@ import (
 //   - Extra/unknown JSON fields are captured in delta.JSON.ExtraFields.
 //   - These fields are present but NOT Valid() — they sit outside the typed schema.
 //   - Raw() returns the raw JSON value (e.g. `"some text"` or `null` or “ for omitted).
-//   - We strings.Trim to unquote rather than json.Unmarshal, matching the streaming
-//     incremental nature of the data (no escaped unicode concerns in practice).
+//   - We previously strings.Trim to unquote rather than json.Unmarshal, matching the streaming
+//     incremental nature of the data, but encountered escaped \n and unicode concerns in practice.
 func extractDeltaReasoning(delta *openai.ChatCompletionChunkChoiceDelta) string {
 	if delta == nil {
 		return ""
@@ -37,7 +37,13 @@ func extractDeltaReasoning(delta *openai.ChatCompletionChunkChoiceDelta) string 
 		if raw == "" || raw == "null" {
 			continue // omitted or explicitly null — no reasoning this chunk
 		}
-		return strings.Trim(raw, `"`)
+		// Correctly unescape JSON string (handles \n, \t, etc)
+		var unescaped string
+		if err := json.Unmarshal([]byte(raw), &unescaped); err == nil {
+			return unescaped
+		}
+		// Fallback if it fails
+		continue
 	}
 	return ""
 }
@@ -439,7 +445,7 @@ func (oa *OpenAI) processStream(stream *ssestream.Stream[openai.ChatCompletionCh
 				reasoningBuffer.WriteString(rcText)
 				if oa.op.status.Peek() != StatusReasoning {
 					// If reasoning content is not empty, switch to reasoning state
-					oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusReasoning}, nil)
+					oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusReasoning}, oa.op.proceed)
 				}
 				oa.op.data <- StreamData{Text: rcText, Type: DataTypeReasoning}
 			}
