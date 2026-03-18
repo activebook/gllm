@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	openai "github.com/sashabaranov/go-openai"
+	openai "github.com/openai/openai-go/v3"
 	openchat "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"google.golang.org/genai"
 )
@@ -48,17 +48,9 @@ func TestEstimateOpenAIMessageTokens_Image(t *testing.T) {
 	b64 := createLargeBase64(1)
 	dataURL := createDataURL(b64, "image/png")
 
-	msg := openai.ChatCompletionMessage{
-		Role: openai.ChatMessageRoleUser,
-		MultiContent: []openai.ChatMessagePart{
-			{
-				Type: openai.ChatMessagePartTypeImageURL,
-				ImageURL: &openai.ChatMessageImageURL{
-					URL: dataURL,
-				},
-			},
-		},
-	}
+	msg := openai.UserMessage([]openai.ChatCompletionContentPartUnionParam{
+		openai.ImageContentPart(openai.ChatCompletionContentPartImageImageURLParam{URL: dataURL}),
+	})
 
 	tokens := EstimateOpenAIMessageTokens(msg)
 	// Expect tokens to be around TokenCostImageDefault (1000) + overhead

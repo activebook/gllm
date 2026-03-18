@@ -5,7 +5,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	anthropic "github.com/anthropics/anthropic-sdk-go"
-	openai "github.com/sashabaranov/go-openai"
+	openai "github.com/openai/openai-go/v3"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"github.com/volcengine/volcengine-go-sdk/volcengine"
 	"google.golang.org/genai"
@@ -41,15 +41,12 @@ func CompressSession(modelConfig *data.AgentConfig, sessionData []byte) (string,
 	switch modelConfig.Model.Provider {
 
 	case ModelProviderOpenAI:
-		var messages []openai.ChatCompletionMessage
+		var messages []openai.ChatCompletionMessageParamUnion
 		if err := parseJSONL(sessionData, &messages); err != nil {
 			return "", fmt.Errorf("failed to parse OpenAI session: %w", err)
 		}
-		send := append(make([]openai.ChatCompletionMessage, 0, len(messages)+1), messages...)
-		send = append(send, openai.ChatCompletionMessage{
-			Role:    openai.ChatMessageRoleUser,
-			Content: CompressionPromptFormat,
-		})
+		send := append(make([]openai.ChatCompletionMessageParamUnion, 0, len(messages)+1), messages...)
+		send = append(send, openai.UserMessage(CompressionPromptFormat))
 		return ag.GenerateOpenAISync(send, CompressionSystemPrompt)
 
 	case ModelProviderAnthropic:
@@ -98,9 +95,9 @@ func CompressSession(modelConfig *data.AgentConfig, sessionData []byte) (string,
 func BuildCompressedSession(summary string, provider string) ([]byte, error) {
 	switch provider {
 	case ModelProviderOpenAI:
-		messages := []openai.ChatCompletionMessage{
-			{Role: openai.ChatMessageRoleUser, Content: CompressedContextPrefix + summary},
-			{Role: openai.ChatMessageRoleAssistant, Content: CompressedContextAck},
+		messages := []openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage(CompressedContextPrefix + summary),
+			openai.AssistantMessage(CompressedContextAck),
 		}
 		return marshalJSONL(messages)
 
@@ -151,30 +148,27 @@ func BuildCompressedSession(summary string, provider string) ([]byte, error) {
 // compressOpenAIMessages compresses OpenAI messages using the active provider's non-streaming API.
 // If the last message is a user message, it is excluded from the summary and re-appended verbatim
 // afterward, preserving the user's exact current intent.
-func compressOpenAIMessages(ag *Agent, messages []openai.ChatCompletionMessage) ([]openai.ChatCompletionMessage, error) {
+func compressOpenAIMessages(ag *Agent, messages []openai.ChatCompletionMessageParamUnion) ([]openai.ChatCompletionMessageParamUnion, error) {
 	if len(messages) == 0 {
 		return messages, nil
 	}
 	latest := messages[len(messages)-1]
-	isUserMsg := latest.Role == openai.ChatMessageRoleUser
+	isUserMsg := latest.GetRole() != nil && *latest.GetRole() == "user"
 	history := messages
 	if isUserMsg {
 		history = messages[:len(messages)-1]
 	}
 
-	send := append(make([]openai.ChatCompletionMessage, 0, len(history)+1), history...)
-	send = append(send, openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleUser,
-		Content: CompressionPromptFormat,
-	})
+	send := append(make([]openai.ChatCompletionMessageParamUnion, 0, len(history)+1), history...)
+	send = append(send, openai.UserMessage(CompressionPromptFormat))
 	summary, err := ag.GenerateOpenAISync(send, CompressionSystemPrompt)
 	if err != nil {
 		return nil, err
 	}
 	// [compressed history] → [ack] → [latest user message verbatim (if applicable)]
-	result := []openai.ChatCompletionMessage{
-		{Role: openai.ChatMessageRoleUser, Content: CompressedContextPrefix + summary},
-		{Role: openai.ChatMessageRoleAssistant, Content: CompressedContextAck},
+	result := []openai.ChatCompletionMessageParamUnion{
+		openai.UserMessage(CompressedContextPrefix + summary),
+		openai.AssistantMessage(CompressedContextAck),
 	}
 	if isUserMsg {
 		result = append(result, latest)

@@ -338,13 +338,16 @@ func (c *OpenChat) process(ag *Agent) error {
 			// Fallback to generic error
 			return fmt.Errorf("stream creation error: %v", err)
 		}
-		defer stream.Close()
+		// Bugfix: do NOT use defer here — deferreds accumulate until process() returns,
+		// so inside a loop each iteration would stack up an open stream. Close explicitly.
+		// defer stream.Close()
 
 		// Wait for the main goroutine to tell sub-goroutine to proceed
 		c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusStarted}, c.op.proceed)
 
 		// Process the stream and collect tool calls
 		assistantMessage, toolCalls, resp, err := c.processStream(stream)
+		stream.Close() // Bugfix: Close immediately after consuming to release the HTTP connection
 		if err != nil {
 			return fmt.Errorf("error processing stream: %v", err)
 		}
@@ -440,6 +443,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 		Name: Ptr(""),
 	}
 	toolCalls := make(map[string]model.ToolCall)
+	var orderedToolCallIDs []string
 	contentBuffer := strings.Builder{}
 	reasoningBuffer := strings.Builder{}
 	lastCallId := ""
@@ -460,31 +464,23 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 		if len(response.Choices) > 0 {
 			delta := (response.Choices[0].Delta)
 
-			// State transitions
-			switch c.op.status.Peek() {
-			case StatusReasoning:
-				// If reasoning content is empty, switch back to normal state
-				// This is to handle the case where reasoning content is empty but we already have content
-				// Aka, the model is done with reasoning content and starting to output normal content
-				if delta.ReasoningContent == nil ||
-					(*delta.ReasoningContent == "" && delta.Content != "") {
-					c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusReasoningOver}, c.op.proceed)
-				}
-			default:
-				// If reasoning content is not empty, switch to reasoning state
-				if util.HasContent(delta.ReasoningContent) {
-					c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusReasoning}, c.op.proceed)
-				}
-			}
-
 			if util.HasContent(delta.ReasoningContent) {
-				// For reasoning model
 				text := *delta.ReasoningContent
 				reasoningBuffer.WriteString(text)
+				if c.op.status.Peek() != StatusReasoning {
+					// If reasoning content is not empty, switch to reasoning state
+					c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusReasoning}, c.op.proceed)
+				}
 				c.op.data <- StreamData{Text: text, Type: DataTypeReasoning}
-			} else if delta.Content != "" {
+			}
+
+			if delta.Content != "" {
 				text := delta.Content
 				contentBuffer.WriteString(text)
+				if c.op.status.Peek() == StatusReasoning {
+					// If regular content arrives while we're reasoning, transition away
+					c.op.status.ChangeTo(c.op.notify, StreamNotify{Status: StatusReasoningOver}, c.op.proceed)
+				}
 				c.op.data <- StreamData{Text: text, Type: DataTypeNormal}
 			}
 
@@ -516,6 +512,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 							toolCalls[id] = tc
 						} else {
 							// Prepare to receive tool call arguments
+							orderedToolCallIDs = append(orderedToolCallIDs, id)
 							toolCalls[id] = model.ToolCall{
 								ID:   id,
 								Type: model.ToolTypeFunction,
@@ -532,9 +529,9 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 	}
 
 	// Update the assistant reasoning message
-	reasoning_content := reasoningBuffer.String()
-	if reasoning_content != "" {
-		assistantMessage.ReasoningContent = &reasoning_content
+	reasoningContent := reasoningBuffer.String()
+	if reasoningContent != "" {
+		assistantMessage.ReasoningContent = &reasoningContent
 	}
 	// Set the content of the assistant message
 	content := contentBuffer.String()
@@ -544,8 +541,8 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 		// using a separate reasoning_content field
 		if thinkContent, cleanedContent := util.ExtractThinkTags(content); thinkContent != "" {
 			// Prepend extracted thinking to existing reasoning content
-			if reasoning_content != "" {
-				fullReasoning := thinkContent + "\n" + reasoning_content
+			if reasoningContent != "" {
+				fullReasoning := reasoningContent + "\n" + thinkContent
 				assistantMessage.ReasoningContent = &fullReasoning
 			} else {
 				assistantMessage.ReasoningContent = &thinkContent
@@ -566,7 +563,8 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 	// Add tool calls to the assistant message if there are any
 	if len(toolCalls) > 0 {
 		var assistantToolCalls []*model.ToolCall
-		for id, tc := range toolCalls {
+		for _, id := range orderedToolCallIDs {
+			tc := toolCalls[id]
 			// Sanitize arguments to handle cases like "}{" or trailing garbage
 			cleanedArgs := sanitizeToolArgs(tc.Function.Arguments)
 			if cleanedArgs != tc.Function.Arguments {

@@ -39,7 +39,7 @@ func TestDetectMessageProvider(t *testing.T) {
 		{
 			name:     "OpenAI Reasoning",
 			input:    `{"role": "assistant", "reasoning_content": "let me think"}`,
-			expected: ModelProviderOpenAI,
+			expected: ModelProviderOpenAICompatible,
 		},
 
 		// --- Anthropic Scenarios ---

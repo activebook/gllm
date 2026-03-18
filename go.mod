@@ -3,8 +3,8 @@ module github.com/activebook/gllm
 go 1.25.3
 
 require (
-	github.com/PuerkitoBio/goquery v1.11.0
-	github.com/anthropics/anthropic-sdk-go v1.26.0
+	github.com/PuerkitoBio/goquery v1.12.0
+	github.com/anthropics/anthropic-sdk-go v1.27.0
 	github.com/atotto/clipboard v0.1.4
 	github.com/briandowns/spinner v1.23.2
 	github.com/charmbracelet/bubbles v1.0.0
@@ -17,20 +17,20 @@ require (
 	github.com/google/jsonschema-go v0.4.2
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/modelcontextprotocol/go-sdk v1.4.0
+	github.com/modelcontextprotocol/go-sdk v1.4.1
 	github.com/muesli/reflow v0.3.0
 	github.com/muesli/termenv v0.16.0
+	github.com/openai/openai-go/v3 v3.29.0
 	github.com/pmezard/go-difflib v1.0.0
-	github.com/sashabaranov/go-openai v1.41.2
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/superstarryeyes/bit v0.3.0
-	github.com/volcengine/volcengine-go-sdk v1.2.19
+	github.com/volcengine/volcengine-go-sdk v1.2.20
 	github.com/willyv3/gogh-themes v1.2.0
 	golang.org/x/term v0.41.0
-	google.golang.org/api v0.271.0
-	google.golang.org/genai v1.50.0
+	google.golang.org/api v0.272.0
+	google.golang.org/genai v1.51.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -40,7 +40,7 @@ require (
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	code.gitea.io/sdk/gitea v0.23.2 // indirect
-	github.com/42wim/httpsig v1.2.3 // indirect
+	github.com/42wim/httpsig v1.2.4 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/alecthomas/chroma/v2 v2.23.1 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
@@ -52,7 +52,7 @@ require (
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
 	github.com/charmbracelet/x/ansi v0.11.6 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.15 // indirect
-	github.com/charmbracelet/x/exp/slice v0.0.0-20260311145557-c83711a11ffa // indirect
+	github.com/charmbracelet/x/exp/slice v0.0.0-20260316093931-f2fb44ab3145 // indirect
 	github.com/charmbracelet/x/exp/strings v0.1.0 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
@@ -73,7 +73,7 @@ require (
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.14 // indirect
-	github.com/googleapis/gax-go/v2 v2.18.0 // indirect
+	github.com/googleapis/gax-go/v2 v2.19.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
@@ -123,8 +123,8 @@ require (
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260311181403-84a4fc48630c // indirect
-	google.golang.org/grpc v1.79.2 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260316180232-0b37fe3546d5 // indirect
+	google.golang.org/grpc v1.79.3 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

@@ -6,9 +6,11 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/anthropics/anthropic-sdk-go/packages/param"
+	anthropicparam "github.com/anthropics/anthropic-sdk-go/packages/param"
 	"github.com/anthropics/anthropic-sdk-go/shared/constant"
-	"github.com/sashabaranov/go-openai"
+	"github.com/openai/openai-go/v3"
+	openaiparam "github.com/openai/openai-go/v3/packages/param"
+	"github.com/openai/openai-go/v3/shared"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"google.golang.org/genai"
 )
@@ -404,16 +406,13 @@ func FilterOpenToolArguments(argsMap map[string]interface{}, ignoreKeys []string
 	return result
 }
 
-// ToOpenAITool converts a GenericTool to an openai.Tool
-func (ot *OpenTool) ToOpenAITool() openai.Tool {
-	return openai.Tool{
-		Type: openai.ToolType(ot.Type),
-		Function: &openai.FunctionDefinition{
-			Name:        ot.Function.Name,
-			Description: ot.Function.Description,
-			Parameters:  ot.Function.Parameters,
-		},
-	}
+// ToOpenAITool converts a GenericTool to an openai.ChatCompletionToolUnionParam
+func (ot *OpenTool) ToOpenAITool() openai.ChatCompletionToolUnionParam {
+	return openai.ChatCompletionFunctionTool(shared.FunctionDefinitionParam{
+		Name:        ot.Function.Name,
+		Description: openaiparam.NewOpt(ot.Function.Description),
+		Parameters:  shared.FunctionParameters(ot.Function.Parameters),
+	})
 }
 
 // ToOpenChatTool converts a GenericTool to a model.Tool
@@ -454,7 +453,7 @@ func (ot *OpenTool) ToAnthropicTool() anthropic.ToolUnionParam {
 
 	t := anthropic.ToolUnionParamOfTool(schema, ot.Function.Name)
 	if t.OfTool != nil && ot.Function.Description != "" {
-		t.OfTool.Description = param.NewOpt(ot.Function.Description)
+		t.OfTool.Description = anthropicparam.NewOpt(ot.Function.Description)
 	}
 	return t
 }

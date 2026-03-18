@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/activebook/gllm/util"
 	anthropic "github.com/anthropics/anthropic-sdk-go"
-	openai "github.com/sashabaranov/go-openai"
+	openai "github.com/openai/openai-go/v3"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	gemini "google.golang.org/genai"
 )
@@ -39,13 +40,15 @@ func (r UniversalRole) String() string {
 }
 
 func (r UniversalRole) ConvertToOpenAI() string {
+	// Openai uses string "assistant", "user", "system"
+	// we use model instead
 	switch r {
 	case UniversalRoleAssistant:
-		return openai.ChatMessageRoleAssistant
+		return model.ChatMessageRoleAssistant
 	case UniversalRoleUser:
-		return openai.ChatMessageRoleUser
+		return model.ChatMessageRoleUser
 	case UniversalRoleSystem:
-		return openai.ChatMessageRoleSystem
+		return model.ChatMessageRoleSystem
 	default:
 		return string(r)
 	}
@@ -94,15 +97,13 @@ func ConvertToUniversalRole(role string) UniversalRole {
 	switch role {
 	case gemini.RoleModel:
 		return UniversalRoleAssistant
-	case openai.ChatMessageRoleAssistant:
+	case model.ChatMessageRoleAssistant:
 		return UniversalRoleAssistant
-	case openai.ChatMessageRoleTool:
+	case model.ChatMessageRoleTool, "function":
 		return UniversalRoleAssistant
-	case openai.ChatMessageRoleFunction:
-		return UniversalRoleAssistant
-	case openai.ChatMessageRoleUser:
+	case model.ChatMessageRoleUser:
 		return UniversalRoleUser
-	case openai.ChatMessageRoleSystem:
+	case model.ChatMessageRoleSystem:
 		return UniversalRoleSystem
 	default:
 		return UniversalRole(role)
@@ -116,26 +117,57 @@ func ConvertToUniversalRole(role string) UniversalRole {
 // ParseOpenAIMessages converts OpenAI messages to universal format.
 // Extracts: Content, MultiContent[].Text, ReasoningContent, Tool Responses as text
 // Ignores: ToolCalls, FunctionCall, ImageURL
-func ParseOpenAIMessages(messages []openai.ChatCompletionMessage) []UniversalMessage {
+func ParseOpenAIMessages(messages []openai.ChatCompletionMessageParamUnion) []UniversalMessage {
 	var result []UniversalMessage
 	for _, msg := range messages {
+		rolePtr := msg.GetRole()
+		if rolePtr == nil {
+			continue
+		}
+		role := *rolePtr
 		um := UniversalMessage{
-			Role:      ConvertToUniversalRole(msg.Role),
-			Reasoning: msg.ReasoningContent,
+			Role: ConvertToUniversalRole(role),
 		}
 
-		// Extract text content
-		if msg.Content != "" {
-			um.Content = msg.Content
-		} else if len(msg.MultiContent) > 0 {
-			// Extract only text parts from multimodal content
-			for _, part := range msg.MultiContent {
-				if part.Type == openai.ChatMessagePartTypeText && part.Text != "" {
-					if um.Content != "" {
-						um.Content += "\n"
+		// Try to extract content and reasoning content via JSON marshaling to be safe and robust
+		// since ChatCompletionMessageParamUnion is complex and reasoning_content might be an extra field.
+		data, err := json.Marshal(msg)
+		if err == nil {
+			var raw map[string]interface{}
+			if err := json.Unmarshal(data, &raw); err == nil {
+				// Content as string
+				if contentStr, ok := raw["content"].(string); ok && contentStr != "" {
+					um.Content = contentStr
+				} else if contentArr, ok := raw["content"].([]interface{}); ok {
+					// Content as Array of parts
+					for _, item := range contentArr {
+						if partMap, ok := item.(map[string]interface{}); ok {
+							if partType, ok := partMap["type"].(string); ok && partType == "text" {
+								if text, ok := partMap["text"].(string); ok && text != "" {
+									if um.Content != "" {
+										um.Content += "\n"
+									}
+									um.Content += text
+								}
+							}
+						}
 					}
-					um.Content += part.Text
 				}
+
+				// Reasoning Content (Deepseek / Custom parameter — only if not already extracted)
+				if reasoning, ok := raw["reasoning_content"].(string); ok && reasoning != "" {
+					um.Reasoning = reasoning
+				} else if reasoning, ok := raw["reasoning"].(string); ok && reasoning != "" {
+					um.Reasoning = reasoning
+				}
+			}
+		}
+
+		// Look for embedded <thought> tags (OpenAI compatibility workaround)
+		if um.Reasoning == "" && um.Content != "" {
+			if thinkContent, cleanedContent := util.ExtractThinkTags(um.Content); thinkContent != "" {
+				um.Reasoning = thinkContent
+				um.Content = cleanedContent
 			}
 		}
 
@@ -148,7 +180,7 @@ func ParseOpenAIMessages(messages []openai.ChatCompletionMessage) []UniversalMes
 }
 
 // ParseOpenChatMessages converts OpenChat (Volcengine) messages to universal format.
-func ParseOpenChatMessages(messages []*model.ChatCompletionMessage) []UniversalMessage {
+func ParseOpenChatMessages(messages []model.ChatCompletionMessage) []UniversalMessage {
 	var result []UniversalMessage
 	for _, msg := range messages {
 		um := UniversalMessage{
@@ -305,19 +337,20 @@ func ParseGeminiMessages(messages []*gemini.Content) []UniversalMessage {
 
 // BuildOpenAIMessages converts universal messages to OpenAI format.
 // Preserves: system role, Content, ReasoningContent
-func BuildOpenAIMessages(messages []UniversalMessage) []openai.ChatCompletionMessage {
-	var result []openai.ChatCompletionMessage
+func BuildOpenAIMessages(messages []UniversalMessage) []openai.ChatCompletionMessageParamUnion {
+	var result []openai.ChatCompletionMessageParamUnion
 	for _, um := range messages {
-		msg := openai.ChatCompletionMessage{
-			Role: um.Role.ConvertToOpenAI(),
+		role := um.Role.ConvertToOpenAI()
+
+		switch role {
+		case model.ChatMessageRoleAssistant:
+			// Reasoning is not set on Request Params in v3.
+			result = append(result, openai.AssistantMessage(um.Content))
+		case model.ChatMessageRoleSystem:
+			result = append(result, openai.SystemMessage(um.Content))
+		default:
+			result = append(result, openai.UserMessage(um.Content))
 		}
-		if um.Content != "" {
-			msg.Content = um.Content
-		}
-		if um.Reasoning != "" {
-			msg.ReasoningContent = um.Reasoning
-		}
-		result = append(result, msg)
 	}
 	return result
 }
@@ -485,18 +518,18 @@ func ConvertMessages(data []byte, sourceProvider, targetProvider string) ([]byte
 
 	switch sourceProvider {
 	case ModelProviderOpenAI:
-		var msgs []openai.ChatCompletionMessage
+		var msgs []openai.ChatCompletionMessageParamUnion
 		if err := parseJSONL(data, &msgs); err != nil {
 			return nil, fmt.Errorf("failed to parse OpenAI messages: %w", err)
 		}
 		uniMsgs = ParseOpenAIMessages(msgs)
 
 	case ModelProviderOpenAICompatible:
-		var msgs []openai.ChatCompletionMessage
+		var msgs []model.ChatCompletionMessage
 		if err := parseJSONL(data, &msgs); err != nil {
 			return nil, fmt.Errorf("failed to parse OpenChat messages: %w", err)
 		}
-		uniMsgs = ParseOpenAIMessages(msgs)
+		uniMsgs = ParseOpenChatMessages(msgs)
 
 	case ModelProviderAnthropic:
 		var msgs []anthropic.MessageParam

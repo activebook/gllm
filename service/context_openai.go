@@ -4,7 +4,7 @@ import (
 	"sort"
 
 	"github.com/activebook/gllm/util"
-	openai "github.com/sashabaranov/go-openai"
+	openai "github.com/openai/openai-go/v3"
 )
 
 // openAIContext implements ContextManager for the OpenAI provider.
@@ -14,25 +14,25 @@ type openAIContext struct {
 
 // PruneMessages trims the OpenAI message history to fit within the context window.
 // extra[0] may be a string systemPrompt for token overhead accounting.
-// extra[1] may optionally carry []openai.Tool for tool-token accounting.
+// extra[1] may optionally carry []openai.ChatCompletionToolUnionParam for tool-token accounting.
 func (c *openAIContext) PruneMessages(messages any, extra ...any) (any, bool, error) {
-	msgs := messages.([]openai.ChatCompletionMessage)
+	msgs := messages.([]openai.ChatCompletionMessageParamUnion)
 	var systemPrompt string
-	var tools []openai.Tool
+	var tools []openai.ChatCompletionToolUnionParam
 	if len(extra) > 0 {
 		if s, ok := extra[0].(string); ok {
 			systemPrompt = s
 		}
 	}
 	if len(extra) > 1 {
-		if t, ok := extra[1].([]openai.Tool); ok {
+		if t, ok := extra[1].([]openai.ChatCompletionToolUnionParam); ok {
 			tools = t
 		}
 	}
 	return c.pruneOpenAIMessages(msgs, systemPrompt, tools)
 }
 
-func (c *openAIContext) pruneOpenAIMessages(messages []openai.ChatCompletionMessage, systemPrompt string, tools []openai.Tool) ([]openai.ChatCompletionMessage, bool, error) {
+func (c *openAIContext) pruneOpenAIMessages(messages []openai.ChatCompletionMessageParamUnion, systemPrompt string, tools []openai.ChatCompletionToolUnionParam) ([]openai.ChatCompletionMessageParamUnion, bool, error) {
 	if c.strategy == StrategyNone || len(messages) == 0 {
 		return messages, false, nil
 	}
@@ -63,7 +63,7 @@ func (c *openAIContext) pruneOpenAIMessages(messages []openai.ChatCompletionMess
 	}
 }
 
-func (c *openAIContext) estimateTokens(messages []openai.ChatCompletionMessage) int {
+func (c *openAIContext) estimateTokens(messages []openai.ChatCompletionMessageParamUnion) int {
 	cache := GetGlobalTokenCache()
 	total := 0
 	for _, msg := range messages {
@@ -72,7 +72,7 @@ func (c *openAIContext) estimateTokens(messages []openai.ChatCompletionMessage) 
 	return total + MessageOverheadTokens
 }
 
-func (c *openAIContext) truncate(messages []openai.ChatCompletionMessage, totalOverhead int) ([]openai.ChatCompletionMessage, bool) {
+func (c *openAIContext) truncate(messages []openai.ChatCompletionMessageParamUnion, totalOverhead int) ([]openai.ChatCompletionMessageParamUnion, bool) {
 	if len(messages) == 0 {
 		return messages, false
 	}
@@ -107,7 +107,9 @@ func (c *openAIContext) truncate(messages []openai.ChatCompletionMessage, totalO
 				removed = true
 				break
 			}
-			if msg.Role != openai.ChatMessageRoleTool && len(msg.ToolCalls) == 0 {
+			role := msg.GetRole()
+			isTool := role != nil && *role == "tool"
+			if !isTool && len(msg.GetToolCalls()) == 0 {
 				historyTokens -= tokenCounts[i]
 				messages = append(messages[:i], messages[i+1:]...)
 				tokenCounts = append(tokenCounts[:i], tokenCounts[i+1:]...)
@@ -124,29 +126,34 @@ func (c *openAIContext) truncate(messages []openai.ChatCompletionMessage, totalO
 	return messages, truncated
 }
 
-func (c *openAIContext) findToolPair(messages []openai.ChatCompletionMessage, index int) []int {
+func (c *openAIContext) findToolPair(messages []openai.ChatCompletionMessageParamUnion, index int) []int {
 	msg := messages[index]
-	if msg.Role == openai.ChatMessageRoleTool && msg.ToolCallID != "" {
+	role := msg.GetRole()
+	isTool := role != nil && *role == "tool"
+	toolCallID := msg.GetToolCallID()
+
+	if isTool && toolCallID != nil && *toolCallID != "" {
 		for i := 0; i < index; i++ {
-			for _, call := range messages[i].ToolCalls {
-				if call.ID == msg.ToolCallID {
+			for _, call := range messages[i].GetToolCalls() {
+				if call.OfFunction != nil && call.OfFunction.ID == *toolCallID {
 					return c.gatherToolPair(messages, i)
 				}
 			}
 		}
 	}
-	if len(msg.ToolCalls) > 0 {
+	if len(msg.GetToolCalls()) > 0 {
 		return c.gatherToolPair(messages, index)
 	}
 	return nil
 }
 
-func (c *openAIContext) gatherToolPair(messages []openai.ChatCompletionMessage, callIndex int) []int {
+func (c *openAIContext) gatherToolPair(messages []openai.ChatCompletionMessageParamUnion, callIndex int) []int {
 	indices := []int{callIndex}
 	callMsg := messages[callIndex]
-	for _, call := range callMsg.ToolCalls {
+	for _, call := range callMsg.GetToolCalls() {
 		for j := callIndex + 1; j < len(messages); j++ {
-			if messages[j].ToolCallID == call.ID {
+			tID := messages[j].GetToolCallID()
+			if call.OfFunction != nil && tID != nil && *tID == call.OfFunction.ID {
 				indices = append(indices, j)
 			}
 		}

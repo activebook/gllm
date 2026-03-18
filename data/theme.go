@@ -47,6 +47,7 @@ var (
 	ReasoningActiveColor string
 	ReasoningDoneColor   string
 	ReasoningOffColor    string
+	ReasoningMinColor    string
 	ReasoningLowColor    string
 	ReasoningMedColor    string
 	ReasoningHighColor   string
@@ -194,8 +195,9 @@ func applyTheme(t goghthemes.Theme) {
 
 	// Reasoning Levels (Heatmap style)
 	ReasoningOffColor = toAnsi(t.BrightBlack)
-	ReasoningLowColor = toAnsi(t.Red)
-	ReasoningMedColor = toAnsi(t.Yellow)
+	ReasoningMinColor = toAnsi(t.Red)
+	ReasoningLowColor = toAnsi(t.Yellow)
+	ReasoningMedColor = toAnsi(t.Blue)
 	ReasoningHighColor = toAnsi(t.Green)
 
 	// 5. UI

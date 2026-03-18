@@ -85,3 +85,21 @@ func ExtractThinkTags(content string) (thinking, cleaned string) {
 	thinking = strings.Join(thinkingParts, "\n")
 	return thinking, cleaned
 }
+
+// InjectThinkTags cleanly prepends reasoning logic wrapped in <think> tags
+// to the primary content area. This is essential for officially preserving
+// continuous "internal monologue" back to OpenRouter/DeepSeek instances
+// within generic API clients that only accept a single `content` string.
+func InjectThinkTags(content, thinking string) string {
+	if thinking == "" {
+		return content
+	}
+
+	thinkingBlock := "<think>\n" + strings.TrimSpace(thinking) + "\n</think>"
+
+	if content == "" {
+		return thinkingBlock
+	}
+
+	return thinkingBlock + "\n" + strings.TrimSpace(content)
+}

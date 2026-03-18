@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/activebook/gllm/util"
-	openai "github.com/sashabaranov/go-openai"
+	openai "github.com/openai/openai-go/v3"
 )
 
 /*
@@ -15,7 +15,7 @@ import (
 // OpenAISession represents a session using OpenAI format
 type OpenAISession struct {
 	BaseSession
-	Messages []openai.ChatCompletionMessage
+	Messages []openai.ChatCompletionMessageParamUnion
 }
 
 func (s *OpenAISession) GetMessages() interface{} {
@@ -23,41 +23,33 @@ func (s *OpenAISession) GetMessages() interface{} {
 }
 
 func (s *OpenAISession) SetMessages(messages interface{}) {
-	if msgs, ok := messages.([]openai.ChatCompletionMessage); ok {
+	if msgs, ok := messages.([]openai.ChatCompletionMessageParamUnion); ok {
 		s.Messages = msgs
 	}
 }
 
-func (s *OpenAISession) MarshalMessages(messages []openai.ChatCompletionMessage, dropToolContent bool) []byte {
-	// The industry's current answer is basically "save everything by default, then compress/prune when it gets too big."
-	// The complete session history, including your prompts and the model's responses, all tool executions (inputs and outputs).
-	// Important: We need to copy the message, otherwise it will modify the original message
-	// model need complete original message, which includes tool content to generate assistant response
-	// but we don't need tool content in session file to save tokens
-
-	empty := ""
+func (s *OpenAISession) MarshalMessages(messages []openai.ChatCompletionMessageParamUnion, dropToolContent bool) []byte {
 	var data []byte
 	for _, msg := range messages {
-		// Never persist system messages — they are always injected fresh
-		// at request time from ag.SystemPrompt. Persisting them would cause bloat
-		// and stale-prompt drift across multi-turn sessions.
-		if msg.Role == openai.ChatMessageRoleSystem {
+		rolePtr := msg.GetRole()
+		if rolePtr != nil && *rolePtr == "system" {
 			continue
 		}
-		// Copy message and clear tool content to save tokens
-		formatted := msg
-		if dropToolContent && msg.Role == openai.ChatMessageRoleTool {
-			formatted.Content = empty
-		}
 
-		// Marshal to compact JSON
-		line, err := json.Marshal(formatted)
+		line, err := json.Marshal(msg)
 		if err != nil {
 			util.Warnf("failed to serialize message: %v\n", err)
 			continue
 		}
 
-		// Write all lines as JSONL (one message per line)
+		if dropToolContent && rolePtr != nil && *rolePtr == "tool" {
+			var raw map[string]interface{}
+			if err := json.Unmarshal(line, &raw); err == nil {
+				raw["content"] = ""
+				line, _ = json.Marshal(raw)
+			}
+		}
+
 		data = append(data, line...)
 		data = append(data, '\n')
 	}
@@ -72,12 +64,12 @@ func (s *OpenAISession) Push(messages ...interface{}) error {
 	}
 
 	// append new messages to s.Messages
-	newmsgs := []openai.ChatCompletionMessage{}
+	var newmsgs []openai.ChatCompletionMessageParamUnion
 	for _, msg := range messages {
 		switch v := msg.(type) {
-		case openai.ChatCompletionMessage:
+		case openai.ChatCompletionMessageParamUnion:
 			newmsgs = append(newmsgs, v)
-		case []openai.ChatCompletionMessage:
+		case []openai.ChatCompletionMessageParamUnion:
 			newmsgs = append(newmsgs, v...)
 		}
 	}
@@ -116,14 +108,14 @@ func (s *OpenAISession) Load() error {
 
 	// Handle empty or non-existent files
 	if len(lines) == 0 {
-		s.Messages = []openai.ChatCompletionMessage{}
+		s.Messages = []openai.ChatCompletionMessageParamUnion{}
 		return nil
 	}
 
 	// Parse each JSONL line as a message
-	s.Messages = make([]openai.ChatCompletionMessage, 0, len(lines))
+	s.Messages = make([]openai.ChatCompletionMessageParamUnion, 0, len(lines))
 	for i, line := range lines {
-		var msg openai.ChatCompletionMessage
+		var msg openai.ChatCompletionMessageParamUnion
 		if err := json.Unmarshal(line, &msg); err != nil {
 			return fmt.Errorf("failed to parse message at line %d: %w", i+1, err)
 		}
@@ -133,7 +125,7 @@ func (s *OpenAISession) Load() error {
 	// Validate format
 	if len(s.Messages) > 0 {
 		msg := s.Messages[0]
-		if msg.Content == "" && len(msg.ToolCalls) == 0 && msg.FunctionCall == nil && msg.ReasoningContent == "" {
+		if rolePtr := msg.GetRole(); rolePtr == nil {
 			return fmt.Errorf("invalid session format: isn't a compatible format. '%s'", s.Path)
 		}
 	}
@@ -143,6 +135,6 @@ func (s *OpenAISession) Load() error {
 
 // Clear removes all messages from the session
 func (s *OpenAISession) Clear() error {
-	s.Messages = []openai.ChatCompletionMessage{}
+	s.Messages = []openai.ChatCompletionMessageParamUnion{}
 	return s.BaseSession.Clear()
 }

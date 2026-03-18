@@ -12,16 +12,17 @@ import (
 )
 
 var thinkCmd = &cobra.Command{
-	Use:       "think [off|low|medium|high]",
+	Use:       "think [off|minimal|low|medium|high]",
 	Short:     "View or set thinking level",
-	ValidArgs: []string{"off", "low", "medium", "high"},
+	ValidArgs: []string{"off", "minimal", "low", "medium", "high"},
 	Long: `View or set the thinking/reasoning level for the active agent.
 
 Thinking levels:
-  off    - Disable thinking mode
-  low    - Minimal reasoning effort
-  medium - Moderate reasoning effort
-  high   - Maximum reasoning effort
+  off     - Disable thinking mode
+  minimal - Minimal reasoning effort
+  low     - Low reasoning effort
+  medium  - Moderate reasoning effort
+  high    - Maximum reasoning effort
 
 The actual behavior depends on the model provider:
   OpenAI:    Maps to reasoning_effort parameter
@@ -29,7 +30,7 @@ The actual behavior depends on the model provider:
   Gemini:    Maps to ThinkingLevel or ThinkingBudget`,
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
-			return []string{"off", "low", "medium", "high", "switch"}, cobra.ShellCompDirectiveNoFileComp
+			return []string{"off", "minimal", "low", "medium", "high", "switch"}, cobra.ShellCompDirectiveNoFileComp
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
@@ -79,7 +80,8 @@ var thinkSwitchCmd = &cobra.Command{
 		selected := currentLevel.String()
 		options := []huh.Option[string]{
 			huh.NewOption("Off - Disable thinking", "off"),
-			huh.NewOption("Low - Minimal reasoning", "low"),
+			huh.NewOption("Minimal - Minimal reasoning", "minimal"),
+			huh.NewOption("Low - Low reasoning", "low"),
 			huh.NewOption("Medium - Moderate reasoning", "medium"),
 			huh.NewOption("High - Maximum reasoning", "high"),
 		}

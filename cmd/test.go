@@ -28,6 +28,8 @@ func runTests(testName string) {
 	fmt.Printf("Running test: %s\n", testName)
 
 	switch testName {
+	case "openai":
+		// test.TestOpenai()
 	case "mcp":
 		// test.TestMCP()
 	case "channels":

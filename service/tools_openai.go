@@ -3,7 +3,7 @@ package service
 import (
 	"fmt"
 
-	openai "github.com/sashabaranov/go-openai"
+	openai "github.com/openai/openai-go/v3"
 )
 
 /*
@@ -11,33 +11,21 @@ import (
  */
 
 // MCPToolCall has it's own logic
-func (op *OpenProcessor) openAIMCPToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+func (op *OpenProcessor) openAIMCPToolCall(toolCall openai.ChatCompletionMessageToolCallUnion, argsMap *map[string]interface{}) (openai.ChatCompletionMessageParamUnion, error) {
 	if op.mcpClient == nil {
 		err := fmt.Errorf("MCP client not initialized")
-		return openai.ChatCompletionMessage{
-			Role:       openai.ChatMessageRoleTool,
-			ToolCallID: toolCall.ID,
-			Content:    fmt.Sprintf("Error: MCP tool call failed: %v", err),
-		}, err
+		return openai.ToolMessage(fmt.Sprintf("Error: MCP tool call failed: %v", err), toolCall.ID), err
 	}
 
 	// Check permisson on mcp tools
 	if err := CheckToolPermission(toolCall.Function.Name, argsMap); err != nil {
-		return openai.ChatCompletionMessage{
-			Role:       openai.ChatMessageRoleTool,
-			ToolCallID: toolCall.ID,
-			Content:    fmt.Sprintf("Error: MCP tool call failed: %v", err),
-		}, err
+		return openai.ToolMessage(fmt.Sprintf("Error: MCP tool call failed: %v", err), toolCall.ID), err
 	}
 
 	// Call the MCP tool
 	result, err := op.mcpClient.CallTool(toolCall.Function.Name, *argsMap)
 	if err != nil {
-		return openai.ChatCompletionMessage{
-			Role:       openai.ChatMessageRoleTool,
-			ToolCallID: toolCall.ID,
-			Content:    fmt.Sprintf("Error: MCP tool call failed: %v", err),
-		}, err
+		return openai.ToolMessage(fmt.Sprintf("Error: MCP tool call failed: %v", err), toolCall.ID), err
 	}
 
 	// Concatenate all text and image URLs into a single string output
@@ -60,50 +48,35 @@ func (op *OpenProcessor) openAIMCPToolCall(toolCall openai.ToolCall, argsMap *ma
 		}
 	}
 
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    output,
-	}, nil
+	return openai.ToolMessage(output, toolCall.ID), nil
 }
 
 // Switch agent tool call is special, it need to deal with IsSwitchAgentError
-func (op *OpenProcessor) openAISwitchAgentToolCall(toolCall openai.ToolCall, argsMap *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+func (op *OpenProcessor) openAISwitchAgentToolCall(toolCall openai.ChatCompletionMessageToolCallUnion, argsMap *map[string]interface{}) (openai.ChatCompletionMessageParamUnion, error) {
 	response, err := switchAgentToolCallImpl(argsMap, op.toolsUse)
-
-	// Create the tool message anyway
-	toolMessage := openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: toolCall.ID,
-		Content:    response,
-	}
 
 	if err != nil {
 		if IsSwitchAgentError(err) {
-			return toolMessage, err
+			return openai.ToolMessage(response, toolCall.ID), err
 		}
 		// Wrap other errors in response
-		toolMessage.Content = fmt.Sprintf("Error: %v", err)
+		response = fmt.Sprintf("Error: %v", err)
 	}
 
-	return toolMessage, err
+	return openai.ToolMessage(response, toolCall.ID), err
 }
 
 // runOpenAITool runs fn and wraps the (string, error) result into an OpenAI tool message.
-func runOpenAITool(tc openai.ToolCall, fn ToolFunc) (openai.ChatCompletionMessage, error) {
+func runOpenAITool(tc openai.ChatCompletionMessageToolCallUnion, fn ToolFunc) (openai.ChatCompletionMessageParamUnion, error) {
 	response, err := fn()
 	if err != nil {
 		response = fmt.Sprintf("Error: %v", err)
 	}
-	return openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		ToolCallID: tc.ID,
-		Content:    response,
-	}, err
+	return openai.ToolMessage(response, tc.ID), err
 }
 
 // dispatchOpenAIToolCall handles the routing of OpenAI tool calls to the correct implementation.
-func (op *OpenProcessor) dispatchOpenAIToolCall(toolCall openai.ToolCall, a *map[string]interface{}) (openai.ChatCompletionMessage, error) {
+func (op *OpenProcessor) dispatchOpenAIToolCall(toolCall openai.ChatCompletionMessageToolCallUnion, a *map[string]interface{}) (openai.ChatCompletionMessageParamUnion, error) {
 	switch toolCall.Function.Name {
 	case ToolShell:
 		return runOpenAITool(toolCall, func() (string, error) { return shellToolCallImpl(a, op.toolsUse) })
@@ -171,11 +144,7 @@ func (op *OpenProcessor) dispatchOpenAIToolCall(toolCall openai.ToolCall, a *map
 		}
 		// Unknown function fallback
 		errorMsg := fmt.Sprintf("Error: Unknown function '%s'. This function is not available. Please use one of the available functions from the tool list.", toolCall.Function.Name)
-		msg := openai.ChatCompletionMessage{
-			Role:       openai.ChatMessageRoleTool,
-			Content:    errorMsg,
-			ToolCallID: toolCall.ID,
-		}
+		msg := openai.ToolMessage(errorMsg, toolCall.ID)
 		op.status.ChangeTo(op.notify, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", toolCall.Function.Name)}, nil)
 		return msg, nil
 	}
