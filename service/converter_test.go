@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"testing"
 )
 
@@ -149,9 +150,12 @@ func TestConvertMessages_InlinesToolResults(t *testing.T) {
 }
 
 func TestConvertMessages_PreservesReasoning(t *testing.T) {
-	// OpenAI conversation with reasoning (JSONL format)
+	// NOTE: The official openai-go SDK's ChatCompletionMessageParamUnion does NOT
+	// preserve custom fields like `reasoning_content` during JSON unmarshal.
+	// The project encodes reasoning as a `<think>...</think>` prefix in the
+	// content string (see BuildOpenAIMessages). This test validates that round-trip.
 	input := `{"role": "user", "content": "Think about this"}
-{"role": "assistant", "content": "My answer", "reasoning_content": "Let me think..."}`
+{"role": "assistant", "content": "<think>\nLet me think...\n</think>\nMy answer"}`
 
 	result, err := ConvertMessages([]byte(input), ModelProviderOpenAI, ModelProviderGemini)
 	if err != nil {
@@ -172,6 +176,8 @@ func TestConvertMessages_PreservesReasoning(t *testing.T) {
 	// Model response should have parts with thought
 	parts, ok := geminiMessages[1]["parts"].([]interface{})
 	if !ok || len(parts) < 2 {
+		out, _ := json.MarshalIndent(geminiMessages, "", "  ")
+		t.Logf("Output: %s", string(out))
 		t.Errorf("Expected model message to have at least 2 parts (thought + text)")
 	}
 }

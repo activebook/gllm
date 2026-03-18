@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	anthropic "github.com/anthropics/anthropic-sdk-go"
-	openai "github.com/sashabaranov/go-openai"
+	openai "github.com/openai/openai-go/v3"
 	openchat "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"google.golang.org/genai"
 )
@@ -156,50 +156,43 @@ func isDataURL(s string) bool {
 
 // EstimateOpenAIMessageTokens estimates tokens for an OpenAI chat message.
 // This accounts for role tokens, content, and tool calls.
-func EstimateOpenAIMessageTokens(msg openai.ChatCompletionMessage) int {
+func EstimateOpenAIMessageTokens(msg openai.ChatCompletionMessageParamUnion) int {
 	tokens := MessageOverheadTokens
 
-	// Content tokens
-	tokens += EstimateTokens(msg.Content)
-
-	// Reasoning content (for models that support it)
-	if msg.ReasoningContent != "" {
-		tokens += EstimateTokens(msg.ReasoningContent)
+	// Fast path via JSON serialization
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return tokens
 	}
 
-	// Multi-part content (images, etc.)
-	if len(msg.MultiContent) > 0 {
-		for _, part := range msg.MultiContent {
-			switch part.Type {
-			case openai.ChatMessagePartTypeText:
-				tokens += EstimateTokens(part.Text)
-			case openai.ChatMessagePartTypeImageURL:
-				// If it's a data URL, usage fixed cost
-				if part.ImageURL != nil {
-					if isDataURL(part.ImageURL.URL) {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return tokens
+	}
+
+	// Content tokens
+	if content, ok := raw["content"]; ok {
+		if str, ok := content.(string); ok {
+			tokens += EstimateTokens(str)
+		} else if arr, ok := content.([]interface{}); ok {
+			for _, item := range arr {
+				if m, ok := item.(map[string]interface{}); ok {
+					switch m["type"] {
+					case "image_url":
 						tokens += TokenCostImageDefault
-					} else {
-						tokens += EstimateTokens(part.ImageURL.URL)
+					case "text":
+						if text, ok := m["text"].(string); ok {
+							tokens += EstimateTokens(text)
+						}
 					}
-					// Check detail if available, but for now we rely on the heuristic
-					// tokens += EstimateTokens(string(part.ImageURL.Detail))
 				}
 			}
 		}
 	}
 
-	// Tool calls
-	if len(msg.ToolCalls) > 0 {
-		for _, call := range msg.ToolCalls {
-			tokens += ToolCallOverhead
-			tokens += EstimateTokens(call.Function.Name)
-			tokens += EstimateTokens(call.Function.Arguments)
-		}
-	}
-
-	// Tool call ID (for tool responses)
-	if msg.ToolCallID != "" {
-		tokens += EstimateTokens(msg.ToolCallID)
+	// Tool calls overhead
+	if toolCalls, ok := raw["tool_calls"].([]interface{}); ok {
+		tokens += ToolCallOverhead * len(toolCalls)
 	}
 
 	return tokens
@@ -407,7 +400,7 @@ func EstimateAnthropicMessageTokens(msg anthropic.MessageParam) int {
 }
 
 // EstimateOpenAIMessagesTokens estimates total tokens for a slice of OpenAI messages.
-func EstimateOpenAIMessagesTokens(messages []openai.ChatCompletionMessage) int {
+func EstimateOpenAIMessagesTokens(messages []openai.ChatCompletionMessageParamUnion) int {
 	total := 0
 	for _, msg := range messages {
 		total += EstimateOpenAIMessageTokens(msg)
@@ -465,7 +458,7 @@ func EstimateGeminiToolTokens(tools []*genai.Tool) int {
 }
 
 // EstimateOpenAIToolTokens estimates tokens for a slice of OpenAI tools
-func EstimateOpenAIToolTokens(tools []openai.Tool) int {
+func EstimateOpenAIToolTokens(tools []openai.ChatCompletionToolUnionParam) int {
 	if len(tools) == 0 {
 		return 0
 	}

@@ -10,7 +10,8 @@ import (
 
 	"github.com/activebook/gllm/data"
 	anthropic "github.com/anthropics/anthropic-sdk-go"
-	openai "github.com/sashabaranov/go-openai"
+	openai "github.com/openai/openai-go/v3"
+	arkmodel "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	gemini "google.golang.org/genai"
 )
 
@@ -45,34 +46,37 @@ func init() {
 }
 
 // Detects if a message is definitely an OpenAI message
-func DetectOpenAIKeyMessage(msg *openai.ChatCompletionMessage) bool {
-	if msg.Role == "" {
+func DetectOpenAIKeyMessage(msg *openai.ChatCompletionMessageParamUnion) bool {
+	rolePtr := msg.GetRole()
+	if rolePtr == nil {
 		return false
 	}
-	// SystemRole is unique to OpenAI
-	if msg.Role == openai.ChatMessageRoleSystem {
+	role := *rolePtr
+
+	// System/Tool/Function roles are unique signals for OpenAI-style messages
+	if role == "system" || role == "tool" || role == "function" {
 		return true
 	}
-	// ReasoningContent is unique to OpenAI
-	if msg.ReasoningContent != "" {
+
+	// ToolCallID is present in 'tool' role messages
+	if id := msg.GetToolCallID(); id != nil && *id != "" {
 		return true
 	}
-	// ToolCallID is unique to OpenAI
-	if msg.ToolCallID != "" {
+
+	// ToolCalls in 'assistant' role messages
+	if len(msg.GetToolCalls()) > 0 {
 		return true
 	}
-	// ToolCalls is unique to OpenAI
-	if len(msg.ToolCalls) > 0 {
-		return true
-	}
-	// ImageURL is unique to OpenAI
-	if len(msg.MultiContent) > 0 {
-		for _, content := range msg.MultiContent {
-			if content.ImageURL != nil {
+
+	// Check content for OpenAI-specific parts like image_url in user messages
+	if role == "user" && msg.OfUser != nil {
+		for _, part := range msg.OfUser.Content.OfArrayOfContentParts {
+			if part.OfImageURL != nil {
 				return true
 			}
 		}
 	}
+
 	return false
 }
 
@@ -122,13 +126,19 @@ func DetectAnthropicKeyMessage(msg *anthropic.MessageParam) bool {
 	return false
 }
 
-/*
- * Helper function to detect provider from a single JSONL line or message object
- */
+// DetectMessageProviderFromLine detects the provider of a message from its JSON representation.
 func DetectMessageProviderFromLine(line []byte) string {
 	line = bytes.TrimSpace(line)
 	if len(line) == 0 || !json.Valid(line) {
 		return ModelProviderUnknown
+	}
+
+	// Fast pre-check using raw JSON map for efficiency and non-standard fields.
+	var raw map[string]interface{}
+	if err := json.Unmarshal(line, &raw); err == nil {
+		if provider := DetectMessageProviderFromRaw(raw); provider != ModelProviderUnknown {
+			return provider
+		}
 	}
 
 	// 1. Check Gemini (Most unique structure "parts")
@@ -147,15 +157,55 @@ func DetectMessageProviderFromLine(line []byte) string {
 		}
 	}
 
-	// 3. Check OpenAI
-	var openaiMsg openai.ChatCompletionMessage
+	// 3. Fallback to full SDK unmarshal check
+	var openaiMsg openai.ChatCompletionMessageParamUnion
 	if err := json.Unmarshal(line, &openaiMsg); err == nil {
 		if DetectOpenAIKeyMessage(&openaiMsg) {
 			return ModelProviderOpenAI
 		}
-		// Weak check for OpenAI Compatible (pure text content)
-		if openaiMsg.Role != "" && (openaiMsg.Content != "" || len(openaiMsg.MultiContent) > 0) {
+		// Weak check: plain role present → OpenAI-compatible
+		rolePtr := openaiMsg.GetRole()
+		if rolePtr != nil && *rolePtr != "" {
 			return ModelProviderOpenAICompatible
+		}
+	}
+
+	return ModelProviderUnknown
+}
+
+// DetectMessageProviderFromRaw performs a fast-path check using a raw JSON map.
+// This is used for performance (avoiding multi-type reflection unmarshals)
+// and for detecting vendor-specific keys that aren't in standard SDK schemas.
+func DetectMessageProviderFromRaw(raw map[string]interface{}) string {
+	// Definitive OpenAI/OpenChat signals
+	role, _ := raw["role"].(string)
+	if role == "tool" || role == "function" || role == "system" {
+		return ModelProviderOpenAI
+	}
+	if _, ok := raw["reasoning_content"]; ok {
+		// reasoning_content is only supported by OpenChat/compatible providers
+		return ModelProviderOpenAICompatible
+	}
+	if _, ok := raw["tool_call_id"]; ok {
+		return ModelProviderOpenAI
+	}
+
+	// Multimodal content parts
+	if contentArr, ok := raw["content"].([]interface{}); ok {
+		for _, item := range contentArr {
+			if m, ok := item.(map[string]interface{}); ok {
+				if m["type"] == "image_url" {
+					return ModelProviderOpenAI
+				}
+			}
+		}
+	}
+
+	// Anthropic uses role 'user' and 'assistant' but also has 'content' array.
+	// Gemini uses 'parts' instead of 'content' and uses role 'model' instead of 'assistant'.
+	if _, ok := raw["parts"]; ok {
+		if role == "user" || role == "model" {
+			return ModelProviderGemini
 		}
 	}
 
@@ -401,7 +451,7 @@ func RenderGeminiSessionLog(input []byte) string {
 // RenderOpenAISessionLog returns a string summary of OpenAI session (JSONL or JSON array format)
 func RenderOpenAISessionLog(input []byte) string {
 	var sb strings.Builder
-	var messages []openai.ChatCompletionMessage
+	var messages []*arkmodel.ChatCompletionMessage
 
 	// JSONL format: parse each line
 	lines := bytes.Split(input, []byte("\n"))
@@ -410,11 +460,11 @@ func RenderOpenAISessionLog(input []byte) string {
 		if len(line) == 0 {
 			continue
 		}
-		var msg openai.ChatCompletionMessage
+		var msg arkmodel.ChatCompletionMessage
 		if err := json.Unmarshal(line, &msg); err != nil {
 			return fmt.Sprintf("Error parsing OpenAI message: %v\n", err)
 		}
-		messages = append(messages, msg)
+		messages = append(messages, &msg)
 	}
 
 	// Summary section
@@ -434,16 +484,15 @@ func RenderOpenAISessionLog(input []byte) string {
 		case "function", "tool":
 			functionResponseCount++
 		}
-		if msg.FunctionCall != nil {
-			functionCallCount++
-		}
-		if len(msg.ToolCalls) > 0 {
-			functionCallCount += len(msg.ToolCalls)
-		}
 
-		for _, item := range msg.MultiContent {
-			if item.Type == "image_url" {
-				imageCount++
+		functionCallCount += len(msg.ToolCalls)
+
+		// Check content for images
+		if msg.Content != nil && msg.Content.ListValue != nil {
+			for _, part := range msg.Content.ListValue {
+				if part.Type == arkmodel.ChatCompletionMessageContentPartTypeImageURL {
+					imageCount++
+				}
 			}
 		}
 	}
@@ -467,34 +516,24 @@ func RenderOpenAISessionLog(input []byte) string {
 		for _, msg := range messages {
 			// Apply color to role
 			roleColor := RoleColors[msg.Role]
-			if roleColor == "" {
-				roleColor = ""
-			}
 			sb.WriteString(fmt.Sprintf("  %s%s%s", roleColor, msg.Role, data.ResetSeq))
 
-			if msg.Name != "" {
-				sb.WriteString(fmt.Sprintf(" (%s)", msg.Name))
+			if msg.Name != nil && *msg.Name != "" {
+				sb.WriteString(fmt.Sprintf(" (%s)", *msg.Name))
 			}
 			sb.WriteString(": ")
 
-			// Function call details
-			if msg.FunctionCall != nil {
-				sb.WriteString(fmt.Sprintf("\n    %s[Function call: %s]%s", ContentTypeColors["function_call"], msg.FunctionCall.Name, data.ResetSeq))
-				if msg.FunctionCall.Arguments != "" {
-					sb.WriteString(fmt.Sprintf(" args: %s", msg.FunctionCall.Arguments))
-				}
-			}
+			// Output format and order is like this:
+			// reasoning
+			// tool response if exists
+			// content
+			// tool calls if exists
 
-			// Tool call details
-			if len(msg.ToolCalls) > 0 {
-				sb.WriteString(fmt.Sprintf("\n    %s[Tool calls: ", ContentTypeColors["function_call"]))
-				for j, tool := range msg.ToolCalls {
-					if j > 0 {
-						sb.WriteString(", ")
-					}
-					sb.WriteString(fmt.Sprintf("%s (id: %s)", tool.Function.Name, tool.ID))
-				}
-				sb.WriteString(fmt.Sprintf("]%s", data.ResetSeq))
+			// Output the reasoning content if it exists
+			if msg.ReasoningContent != nil && *msg.ReasoningContent != "" {
+				sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
+				sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(*msg.ReasoningContent, ContentTypeColors["reasoning_content"], "    ")))
+				sb.WriteString(fmt.Sprintf("\n    %s✓%s\n", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 			}
 
 			// Tool response details
@@ -502,32 +541,45 @@ func RenderOpenAISessionLog(input []byte) string {
 				sb.WriteString(fmt.Sprintf("\n    %s[Response to tool call: %s]%s", ContentTypeColors["function_response"], msg.ToolCallID, data.ResetSeq))
 			}
 
-			// Output the reasoning content if it exists
-			if msg.ReasoningContent != "" {
-				sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
-				sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(msg.ReasoningContent, ContentTypeColors["reasoning_content"], "    ")))
-				sb.WriteString(fmt.Sprintf("\n    %s✓%s\n", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
-			}
-
-			if msg.Content != "" {
-				sb.WriteString("\n    ")
-				sb.WriteString(indentText(msg.Content, "    "))
-			}
-
-			if len(msg.MultiContent) > 0 {
-				// sb.WriteString("\n    Multimodal content: ")
-				for j, item := range msg.MultiContent {
-					if j > 0 {
-						sb.WriteString(", ")
-					}
-					if item.Type == "text" {
-						sb.WriteString(fmt.Sprintf("\n    %s", indentText(item.Text, "    ")))
-					}
-					if item.Type == "image_url" {
-						sb.WriteString(fmt.Sprintf("\n    %simage%s", ContentTypeColors["image"], data.ResetSeq))
+			if msg.Content != nil {
+				if msg.Content.StringValue != nil && *msg.Content.StringValue != "" {
+					sb.WriteString("\n    ")
+					sb.WriteString(indentText(*msg.Content.StringValue, "    "))
+				} else if len(msg.Content.ListValue) > 0 {
+					for j, part := range msg.Content.ListValue {
+						if j > 0 {
+							sb.WriteString(", ")
+						}
+						switch part.Type {
+						case arkmodel.ChatCompletionMessageContentPartTypeText:
+							if part.Text != "" {
+								sb.WriteString(fmt.Sprintf("\n    %s", indentText(part.Text, "    ")))
+							}
+						case arkmodel.ChatCompletionMessageContentPartTypeImageURL:
+							sb.WriteString(fmt.Sprintf("\n    %simage%s", ContentTypeColors["image"], data.ResetSeq))
+						}
 					}
 				}
-				// sb.WriteString("\n    ")
+			}
+
+			// Tool call details, print at the end
+			if len(msg.ToolCalls) > 0 {
+				for _, tool := range msg.ToolCalls {
+					sb.WriteString("\n")
+					sb.WriteString(fmt.Sprintf("    %s[Tool calls: ", ContentTypeColors["function_call"]))
+					sb.WriteString(fmt.Sprintf("%s (id: %s)", tool.Function.Name, tool.ID))
+					sb.WriteString(fmt.Sprintf("]%s\n", data.ResetSeq))
+					if tool.Function.Arguments != "" {
+						// we should write arguments in a pretty way
+						var args map[string]interface{}
+						if err := json.Unmarshal([]byte(tool.Function.Arguments), &args); err == nil {
+							argStr, _ := json.MarshalIndent(args, "    ", "  ")
+							sb.WriteString(fmt.Sprintf("    args: %s", string(argStr)))
+						} else {
+							sb.WriteString(fmt.Sprintf("    args: %s", tool.Function.Arguments))
+						}
+					}
+				}
 			}
 
 			sb.WriteString("\n\n")

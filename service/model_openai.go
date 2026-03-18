@@ -5,43 +5,65 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/activebook/gllm/util"
-	openai "github.com/sashabaranov/go-openai"
+	openai "github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/packages/param"
+	"github.com/openai/openai-go/v3/packages/ssestream"
 )
 
-func (ag *Agent) getOpenAIFilePart(file *FileData) *openai.ChatMessagePart {
+// extractDeltaReasoning extracts vendor-specific reasoning/thinking content from a
+// streaming delta's ExtraFields. Providers like DeepSeek R1 use "reasoning_content";
+// others (e.g. OpenRouter) use "reasoning".
+//
+// Key SDK mechanics:
+//   - Extra/unknown JSON fields are captured in delta.JSON.ExtraFields.
+//   - These fields are present but NOT Valid() — they sit outside the typed schema.
+//   - Raw() returns the raw JSON value (e.g. `"some text"` or `null` or “ for omitted).
+//   - We strings.Trim to unquote rather than json.Unmarshal, matching the streaming
+//     incremental nature of the data (no escaped unicode concerns in practice).
+func extractDeltaReasoning(delta *openai.ChatCompletionChunkChoiceDelta) string {
+	if delta == nil {
+		return ""
+	}
+	for _, key := range []string{"reasoning_content", "reasoning"} {
+		field, ok := delta.JSON.ExtraFields[key]
+		if !ok || field.Valid() {
+			continue // field absent, or it is a typed/valid field (shouldn't happen but guard anyway)
+		}
+		raw := field.Raw()
+		if raw == "" || raw == "null" {
+			continue // omitted or explicitly null — no reasoning this chunk
+		}
+		return strings.Trim(raw, `"`)
+	}
+	return ""
+}
 
-	var part *openai.ChatMessagePart
+func (ag *Agent) getOpenAIFilePart(file *FileData) (openai.ChatCompletionContentPartUnionParam, bool) {
+
+	var part openai.ChatCompletionContentPartUnionParam
 	format := file.Format()
 	// Handle based on file type
 	if IsImageMIMEType(format) {
 		// Create base64 image URL
 		base64Data := base64.StdEncoding.EncodeToString(file.Data())
-		//imageURL := fmt.Sprintf("data:image/%s;base64,%s", file.Format(), base64Data)
-		// data:format;base64,base64Data
 		imageURL := fmt.Sprintf("data:%s;base64,%s", file.Format(), base64Data)
 		// Create and append image part
-		part = &openai.ChatMessagePart{
-			Type: openai.ChatMessagePartTypeImageURL,
-			ImageURL: &openai.ChatMessageImageURL{
-				URL: imageURL,
-			},
-		}
+		part = openai.ImageContentPart(openai.ChatCompletionContentPartImageImageURLParam{URL: imageURL})
+		return part, true
 	} else if IsTextMIMEType(format) {
 		// Create and append text part
-		part = &openai.ChatMessagePart{
-			Type: openai.ChatMessagePartTypeText,
-			Text: string(file.Data()),
-		}
+		part = openai.TextContentPart(string(file.Data()))
+		return part, true
 	} else {
 		// Unknown file type, skip
 		// Don't deal with pdf, xls
 		// It needs upload to OpenAI's servers first, so we can't include them directly in a message.
+		return part, false
 	}
-	return part
 }
 
 /*
@@ -57,44 +79,33 @@ func (ag *Agent) SortOpenAIMessagesByOrder() error {
 	}
 
 	// Get current history (pure dialogue, no system messages)
-	history, _ := ag.Session.GetMessages().([]openai.ChatCompletionMessage)
+	history, _ := ag.Session.GetMessages().([]openai.ChatCompletionMessageParamUnion)
 
-	var userMessage openai.ChatCompletionMessage
 	// Add File parts if available
 	if len(ag.Files) > 0 {
-		// Add user message
-		userMessage = openai.ChatCompletionMessage{
-			Role:    openai.ChatMessageRoleUser,
-			Content: "", // Empty string for multimodal
-			MultiContent: []openai.ChatMessagePart{
-				{
-					Type: openai.ChatMessagePartTypeText,
-					Text: ag.UserPrompt,
-				},
-			},
+		var parts []openai.ChatCompletionContentPartUnionParam
+		if ag.UserPrompt != "" {
+			parts = append(parts, openai.TextContentPart(ag.UserPrompt))
 		}
 		// Add all files
 		for _, file := range ag.Files {
 			if file != nil {
-				part := ag.getOpenAIFilePart(file)
-				if part != nil {
-					userMessage.MultiContent = append(userMessage.MultiContent, *part)
+				part, ok := ag.getOpenAIFilePart(file)
+				if ok {
+					parts = append(parts, part)
 				}
 			}
 		}
+		if len(parts) > 0 {
+			history = append(history, openai.UserMessage(parts))
+		}
 	} else {
 		// For text only models, add user prompt directly
-		// If use MultiContent(for multimodal), it could be error
-		userMessage = openai.ChatCompletionMessage{
-			Role:    openai.ChatMessageRoleUser,
-			Content: ag.UserPrompt, // only for text models
+		if ag.UserPrompt != "" {
+			history = append(history, openai.UserMessage(ag.UserPrompt))
 		}
 	}
 	// Add to history only if it's not empty
-	if ag.UserPrompt != "" || len(ag.Files) > 0 {
-		history = append(history, userMessage)
-	}
-
 	ag.Session.SetMessages(history)
 	// Bugfix: save session after update messages
 	// Because the system message could be modified, and added user message
@@ -103,15 +114,12 @@ func (ag *Agent) SortOpenAIMessagesByOrder() error {
 
 // prependOpenAISystemMessage builds the final API messages slice by prepending
 // a fresh system message in-memory. Returns history unchanged when prompt is empty.
-func prependOpenAISystemMessage(systemPrompt string, history []openai.ChatCompletionMessage) []openai.ChatCompletionMessage {
+func prependOpenAISystemMessage(systemPrompt string, history []openai.ChatCompletionMessageParamUnion) []openai.ChatCompletionMessageParamUnion {
 	if systemPrompt == "" {
 		return history
 	}
-	sysMsg := openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleSystem,
-		Content: systemPrompt,
-	}
-	messages := make([]openai.ChatCompletionMessage, 0, 1+len(history))
+	sysMsg := openai.SystemMessage(systemPrompt)
+	messages := make([]openai.ChatCompletionMessageParamUnion, 0, 1+len(history))
 	messages = append(messages, sysMsg)
 	messages = append(messages, history...)
 	return messages
@@ -121,34 +129,33 @@ func prependOpenAISystemMessage(systemPrompt string, history []openai.ChatComple
 // This is used for background tasks like context compression where streaming is unnecessary.
 // systemPrompt is the system prompt to be used for the sync generation, it's majorly a role.
 // the last message is the user prompt to do the task.
-func (ag *Agent) GenerateOpenAISync(messages []openai.ChatCompletionMessage, systemPrompt string) (string, error) {
+func (ag *Agent) GenerateOpenAISync(messages []openai.ChatCompletionMessageParamUnion, systemPrompt string) (string, error) {
 	ctx := context.Background()
-	config := openai.DefaultConfig(ag.Model.ApiKey)
+	opts := []option.RequestOption{option.WithAPIKey(ag.Model.ApiKey)}
 	if ag.Model.EndPoint != "" {
-		config.BaseURL = ag.Model.EndPoint
+		opts = append(opts, option.WithBaseURL(ag.Model.EndPoint))
 	}
-	client := openai.NewClientWithConfig(config)
+	client := openai.NewClient(opts...)
 
 	// Add system prompt
-	messages = append([]openai.ChatCompletionMessage{{
-		Role:    openai.ChatMessageRoleSystem,
-		Content: systemPrompt,
-	}}, messages...)
+	messages = append([]openai.ChatCompletionMessageParamUnion{openai.SystemMessage(systemPrompt)}, messages...)
 
-	req := openai.ChatCompletionRequest{
-		Model:       ag.Model.Model,
-		Temperature: ag.Model.Temperature,
-		TopP:        ag.Model.TopP,
-		Messages:    messages,
-		Stream:      false,
+	req := openai.ChatCompletionNewParams{
+		Model:    openai.ChatModel(ag.Model.Model),
+		Messages: messages,
+	}
+	if ag.Model.Temperature != 0 {
+		req.Temperature = openai.Float(float64(ag.Model.Temperature))
+	}
+	if ag.Model.TopP != 0 {
+		req.TopP = openai.Float(float64(ag.Model.TopP))
 	}
 
 	if ag.Model.Seed != nil {
-		seedInt32 := int(*ag.Model.Seed)
-		req.Seed = &seedInt32
+		req.Seed = openai.Int(int64(*ag.Model.Seed))
 	}
 
-	resp, err := client.CreateChatCompletion(ctx, req)
+	resp, err := client.Chat.Completions.New(ctx, req)
 	if err != nil {
 		return "", fmt.Errorf("sync chat completion error: %w", err)
 	}
@@ -166,14 +173,16 @@ func (ag *Agent) GenerateOpenAIStream() error {
 	// Initialize the Client
 	ctx := context.Background()
 	// Create a client config with custom base URL
-	config := openai.DefaultConfig(ag.Model.ApiKey)
-	if ag.Model.EndPoint != "" {
-		config.BaseURL = ag.Model.EndPoint
+	clientOpts := []option.RequestOption{
+		option.WithAPIKey(ag.Model.ApiKey),
 	}
-	client := openai.NewClientWithConfig(config)
+	if ag.Model.EndPoint != "" {
+		clientOpts = append(clientOpts, option.WithBaseURL(ag.Model.EndPoint))
+	}
+	client := openai.NewClient(clientOpts...)
 
 	// Create tools
-	tools := []openai.Tool{}
+	tools := []openai.ChatCompletionToolUnionParam{}
 	if len(ag.EnabledTools) > 0 {
 		// Add tools
 		tools = ag.getOpenAITools()
@@ -207,7 +216,7 @@ func (ag *Agent) GenerateOpenAIStream() error {
 		agentName:   ag.AgentName,
 	}
 	chat := &OpenAI{
-		client: client,
+		client: &client,
 		tools:  tools,
 		op:     &op,
 	}
@@ -241,7 +250,7 @@ func (ag *Agent) GenerateOpenAIStream() error {
 // OpenAI manages the state of an ongoing session with an AI assistant
 type OpenAI struct {
 	client *openai.Client
-	tools  []openai.Tool
+	tools  []openai.ChatCompletionToolUnionParam
 	op     *OpenProcessor
 }
 
@@ -256,7 +265,7 @@ func (oa *OpenAI) process(ag *Agent) error {
 
 		// Get all history messages - MUST be inside loop to pick up newly pushed messages.
 		// Session only holds pure dialogue (user/assistant/tool turns).
-		messages, _ := ag.Session.GetMessages().([]openai.ChatCompletionMessage)
+		messages, _ := ag.Session.GetMessages().([]openai.ChatCompletionMessageParamUnion)
 
 		// Apply context window management.
 		util.Debugf("Context messages: [%d]\n", len(messages))
@@ -264,7 +273,7 @@ func (oa *OpenAI) process(ag *Agent) error {
 		if err != nil {
 			return fmt.Errorf("failed to prune context: %w", err)
 		}
-		messages = pruned.([]openai.ChatCompletionMessage)
+		messages = pruned.([]openai.ChatCompletionMessageParamUnion)
 
 		if truncated {
 			util.Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.\n", ag.Context.GetStrategy())
@@ -278,41 +287,43 @@ func (oa *OpenAI) process(ag *Agent) error {
 		messages = prependOpenAISystemMessage(ag.SystemPrompt, messages)
 
 		// Create the request
-		req := openai.ChatCompletionRequest{
-			Model:       ag.Model.Model,
-			Temperature: ag.Model.Temperature,
-			TopP:        ag.Model.TopP,
+		req := openai.ChatCompletionNewParams{
+			Model:       openai.ChatModel(ag.Model.Model),
+			Temperature: openai.Float(float64(ag.Model.Temperature)),
+			TopP:        openai.Float(float64(ag.Model.TopP)),
 			Messages:    messages,
-			Tools:       oa.tools,
-			Stream:      true,
+		}
+
+		// Tools
+		if len(oa.tools) > 0 {
+			req.Tools = oa.tools
 		}
 
 		// Add seed if provided
 		if ag.Model.Seed != nil {
-			seedInt32 := int(*ag.Model.Seed)
-			req.Seed = &seedInt32
+			req.Seed = openai.Int(int64(*ag.Model.Seed))
 		}
 
 		// Add reasoning effort if thinking is enabled
 		if effort := ag.ThinkingLevel.ToOpenAIReasoningEffort(); effort != "" {
-			req.ReasoningEffort = effort
+			req.ReasoningEffort = openai.ReasoningEffort(effort)
 		}
 		if ag.TokenUsage != nil {
-			req.StreamOptions = &openai.StreamOptions{IncludeUsage: true}
+			req.StreamOptions = openai.ChatCompletionStreamOptionsParam{IncludeUsage: openai.Bool(true)}
 		}
 
 		// Make the streaming request
-		stream, err := oa.client.CreateChatCompletionStream(oa.op.ctx, req)
-		if err != nil {
-			return fmt.Errorf("stream creation error: %v", err)
-		}
-		defer stream.Close()
+		stream := oa.client.Chat.Completions.NewStreaming(oa.op.ctx, req)
+		// Bug: do NOT use defer here — deferreds accumulate until process() returns,
+		// so inside a loop each iteration would stack up an open stream. Close explicitly.
+		// defer stream.Close()
 
 		// Wait for the main goroutine to tell sub-goroutine to proceed
 		oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusStarted}, oa.op.proceed)
 
 		// Process the stream and collect tool calls
 		assistantMessage, toolCalls, resp, err := oa.processStream(stream)
+		stream.Close() // Bugfix: Close immediately after consuming to release the HTTP connection
 		if err != nil {
 			return fmt.Errorf("error processing stream: %v", err)
 		}
@@ -386,7 +397,7 @@ func (oa *OpenAI) process(ag *Agent) error {
 // Because model supports interleaved tool calls and responses, aka ReAct
 // If error happened or user cancelled, in order to maintain session integrity, we need to save the session
 // So that we can resume the session from the last saved state
-func (oa *OpenAI) saveToSession(ag *Agent, message openai.ChatCompletionMessage) error {
+func (oa *OpenAI) saveToSession(ag *Agent, message openai.ChatCompletionMessageParamUnion) error {
 	// Add the assistant's message to the session
 	err := ag.Session.Push(message)
 	if err != nil {
@@ -396,24 +407,24 @@ func (oa *OpenAI) saveToSession(ag *Agent, message openai.ChatCompletionMessage)
 }
 
 // processStream processes the stream and collects tool calls
-func (oa *OpenAI) processStream(stream *openai.ChatCompletionStream) (openai.ChatCompletionMessage, []openai.ToolCall, *openai.ChatCompletionStreamResponse, error) {
-	assistantMessage := openai.ChatCompletionMessage{
-		Role: openai.ChatMessageRoleAssistant,
+func (oa *OpenAI) processStream(stream *ssestream.Stream[openai.ChatCompletionChunk]) (openai.ChatCompletionMessageParamUnion, []openai.ChatCompletionMessageToolCallUnionParam, *openai.ChatCompletionChunk, error) {
+	var assistantMessage openai.ChatCompletionAssistantMessageParam
+
+	type ToolCallBuilder struct {
+		ID        string
+		Name      string
+		Arguments string
 	}
-	toolCalls := make(map[string]openai.ToolCall)
+	toolCallsMap := make(map[string]*ToolCallBuilder)
+	var orderedToolCallIDs []string
+
 	contentBuffer := strings.Builder{}
 	reasoningBuffer := strings.Builder{}
 	lastCallId := ""
-	var finalResp *openai.ChatCompletionStreamResponse
+	var finalResp *openai.ChatCompletionChunk
 
-	for {
-		response, err := stream.Recv()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return assistantMessage, nil, nil, fmt.Errorf("error receiving stream data: %v", err)
-		}
+	for stream.Next() {
+		response := stream.Current()
 		// Get the final response
 		finalResp = &response
 
@@ -421,30 +432,25 @@ func (oa *OpenAI) processStream(stream *openai.ChatCompletionStream) (openai.Cha
 		if len(response.Choices) > 0 {
 			delta := response.Choices[0].Delta
 
-			// State transitions
-			switch oa.op.status.Peek() {
-			case StatusReasoning:
-				// If reasoning content is empty, switch back to normal state
-				// This is to handle the case where reasoning content is empty but we already have content
-				// Aka, the model is done with reasoning content and starting to output normal content
-				if delta.ReasoningContent == "" && delta.Content != "" {
-					oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusReasoningOver}, oa.op.proceed)
+			// (The official SDK param struct has no reasoning_content field.)
+			// Extract vendor reasoning content (DeepSeek R1 → "reasoning_content",
+			// OpenRouter/others → "reasoning") from ExtraFields.
+			if rcText := extractDeltaReasoning(&delta); rcText != "" {
+				reasoningBuffer.WriteString(rcText)
+				if oa.op.status.Peek() != StatusReasoning {
+					// If reasoning content is not empty, switch to reasoning state
+					oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusReasoning}, nil)
 				}
-			default:
-				// If reasoning content is not empty, switch to reasoning state
-				if delta.ReasoningContent != "" {
-					oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusReasoning}, oa.op.proceed)
-				}
+				oa.op.data <- StreamData{Text: rcText, Type: DataTypeReasoning}
 			}
 
-			if delta.ReasoningContent != "" {
-				// For reasoning model
-				text := delta.ReasoningContent
-				reasoningBuffer.WriteString(text)
-				oa.op.data <- StreamData{Text: text, Type: DataTypeReasoning}
-			} else if delta.Content != "" {
+			if delta.Content != "" {
 				text := delta.Content
 				contentBuffer.WriteString(text)
+				if oa.op.status.Peek() == StatusReasoning {
+					// If regular content arrives while we're reasoning, transition away
+					oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusReasoningOver}, oa.op.proceed)
+				}
 				oa.op.data <- StreamData{Text: text, Type: DataTypeNormal}
 			}
 
@@ -464,25 +470,21 @@ func (oa *OpenAI) processStream(stream *openai.ChatCompletionStream) (openai.Cha
 					// Handle streaming tool call parts
 					if id == "" && lastCallId != "" {
 						// Continue with previous tool call
-						if tc, exists := toolCalls[lastCallId]; exists {
-							tc.Function.Arguments += toolCall.Function.Arguments
-							toolCalls[lastCallId] = tc
+						if tc, exists := toolCallsMap[lastCallId]; exists {
+							tc.Arguments += toolCall.Function.Arguments
 						}
 					} else if id != "" {
 						// Create or update a tool call
 						lastCallId = id
-						if tc, exists := toolCalls[id]; exists {
-							tc.Function.Arguments += toolCall.Function.Arguments
-							toolCalls[id] = tc
+						if tc, exists := toolCallsMap[id]; exists {
+							tc.Arguments += toolCall.Function.Arguments
 						} else {
 							// Prepare to receive tool call arguments
-							toolCalls[id] = openai.ToolCall{
-								ID:   id,
-								Type: openai.ToolTypeFunction,
-								Function: openai.FunctionCall{
-									Name:      functionName,
-									Arguments: toolCall.Function.Arguments,
-								},
+							orderedToolCallIDs = append(orderedToolCallIDs, id)
+							toolCallsMap[id] = &ToolCallBuilder{
+								ID:        id,
+								Name:      functionName,
+								Arguments: toolCall.Function.Arguments,
 							}
 						}
 					}
@@ -491,63 +493,74 @@ func (oa *OpenAI) processStream(stream *openai.ChatCompletionStream) (openai.Cha
 		}
 	}
 
-	// Update the assistant reasoning message
-	reasoning_content := reasoningBuffer.String()
-	if reasoning_content != "" {
-		assistantMessage.ReasoningContent = reasoning_content
+	if err := stream.Err(); err != nil {
+		return openai.ChatCompletionMessageParamUnion{OfAssistant: &assistantMessage}, nil, nil, fmt.Errorf("error receiving stream data: %v", err)
 	}
+
+	// Update the assistant reasoning message
+	reasoningContent := reasoningBuffer.String()
+
 	// Set the content of the assistant message
 	content := contentBuffer.String()
-	if content != "" {
-		// Extract <think> tags from content if present
-		// Some providers embed reasoning in <think>...</think> tags instead of
-		// using a separate reasoning_content field
+	if content != "" || reasoningContent != "" {
+		// Also try extracting inline <think> tags (DeepSeek / Qwen streaming format)
 		if thinkContent, cleanedContent := util.ExtractThinkTags(content); thinkContent != "" {
-			// Prepend extracted thinking to existing reasoning content
-			if reasoning_content != "" {
-				assistantMessage.ReasoningContent = thinkContent + "\n" + reasoning_content
+			if reasoningContent != "" {
+				reasoningContent = thinkContent + "\n" + reasoningContent
 			} else {
-				assistantMessage.ReasoningContent = thinkContent
+				reasoningContent = thinkContent
 			}
 			content = cleanedContent
 		}
 
-		if content != "" {
-			if !strings.HasSuffix(content, "\n") {
-				content = content + "\n"
-			}
-			assistantMessage.Content = content
+		if content != "" && !strings.HasSuffix(content, "\n") {
+			content = content + "\n"
 		}
+		assistantMessage.Content.OfString = param.NewOpt(content)
 	}
 
 	// Convert tool calls map to slice
-	var assistantToolCalls []openai.ToolCall
-	for _, tc := range toolCalls {
-		assistantToolCalls = append(assistantToolCalls, tc)
+	var assistantToolCalls []openai.ChatCompletionMessageToolCallUnionParam
+	for _, id := range orderedToolCallIDs {
+		tc := toolCallsMap[id]
+		assistantToolCalls = append(assistantToolCalls, openai.ChatCompletionMessageToolCallUnionParam{
+			OfFunction: &openai.ChatCompletionMessageFunctionToolCallParam{
+				ID: tc.ID,
+				Function: openai.ChatCompletionMessageFunctionToolCallFunctionParam{
+					Name:      tc.Name,
+					Arguments: tc.Arguments,
+				},
+			},
+		})
 	}
 	// Add tool calls to the assistant message if there are any
 	if len(assistantToolCalls) > 0 {
 		assistantMessage.ToolCalls = assistantToolCalls
 	}
 
-	return assistantMessage, assistantToolCalls, finalResp, nil
+	return openai.ChatCompletionMessageParamUnion{OfAssistant: &assistantMessage}, assistantToolCalls, finalResp, nil
 }
 
 // processToolCall processes a single tool call and returns a tool response message
-func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompletionMessage, error) {
+func (oa *OpenAI) processToolCall(toolCall openai.ChatCompletionMessageToolCallUnionParam) (openai.ChatCompletionMessageParamUnion, error) {
 	// Parse the query from the arguments
 	var argsMap map[string]interface{}
-	argsStr := toolCall.Function.Arguments
+	fnCall := toolCall.GetFunction()
+	if fnCall == nil {
+		return openai.ToolMessage("Error: unsupported tool call type", ""), fmt.Errorf("unsupported tool call type")
+	}
+
+	argsStr := fnCall.Arguments
 	if strings.TrimSpace(argsStr) == "" {
 		argsStr = "{}"
 	}
 
 	if err := json.Unmarshal([]byte(argsStr), &argsMap); err != nil {
-		return openai.ChatCompletionMessage{}, fmt.Errorf("error parsing arguments: %v", err)
+		return openai.ChatCompletionMessageParamUnion{}, fmt.Errorf("error parsing arguments: %v", err)
 	}
 
 	var filteredArgs map[string]interface{}
-	if toolCall.Function.Name == ToolEditFile || toolCall.Function.Name == ToolWriteFile || toolCall.Function.Name == ToolAskUser {
+	if fnCall.Name == ToolEditFile || fnCall.Name == ToolWriteFile || fnCall.Name == ToolAskUser {
 		// Don't show content(the modified content could be too long)
 		filteredArgs = FilterOpenToolArguments(argsMap, []string{"content", "edits", "options", "question_type"})
 	} else {
@@ -557,16 +570,26 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 	// Call function
 	// Create structured data for the UI
 	toolCallData := map[string]interface{}{
-		"function": toolCall.Function.Name,
+		"function": fnCall.Name,
 		"args":     filteredArgs,
 	}
 	jsonData, _ := json.Marshal(toolCallData)
 	oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusFunctionCalling, Data: string(jsonData)}, oa.op.proceed)
 
-	var msg openai.ChatCompletionMessage
+	// Convert ChatCompletionMessageToolCallUnionParam to ChatCompletionMessageToolCallUnion for dispatch
+	toolCallUnion := openai.ChatCompletionMessageToolCallUnion{
+		ID:   toolCall.OfFunction.ID,
+		Type: "function",
+		Function: openai.ChatCompletionMessageFunctionToolCallFunction{
+			Name:      toolCall.OfFunction.Function.Name,
+			Arguments: toolCall.OfFunction.Function.Arguments,
+		},
+	}
+
+	var msg openai.ChatCompletionMessageParamUnion
 	var err error
 	// Dispatch tool call
-	msg, err = oa.op.dispatchOpenAIToolCall(toolCall, &argsMap)
+	msg, err = oa.op.dispatchOpenAIToolCall(toolCallUnion, &argsMap)
 
 	// Function call is done
 	oa.op.status.ChangeTo(oa.op.notify, StreamNotify{Status: StatusFunctionCallingOver}, oa.op.proceed)
@@ -578,33 +601,28 @@ func (oa *OpenAI) processToolCall(toolCall openai.ToolCall) (openai.ChatCompleti
 // Each response may contain tool calls that trigger additional processing
 // New responses are generated based on tool call results
 // Each of these interactions consumes tokens that should be tracked
-func addUpOpenAITokenUsage(ag *Agent, resp *openai.ChatCompletionStreamResponse) {
+func addUpOpenAITokenUsage(ag *Agent, resp *openai.ChatCompletionChunk) {
 	// For openai model, cache read tokens are not included in the usage
 	// Because cached tokens already in the prompt tokens, so we don't need to count them
 	// Thought tokens are also included in the prompt tokens
 	// So the total tokens is the sum of prompt tokens and completion tokens
-	if resp != nil && resp.Usage != nil && ag.TokenUsage != nil {
-		cachedTokens := 0
-		thoughtTokens := 0
-		if resp.Usage.PromptTokensDetails != nil {
-			cachedTokens = int(resp.Usage.PromptTokensDetails.CachedTokens)
-		}
-		if resp.Usage.CompletionTokensDetails != nil {
-			thoughtTokens = int(resp.Usage.CompletionTokensDetails.ReasoningTokens)
-		}
+	if resp != nil && ag.TokenUsage != nil && resp.JSON.Usage.Valid() {
+		usage := resp.Usage
+		cachedTokens := usage.PromptTokensDetails.CachedTokens
+		thoughtTokens := usage.CompletionTokensDetails.ReasoningTokens
 		ag.TokenUsage.CachedTokensInPrompt = true
 		ag.TokenUsage.RecordTokenUsage(
-			int(resp.Usage.PromptTokens),
-			int(resp.Usage.CompletionTokens),
+			int(usage.PromptTokens),
+			int(usage.CompletionTokens),
 			int(cachedTokens),
 			int(thoughtTokens),
-			int(resp.Usage.TotalTokens))
+			int(usage.TotalTokens))
 	}
 }
 
 // getOpenAITools returns the tools for OpenAI
-func (ag *Agent) getOpenAITools() []openai.Tool {
-	var tools []openai.Tool
+func (ag *Agent) getOpenAITools() []openai.ChatCompletionToolUnionParam {
+	var tools []openai.ChatCompletionToolUnionParam
 
 	// Get filtered tools based on agent's enabled tools list
 	genericTools := GetOpenToolsFiltered(ag.EnabledTools)
@@ -615,8 +633,8 @@ func (ag *Agent) getOpenAITools() []openai.Tool {
 	return tools
 }
 
-func (ag *Agent) getOpenAIMCPTools() []openai.Tool {
-	var tools []openai.Tool
+func (ag *Agent) getOpenAIMCPTools() []openai.ChatCompletionToolUnionParam {
+	var tools []openai.ChatCompletionToolUnionParam
 	// Add MCP tools if client is available
 	if ag.MCPClient != nil {
 		mcpTools := getMCPTools(ag.MCPClient)

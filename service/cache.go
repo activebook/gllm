@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	anthropic "github.com/anthropics/anthropic-sdk-go"
-	openai "github.com/sashabaranov/go-openai"
+	openai "github.com/openai/openai-go/v3"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"google.golang.org/genai"
 )
@@ -110,11 +110,15 @@ func (tc *TokenCache) Stats() (hits, misses int64, size int) {
 // GetOpenAIMessageKey generates a cache key for an OpenAI message by JSON marshaling.
 // This captures ALL fields (Content, ReasoningContent, ToolCalls, MultiContent, etc.)
 // ensuring different messages never produce the same key.
-func GetOpenAIMessageKey(msg openai.ChatCompletionMessage) string {
+func GetOpenAIMessageKey(msg openai.ChatCompletionMessageParamUnion) string {
 	data, err := json.Marshal(msg)
 	if err != nil {
+		roleStr := ""
+		if role := msg.GetRole(); role != nil {
+			roleStr = *role
+		}
 		// Fallback: role + content (unlikely to fail)
-		return string(msg.Role) + "|" + msg.Content
+		return roleStr + "|" + fmt.Sprintf("%v", msg)
 	}
 	return string(data)
 }
@@ -188,7 +192,7 @@ func ClearTokenCache() {
 // =============================================================================
 
 // GetOrComputeOpenAITokens retrieves cached tokens or computes and caches them.
-func (tc *TokenCache) GetOrComputeOpenAITokens(msg openai.ChatCompletionMessage) int {
+func (tc *TokenCache) GetOrComputeOpenAITokens(msg openai.ChatCompletionMessageParamUnion) int {
 	key := GetOpenAIMessageKey(msg)
 	if count, found := tc.Get(key); found {
 		return count
