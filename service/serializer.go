@@ -77,6 +77,13 @@ func DetectOpenAIKeyMessage(msg *openai.ChatCompletionMessageParamUnion) bool {
 		}
 	}
 
+	// OpenAI-compatible reasoning tags are a definitive signal for GLLM's internal handling
+	if role == "assistant" && msg.OfAssistant != nil {
+		if content := msg.OfAssistant.Content.OfString.Value; content != "" && strings.Contains(content, "</think>") {
+			return true
+		}
+	}
+
 	return false
 }
 
