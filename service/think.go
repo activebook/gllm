@@ -11,24 +11,26 @@ import (
 
 // ThinkingLevel represents the unified thinking/reasoning level across providers.
 // Maps to provider-specific configurations:
-// - OpenAI: reasoning_effort ("low"/"medium"/"high")
+// - OpenAI: reasoning_effort ("off"/"minimal"/"low"/"medium"/"high")
 // - OpenChat: model.Thinking + ReasoningEffort
 // - Gemini 2.5: ThinkingBudget (token count, -1 for dynamic)
-// - Gemini 3: ThinkingLevel ("LOW"/"MEDIUM"/"HIGH")
-// - Anthropic: thinking.budget_tokens
+// - Gemini 3: ThinkingLevel ("OFF"/"MINIMAL"/"LOW"/"MEDIUM"/"HIGH")
+// - Anthropic: thinking.budget_tokens (0/1024/4096/16384/31999)
 type ThinkingLevel string
 
 const (
-	ThinkingLevelOff    ThinkingLevel = "off"
-	ThinkingLevelLow    ThinkingLevel = "low"
-	ThinkingLevelMedium ThinkingLevel = "medium"
-	ThinkingLevelHigh   ThinkingLevel = "high"
+	ThinkingLevelOff     ThinkingLevel = "off"
+	ThinkingLevelMinimal ThinkingLevel = "minimal"
+	ThinkingLevelLow     ThinkingLevel = "low"
+	ThinkingLevelMedium  ThinkingLevel = "medium"
+	ThinkingLevelHigh    ThinkingLevel = "high"
 )
 
 // AllThinkingLevels returns all valid thinking levels in order
 func AllThinkingLevels() []ThinkingLevel {
 	return []ThinkingLevel{
 		ThinkingLevelOff,
+		ThinkingLevelMinimal,
 		ThinkingLevelLow,
 		ThinkingLevelMedium,
 		ThinkingLevelHigh,
@@ -41,6 +43,8 @@ func ParseThinkingLevel(s string) ThinkingLevel {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "off", "disabled", "false", "0", "":
 		return ThinkingLevelOff
+	case "minimal", "min":
+		return ThinkingLevelMinimal
 	case "low":
 		return ThinkingLevelLow
 	case "medium", "med":
@@ -67,6 +71,8 @@ func (t ThinkingLevel) Display() string {
 	switch t {
 	case ThinkingLevelOff:
 		return data.ReasoningOffColor + "off" + data.ResetSeq
+	case ThinkingLevelMinimal:
+		return data.ReasoningMinColor + "minimal" + data.ResetSeq
 	case ThinkingLevelLow:
 		return data.ReasoningLowColor + "low" + data.ResetSeq
 	case ThinkingLevelMedium:
@@ -82,6 +88,8 @@ func (t ThinkingLevel) Display() string {
 // Returns empty string for ThinkingLevelOff (no param should be set).
 func (t ThinkingLevel) ToOpenAIReasoningEffort() string {
 	switch t {
+	case ThinkingLevelMinimal:
+		return "minimal"
 	case ThinkingLevelLow:
 		return "low"
 	case ThinkingLevelMedium:
@@ -103,6 +111,8 @@ func (t ThinkingLevel) ToOpenChatParams() (*model.Thinking, *model.ReasoningEffo
 	var effort model.ReasoningEffort
 
 	switch t {
+	case ThinkingLevelMinimal:
+		effort = model.ReasoningEffortMinimal
 	case ThinkingLevelLow:
 		effort = model.ReasoningEffortLow
 	case ThinkingLevelMedium:
@@ -121,6 +131,8 @@ func (t ThinkingLevel) ToAnthropicParams() anthropic.ThinkingConfigParamUnion {
 	case ThinkingLevelOff:
 		disable := anthropic.NewThinkingConfigDisabledParam()
 		return anthropic.ThinkingConfigParamUnion{OfDisabled: &disable}
+	case ThinkingLevelMinimal:
+		return anthropic.ThinkingConfigParamOfEnabled(1024)
 	case ThinkingLevelLow:
 		return anthropic.ThinkingConfigParamOfEnabled(4096)
 	case ThinkingLevelMedium:
@@ -161,6 +173,8 @@ func (t ThinkingLevel) ToGeminiConfig(modelName string) *genai.ThinkingConfig {
 	if IsModelGemini3(modelName) {
 		// Gemini 3 uses ThinkingLevel enum
 		switch t {
+		case ThinkingLevelMinimal:
+			config.ThinkingLevel = genai.ThinkingLevelMinimal
 		case ThinkingLevelLow:
 			config.ThinkingLevel = genai.ThinkingLevelLow
 		case ThinkingLevelMedium:
@@ -172,6 +186,8 @@ func (t ThinkingLevel) ToGeminiConfig(modelName string) *genai.ThinkingConfig {
 		// Gemini 2.5 uses ThinkingBudget
 		var budget int32
 		switch t {
+		case ThinkingLevelMinimal:
+			budget = 1024
 		case ThinkingLevelLow:
 			budget = 4096
 		case ThinkingLevelMedium:
