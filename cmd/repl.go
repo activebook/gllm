@@ -140,9 +140,17 @@ func (ri *ReplInfo) printWelcome() {
 		Render(welcomeText)
 
 	// --- Right panel: instructions ---
+	// maxCmdLen := 0
+	// for cmd := range replSpecMap {
+	// 	if len(cmd) > maxCmdLen {
+	// 		maxCmdLen = len(cmd)
+	// 	}
+	// }
+	// format := fmt.Sprintf("• %%-%ds : %%s", maxCmdLen)
+
 	instructions := []string{}
 	for cmd, desc := range replSpecMap {
-		instructions = append(instructions, "• "+cmd+": "+desc)
+		instructions = append(instructions, fmt.Sprintf("• %s: %s", cmd, desc))
 	}
 	sort.Strings(instructions)
 
