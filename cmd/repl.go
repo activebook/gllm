@@ -119,49 +119,63 @@ func (ri *ReplInfo) printWelcome() {
 		BorderForeground(lipgloss.Color(data.BorderHex)).
 		Width(safeWidth).
 		Margin(0, 1).
-		Padding(1)
+		Padding(1, 1)
 
 	innerWidth := safeWidth - borderStyle.GetHorizontalFrameSize()
 
-	headerStyle := lipgloss.NewStyle().
+	// Split into left (~40%) and right (~60%) columns
+	leftWidth := innerWidth * 40 / 100
+	rightWidth := innerWidth - leftWidth
+
+	// --- Left panel: logo + welcome ---
+	logo := ui.GetLogo(data.KeyHex, data.LabelHex, 0.5)
+	welcomeText := logo + "\nWelcome back!\n" + data.DetailColor + " (v" + version + ")" + data.ResetSeq
+
+	leftContent := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color(data.KeyHex)).
-		Width(innerWidth).
+		Width(leftWidth).
 		Align(lipgloss.Center).
-		MarginTop(0).
-		MarginBottom(1).
-		Padding(0, 0)
+		Padding(0, 1).
+		Render(welcomeText)
 
-	contentStyle := lipgloss.NewStyle().
+	// --- Right panel: instructions ---
+	// maxCmdLen := 0
+	// for cmd := range replSpecMap {
+	// 	if len(cmd) > maxCmdLen {
+	// 		maxCmdLen = len(cmd)
+	// 	}
+	// }
+	// format := fmt.Sprintf("• %%-%ds : %%s", maxCmdLen)
+
+	instructions := []string{}
+	for cmd, desc := range replSpecMap {
+		instructions = append(instructions, fmt.Sprintf("• %s: %s", cmd, desc))
+	}
+	sort.Strings(instructions)
+
+	rightContent := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(data.LabelHex)).
-		Width(innerWidth).
+		Width(rightWidth).
 		Align(lipgloss.Left).
-		Padding(0, 2)
+		Padding(0, 0, 0, 2).
+		Render(strings.Join(instructions, "\n"))
+
+	// --- Combine panels horizontally ---
+	inner := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		leftContent,
+		rightContent,
+	)
+
+	banner := borderStyle.Render(inner)
+	fmt.Println(banner)
 
 	hintStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(data.DetailHex)).
-		Width(innerWidth).
+		Width(safeWidth).
 		Align(lipgloss.Center).
 		Italic(true)
-
-	logo := ui.GetLogo(data.KeyHex, data.LabelHex, 0.5)
-	welcomeText := logo + "\nWelcome back!" + data.DetailColor + " (v" + version + ")" + data.ResetSeq
-	// use replSpecMap to instructions
-	instructions := []string{}
-	for cmd, desc := range replSpecMap {
-		instructions = append(instructions, "• "+cmd+": "+desc)
-	}
-
-	header := headerStyle.Render(welcomeText)
-	content := contentStyle.Render(strings.Join(instructions, "\n"))
-
-	banner := borderStyle.Render(lipgloss.JoinVertical(
-		lipgloss.Center,
-		header,
-		content,
-	))
-
-	fmt.Println(banner)
 	fmt.Println(hintStyle.Padding(0, 2).Render("Type your message below and press Enter to send."))
 	fmt.Println()
 }
