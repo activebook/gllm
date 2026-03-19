@@ -51,11 +51,11 @@ var (
 	}
 
 	replSpecMap = map[string]string{
-		"@path":     "Reference to files and folders",
-		"!bash":     "Execute local shell commands",
-		"/cmd":      "Execute built-in, skills or workflow commands",
-		"shift+tab": "Toggle plan mode or yolo mode",
-		"ctrl+c":    "Cancel current generation or exit session",
+		"@path":     "Reference to files, folders",
+		"!bash":     "Execute shell commands",
+		"/cmd":      "Execute built-in commands",
+		"shift+tab": "Toggle plan or yolo mode",
+		"ctrl+c":    "Cancel or exit session",
 		"ctrl+d":    "Clear all input",
 	}
 )
