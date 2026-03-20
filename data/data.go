@@ -37,7 +37,7 @@ func GetMcpFilePath() string {
 
 // GetMemoryFilePath returns the path to the memory file.
 func GetMemoryFilePath() string {
-	return filepath.Join(GetConfigDir(), "context.md")
+	return filepath.Join(GetConfigDir(), "memory.md")
 }
 
 // GetSessionsDirPath returns the path to the session directory.
@@ -63,6 +63,11 @@ func GetSkillsDirPath() string {
 // GetWorkflowsDirPath returns the path to the workflows directory.
 func GetWorkflowsDirPath() string {
 	return filepath.Join(GetConfigDir(), "workflows")
+}
+
+// GetAgentsDirPath returns the path to the agents directory.
+func GetAgentsDirPath() string {
+	return filepath.Join(GetConfigDir(), "agents")
 }
 
 // GetSettingsFilePath returns the path to the settings file.

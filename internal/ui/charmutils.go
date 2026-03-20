@@ -208,3 +208,50 @@ func GetDynamicHuhNote(title string, ms *huh.MultiSelect[string], descFunc func(
 
 	return note
 }
+
+// GetDynamicHuhNoteForSelect creates a note that updates based on the hovered item in a single select
+func GetDynamicHuhNoteForSelect(title string, sel *huh.Select[string], descFunc func(string) string) *huh.Note {
+	var renderer *glamour.TermRenderer
+	var err error
+	renderer, err = glamour.NewTermRenderer(
+		glamour.WithAutoStyle(),
+		glamour.WithStylesFromJSONBytes([]byte(compactStyleJSON)),
+		glamour.WithPreservedNewLines(),
+	)
+	if err != nil {
+		renderer, err = glamour.NewTermRenderer(glamour.WithAutoStyle())
+	}
+
+	var note *huh.Note
+	if strings.TrimSpace(title) == "" {
+		note = huh.NewNote()
+	} else {
+		note = huh.NewNote().Title(title)
+	}
+
+	note.DescriptionFunc(func() string {
+		hovered, _ := sel.Hovered()
+		desc := descFunc(hovered)
+		renderedDesc, err := renderer.Render(desc)
+		if err != nil {
+			renderedDesc = desc
+		}
+
+		lineCount := strings.Count(renderedDesc, "\n") + 1
+		minHeight := 5
+		maxHeight := 15
+		height := lineCount + 2
+		if height < minHeight {
+			height = minHeight
+		}
+		if height > maxHeight {
+			height = maxHeight
+		}
+
+		note.Height(height)
+		return renderedDesc
+	}, onCursorUpdate{sel})
+
+	return note
+}
+
