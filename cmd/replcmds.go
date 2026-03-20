@@ -28,8 +28,7 @@ var (
 		"/yolo":     "Toggle YOLO mode (shift+tab to cycle)",
 		"/model":    "Manage models (list, switch, add, etc.)",
 		"/agent":    "Manage agents (list, switch, add, etc.)",
-		"/template": "Manage templates (list, switch, add, etc.)",
-		"/system":   "Manage system prompts (list, switch, add, etc.)",
+
 		"/search":   "Manage search engines (list, switch, etc.)",
 		"/tools":    "Switch embedding tools",
 		"/mcp":      "Manage MCP servers (list, switch, etc.)",

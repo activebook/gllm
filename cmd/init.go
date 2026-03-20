@@ -350,7 +350,7 @@ func RunInitWizard() error {
 			Tools:        selectedTools,
 			Think:        selectedThinkingLevel,
 			Capabilities: selectedFeatures,
-			SystemPrompt: "You are a helpful assistant",
+			SystemPrompt: defaultSystemPromptContent,
 		}
 	}
 

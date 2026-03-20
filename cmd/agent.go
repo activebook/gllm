@@ -124,7 +124,7 @@ var agentAddCmd = &cobra.Command{
 			model     string
 			tools     []string
 			think     string
-			sysPrompt = "You are a helpful assistant"
+			sysPrompt = defaultSystemPromptContent
 		)
 
 		// Initial defaults

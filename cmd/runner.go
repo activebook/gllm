@@ -76,7 +76,7 @@ func RunAgent(prompt string, files []*service.FileData, sessionName string, outp
 			}
 		}
 
-		// Build Final Prompt (Template + Input + @ Processing)
+		// Build Final Prompt (Input + @ Processing)
 		finalPrompt := buildFinalPrompt(prompt)
 
 		// Load MCP config
@@ -146,7 +146,7 @@ func RunAgent(prompt string, files []*service.FileData, sessionName string, outp
 	return nil
 }
 
-// buildFinalPrompt combines template and user input, and processes @ references
+// buildFinalPrompt combines user input and processes @ references
 func buildFinalPrompt(input string) string {
 	tb := TextBuilder{}
 	tb.appendText(input)

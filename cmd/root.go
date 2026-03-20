@@ -41,7 +41,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 					"agent", "completion", "config", "session",
 					"diff", "editor", "features", "help", "init",
 					"mcp", "memory", "model", "search", "skills",
-					"system", "template", "theme", "think", "tools", "version",
+					"theme", "think", "tools", "version",
 				}, cobra.ShellCompDirectiveNoFileComp
 			}
 			return nil, cobra.ShellCompDirectiveNoFileComp
