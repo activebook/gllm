@@ -150,6 +150,9 @@ func (c *ConfigStore) ConfigFileUsed() string {
 // Returns nil if agent doesn't exist.
 func (c *ConfigStore) GetAgent(name string) *AgentConfig {
 	name = strings.ToLower(name)
+	if err := ValidateAgentName(name); err != nil {
+		return nil
+	}
 	agentPath := filepath.Join(GetAgentsDirPath(), name+".md")
 	agent, err := ParseAgentFile(agentPath)
 	if err != nil {
@@ -218,6 +221,9 @@ func (c *ConfigStore) SetAgent(name string, agent *AgentConfig) error {
 // DeleteAgent removes an agent configuration.
 func (c *ConfigStore) DeleteAgent(name string) error {
 	name = strings.ToLower(name)
+	if err := ValidateAgentName(name); err != nil {
+		return fmt.Errorf("invalid agent name: %w", err)
+	}
 	agentPath := filepath.Join(GetAgentsDirPath(), name+".md")
 
 	if _, err := os.Stat(agentPath); os.IsNotExist(err) {
@@ -231,6 +237,13 @@ func (c *ConfigStore) DeleteAgent(name string) error {
 func (c *ConfigStore) RenameAgent(oldName, newName string) error {
 	oldName = strings.ToLower(oldName)
 	newName = strings.ToLower(newName)
+
+	if err := ValidateAgentName(oldName); err != nil {
+		return fmt.Errorf("invalid old name: %w", err)
+	}
+	if err := ValidateAgentName(newName); err != nil {
+		return fmt.Errorf("invalid new name: %w", err)
+	}
 
 	if oldName == newName {
 		return nil

@@ -77,6 +77,10 @@ func ParseAgentFile(path string) (*AgentConfig, error) {
 
 // WriteAgentFile writes an AgentConfig to a .md file in the agents directory.
 func WriteAgentFile(agent *AgentConfig) error {
+	if err := ValidateAgentName(agent.Name); err != nil {
+		return fmt.Errorf("cannot write agent file: %w", err)
+	}
+
 	if err := EnsureAgentsDir(); err != nil {
 		return err
 	}
@@ -117,6 +121,9 @@ func ValidateAgentName(name string) error {
 // It validates the agent exists and is well-formed before exporting.
 func ExportAgent(name, destPath string) error {
 	name = strings.ToLower(name)
+	if err := ValidateAgentName(name); err != nil {
+		return fmt.Errorf("cannot export: %w", err)
+	}
 
 	// Check if agent exists
 	srcPath := filepath.Join(GetAgentsDirPath(), name+".md")
