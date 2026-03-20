@@ -152,14 +152,8 @@ func (c *ConfigStore) ConfigFileUsed() string {
 func (c *ConfigStore) GetAgent(name string) *AgentConfig {
 	name = strings.ToLower(name)
 	agentPath := filepath.Join(GetAgentsDirPath(), name+".md")
-
-	if _, err := os.Stat(agentPath); os.IsNotExist(err) {
-		return nil
-	}
-
 	agent, err := c.parseAgentFile(agentPath)
 	if err != nil {
-		fmt.Printf("Warning: failed to parse agent file %s: %v\n", agentPath, err)
 		return nil
 	}
 	return agent
@@ -535,18 +529,6 @@ func (c *ConfigStore) Save() error {
 	}
 
 	return c.v.WriteConfigAs(configFile)
-}
-
-// agentToMap converts an Agent struct to a map for viper storage.
-func (c *ConfigStore) agentToMap(agent *AgentConfig) map[string]interface{} {
-	return map[string]interface{}{
-		"model":          agent.Model.Name,
-		"tools":          agent.Tools,
-		"capabilities":   agent.Capabilities,
-		"think":          agent.Think,
-		"system_prompt":  agent.SystemPrompt,
-		"max_recursions": agent.MaxRecursions,
-	}
 }
 
 // modelToMap converts a Model struct to a map for viper storage.

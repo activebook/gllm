@@ -69,11 +69,6 @@ var agentListCmd = &cobra.Command{
 		// List all agents
 		store := data.NewConfigStore()
 		agents := store.GetAllAgents()
-		if agents == nil {
-			fmt.Printf("No agents configured yet. Use 'gllm agent add' to create one.\n")
-			return
-		}
-
 		if len(agents) == 0 {
 			fmt.Printf("No agents configured yet. Use 'gllm agent add' to create one.\n")
 			return
