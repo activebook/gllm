@@ -164,7 +164,7 @@ var agentAddCmd = &cobra.Command{
 						if strings.TrimSpace(s) == "" {
 							return fmt.Errorf("name is required")
 						}
-						if err := data.ValidateAgentName(s); err != nil {
+						if err := util.ValidateResourceName("agent", s); err != nil {
 							return err
 						}
 						// Check if exists
@@ -835,7 +835,7 @@ var agentRenameCmd = &cobra.Command{
 
 		// Interactive input for new name
 		if newName == "" {
-			newName = oldName
+			newName = oldName // set default value
 			err := huh.NewInput().
 				Title("New Agent Name").
 				Description(fmt.Sprintf("Enter new name for agent '%s'", oldName)).
@@ -844,7 +844,7 @@ var agentRenameCmd = &cobra.Command{
 					if strings.TrimSpace(s) == "" {
 						return fmt.Errorf("name cannot be empty")
 					}
-					if err := data.ValidateAgentName(s); err != nil {
+					if err := util.ValidateResourceName("agent", s); err != nil {
 						return err
 					}
 					if store.GetAgent(s) != nil {
@@ -926,8 +926,6 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 
 	fmt.Printf("%sMax Recursions: %d\n", spaceholder, agent.MaxRecursions)
 }
-
-
 
 func ValidateMaxRecursions(s string) error {
 	if s == "" {
@@ -1097,7 +1095,7 @@ already exists you will be prompted to confirm overwrite.`,
 			util.Errorf("Agent file is missing a 'name' field in its frontmatter.\n")
 			return
 		}
-		if err := data.ValidateAgentName(agent.Name); err != nil {
+		if err := util.ValidateResourceName("agent", agent.Name); err != nil {
 			util.Errorf("Agent name is invalid: %v\n", err)
 			return
 		}

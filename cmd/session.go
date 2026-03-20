@@ -445,6 +445,10 @@ var sessionRenameCmd = &cobra.Command{
 		if len(args) >= 2 {
 			oldName = args[0]
 			newName = args[1]
+			if err := util.ValidateResourceName("session", newName); err != nil {
+				util.Errorf("%v\n", err)
+				return err
+			}
 		} else {
 			// Select session to rename
 			sessions, err := service.ListSortedSessions(sessionDir, false, true)
@@ -479,6 +483,7 @@ var sessionRenameCmd = &cobra.Command{
 			}
 
 			// Get new name
+			newName = oldName // set default value
 			err = huh.NewInput().
 				Title("New Name").
 				Value(&newName).
@@ -486,6 +491,12 @@ var sessionRenameCmd = &cobra.Command{
 					s = strings.TrimSpace(s)
 					if s == "" {
 						return fmt.Errorf("new name cannot be empty")
+					}
+					if strings.TrimSpace(s) == oldName {
+						return fmt.Errorf("name cannot be the same as old name")
+					}
+					if err := util.ValidateResourceName("session", s); err != nil {
+						return err
 					}
 					return nil
 				}).
