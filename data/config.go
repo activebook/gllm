@@ -151,10 +151,12 @@ func (c *ConfigStore) ConfigFileUsed() string {
 func (c *ConfigStore) GetAgent(name string) *AgentConfig {
 	name = strings.ToLower(name)
 	agentPath := filepath.Join(GetAgentsDirPath(), name+".md")
-	agent, err := c.ParseAgentFile(agentPath)
+	agent, err := ParseAgentFile(agentPath)
 	if err != nil {
 		return nil
 	}
+	// Hydrate the model
+	agent.Model = c.getModelFromAgentMap(map[string]interface{}{"model": agent.Model.Name}, "model")
 	return agent
 }
 
@@ -176,11 +178,13 @@ func (c *ConfigStore) GetAllAgents() map[string]*AgentConfig {
 
 		name := strings.TrimSuffix(entry.Name(), ".md")
 		agentPath := filepath.Join(GetAgentsDirPath(), entry.Name())
-		agent, err := c.ParseAgentFile(agentPath)
+		agent, err := ParseAgentFile(agentPath)
 		if err != nil {
 			fmt.Printf("Warning: failed to parse agent file %s: %v\n", agentPath, err)
 			continue
 		}
+		// Hydrate the model
+		agent.Model = c.getModelFromAgentMap(map[string]interface{}{"model": agent.Model.Name}, "model")
 		result[name] = agent
 	}
 	return result
@@ -208,7 +212,7 @@ func (c *ConfigStore) GetAgentNames() []string {
 // SetAgent saves or updates an agent configuration.
 func (c *ConfigStore) SetAgent(name string, agent *AgentConfig) error {
 	agent.Name = strings.ToLower(name)
-	return c.writeAgentFile(agent)
+	return WriteAgentFile(agent)
 }
 
 // DeleteAgent removes an agent configuration.
@@ -244,16 +248,19 @@ func (c *ConfigStore) RenameAgent(oldName, newName string) error {
 	}
 
 	// Double check parsing works for the old config
-	agent, err := c.ParseAgentFile(oldPath)
+	agent, err := ParseAgentFile(oldPath)
 	if err != nil {
+		// Skip malformed legacy files
 		return fmt.Errorf("failed to parse old agent config: %w", err)
 	}
+	// Hydrate the model
+	agent.Model = c.getModelFromAgentMap(map[string]interface{}{"model": agent.Model.Name}, "model")
 
 	// Update name in struct
 	agent.Name = newName
 
 	// Write to new path
-	if err := c.writeAgentFile(agent); err != nil {
+	if err := WriteAgentFile(agent); err != nil {
 		return fmt.Errorf("failed to write renamed agent: %w", err)
 	}
 
@@ -312,7 +319,7 @@ func (c *ConfigStore) RenameModel(oldName, newName string) error {
 	for _, agent := range agents {
 		if strings.ToLower(agent.Model.Name) == oldName {
 			agent.Model.Name = newName
-			if err := c.writeAgentFile(agent); err != nil {
+			if err := WriteAgentFile(agent); err != nil {
 				return fmt.Errorf("failed to update agent reference: %w", err)
 			}
 		}

@@ -26,7 +26,8 @@ func EnsureAgentsDir() error {
 	return os.MkdirAll(GetAgentsDirPath(), 0750)
 }
 
-func (c *ConfigStore) ParseAgentFile(path string) (*AgentConfig, error) {
+// ParseAgentFile reads and parses an agent .md file, returning the raw AgentConfig.
+func ParseAgentFile(path string) (*AgentConfig, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read agent file: %w", err)
@@ -56,12 +57,10 @@ func (c *ConfigStore) ParseAgentFile(path string) (*AgentConfig, error) {
 
 	agentName := strings.TrimSuffix(filepath.Base(path), ".md")
 
-	modelMap := map[string]interface{}{"model": meta.Model}
-
 	agent := &AgentConfig{
 		Name:          agentName,
 		Description:   meta.Description,
-		Model:         c.getModelFromAgentMap(modelMap, "model"),
+		Model:         Model{Name: meta.Model},
 		Think:         meta.Think,
 		SystemPrompt:  systemPromptStr,
 		MaxRecursions: meta.MaxRecursions,
@@ -76,7 +75,8 @@ func (c *ConfigStore) ParseAgentFile(path string) (*AgentConfig, error) {
 	return agent, nil
 }
 
-func (c *ConfigStore) writeAgentFile(agent *AgentConfig) error {
+// WriteAgentFile writes an AgentConfig to a .md file in the agents directory.
+func WriteAgentFile(agent *AgentConfig) error {
 	if err := EnsureAgentsDir(); err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func ValidateAgentName(name string) error {
 
 // ExportAgent exports an agent's .md file to the specified destination path.
 // It validates the agent exists and is well-formed before exporting.
-func (c *ConfigStore) ExportAgent(name, destPath string) error {
+func ExportAgent(name, destPath string) error {
 	name = strings.ToLower(name)
 
 	// Check if agent exists
@@ -125,7 +125,7 @@ func (c *ConfigStore) ExportAgent(name, destPath string) error {
 	}
 
 	// Validate before exporting
-	if _, err := c.ParseAgentFile(srcPath); err != nil {
+	if _, err := ParseAgentFile(srcPath); err != nil {
 		return fmt.Errorf("agent file is malformed: %w", err)
 	}
 
@@ -145,14 +145,14 @@ func (c *ConfigStore) ExportAgent(name, destPath string) error {
 
 // ImportAgent imports an agent from a .md file into the agents directory.
 // It validates the file format and checks for name conflicts.
-func (c *ConfigStore) ImportAgent(srcPath string) error {
+func ImportAgent(srcPath string) error {
 	// Check if source file exists
 	if _, err := os.Stat(srcPath); os.IsNotExist(err) {
 		return fmt.Errorf("file not found: %s", srcPath)
 	}
 
 	// Parse and validate frontmatter
-	agent, err := c.ParseAgentFile(srcPath)
+	agent, err := ParseAgentFile(srcPath)
 	if err != nil {
 		return fmt.Errorf("invalid agent file: %w", err)
 	}

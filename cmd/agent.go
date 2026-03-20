@@ -1017,12 +1017,39 @@ var agentExportCmd = &cobra.Command{
 
 If [FILE] is omitted the agent is exported to ./<name>.md in the current directory.
 If [FILE] is a directory the file is placed inside that directory as <name>.md.`,
-	Args: cobra.RangeArgs(1, 2),
-	Run: func(cmd *cobra.Command, args []string) {
-		name := strings.ToLower(args[0])
-		store := data.NewConfigStore()
-
+	Args: cobra.MaximumNArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		var name string
 		var destPath string
+
+		if len(args) > 0 {
+			name = strings.ToLower(args[0])
+		} else {
+			store := data.NewConfigStore()
+			agents := store.GetAllAgents()
+			if len(agents) == 0 {
+				return fmt.Errorf("no agents found to export")
+			}
+
+			name = store.GetActiveAgentName()
+			var options []huh.Option[string]
+			for n := range agents {
+				options = append(options, huh.NewOption(n, n))
+			}
+			ui.SortOptions(options, name)
+			height := io.GetTermFitHeight(len(options))
+
+			sel := huh.NewSelect[string]().
+				Title("Select an agent to export:").
+				Options(options...).
+				Height(height).
+				Value(&name)
+
+			if err := huh.NewForm(huh.NewGroup(sel)).Run(); err != nil {
+				return err
+			}
+		}
+
 		if len(args) == 2 {
 			destPath = args[1]
 			if info, err := os.Stat(destPath); err == nil && info.IsDir() {
@@ -1032,11 +1059,11 @@ If [FILE] is a directory the file is placed inside that directory as <name>.md.`
 			destPath = name + ".md"
 		}
 
-		if err := store.ExportAgent(name, destPath); err != nil {
-			util.Errorf("Failed to export agent: %v\n", err)
-			return
+		if err := data.ExportAgent(name, destPath); err != nil {
+			return fmt.Errorf("failed to export agent: %w", err)
 		}
 		fmt.Printf("Agent '%s' exported to: %s\n", name, destPath)
+		return nil
 	},
 }
 
@@ -1061,7 +1088,7 @@ already exists you will be prompted to confirm overwrite.`,
 		store := data.NewConfigStore()
 
 		// Parse and validate frontmatter before touching the config dir.
-		agent, err := store.ParseAgentFile(srcPath)
+		agent, err := data.ParseAgentFile(srcPath)
 		if err != nil {
 			util.Errorf("Invalid agent file: %v\n", err)
 			return
@@ -1091,7 +1118,7 @@ already exists you will be prompted to confirm overwrite.`,
 			}
 		}
 
-		if err := store.ImportAgent(srcPath); err != nil {
+		if err := data.ImportAgent(srcPath); err != nil {
 			util.Errorf("Failed to import agent: %v\n", err)
 			return
 		}
