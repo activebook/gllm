@@ -847,7 +847,7 @@ var agentRenameCmd = &cobra.Command{
 					if err := util.ValidateResourceName("agent", s); err != nil {
 						return err
 					}
-					if store.GetAgent(s) != nil {
+					if !strings.EqualFold(s, oldName) && store.GetAgent(s) != nil {
 						return fmt.Errorf("agent '%s' already exists", s)
 					}
 					return nil

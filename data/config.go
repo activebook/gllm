@@ -236,6 +236,9 @@ func (c *ConfigStore) DeleteAgent(name string) error {
 
 // RenameAgent renames an existing agent
 func (c *ConfigStore) RenameAgent(oldName, newName string) error {
+	if strings.EqualFold(oldName, newName) {
+		return nil
+	}
 	oldName = strings.ToLower(oldName)
 	newName = strings.ToLower(newName)
 
@@ -244,10 +247,6 @@ func (c *ConfigStore) RenameAgent(oldName, newName string) error {
 	}
 	if err := util.ValidateResourceName("agent", newName); err != nil {
 		return fmt.Errorf("invalid new name: %w", err)
-	}
-
-	if oldName == newName {
-		return nil
 	}
 
 	oldPath := filepath.Join(GetAgentsDirPath(), oldName+".md")
@@ -298,12 +297,11 @@ func (c *ConfigStore) RenameAgent(oldName, newName string) error {
 // Use atomic map operations, ensuring that the old key is correctly removed from gllm.yaml in a single save operation.
 // RenameModel renames an existing model
 func (c *ConfigStore) RenameModel(oldName, newName string) error {
-	oldName = strings.ToLower(oldName)
-	newName = strings.ToLower(newName)
-
-	if oldName == newName {
+	if strings.EqualFold(oldName, newName) {
 		return nil
 	}
+	oldName = strings.ToLower(oldName)
+	newName = strings.ToLower(newName)
 
 	modelsMap := c.v.GetStringMap("models")
 	if modelsMap == nil {

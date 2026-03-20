@@ -293,13 +293,10 @@ var workflowRenameCmd = &cobra.Command{
 					if strings.TrimSpace(s) == "" {
 						return fmt.Errorf("name cannot be empty")
 					}
-					if strings.TrimSpace(s) == oldName {
-						return fmt.Errorf("name cannot be the same as old name")
-					}
 					if err := util.ValidateResourceName("workflow", s); err != nil {
 						return err
 					}
-					if util.Contains(wm.GetWorkflowNames(), s, true) {
+					if !strings.EqualFold(s, oldName) && util.Contains(wm.GetWorkflowNames(), s, true) {
 						return fmt.Errorf("workflow '%s' already exists", s)
 					}
 					if wm.IsReservedCommand(s) {

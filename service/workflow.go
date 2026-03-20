@@ -194,6 +194,9 @@ func (wm *WorkflowManager) RemoveWorkflow(name string) error {
 
 // RenameWorkflow renames a workflow
 func (wm *WorkflowManager) RenameWorkflow(oldName, newName string) error {
+	if strings.EqualFold(oldName, newName) {
+		return nil
+	}
 	if wm.IsReservedCommand(newName) {
 		return fmt.Errorf("cannot rename to '%s': conflicts with reserved command", newName)
 	}
