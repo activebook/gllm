@@ -3,7 +3,6 @@ package cmd
 
 import (
 	"fmt"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -16,7 +15,6 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 
-	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -166,7 +164,7 @@ var agentAddCmd = &cobra.Command{
 						if strings.TrimSpace(s) == "" {
 							return fmt.Errorf("name is required")
 						}
-						if err := CheckAgentName(s); err != nil {
+						if err := data.ValidateAgentName(s); err != nil {
 							return err
 						}
 						// Check if exists
@@ -846,7 +844,7 @@ var agentRenameCmd = &cobra.Command{
 					if strings.TrimSpace(s) == "" {
 						return fmt.Errorf("name cannot be empty")
 					}
-					if err := CheckAgentName(s); err != nil {
+					if err := data.ValidateAgentName(s); err != nil {
 						return err
 					}
 					if store.GetAgent(s) != nil {
@@ -929,14 +927,7 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 	fmt.Printf("%sMax Recursions: %d\n", spaceholder, agent.MaxRecursions)
 }
 
-var validAgentNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
-func CheckAgentName(name string) error {
-	if !validAgentNameRegex.MatchString(name) {
-		return fmt.Errorf("agent name '%s' is invalid: only alphanumeric characters, dashes, and underscores are allowed", name)
-	}
-	return nil
-}
 
 func ValidateMaxRecursions(s string) error {
 	if s == "" {
@@ -1041,25 +1032,8 @@ If [FILE] is a directory the file is placed inside that directory as <name>.md.`
 			destPath = name + ".md"
 		}
 
-		srcPath := filepath.Join(data.GetAgentsDirPath(), name+".md")
-		if _, err := os.Stat(srcPath); os.IsNotExist(err) {
-			util.Errorf("Agent '%s' not found.\n", name)
-			return
-		}
-
-		// Validate before exporting.
-		if _, err := store.ParseAgentFile(srcPath); err != nil {
-			util.Errorf("Agent file is malformed: %v\n", err)
-			return
-		}
-
-		content, err := os.ReadFile(srcPath)
-		if err != nil {
-			util.Errorf("Failed to read agent file: %v\n", err)
-			return
-		}
-		if err := os.WriteFile(destPath, content, fs.FileMode(0644)); err != nil {
-			util.Errorf("Failed to write export file: %v\n", err)
+		if err := store.ExportAgent(name, destPath); err != nil {
+			util.Errorf("Failed to export agent: %v\n", err)
 			return
 		}
 		fmt.Printf("Agent '%s' exported to: %s\n", name, destPath)
@@ -1096,7 +1070,7 @@ already exists you will be prompted to confirm overwrite.`,
 			util.Errorf("Agent file is missing a 'name' field in its frontmatter.\n")
 			return
 		}
-		if err := CheckAgentName(agent.Name); err != nil {
+		if err := data.ValidateAgentName(agent.Name); err != nil {
 			util.Errorf("Agent name is invalid: %v\n", err)
 			return
 		}
@@ -1117,20 +1091,8 @@ already exists you will be prompted to confirm overwrite.`,
 			}
 		}
 
-		if err := data.EnsureAgentsDir(); err != nil {
-			util.Errorf("Failed to create agents directory: %v\n", err)
-			return
-		}
-
-		// Preserve the exact source file content.
-		content, err := os.ReadFile(srcPath)
-		if err != nil {
-			util.Errorf("Failed to read source file: %v\n", err)
-			return
-		}
-		destPath := filepath.Join(data.GetAgentsDirPath(), agent.Name+".md")
-		if err := os.WriteFile(destPath, content, fs.FileMode(0644)); err != nil {
-			util.Errorf("Failed to write agent file: %v\n", err)
+		if err := store.ImportAgent(srcPath); err != nil {
+			util.Errorf("Failed to import agent: %v\n", err)
 			return
 		}
 		fmt.Printf("Agent '%s' imported successfully.\n", agent.Name)

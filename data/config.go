@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 )
 
 // AgentConfig represents a fully-typed agent configuration.
@@ -588,98 +587,6 @@ func (c *ConfigStore) mapToSearchEngine(name string, m map[string]interface{}) S
 		}
 	}
 	return se
-}
-
-type AgentFrontmatter struct {
-	Name          string   `yaml:"name"`
-	Description   string   `yaml:"description,omitempty"`
-	Model         string   `yaml:"model"`
-	Tools         []string `yaml:"tools,omitempty"`
-	Capabilities  []string `yaml:"capabilities,omitempty"`
-	Think         string   `yaml:"think,omitempty"`
-	MaxRecursions int      `yaml:"max_recursions,omitempty"`
-}
-
-// EnsureAgentsDir creates the agents directory if it doesn't exist.
-func EnsureAgentsDir() error {
-	return os.MkdirAll(GetAgentsDirPath(), 0750)
-}
-
-func (c *ConfigStore) ParseAgentFile(path string) (*AgentConfig, error) {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read agent file: %w", err)
-	}
-
-	s := string(content)
-	if !strings.HasPrefix(s, "---") {
-		return nil, fmt.Errorf("agent file missing frontmatter in %s", path)
-	}
-
-	parts := strings.SplitN(s, "---", 3)
-	if len(parts) < 3 {
-		return nil, fmt.Errorf("invalid frontmatter format in %s", path)
-	}
-
-	frontmatterStr := parts[1]
-	systemPromptStr := strings.TrimSpace(parts[2])
-
-	var meta AgentFrontmatter
-	if err := yaml.Unmarshal([]byte(frontmatterStr), &meta); err != nil {
-		return nil, fmt.Errorf("failed to parse frontmatter in %s: %w", path, err)
-	}
-
-	if meta.MaxRecursions == 0 {
-		meta.MaxRecursions = 50 // default
-	}
-
-	agentName := strings.TrimSuffix(filepath.Base(path), ".md")
-
-	modelMap := map[string]interface{}{"model": meta.Model}
-
-	agent := &AgentConfig{
-		Name:          agentName,
-		Description:   meta.Description,
-		Model:         c.getModelFromAgentMap(modelMap, "model"),
-		Think:         meta.Think,
-		SystemPrompt:  systemPromptStr,
-		MaxRecursions: meta.MaxRecursions,
-		Tools:         meta.Tools,
-		Capabilities:  meta.Capabilities,
-	}
-
-	if meta.Name != "" {
-		agent.Name = meta.Name
-	}
-
-	return agent, nil
-}
-
-func (c *ConfigStore) writeAgentFile(agent *AgentConfig) error {
-	if err := EnsureAgentsDir(); err != nil {
-		return err
-	}
-
-	filename := filepath.Join(GetAgentsDirPath(), agent.Name+".md")
-
-	meta := AgentFrontmatter{
-		Name:          agent.Name,
-		Description:   agent.Description,
-		Model:         agent.Model.Name,
-		Tools:         agent.Tools,
-		Capabilities:  agent.Capabilities,
-		Think:         agent.Think,
-		MaxRecursions: agent.MaxRecursions,
-	}
-
-	yamlData, err := yaml.Marshal(&meta)
-	if err != nil {
-		return fmt.Errorf("failed to marshal agent frontmatter: %w", err)
-	}
-
-	content := fmt.Sprintf("---\n%s---\n\n%s\n", string(yamlData), agent.SystemPrompt)
-
-	return os.WriteFile(filename, []byte(content), 0644)
 }
 
 // Helper functions for type-safe extraction from interface{} maps.
