@@ -353,8 +353,8 @@ var agentSetCmd = &cobra.Command{
 				Value(&name)
 
 			getDesc := func(agentName string) string {
-				if agentConfig := store.GetAgent(agentName); agentConfig != nil && agentConfig.Description != "" {
-					return agentConfig.Description
+				if a, ok := agents[agentName]; ok && a.Description != "" {
+					return a.Description
 				}
 				return "No description available."
 			}
@@ -611,8 +611,8 @@ var agentRemoveCmd = &cobra.Command{
 				Value(&name)
 
 			getDesc := func(agentName string) string {
-				if agentConfig := store.GetAgent(agentName); agentConfig != nil && agentConfig.Description != "" {
-					return agentConfig.Description
+				if a, ok := agents[agentName]; ok && a.Description != "" {
+					return a.Description
 				}
 				return "No description available."
 			}
@@ -696,8 +696,8 @@ tools, search settings, and other preferences to match the selected agent.`,
 				Value(&name)
 
 			getDesc := func(agentName string) string {
-				if agentConfig := store.GetAgent(agentName); agentConfig != nil && agentConfig.Description != "" {
-					return agentConfig.Description
+				if a, ok := agents[agentName]; ok && a.Description != "" {
+					return a.Description
 				}
 				return "No description available."
 			}
@@ -758,8 +758,8 @@ var agentInfoCmd = &cobra.Command{
 				Value(&name)
 
 			getDesc := func(agentName string) string {
-				if agentConfig := store.GetAgent(agentName); agentConfig != nil && agentConfig.Description != "" {
-					return agentConfig.Description
+				if a, ok := agents[agentName]; ok && a.Description != "" {
+					return a.Description
 				}
 				return "No description available."
 			}
