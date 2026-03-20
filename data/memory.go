@@ -9,8 +9,6 @@ import (
 )
 
 const (
-	// MemoryFileName is the name of the memory file
-	MemoryFileName = "context.md"
 	// MemoryHeader is the header for the memory file
 	MemoryHeader = "## gllm Added Memories"
 )

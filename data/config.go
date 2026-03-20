@@ -8,13 +8,15 @@ import (
 	"strings"
 
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 // AgentConfig represents a fully-typed agent configuration.
 // All fields are strongly typed - no interface{} leaks to other layers.
 // Named AgentConfig to avoid conflict with the runtime Agent struct in service/agent.go.
 type AgentConfig struct {
-	Name          string   // Name is the key in the agents map, not stored in YAML
+	Name          string   // Name
+	Description   string   // Description
 	Model         Model    // Model name reference
 	Tools         []string // List of enabled tools
 	Capabilities  []string // List of enabled capabilities (mcp, skills, usage, markdown, subagents)
@@ -149,31 +151,42 @@ func (c *ConfigStore) ConfigFileUsed() string {
 // Returns nil if agent doesn't exist.
 func (c *ConfigStore) GetAgent(name string) *AgentConfig {
 	name = strings.ToLower(name)
-	agentsMap := c.v.GetStringMap("agents")
-	if agentsMap == nil {
+	agentPath := filepath.Join(GetAgentsDirPath(), name+".md")
+
+	if _, err := os.Stat(agentPath); os.IsNotExist(err) {
 		return nil
 	}
 
-	config, exists := agentsMap[name]
-	if !exists {
+	agent, err := c.parseAgentFile(agentPath)
+	if err != nil {
+		fmt.Printf("Warning: failed to parse agent file %s: %v\n", agentPath, err)
 		return nil
 	}
-
-	return c.parseAgentConfig(name, config)
+	return agent
 }
 
 // GetAllAgents returns all configured agents as a map.
 func (c *ConfigStore) GetAllAgents() map[string]*AgentConfig {
-	agentsMap := c.v.GetStringMap("agents")
-	if agentsMap == nil {
-		return nil
+	result := make(map[string]*AgentConfig)
+	entries, err := os.ReadDir(GetAgentsDirPath())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return result
+		}
+		return result
 	}
 
-	result := make(map[string]*AgentConfig)
-	for name, config := range agentsMap {
-		agent := c.parseAgentConfig(name, config)
-		if agent == nil {
-			continue // Skip invalid agents
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
+			continue
+		}
+
+		name := strings.TrimSuffix(entry.Name(), ".md")
+		agentPath := filepath.Join(GetAgentsDirPath(), entry.Name())
+		agent, err := c.parseAgentFile(agentPath)
+		if err != nil {
+			fmt.Printf("Warning: failed to parse agent file %s: %v\n", agentPath, err)
+			continue
 		}
 		result[name] = agent
 	}
@@ -182,13 +195,17 @@ func (c *ConfigStore) GetAllAgents() map[string]*AgentConfig {
 
 // GetAgentNames returns a sorted list of agent names.
 func (c *ConfigStore) GetAgentNames() []string {
-	agentsMap := c.v.GetStringMap("agents")
-	if agentsMap == nil {
-		return nil
+	var names []string
+	entries, err := os.ReadDir(GetAgentsDirPath())
+	if err != nil {
+		return names
 	}
 
-	names := make([]string, 0, len(agentsMap))
-	for name := range agentsMap {
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
+			continue
+		}
+		name := strings.TrimSuffix(entry.Name(), ".md")
 		names = append(names, name)
 	}
 	sort.Strings(names)
@@ -197,35 +214,20 @@ func (c *ConfigStore) GetAgentNames() []string {
 
 // SetAgent saves or updates an agent configuration.
 func (c *ConfigStore) SetAgent(name string, agent *AgentConfig) error {
-	name = strings.ToLower(name)
-	agentsMap := c.v.GetStringMap("agents")
-	if agentsMap == nil {
-		agentsMap = make(map[string]interface{})
-	}
-
-	// Convert Agent struct to map for viper
-	agentsMap[name] = c.agentToMap(agent)
-	c.v.Set("agents", agentsMap)
-
-	return c.Save()
+	agent.Name = strings.ToLower(name)
+	return c.writeAgentFile(agent)
 }
 
 // DeleteAgent removes an agent configuration.
 func (c *ConfigStore) DeleteAgent(name string) error {
 	name = strings.ToLower(name)
-	agentsMap := c.v.GetStringMap("agents")
-	if agentsMap == nil {
-		return fmt.Errorf("no agents configured")
-	}
+	agentPath := filepath.Join(GetAgentsDirPath(), name+".md")
 
-	if _, exists := agentsMap[name]; !exists {
+	if _, err := os.Stat(agentPath); os.IsNotExist(err) {
 		return fmt.Errorf("agent '%s' not found", name)
 	}
 
-	delete(agentsMap, name)
-	c.v.Set("agents", agentsMap)
-
-	return c.Save()
+	return os.Remove(agentPath)
 }
 
 // RenameAgent renames an existing agent
@@ -237,44 +239,43 @@ func (c *ConfigStore) RenameAgent(oldName, newName string) error {
 		return nil
 	}
 
-	agentsMap := c.v.GetStringMap("agents")
-	if agentsMap == nil {
-		return fmt.Errorf("no agents configured")
-	}
+	oldPath := filepath.Join(GetAgentsDirPath(), oldName+".md")
+	newPath := filepath.Join(GetAgentsDirPath(), newName+".md")
 
-	// Check if old agent exists
-	config, exists := agentsMap[oldName]
-	if !exists {
+	if _, err := os.Stat(oldPath); os.IsNotExist(err) {
 		return fmt.Errorf("agent '%s' not found", oldName)
 	}
 
-	// Check if new name already exists
-	if _, exists := agentsMap[newName]; exists {
+	if _, err := os.Stat(newPath); err == nil {
 		return fmt.Errorf("agent '%s' already exists", newName)
 	}
 
 	// Double check parsing works for the old config
-	agent := c.parseAgentConfig(oldName, config)
-	if agent == nil {
-		return fmt.Errorf("failed to parse old agent config")
+	agent, err := c.parseAgentFile(oldPath)
+	if err != nil {
+		return fmt.Errorf("failed to parse old agent config: %w", err)
 	}
 
 	// Update name in struct
 	agent.Name = newName
 
-	// Update the map: add new, remove old
-	agentsMap[newName] = c.agentToMap(agent)
-	delete(agentsMap, oldName)
+	// Write to new path
+	if err := c.writeAgentFile(agent); err != nil {
+		return fmt.Errorf("failed to write renamed agent: %w", err)
+	}
 
-	// Update viper and save
-	c.v.Set("agents", agentsMap)
+	// Remove old path
+	if err := os.Remove(oldPath); err != nil {
+		return fmt.Errorf("failed to remove old agent file: %w", err)
+	}
 
 	// Update active agent if necessary
 	if c.GetActiveAgentName() == oldName {
 		c.v.Set("agent", newName)
+		return c.Save()
 	}
 
-	return c.Save()
+	return nil
 }
 
 // Bugfix:
@@ -318,9 +319,7 @@ func (c *ConfigStore) RenameModel(oldName, newName string) error {
 	for _, agent := range agents {
 		if strings.ToLower(agent.Model.Name) == oldName {
 			agent.Model.Name = newName
-			// SetAgent will call Save() internally, but we'll call Save() at the end anyway.
-			// However, SetAgent updates the "agents" map in Viper.
-			if err := c.SetAgent(agent.Name, agent); err != nil {
+			if err := c.writeAgentFile(agent); err != nil {
 				return fmt.Errorf("failed to update agent reference: %w", err)
 			}
 		}
@@ -538,27 +537,6 @@ func (c *ConfigStore) Save() error {
 	return c.v.WriteConfigAs(configFile)
 }
 
-// parseAgentConfig converts a raw config value to an Agent struct.
-// This is where ALL type assertions happen - keeping them out of cmd/service.
-func (c *ConfigStore) parseAgentConfig(name string, config interface{}) *AgentConfig {
-	configMap := toStringMap(config)
-	if configMap == nil {
-		return nil
-	}
-
-	agent := &AgentConfig{
-		Name:          name,
-		Model:         c.getModelFromAgentMap(configMap, "model"),
-		Think:         getString(configMap, "think"),
-		SystemPrompt:  getString(configMap, "system_prompt"),
-		MaxRecursions: getInt(configMap, "max_recursions", 50),
-		Tools:         getStringSlice(configMap, "tools"),
-		Capabilities:  getStringSlice(configMap, "capabilities"),
-	}
-
-	return agent
-}
-
 // agentToMap converts an Agent struct to a map for viper storage.
 func (c *ConfigStore) agentToMap(agent *AgentConfig) map[string]interface{} {
 	return map[string]interface{}{
@@ -628,6 +606,98 @@ func (c *ConfigStore) mapToSearchEngine(name string, m map[string]interface{}) S
 		}
 	}
 	return se
+}
+
+type AgentFrontmatter struct {
+	Name          string   `yaml:"name"`
+	Description   string   `yaml:"description,omitempty"`
+	Model         string   `yaml:"model"`
+	Tools         []string `yaml:"tools,omitempty"`
+	Capabilities  []string `yaml:"capabilities,omitempty"`
+	Think         string   `yaml:"think,omitempty"`
+	MaxRecursions int      `yaml:"max_recursions,omitempty"`
+}
+
+// EnsureAgentsDir creates the agents directory if it doesn't exist.
+func EnsureAgentsDir() error {
+	return os.MkdirAll(GetAgentsDirPath(), 0750)
+}
+
+func (c *ConfigStore) parseAgentFile(path string) (*AgentConfig, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read agent file: %w", err)
+	}
+
+	s := string(content)
+	if !strings.HasPrefix(s, "---") {
+		return nil, fmt.Errorf("agent file missing frontmatter in %s", path)
+	}
+
+	parts := strings.SplitN(s, "---", 3)
+	if len(parts) < 3 {
+		return nil, fmt.Errorf("invalid frontmatter format in %s", path)
+	}
+
+	frontmatterStr := parts[1]
+	systemPromptStr := strings.TrimSpace(parts[2])
+
+	var meta AgentFrontmatter
+	if err := yaml.Unmarshal([]byte(frontmatterStr), &meta); err != nil {
+		return nil, fmt.Errorf("failed to parse frontmatter in %s: %w", path, err)
+	}
+
+	if meta.MaxRecursions == 0 {
+		meta.MaxRecursions = 50 // default
+	}
+
+	agentName := strings.TrimSuffix(filepath.Base(path), ".md")
+
+	modelMap := map[string]interface{}{"model": meta.Model}
+
+	agent := &AgentConfig{
+		Name:          agentName,
+		Description:   meta.Description,
+		Model:         c.getModelFromAgentMap(modelMap, "model"),
+		Think:         meta.Think,
+		SystemPrompt:  systemPromptStr,
+		MaxRecursions: meta.MaxRecursions,
+		Tools:         meta.Tools,
+		Capabilities:  meta.Capabilities,
+	}
+
+	if meta.Name != "" {
+		agent.Name = meta.Name
+	}
+
+	return agent, nil
+}
+
+func (c *ConfigStore) writeAgentFile(agent *AgentConfig) error {
+	if err := EnsureAgentsDir(); err != nil {
+		return err
+	}
+
+	filename := filepath.Join(GetAgentsDirPath(), agent.Name+".md")
+
+	meta := AgentFrontmatter{
+		Name:          agent.Name,
+		Description:   agent.Description,
+		Model:         agent.Model.Name,
+		Tools:         agent.Tools,
+		Capabilities:  agent.Capabilities,
+		Think:         agent.Think,
+		MaxRecursions: agent.MaxRecursions,
+	}
+
+	yamlData, err := yaml.Marshal(&meta)
+	if err != nil {
+		return fmt.Errorf("failed to marshal agent frontmatter: %w", err)
+	}
+
+	content := fmt.Sprintf("---\n%s---\n\n%s\n", string(yamlData), agent.SystemPrompt)
+
+	return os.WriteFile(filename, []byte(content), 0644)
 }
 
 // Helper functions for type-safe extraction from interface{} maps.

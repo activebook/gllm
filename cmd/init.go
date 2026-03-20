@@ -50,6 +50,7 @@ func buildToolsOptions() []huh.Option[string] {
 func RunInitWizard() error {
 	var (
 		agentName             string
+		agentDesc             string
 		provider              string
 		endpoint              string
 		apiKey                string
@@ -85,6 +86,14 @@ func RunInitWizard() error {
 					}
 					return nil
 				}),
+
+			// Description
+			huh.NewText().
+				Title("Description (optional)").
+				Description("A brief summary of what this agent does").
+				Lines(5).
+				Value(&agentDesc).
+				Placeholder("A helpful, reliable AI assistant."),
 
 			huh.NewSelect[string]().
 				Title("Choose your AI Provider").
@@ -339,13 +348,17 @@ func RunInitWizard() error {
 	// Setup agent config
 	var agentConfig *data.AgentConfig
 	if existing := store.GetAgent(agentName); existing != nil {
+		// Update existing agent
 		agentConfig = existing
+		agentConfig.Description = agentDesc
 		agentConfig.Model = newModel
 		agentConfig.Tools = selectedTools
 		agentConfig.Think = selectedThinkingLevel
 		agentConfig.Capabilities = selectedFeatures
 	} else {
+		// Create new agent
 		agentConfig = &data.AgentConfig{
+			Description:  agentDesc,
 			Model:        newModel,
 			Tools:        selectedTools,
 			Think:        selectedThinkingLevel,

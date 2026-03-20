@@ -3,6 +3,7 @@ package cmd
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -120,10 +121,11 @@ var agentAddCmd = &cobra.Command{
 
 		// Form variables
 		var (
-			model     string
-			tools     []string
-			think     string
-			sysPrompt = defaultSystemPromptContent
+			description string
+			model       string
+			tools       []string
+			think       string
+			sysPrompt   = defaultSystemPromptContent
 		)
 
 		// Initial defaults
@@ -179,6 +181,21 @@ var agentAddCmd = &cobra.Command{
 		).Run()
 		if err != nil {
 			fmt.Println("Aborted.")
+			return
+		}
+
+		// Description
+		err = huh.NewForm(
+			huh.NewGroup(
+				huh.NewText().
+					Title("Description (optional)").
+					Description("A brief summary of what this agent does").
+					Lines(5).
+					Value(&description).
+					Placeholder("A helpful, reliable AI assistant."),
+			).WithHeight(height),
+		).Run()
+		if err != nil {
 			return
 		}
 
@@ -280,6 +297,7 @@ var agentAddCmd = &cobra.Command{
 
 		agentConfig := &data.AgentConfig{
 			Name:          name,
+			Description:   description,
 			Model:         data.Model{Name: model},
 			Tools:         tools,
 			Capabilities:  capabilities,
@@ -288,7 +306,7 @@ var agentAddCmd = &cobra.Command{
 			MaxRecursions: recursionVal,
 		}
 
-		store.SetAgent(name, agentConfig)
+		err = store.SetAgent(name, agentConfig)
 		if err != nil {
 			fmt.Printf("Error adding agent: %v\n", err)
 			return
@@ -327,13 +345,25 @@ var agentSetCmd = &cobra.Command{
 			ui.SortOptions(options, name)
 			height := io.GetTermFitHeight(len(options))
 
-			err := huh.NewSelect[string]().
+			sel := huh.NewSelect[string]().
 				Title("Select Agent to Edit").
 				Description("Choose an existing agent configuration to modify").
 				Height(height).
 				Options(options...).
-				Value(&name).
-				Run()
+				Value(&name)
+
+			getDesc := func(agentName string) string {
+				if agentConfig := store.GetAgent(agentName); agentConfig != nil && agentConfig.Description != "" {
+					return agentConfig.Description
+				}
+				return "No description available."
+			}
+
+			note := ui.GetDynamicHuhNoteForSelect("Agent Description", sel, getDesc)
+
+			err := huh.NewForm(
+				huh.NewGroup(sel, note),
+			).Run()
 			if err != nil {
 				fmt.Println("Aborted.")
 				return
@@ -349,6 +379,7 @@ var agentSetCmd = &cobra.Command{
 
 		// Form variables populated with existing config
 		var (
+			description  string
 			model        string
 			tools        []string
 			think        string
@@ -357,6 +388,7 @@ var agentSetCmd = &cobra.Command{
 		)
 
 		// Access typed struct fields directly - no type assertions needed!
+		description = agent.Description
 		model = agent.Model.Name
 		tools = agent.Tools
 		think = agent.Think
@@ -403,8 +435,24 @@ var agentSetCmd = &cobra.Command{
 		ui.SortOptions(thinkOptions, think)
 
 		// Build form
+		var err error
+		// Description
+		err = huh.NewForm(
+			huh.NewGroup(
+				huh.NewText().
+					Title("Description (optional)").
+					Description("A brief summary of what this agent does").
+					Lines(5).
+					Value(&description).
+					Placeholder("A helpful, reliable AI assistant."),
+			),
+		).Run()
+		if err != nil {
+			return
+		}
+
 		// Model
-		err := huh.NewForm(
+		err = huh.NewForm(
 			huh.NewGroup(
 				huh.NewSelect[string]().
 					Title("Model").
@@ -424,7 +472,7 @@ var agentSetCmd = &cobra.Command{
 				huh.NewText().
 					Title("System Prompt").
 					Description("The system prompt to use for agent responses").
-					Lines(5).
+					Lines(10).
 					Value(&sysPrompt),
 			),
 		).Run()
@@ -509,6 +557,7 @@ var agentSetCmd = &cobra.Command{
 
 		agentConfig := &data.AgentConfig{
 			Name:          name,
+			Description:   description,
 			Model:         data.Model{Name: model},
 			Tools:         tools,
 			Capabilities:  capabilities,
@@ -554,13 +603,25 @@ var agentRemoveCmd = &cobra.Command{
 			ui.SortOptions(options, name)
 			height := io.GetTermFitHeight(len(options))
 
-			err := huh.NewSelect[string]().
+			sel := huh.NewSelect[string]().
 				Title("Select Agent to Remove").
 				Description("Choose the agent configuration you want to delete").
 				Height(height).
 				Options(options...).
-				Value(&name).
-				Run()
+				Value(&name)
+
+			getDesc := func(agentName string) string {
+				if agentConfig := store.GetAgent(agentName); agentConfig != nil && agentConfig.Description != "" {
+					return agentConfig.Description
+				}
+				return "No description available."
+			}
+
+			note := ui.GetDynamicHuhNoteForSelect("Agent Description", sel, getDesc)
+
+			err := huh.NewForm(
+				huh.NewGroup(sel, note),
+			).Run()
 			if err != nil {
 				fmt.Println("Aborted.")
 				return
@@ -627,13 +688,25 @@ tools, search settings, and other preferences to match the selected agent.`,
 			ui.SortOptions(options, name)
 			height := io.GetTermFitHeight(len(options))
 
-			err := huh.NewSelect[string]().
+			sel := huh.NewSelect[string]().
 				Title("Select Agent").
 				Description("Switch to a different agent profile").
 				Options(options...).
 				Height(height).
-				Value(&name).
-				Run()
+				Value(&name)
+
+			getDesc := func(agentName string) string {
+				if agentConfig := store.GetAgent(agentName); agentConfig != nil && agentConfig.Description != "" {
+					return agentConfig.Description
+				}
+				return "No description available."
+			}
+
+			note := ui.GetDynamicHuhNoteForSelect("Agent Description", sel, getDesc)
+
+			err := huh.NewForm(
+				huh.NewGroup(sel, note),
+			).Run()
 
 			if err != nil {
 				fmt.Println("Aborted.")
@@ -677,13 +750,25 @@ var agentInfoCmd = &cobra.Command{
 			ui.SortOptions(options, name)
 			height := io.GetTermFitHeight(len(options))
 
-			err := huh.NewSelect[string]().
+			sel := huh.NewSelect[string]().
 				Title("Select Agent to Check").
 				Description("Choose an agent to view its detailed configuration").
 				Height(height).
 				Options(options...).
-				Value(&name).
-				Run()
+				Value(&name)
+
+			getDesc := func(agentName string) string {
+				if agentConfig := store.GetAgent(agentName); agentConfig != nil && agentConfig.Description != "" {
+					return agentConfig.Description
+				}
+				return "No description available."
+			}
+
+			note := ui.GetDynamicHuhNoteForSelect("Agent Description", sel, getDesc)
+
+			err := huh.NewForm(
+				huh.NewGroup(sel, note),
+			).Run()
 			if err != nil {
 				return err
 			}
@@ -809,6 +894,10 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 		fmt.Printf("%sName: %s\n", spaceholder, agent.Name)
 	}
 
+	if agent.Description != "" {
+		fmt.Printf("%sDescription: %s\n", spaceholder, agent.Description)
+	}
+
 	if agent.Model.Name != "" {
 		fmt.Printf("%sModel: %s\n", spaceholder, agent.Model.Name)
 	}
@@ -839,9 +928,11 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 	fmt.Printf("%sMax Recursions: %d\n", spaceholder, agent.MaxRecursions)
 }
 
+var validAgentNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
 func CheckAgentName(name string) error {
-	if strings.Contains(name, ".") {
-		return fmt.Errorf("agent name '%s' contains a dot, which is not allowed", name)
+	if !validAgentNameRegex.MatchString(name) {
+		return fmt.Errorf("agent name '%s' is invalid: only alphanumeric characters, dashes, and underscores are allowed", name)
 	}
 	return nil
 }
