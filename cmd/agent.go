@@ -15,6 +15,10 @@ import (
 	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
+
+	"io/fs"
+	"os"
+	"path/filepath"
 )
 
 const (
@@ -878,6 +882,8 @@ func init() {
 	agentCmd.AddCommand(agentRenameCmd)
 	agentCmd.AddCommand(agentSwitchCmd)
 	agentCmd.AddCommand(agentInfoCmd)
+	agentCmd.AddCommand(agentExportCmd)
+	agentCmd.AddCommand(agentImportCmd)
 }
 
 // NOTE: getToolsFromConfig is no longer needed - data.AgentConfig.Tools is already []string
@@ -1010,4 +1016,123 @@ func runMaxRecursionsSelection(currentVal int) (int, error) {
 	}
 
 	return valMap[selection], nil
+}
+
+// agentExportCmd exports an agent's .md file to the given path.
+var agentExportCmd = &cobra.Command{
+	Use:   "export [NAME] [FILE]",
+	Short: "Export an agent to a Markdown file",
+	Long: `Export a named agent's configuration to a portable .md file.
+
+If [FILE] is omitted the agent is exported to ./<name>.md in the current directory.
+If [FILE] is a directory the file is placed inside that directory as <name>.md.`,
+	Args: cobra.RangeArgs(1, 2),
+	Run: func(cmd *cobra.Command, args []string) {
+		name := strings.ToLower(args[0])
+		store := data.NewConfigStore()
+
+		var destPath string
+		if len(args) == 2 {
+			destPath = args[1]
+			if info, err := os.Stat(destPath); err == nil && info.IsDir() {
+				destPath = filepath.Join(destPath, name+".md")
+			}
+		} else {
+			destPath = name + ".md"
+		}
+
+		srcPath := filepath.Join(data.GetAgentsDirPath(), name+".md")
+		if _, err := os.Stat(srcPath); os.IsNotExist(err) {
+			util.Errorf("Agent '%s' not found.\n", name)
+			return
+		}
+
+		// Validate before exporting.
+		if _, err := store.ParseAgentFile(srcPath); err != nil {
+			util.Errorf("Agent file is malformed: %v\n", err)
+			return
+		}
+
+		content, err := os.ReadFile(srcPath)
+		if err != nil {
+			util.Errorf("Failed to read agent file: %v\n", err)
+			return
+		}
+		if err := os.WriteFile(destPath, content, fs.FileMode(0644)); err != nil {
+			util.Errorf("Failed to write export file: %v\n", err)
+			return
+		}
+		fmt.Printf("Agent '%s' exported to: %s\n", name, destPath)
+	},
+}
+
+// agentImportCmd imports an agent from a .md file into the agents directory.
+var agentImportCmd = &cobra.Command{
+	Use:   "import [FILE]",
+	Short: "Import an agent from a Markdown file",
+	Long: `Import an agent from a portable .md file into your local agents directory.
+
+The file must contain valid YAML frontmatter (name, description, model ...) between
+--- delimiters, followed by the system prompt. If an agent with the same name
+already exists you will be prompted to confirm overwrite.`,
+	Args: cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		srcPath := args[0]
+
+		if _, err := os.Stat(srcPath); os.IsNotExist(err) {
+			util.Errorf("File not found: %s\n", srcPath)
+			return
+		}
+
+		store := data.NewConfigStore()
+
+		// Parse and validate frontmatter before touching the config dir.
+		agent, err := store.ParseAgentFile(srcPath)
+		if err != nil {
+			util.Errorf("Invalid agent file: %v\n", err)
+			return
+		}
+		if agent.Name == "" {
+			util.Errorf("Agent file is missing a 'name' field in its frontmatter.\n")
+			return
+		}
+		if err := CheckAgentName(agent.Name); err != nil {
+			util.Errorf("Agent name is invalid: %v\n", err)
+			return
+		}
+
+		// Warn on collision.
+		if existing := store.GetAgent(agent.Name); existing != nil {
+			var overwrite bool
+			_ = huh.NewForm(
+				huh.NewGroup(
+					huh.NewConfirm().
+						Title(fmt.Sprintf("Agent '%s' already exists. Overwrite?", agent.Name)).
+						Value(&overwrite),
+				),
+			).Run()
+			if !overwrite {
+				fmt.Println("Import cancelled.")
+				return
+			}
+		}
+
+		if err := data.EnsureAgentsDir(); err != nil {
+			util.Errorf("Failed to create agents directory: %v\n", err)
+			return
+		}
+
+		// Preserve the exact source file content.
+		content, err := os.ReadFile(srcPath)
+		if err != nil {
+			util.Errorf("Failed to read source file: %v\n", err)
+			return
+		}
+		destPath := filepath.Join(data.GetAgentsDirPath(), agent.Name+".md")
+		if err := os.WriteFile(destPath, content, fs.FileMode(0644)); err != nil {
+			util.Errorf("Failed to write agent file: %v\n", err)
+			return
+		}
+		fmt.Printf("Agent '%s' imported successfully.\n", agent.Name)
+	},
 }

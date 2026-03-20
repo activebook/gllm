@@ -152,7 +152,7 @@ func (c *ConfigStore) ConfigFileUsed() string {
 func (c *ConfigStore) GetAgent(name string) *AgentConfig {
 	name = strings.ToLower(name)
 	agentPath := filepath.Join(GetAgentsDirPath(), name+".md")
-	agent, err := c.parseAgentFile(agentPath)
+	agent, err := c.ParseAgentFile(agentPath)
 	if err != nil {
 		return nil
 	}
@@ -177,7 +177,7 @@ func (c *ConfigStore) GetAllAgents() map[string]*AgentConfig {
 
 		name := strings.TrimSuffix(entry.Name(), ".md")
 		agentPath := filepath.Join(GetAgentsDirPath(), entry.Name())
-		agent, err := c.parseAgentFile(agentPath)
+		agent, err := c.ParseAgentFile(agentPath)
 		if err != nil {
 			fmt.Printf("Warning: failed to parse agent file %s: %v\n", agentPath, err)
 			continue
@@ -245,7 +245,7 @@ func (c *ConfigStore) RenameAgent(oldName, newName string) error {
 	}
 
 	// Double check parsing works for the old config
-	agent, err := c.parseAgentFile(oldPath)
+	agent, err := c.ParseAgentFile(oldPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse old agent config: %w", err)
 	}
@@ -605,7 +605,7 @@ func EnsureAgentsDir() error {
 	return os.MkdirAll(GetAgentsDirPath(), 0750)
 }
 
-func (c *ConfigStore) parseAgentFile(path string) (*AgentConfig, error) {
+func (c *ConfigStore) ParseAgentFile(path string) (*AgentConfig, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read agent file: %w", err)
