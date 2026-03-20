@@ -19,7 +19,6 @@ type AgentConfig struct {
 	Tools         []string // List of enabled tools
 	Capabilities  []string // List of enabled capabilities (mcp, skills, usage, markdown, subagents)
 	Think         string   // Thinking level: off, low, medium, high
-	Template      string   // Template reference
 	SystemPrompt  string   // System prompt reference
 	MaxRecursions int      // Maximum tool call recursions
 }
@@ -503,76 +502,6 @@ func (c *ConfigStore) DeleteSearchEngine(name string) error {
 	return c.Save()
 }
 
-// GetTemplates returns all configured templates.
-func (c *ConfigStore) GetTemplates() map[string]string {
-	return c.v.GetStringMapString("templates")
-}
-
-// GetTemplate returns a specific template by name.
-func (c *ConfigStore) GetTemplate(name string) string {
-	name = strings.ToLower(name)
-	return c.v.GetStringMapString("templates")[name]
-}
-
-// SetTemplate adds or updates a template.
-func (c *ConfigStore) SetTemplate(name, content string) error {
-	name = strings.ToLower(name)
-	templates := c.v.GetStringMapString("templates")
-	if templates == nil {
-		templates = make(map[string]string)
-	}
-	templates[name] = content
-	c.v.Set("templates", templates)
-	return c.Save()
-}
-
-// DeleteTemplate removes a template.
-func (c *ConfigStore) DeleteTemplate(name string) error {
-	name = strings.ToLower(name)
-	templates := c.v.GetStringMapString("templates")
-	if templates == nil {
-		return fmt.Errorf("no templates configured")
-	}
-	delete(templates, name)
-	c.v.Set("templates", templates)
-	return c.Save()
-}
-
-// GetSystemPrompts returns all configured system prompts.
-func (c *ConfigStore) GetSystemPrompts() map[string]string {
-	return c.v.GetStringMapString("system_prompts")
-}
-
-// GetSystemPrompt returns a specific system prompt by name.
-func (c *ConfigStore) GetSystemPrompt(name string) string {
-	name = strings.ToLower(name)
-	return c.v.GetStringMapString("system_prompts")[name]
-}
-
-// SetSystemPrompt adds or updates a system prompt.
-func (c *ConfigStore) SetSystemPrompt(name, content string) error {
-	name = strings.ToLower(name)
-	prompts := c.v.GetStringMapString("system_prompts")
-	if prompts == nil {
-		prompts = make(map[string]string)
-	}
-	prompts[name] = content
-	c.v.Set("system_prompts", prompts)
-	return c.Save()
-}
-
-// DeleteSystemPrompt removes a system prompt.
-func (c *ConfigStore) DeleteSystemPrompt(name string) error {
-	name = strings.ToLower(name)
-	prompts := c.v.GetStringMapString("system_prompts")
-	if prompts == nil {
-		return fmt.Errorf("no system prompts configured")
-	}
-	delete(prompts, name)
-	c.v.Set("system_prompts", prompts)
-	return c.Save()
-}
-
 // GetString returns a string value from config.
 func (c *ConfigStore) GetString(key string) string {
 	return c.v.GetString(key)
@@ -621,7 +550,6 @@ func (c *ConfigStore) parseAgentConfig(name string, config interface{}) *AgentCo
 		Name:          name,
 		Model:         c.getModelFromAgentMap(configMap, "model"),
 		Think:         getString(configMap, "think"),
-		Template:      getString(configMap, "template"),
 		SystemPrompt:  getString(configMap, "system_prompt"),
 		MaxRecursions: getInt(configMap, "max_recursions", 50),
 		Tools:         getStringSlice(configMap, "tools"),
@@ -638,7 +566,6 @@ func (c *ConfigStore) agentToMap(agent *AgentConfig) map[string]interface{} {
 		"tools":          agent.Tools,
 		"capabilities":   agent.Capabilities,
 		"think":          agent.Think,
-		"template":       agent.Template,
 		"system_prompt":  agent.SystemPrompt,
 		"max_recursions": agent.MaxRecursions,
 	}

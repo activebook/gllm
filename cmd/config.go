@@ -122,7 +122,7 @@ var configPrintCmd = &cobra.Command{
 	Use:     "print",
 	Aliases: []string{"pr", "all", "list", "ls"},
 	Short:   "Print all configurations",
-	Long:    `Print all configuration including all LLM models, system prompts, and templates. and all default settings (e.g., default model, default system prompt, default template).`,
+	Long:    `Print all configuration including all LLM models and all default settings (e.g., default model, default system prompt).`,
 	Run: func(cmd *cobra.Command, args []string) {
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
@@ -137,15 +137,6 @@ var configPrintCmd = &cobra.Command{
 		modelListCmd.Run(modelListCmd, []string{})
 		w.Flush()
 
-		// System Prompts section
-		printSection("System Prompts")
-		systemListCmd.Run(systemListCmd, []string{})
-		w.Flush()
-
-		// Templates section
-		printSection("Templates")
-		templateListCmd.Run(templateListCmd, []string{})
-		w.Flush()
 
 		// Memory section
 		printSection("Memory")

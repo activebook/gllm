@@ -405,7 +405,7 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 	}
 
 	// Build system prompt
-	sysPrompt := store.GetSystemPrompt(agentConfig.SystemPrompt)
+	sysPrompt := agentConfig.SystemPrompt
 
 	// Load MCP config (if error, just continue)
 	mcpConfig, _ := e.mcpStore.Load()

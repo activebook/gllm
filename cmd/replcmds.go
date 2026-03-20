@@ -28,8 +28,7 @@ var (
 		"/yolo":     "Toggle YOLO mode (shift+tab to cycle)",
 		"/model":    "Manage models (list, switch, add, etc.)",
 		"/agent":    "Manage agents (list, switch, add, etc.)",
-		"/template": "Manage templates (list, switch, add, etc.)",
-		"/system":   "Manage system prompts (list, switch, add, etc.)",
+
 		"/search":   "Manage search engines (list, switch, etc.)",
 		"/tools":    "Switch embedding tools",
 		"/mcp":      "Manage MCP servers (list, switch, etc.)",
@@ -51,11 +50,11 @@ var (
 	}
 
 	replSpecMap = map[string]string{
-		"@path":     "Reference to files and folders",
-		"!bash":     "Execute local shell commands",
-		"/cmd":      "Execute built-in, skills or workflow commands",
-		"shift+tab": "Toggle plan mode or yolo mode",
-		"ctrl+c":    "Cancel current generation or exit session",
+		"@path":     "Reference to files, folders",
+		"!bash":     "Execute shell commands",
+		"/cmd":      "Execute built-in commands",
+		"shift+tab": "Toggle plan or yolo mode",
+		"ctrl+c":    "Cancel or exit session",
 		"ctrl+d":    "Clear all input",
 	}
 )
@@ -139,12 +138,6 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 
 	case "/agent":
 		runCommand(agentCmd, parts[1:])
-
-	case "/template":
-		runCommand(templateCmd, parts[1:])
-
-	case "/system":
-		runCommand(systemCmd, parts[1:])
 
 	case "/search":
 		runCommand(searchCmd, parts[1:])
@@ -296,14 +289,6 @@ func (ri *ReplInfo) showInfo() {
 
 	printSection("CURRENT SETTINGS")
 
-	// System prompt
-	printSection("SYSTEM PROMPT")
-	systemCmd.Run(systemCmd, []string{})
-
-	// Template
-	printSection("TEMPLATE")
-	templateCmd.Run(templateCmd, []string{})
-
 	// Memory section (included in system prompt)
 	// printSection("Memory")
 	// memoryListCmd.Run(memoryListCmd, []string{})
@@ -312,10 +297,6 @@ func (ri *ReplInfo) showInfo() {
 	// Search Engines section
 	printSection("Search Engines")
 	searchListCmd.Run(searchListCmd, []string{})
-
-	// Plugins section
-	printSection("Tools")
-	ListAllTools()
 
 	// Current Agent section
 	printSection("Agents")

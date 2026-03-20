@@ -166,7 +166,7 @@ func convertUserInputToBool(input string) (bool, error) {
 
 // Define the hardcoded default system prompt
 const defaultSystemPromptContent = "You are a helpful assistant."
-const defaultTemplateContent = ""
+
 
 func validateInt(s string) error {
 	_, err := strconv.Atoi(s)

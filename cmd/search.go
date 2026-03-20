@@ -311,8 +311,8 @@ var searchListCmd = &cobra.Command{
 		googleConfig := engines[service.GoogleSearchEngine]
 		if googleConfig != nil {
 			fmt.Println("Google Search:")
-			fmt.Printf("  API Key: %s\n", maskAPIKey(googleConfig.Config["key"]))
-			fmt.Printf("  CX: %s\n", maskAPIKey(googleConfig.Config["cx"]))
+			// fmt.Printf("  API Key: %s\n", maskAPIKey(googleConfig.Config["key"]))
+			// fmt.Printf("  CX: %s\n", maskAPIKey(googleConfig.Config["cx"]))
 			fmt.Println("  DeepDive limit: ", googleConfig.DeepDive)
 			fmt.Println("  Max References: ", googleConfig.Reference)
 			fmt.Println("  Quota: 100 searches per day (free tier)")
@@ -322,7 +322,7 @@ var searchListCmd = &cobra.Command{
 		tavilyConfig := engines[service.TavilySearchEngine]
 		if tavilyConfig != nil {
 			fmt.Println("Tavily Search:")
-			fmt.Printf("  API Key: %s\n", maskAPIKey(tavilyConfig.Config["key"]))
+			// fmt.Printf("  API Key: %s\n", maskAPIKey(tavilyConfig.Config["key"]))
 			fmt.Println("  DeepDive limit: ", tavilyConfig.DeepDive)
 			fmt.Println("  Max References: ", tavilyConfig.Reference)
 			fmt.Println("  Quota: 1000 searches per month (free tier)")
@@ -332,7 +332,7 @@ var searchListCmd = &cobra.Command{
 		bingConfig := engines[service.BingSearchEngine]
 		if bingConfig != nil {
 			fmt.Println("Bing Search:")
-			fmt.Printf("  API Key: %s\n", maskAPIKey(bingConfig.Config["key"]))
+			// fmt.Printf("  API Key: %s\n", maskAPIKey(bingConfig.Config["key"]))
 			fmt.Println("  DeepDive limit: ", bingConfig.DeepDive)
 			fmt.Println("  Max References: ", bingConfig.Reference)
 			fmt.Println("  Quota: 100 searches per month (free tier) - SerpAPI")

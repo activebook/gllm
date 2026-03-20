@@ -76,12 +76,8 @@ func RunAgent(prompt string, files []*service.FileData, sessionName string, outp
 			}
 		}
 
-		// Build Final Prompt (Template + Input + @ Processing)
-		finalPrompt := buildFinalPrompt(agent, prompt)
-
-		// Get system prompt
-		store := data.NewConfigStore()
-		sysPrompt := store.GetSystemPrompt(agent.SystemPrompt)
+		// Build Final Prompt (Input + @ Processing)
+		finalPrompt := buildFinalPrompt(prompt)
 
 		// Load MCP config
 		mcpStore := data.NewMCPStore()
@@ -96,7 +92,7 @@ func RunAgent(prompt string, files []*service.FileData, sessionName string, outp
 		// Prepare Agent Options
 		op := service.AgentOptions{
 			Prompt:        finalPrompt,
-			SysPrompt:     sysPrompt,
+			SysPrompt:     agent.SystemPrompt,
 			Files:         files,
 			ModelInfo:     &agent.Model,
 			MaxRecursions: agent.MaxRecursions,
@@ -150,12 +146,9 @@ func RunAgent(prompt string, files []*service.FileData, sessionName string, outp
 	return nil
 }
 
-// buildFinalPrompt combines template and user input, and processes @ references
-func buildFinalPrompt(agent *data.AgentConfig, input string) string {
+// buildFinalPrompt combines user input and processes @ references
+func buildFinalPrompt(input string) string {
 	tb := TextBuilder{}
-	store := data.NewConfigStore()
-	templateContent := store.GetTemplate(agent.Template)
-	tb.appendText(templateContent)
 	tb.appendText(input)
 
 	rawPrompt := tb.String()
