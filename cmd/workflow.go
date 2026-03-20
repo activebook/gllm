@@ -88,6 +88,10 @@ var workflowAddCmd = &cobra.Command{
 				util.Errorf("%v\n", err)
 				return
 			}
+			if util.Contains(wm.GetWorkflowNames(), name, true) {
+				util.Errorf("workflow '%s' already exists\n", name)
+				return
+			}
 		} else {
 			err := huh.NewInput().
 				Title("Workflow Name").
@@ -99,6 +103,9 @@ var workflowAddCmd = &cobra.Command{
 					}
 					if err := util.ValidateResourceName("workflow", s); err != nil {
 						return err
+					}
+					if util.Contains(wm.GetWorkflowNames(), s, true) {
+						return fmt.Errorf("workflow '%s' already exists", s)
 					}
 					if wm.IsReservedCommand(s) {
 						return fmt.Errorf("name '%s' is a reserved command", s)
@@ -246,6 +253,10 @@ var workflowRenameCmd = &cobra.Command{
 				util.Errorf("%v\n", err)
 				return
 			}
+			if util.Contains(wm.GetWorkflowNames(), newName, true) {
+				util.Errorf("workflow '%s' already exists\n", newName)
+				return
+			}
 		}
 
 		if oldName == "" {
@@ -287,6 +298,9 @@ var workflowRenameCmd = &cobra.Command{
 					}
 					if err := util.ValidateResourceName("workflow", s); err != nil {
 						return err
+					}
+					if util.Contains(wm.GetWorkflowNames(), s, true) {
+						return fmt.Errorf("workflow '%s' already exists", s)
 					}
 					if wm.IsReservedCommand(s) {
 						return fmt.Errorf("name '%s' is a reserved command", s)
