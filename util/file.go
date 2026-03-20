@@ -11,7 +11,8 @@ import (
 
 // SanitizeTitle replaces spaces with underscores in a given title.
 var (
-	invalidFileChars = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1F]`)
+	invalidFileChars       = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1F]`)
+	validResourceNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 )
 
 func GetSanitizeTitle(title string) string {
@@ -24,6 +25,14 @@ func GetSanitizeTitle(title string) string {
 		sanitized = "untitled"
 	}
 	return sanitized
+}
+
+// ValidateResourceName checks if the name is filesystem-safe.
+func ValidateResourceName(resourceType, name string) error {
+	if !validResourceNameRegex.MatchString(name) {
+		return fmt.Errorf("%s name '%s' is invalid: only alphanumeric characters, dashes, and underscores are allowed", resourceType, name)
+	}
+	return nil
 }
 
 func GetUserConfigDir() string {

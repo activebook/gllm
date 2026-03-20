@@ -33,7 +33,7 @@ var workflowCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(workflowCmd)
 	workflowCmd.AddCommand(workflowListCmd)
-	workflowCmd.AddCommand(workflowCreateCmd)
+	workflowCmd.AddCommand(workflowAddCmd)
 	workflowCmd.AddCommand(workflowRemoveCmd)
 	workflowCmd.AddCommand(workflowRenameCmd)
 	workflowCmd.AddCommand(workflowInfoCmd)
@@ -69,9 +69,9 @@ var workflowListCmd = &cobra.Command{
 	},
 }
 
-var workflowCreateCmd = &cobra.Command{
-	Use:     "create [name]",
-	Aliases: []string{"new", "add", "c", "n"},
+var workflowAddCmd = &cobra.Command{
+	Use:     "add [name]",
+	Aliases: []string{"create", "new", "c", "n", "a"},
 	Short:   "Create a new workflow",
 	Args:    cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -84,6 +84,10 @@ var workflowCreateCmd = &cobra.Command{
 		var name string
 		if len(args) > 0 {
 			name = args[0]
+			if err := util.ValidateResourceName("workflow", name); err != nil {
+				util.Errorf("%v\n", err)
+				return
+			}
 		} else {
 			err := huh.NewInput().
 				Title("Workflow Name").
@@ -92,6 +96,9 @@ var workflowCreateCmd = &cobra.Command{
 				Validate(func(s string) error {
 					if strings.TrimSpace(s) == "" {
 						return fmt.Errorf("name cannot be empty")
+					}
+					if err := util.ValidateResourceName("workflow", s); err != nil {
+						return err
 					}
 					if wm.IsReservedCommand(s) {
 						return fmt.Errorf("name '%s' is a reserved command", s)
@@ -235,6 +242,10 @@ var workflowRenameCmd = &cobra.Command{
 		}
 		if len(args) >= 2 {
 			newName = args[1]
+			if err := util.ValidateResourceName("workflow", newName); err != nil {
+				util.Errorf("%v\n", err)
+				return
+			}
 		}
 
 		if oldName == "" {
@@ -273,6 +284,9 @@ var workflowRenameCmd = &cobra.Command{
 					}
 					if strings.TrimSpace(s) == oldName {
 						return fmt.Errorf("name cannot be the same as old name")
+					}
+					if err := util.ValidateResourceName("workflow", s); err != nil {
+						return err
 					}
 					if wm.IsReservedCommand(s) {
 						return fmt.Errorf("name '%s' is a reserved command", s)

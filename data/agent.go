@@ -5,9 +5,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
+	"github.com/activebook/gllm/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -77,7 +77,7 @@ func ParseAgentFile(path string) (*AgentConfig, error) {
 
 // WriteAgentFile writes an AgentConfig to a .md file in the agents directory.
 func WriteAgentFile(agent *AgentConfig) error {
-	if err := ValidateAgentName(agent.Name); err != nil {
+	if err := util.ValidateResourceName("agent", agent.Name); err != nil {
 		return fmt.Errorf("cannot write agent file: %w", err)
 	}
 
@@ -107,21 +107,13 @@ func WriteAgentFile(agent *AgentConfig) error {
 	return os.WriteFile(filename, []byte(content), 0644)
 }
 
-var validAgentNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
-// ValidateAgentName checks if the agent name is filesystem-safe.
-func ValidateAgentName(name string) error {
-	if !validAgentNameRegex.MatchString(name) {
-		return fmt.Errorf("agent name '%s' is invalid: only alphanumeric characters, dashes, and underscores are allowed", name)
-	}
-	return nil
-}
 
 // ExportAgent exports an agent's .md file to the specified destination path.
 // It validates the agent exists and is well-formed before exporting.
 func ExportAgent(name, destPath string) error {
 	name = strings.ToLower(name)
-	if err := ValidateAgentName(name); err != nil {
+	if err := util.ValidateResourceName("agent", name); err != nil {
 		return fmt.Errorf("cannot export: %w", err)
 	}
 
@@ -168,7 +160,7 @@ func ImportAgent(srcPath string) error {
 		return fmt.Errorf("agent file is missing a 'name' field in its frontmatter")
 	}
 
-	if err := ValidateAgentName(agent.Name); err != nil {
+	if err := util.ValidateResourceName("agent", agent.Name); err != nil {
 		return fmt.Errorf("agent name is invalid: %w", err)
 	}
 
