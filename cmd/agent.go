@@ -79,7 +79,6 @@ var agentListCmd = &cobra.Command{
 		}
 
 		fmt.Println("Available agents:")
-		fmt.Println()
 
 		// Get agent names and sort them
 		names := make([]string, 0, len(agents))
@@ -97,7 +96,7 @@ var agentListCmd = &cobra.Command{
 			if active {
 				displayName = data.SwitchOnColor + name + data.ResetSeq
 			}
-			fmt.Printf("  %s %s\n", indicator, displayName)
+			fmt.Printf("%s %s\n", indicator, displayName)
 		}
 
 		if activeAgentName != "" {
@@ -819,9 +818,9 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 		// Inject memory, skills, plan mode into system prompt
 		resolvedSysPrompt = service.ConstructSystemPrompt(resolvedSysPrompt, agent.Capabilities)
 		// Show the resolved system prompt
-		fmt.Printf("%sSystem Prompt:\n\n%s\n\n", spaceholder, resolvedSysPrompt)
+		fmt.Printf("%sSystem Prompt:\n%s\n\n", spaceholder, resolvedSysPrompt)
 	} else {
-		fmt.Printf("%sSystem Prompt: \n", spaceholder)
+		fmt.Printf("%sSystem Prompt: \n\n", spaceholder)
 	}
 
 	fmt.Printf("%sThink: %v\n", spaceholder, agent.Think)
