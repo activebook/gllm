@@ -292,7 +292,8 @@ func RunInitWizard() error {
 				Description("Select the thinking level for this agent").
 				Options(
 					huh.NewOption("Off - Disable thinking", "off").Selected(true),
-					huh.NewOption("Low - Minimal reasoning", "low").Selected(false),
+					huh.NewOption("Minimal - Minimal reasoning", "minimal").Selected(false),
+					huh.NewOption("Low - Low reasoning", "low").Selected(false),
 					huh.NewOption("Medium - Moderate reasoning", "medium").Selected(false),
 					huh.NewOption("High - Maximum reasoning", "high").Selected(false),
 				).
@@ -349,6 +350,7 @@ func RunInitWizard() error {
 			Tools:        selectedTools,
 			Think:        selectedThinkingLevel,
 			Capabilities: selectedFeatures,
+			SystemPrompt: "You are a helpful assistant",
 		}
 	}
 

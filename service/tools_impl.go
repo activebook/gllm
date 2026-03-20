@@ -1207,11 +1207,6 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Too
 				sysPrompt := strings.ReplaceAll(ag.SystemPrompt, "\n", " ")
 				sb.WriteString(fmt.Sprintf("  System Prompt: %s\n", sysPrompt))
 			}
-			if ag.Template != "" {
-				// Show more of the template to help the model decide
-				template := strings.ReplaceAll(ag.Template, "\n", " ")
-				sb.WriteString(fmt.Sprintf("  Template: %s\n", template))
-			}
 		}
 		sb.WriteString("\nTo switch to an agent, use this tool with the agent's name.")
 		return sb.String(), nil
@@ -1302,11 +1297,6 @@ func listAgentToolCallImpl() (string, error) {
 			// Show more system prompt to help model understand the agent
 			sysPrompt := strings.ReplaceAll(ag.SystemPrompt, "\n", " ")
 			sb.WriteString(fmt.Sprintf("  System Prompt: %s\n", sysPrompt))
-		}
-		if ag.Template != "" {
-			// Show more template to help model understand the agent
-			template := strings.ReplaceAll(ag.Template, "\n", " ")
-			sb.WriteString(fmt.Sprintf("  Template: %s\n", template))
 		}
 
 		sb.WriteString("\n")

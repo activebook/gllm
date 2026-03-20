@@ -124,8 +124,7 @@ var agentAddCmd = &cobra.Command{
 			model     string
 			tools     []string
 			think     string
-			template  string
-			sysPrompt string
+			sysPrompt = "You are a helpful assistant"
 		)
 
 		// Initial defaults
@@ -142,24 +141,6 @@ var agentAddCmd = &cobra.Command{
 		}
 		// Sort models
 		ui.SortOptions(modelOptions, "")
-
-		// Templates
-		templatesMap := store.GetTemplates()
-		var templateOptions []huh.Option[string]
-		templateOptions = append(templateOptions, huh.NewOption("None", ""))
-		for t := range templatesMap {
-			templateOptions = append(templateOptions, huh.NewOption(t, t))
-		}
-		ui.SortOptions(templateOptions, "")
-
-		// System Prompts
-		sysPromptsMap := store.GetSystemPrompts()
-		var sysPromptOptions []huh.Option[string]
-		sysPromptOptions = append(sysPromptOptions, huh.NewOption("None", ""))
-		for s := range sysPromptsMap {
-			sysPromptOptions = append(sysPromptOptions, huh.NewOption(s, s))
-		}
-		ui.SortOptions(sysPromptOptions, "")
 
 		// Tools
 		toolsList := service.GetAllEmbeddingTools()
@@ -219,25 +200,11 @@ var agentAddCmd = &cobra.Command{
 		// System Prompt
 		err = huh.NewForm(
 			huh.NewGroup(
-				huh.NewSelect[string]().
+				huh.NewText().
 					Title("System Prompt").
 					Description("The system prompt to use for agent responses").
-					Options(sysPromptOptions...).
+					Lines(5).
 					Value(&sysPrompt),
-			).WithHeight(height),
-		).Run()
-		if err != nil {
-			return
-		}
-
-		// Template
-		err = huh.NewForm(
-			huh.NewGroup(
-				huh.NewSelect[string]().
-					Title("Template").
-					Description("The template to use for agent responses").
-					Options(templateOptions...).
-					Value(&template),
 			).WithHeight(height),
 		).Run()
 		if err != nil {
@@ -273,7 +240,8 @@ var agentAddCmd = &cobra.Command{
 					Description("Select the thinking level for this agent").
 					Options(
 						huh.NewOption("Off - Disable thinking", "off").Selected(true),
-						huh.NewOption("Low - Minimal reasoning", "low").Selected(false),
+						huh.NewOption("Minimal - Minimal reasoning", "minimal").Selected(false),
+						huh.NewOption("Low - Low reasoning", "low").Selected(false),
 						huh.NewOption("Medium - Moderate reasoning", "medium").Selected(false),
 						huh.NewOption("High - Maximum reasoning", "high").Selected(false),
 					).
@@ -317,7 +285,6 @@ var agentAddCmd = &cobra.Command{
 			Tools:         tools,
 			Capabilities:  capabilities,
 			Think:         think,
-			Template:      template,
 			SystemPrompt:  sysPrompt,
 			MaxRecursions: recursionVal,
 		}
@@ -386,7 +353,6 @@ var agentSetCmd = &cobra.Command{
 			model        string
 			tools        []string
 			think        string
-			template     string
 			sysPrompt    string
 			capabilities []string
 		)
@@ -395,7 +361,6 @@ var agentSetCmd = &cobra.Command{
 		model = agent.Model.Name
 		tools = agent.Tools
 		think = agent.Think
-		template = agent.Template
 		sysPrompt = agent.SystemPrompt
 
 		// Populate capabilities from struct fields
@@ -408,22 +373,6 @@ var agentSetCmd = &cobra.Command{
 			modelOptions = append(modelOptions, huh.NewOption(name, name))
 		}
 		ui.SortOptions(modelOptions, model)
-
-		templatesMap := store.GetTemplates()
-		var templateOptions []huh.Option[string]
-		templateOptions = append(templateOptions, huh.NewOption("None", " "))
-		for t := range templatesMap {
-			templateOptions = append(templateOptions, huh.NewOption(t, t))
-		}
-		ui.SortOptions(templateOptions, template)
-
-		sysPromptsMap := store.GetSystemPrompts()
-		var sysPromptOptions []huh.Option[string]
-		sysPromptOptions = append(sysPromptOptions, huh.NewOption("None", " "))
-		for s := range sysPromptsMap {
-			sysPromptOptions = append(sysPromptOptions, huh.NewOption(s, s))
-		}
-		ui.SortOptions(sysPromptOptions, sysPrompt)
 
 		// Tools - build options with pre-selected state
 		toolsList := service.GetAllEmbeddingTools()
@@ -447,7 +396,8 @@ var agentSetCmd = &cobra.Command{
 		currentThinkLevel := service.ParseThinkingLevel(think)
 		thinkOptions := []huh.Option[string]{
 			huh.NewOption("Off - Disable thinking", "off").Selected(currentThinkLevel == service.ThinkingLevelOff),
-			huh.NewOption("Low - Minimal reasoning", "low").Selected(currentThinkLevel == service.ThinkingLevelLow),
+			huh.NewOption("Minimal - Minimal reasoning", "minimal").Selected(currentThinkLevel == service.ThinkingLevelMinimal),
+			huh.NewOption("Low - Low reasoning", "low").Selected(currentThinkLevel == service.ThinkingLevelLow),
 			huh.NewOption("Medium - Moderate reasoning", "medium").Selected(currentThinkLevel == service.ThinkingLevelMedium),
 			huh.NewOption("High - Maximum reasoning", "high").Selected(currentThinkLevel == service.ThinkingLevelHigh),
 		}
@@ -472,25 +422,11 @@ var agentSetCmd = &cobra.Command{
 		// System Prompt
 		err = huh.NewForm(
 			huh.NewGroup(
-				huh.NewSelect[string]().
+				huh.NewText().
 					Title("System Prompt").
 					Description("The system prompt to use for agent responses").
-					Options(sysPromptOptions...).
+					Lines(5).
 					Value(&sysPrompt),
-			),
-		).Run()
-		if err != nil {
-			return
-		}
-
-		// Template
-		err = huh.NewForm(
-			huh.NewGroup(
-				huh.NewSelect[string]().
-					Title("Template").
-					Description("The template to use for agent responses").
-					Options(templateOptions...).
-					Value(&template),
 			),
 		).Run()
 		if err != nil {
@@ -570,7 +506,6 @@ var agentSetCmd = &cobra.Command{
 		// Bugfix:
 		// We set None options as " " in the form, so we need to trim them
 		// Why set " " in the form: huh has a bug, without space, the sort doesn't work
-		template = strings.TrimSpace(template)
 		sysPrompt = strings.TrimSpace(sysPrompt)
 
 		agentConfig := &data.AgentConfig{
@@ -579,7 +514,6 @@ var agentSetCmd = &cobra.Command{
 			Tools:         tools,
 			Capabilities:  capabilities,
 			Think:         think,
-			Template:      template,
 			SystemPrompt:  sysPrompt,
 			MaxRecursions: recursionVal,
 		}
@@ -880,27 +814,14 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 		fmt.Printf("%sModel: %s\n", spaceholder, agent.Model.Name)
 	}
 
-	store := data.NewConfigStore()
 	if agent.SystemPrompt != "" {
-		resolvedSysPrompt := store.GetSystemPrompt(agent.SystemPrompt)
+		resolvedSysPrompt := agent.SystemPrompt
 		// Inject memory, skills, plan mode into system prompt
 		resolvedSysPrompt = service.ConstructSystemPrompt(resolvedSysPrompt, agent.Capabilities)
 		// Show the resolved system prompt
 		fmt.Printf("%sSystem Prompt:\n\n%s\n\n", spaceholder, resolvedSysPrompt)
 	} else {
 		fmt.Printf("%sSystem Prompt: \n", spaceholder)
-	}
-
-	if agent.Template != "" {
-		resolvedTemplate := store.GetTemplate(agent.Template)
-		// if len(resolvedTemplate) > 50 {
-		// 	fmt.Printf("%sTemplate: %s...\n", spaceholder, resolvedTemplate[:47])
-		// } else {
-		// 	fmt.Printf("%sTemplate: %s\n", spaceholder, resolvedTemplate)
-		// }
-		fmt.Printf("%sTemplate:\n\n%s\n\n", spaceholder, resolvedTemplate)
-	} else {
-		fmt.Printf("%sTemplate: \n", spaceholder)
 	}
 
 	fmt.Printf("%sThink: %v\n", spaceholder, agent.Think)

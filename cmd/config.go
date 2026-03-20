@@ -137,15 +137,6 @@ var configPrintCmd = &cobra.Command{
 		modelListCmd.Run(modelListCmd, []string{})
 		w.Flush()
 
-		// System Prompts section
-		printSection("System Prompts")
-		systemListCmd.Run(systemListCmd, []string{})
-		w.Flush()
-
-		// Templates section
-		printSection("Templates")
-		templateListCmd.Run(templateListCmd, []string{})
-		w.Flush()
 
 		// Memory section
 		printSection("Memory")

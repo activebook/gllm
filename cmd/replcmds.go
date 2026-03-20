@@ -140,12 +140,6 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 	case "/agent":
 		runCommand(agentCmd, parts[1:])
 
-	case "/template":
-		runCommand(templateCmd, parts[1:])
-
-	case "/system":
-		runCommand(systemCmd, parts[1:])
-
 	case "/search":
 		runCommand(searchCmd, parts[1:])
 
@@ -296,14 +290,6 @@ func (ri *ReplInfo) showInfo() {
 
 	printSection("CURRENT SETTINGS")
 
-	// System prompt
-	printSection("SYSTEM PROMPT")
-	systemCmd.Run(systemCmd, []string{})
-
-	// Template
-	printSection("TEMPLATE")
-	templateCmd.Run(templateCmd, []string{})
-
 	// Memory section (included in system prompt)
 	// printSection("Memory")
 	// memoryListCmd.Run(memoryListCmd, []string{})
@@ -312,10 +298,6 @@ func (ri *ReplInfo) showInfo() {
 	// Search Engines section
 	printSection("Search Engines")
 	searchListCmd.Run(searchListCmd, []string{})
-
-	// Plugins section
-	printSection("Tools")
-	ListAllTools()
 
 	// Current Agent section
 	printSection("Agents")
