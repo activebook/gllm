@@ -492,7 +492,7 @@ var sessionRenameCmd = &cobra.Command{
 					if s == "" {
 						return fmt.Errorf("new name cannot be empty")
 					}
-					if strings.TrimSpace(s) == oldName {
+					if strings.EqualFold(s, oldName) {
 						return fmt.Errorf("name cannot be the same as old name")
 					}
 					if err := util.ValidateResourceName("session", s); err != nil {
@@ -522,6 +522,11 @@ var sessionRenameCmd = &cobra.Command{
 				return fmt.Errorf("index %d out of range (1-%d)", index, len(sessions))
 			}
 			oldName = sessions[index-1].Name
+		}
+
+		if strings.EqualFold(oldName, newName) {
+			fmt.Println("No changes made.")
+			return nil
 		}
 
 		oldPath := util.JoinFilePath(sessionDir, oldName+".jsonl")

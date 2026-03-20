@@ -29,14 +29,16 @@ func GetStringValue(data map[string]any, key string) string {
 
 func Contains(list []string, item string, ignoreCase bool) bool {
 	if ignoreCase {
-		item = strings.ToLower(item)
-	}
-	for _, v := range list {
-		if ignoreCase {
-			v = strings.ToLower(v)
+		for _, v := range list {
+			if strings.EqualFold(v, item) {
+				return true
+			}
 		}
-		if v == item {
-			return true
+	} else {
+		for _, v := range list {
+			if v == item {
+				return true
+			}
 		}
 	}
 	return false
