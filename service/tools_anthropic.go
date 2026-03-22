@@ -122,6 +122,8 @@ func (op *OpenProcessor) dispatchAnthropicToolCall(toolCall anthropic.ToolUseBlo
 		return runAnthropicTool(toolCall.ID, func() (string, error) { return listMemoryToolCallImpl() })
 	case ToolSaveMemory:
 		return runAnthropicTool(toolCall.ID, func() (string, error) { return saveMemoryToolCallImpl(a) })
+	case ToolBuildAgent:
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return buildAgentToolCallImpl(a, op.toolsUse) })
 	case ToolSwitchAgent:
 		return op.anthropicSwitchAgentToolCall(toolCall, a)
 	case ToolListAgent:

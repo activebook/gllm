@@ -13,16 +13,16 @@ import (
 )
 
 const (
-	EmbeddingToolsDescription = `[Tools]() enable file system operations, command execution, and agent switching.
+	EmbeddingToolsDescription = `[Tools]() enable file system operations, command execution, and other essential functions.
 
 Run shell command or script ( [shell]()):
    - _Use when need to run a local command such as python, node, bash, etc._
    - _Or run any other command-line tool or script_
    - _Best for: "Run this python script and give me result"_
 
-Automatic agent switch ( [switch\\_agent]()):
-   - _Use when you want to delegate control completely to another agent_
-   - _Best for: "Already done the planning, switch to code mode"_`
+Security Warning ( [important]()):
+   - _Tools like shell execution and file modification have direct access to your system._
+   - _Grant these tools only to trusted agents._`
 )
 
 func init() {
@@ -63,7 +63,7 @@ var toolsSwCmd = &cobra.Command{
 		}
 
 		// Get all available tools
-		allTools := service.GetAllEmbeddingTools()
+		allTools := service.GetEmbeddingTools()
 
 		// Get currently enabled tools
 		enabledTools := agent.Tools
@@ -138,7 +138,7 @@ func GetAllTools(agent *data.AgentConfig) string {
 
 	// Add skill tools if skills are enabled
 	if service.IsAgentSkillsEnabled(agent.Capabilities) {
-		skillTools := service.GetAllSkillTools()
+		skillTools := service.GetSkillTools()
 		for _, t := range skillTools {
 			enabledSet[t] = true
 		}
@@ -146,7 +146,7 @@ func GetAllTools(agent *data.AgentConfig) string {
 
 	// Add web search tools if web search is enabled
 	if service.IsWebSearchEnabled(agent.Capabilities) {
-		webSearchTools := service.GetAllSearchTools()
+		webSearchTools := service.GetSearchTools()
 		for _, t := range webSearchTools {
 			enabledSet[t] = true
 		}
@@ -154,15 +154,23 @@ func GetAllTools(agent *data.AgentConfig) string {
 
 	// Add sub agents tools if sub agents are enabled
 	if service.IsSubAgentsEnabled(agent.Capabilities) {
-		subAgentsTools := service.GetAllSubagentTools()
+		subAgentsTools := service.GetSubagentTools()
 		for _, t := range subAgentsTools {
+			enabledSet[t] = true
+		}
+	}
+
+	// Add agent delegation tools if agent delegation is enabled
+	if service.IsAgentDelegationEnabled(agent.Capabilities) {
+		agentDelegationTools := service.GetAgentDelegationTools()
+		for _, t := range agentDelegationTools {
 			enabledSet[t] = true
 		}
 	}
 
 	// Add agent memory tools if agent memory is enabled
 	if service.IsAgentMemoryEnabled(agent.Capabilities) {
-		agentMemoryTools := service.GetAllMemoryTools()
+		agentMemoryTools := service.GetMemoryTools()
 		for _, t := range agentMemoryTools {
 			enabledSet[t] = true
 		}
@@ -170,7 +178,7 @@ func GetAllTools(agent *data.AgentConfig) string {
 
 	// Add plan mode tools if plan mode is enabled
 	if service.IsPlanModeEnabled(agent.Capabilities) {
-		agentPlanModeTools := service.GetAllPlanModeTools()
+		agentPlanModeTools := service.GetPlanModeTools()
 		for _, t := range agentPlanModeTools {
 			enabledSet[t] = true
 		}
@@ -181,12 +189,12 @@ func GetAllTools(agent *data.AgentConfig) string {
 	// to tell user those tools are not switchable
 	// they are built-in capabilities tools
 	for _, tool := range sortedTools {
-		displayName := tool
+		asterisk := ""
 		if !service.AvailableEmbeddingTool(tool) {
-			displayName += "'"
+			asterisk = "*"
 		}
 		indicator := ui.FormatEnabledIndicator(enabledSet[tool])
-		toolsList += fmt.Sprintf("%s %s\n", indicator, displayName)
+		toolsList += fmt.Sprintf("%s %s %s\n", indicator, tool, asterisk)
 	}
 
 	return toolsList
@@ -202,5 +210,5 @@ func ListAllTools() {
 
 	toolsList := GetAllTools(agent)
 	fmt.Println(toolsList)
-	fmt.Println("' behind the tool name means it is a built-in capabilities tool which can be switched on/off in agent capabilities settings.")
+	fmt.Println("* behind the tool name means it is a built-in capabilities tool which can be switched on/off in agent capabilities settings.")
 }

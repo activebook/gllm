@@ -37,6 +37,7 @@ const (
 	ToolReadMultipleFiles = "read_multiple_files"
 	ToolWebFetch          = "web_fetch"
 	ToolSwitchAgent       = "switch_agent"
+	ToolBuildAgent        = "build_agent"
 	ToolAskUser           = "ask_user"
 	ToolWebSearch         = "web_search"
 	ToolActivateSkill     = "activate_skill"
@@ -101,8 +102,6 @@ var (
 		ToolReadMultipleFiles,
 		// web tools
 		ToolWebFetch,
-		// agent tools
-		ToolSwitchAgent,
 		// Interactive tools
 		ToolAskUser,
 	}
@@ -121,6 +120,12 @@ var (
 	}
 	subagentTools = []string{
 		// Sub-agent orchestration tools
+		ToolSwitchAgent,
+		ToolBuildAgent,
+	}
+
+	agentDelegationTools = []string{
+		// Agent delegation tools
 		ToolListAgent,
 		ToolSpawnSubAgents,
 		// shared state tools
@@ -128,7 +133,8 @@ var (
 		ToolSetState,
 		ToolListState,
 	}
-	planTools = []string{
+
+	planModeTools = []string{
 		// Plan mode
 		ToolExitPlanMode,
 		ToolEnterPlanMode,
@@ -154,49 +160,61 @@ var (
 	}
 )
 
-func GetAllEmbeddingTools() []string {
+func GetEmbeddingTools() []string {
 	return embeddingTools
 }
 
-func GetAllSearchTools() []string {
+func GetSearchTools() []string {
 	return searchTools
 }
 
-func GetAllSkillTools() []string {
+func GetSkillTools() []string {
 	return skillTools
 }
 
-func GetAllMemoryTools() []string {
+func GetMemoryTools() []string {
 	return memoryTools
 }
 
-func GetAllSubagentTools() []string {
+func GetSubagentTools() []string {
 	return subagentTools
 }
 
-func GetAllPlanModeTools() []string {
-	return planTools
+func GetAgentDelegationTools() []string {
+	return agentDelegationTools
+}
+
+func GetPlanModeTools() []string {
+	return planModeTools
+}
+
+func GetAllFeatureInjectedTools() []string {
+	tools := []string{}
+	tools = append(tools, GetSearchTools()...)
+	tools = append(tools, GetSkillTools()...)
+	tools = append(tools, GetMemoryTools()...)
+	tools = append(tools, GetSubagentTools()...)
+	tools = append(tools, GetAgentDelegationTools()...)
+	tools = append(tools, GetPlanModeTools()...)
+	return tools
 }
 
 func GetAllOpenTools() []string {
-	tools := GetAllEmbeddingTools()
-	tools = append(tools, GetAllSearchTools()...)
-	tools = append(tools, GetAllSkillTools()...)
-	tools = append(tools, GetAllMemoryTools()...)
-	tools = append(tools, GetAllSubagentTools()...)
-	tools = append(tools, GetAllPlanModeTools()...)
+	tools := GetEmbeddingTools()
+	tools = append(tools, GetAllFeatureInjectedTools()...)
 	return tools
 }
 
 // IsAvailableTool checks if a tool is available for the current agent.
 // It checks if the tool is available in the
-// embedding tools, search tools, skill tools, memory tools, subagent tools, or MCP tools.
+// embedding tools, search tools, skill tools, memory tools, subagent tools, agent delegation tools, or MCP tools.
 func IsAvailableOpenTool(toolName string) bool {
 	return AvailableEmbeddingTool(toolName) ||
 		AvailableSearchTool(toolName) ||
 		AvailableSkillTool(toolName) ||
 		AvailableMemoryTool(toolName) ||
 		AvailableSubagentTool(toolName) ||
+		AvailableAgentDelegationTool(toolName) ||
 		AvailablePlanTool(toolName)
 }
 
@@ -250,9 +268,19 @@ func AvailableSubagentTool(toolName string) bool {
 	return false
 }
 
+// AvailableAgentDelegationTool checks if a tool is available in the agent delegation tools.
+func AvailableAgentDelegationTool(toolName string) bool {
+	for _, tool := range agentDelegationTools {
+		if tool == toolName {
+			return true
+		}
+	}
+	return false
+}
+
 // AvailablePlanTool checks if a tool is available in the plan tools.
 func AvailablePlanTool(toolName string) bool {
-	for _, tool := range planTools {
+	for _, tool := range planModeTools {
 		if tool == toolName {
 			return true
 		}
@@ -273,6 +301,26 @@ func AppendSubagentTools(tools []string) []string {
 // RemoveSubagentTools removes subagent tools from the given tools slice.
 func RemoveSubagentTools(tools []string) []string {
 	for _, tool := range subagentTools {
+		tools = slices.DeleteFunc(tools, func(t string) bool {
+			return t == tool
+		})
+	}
+	return tools
+}
+
+// AppendAgentDelegationTools appends agent delegation tools to the given tools slice if they are not already present.
+func AppendAgentDelegationTools(tools []string) []string {
+	for _, tool := range agentDelegationTools {
+		if !slices.Contains(tools, tool) {
+			tools = append(tools, tool)
+		}
+	}
+	return tools
+}
+
+// RemoveAgentDelegationTools removes agent delegation tools from the given tools slice.
+func RemoveAgentDelegationTools(tools []string) []string {
+	for _, tool := range agentDelegationTools {
 		tools = slices.DeleteFunc(tools, func(t string) bool {
 			return t == tool
 		})
@@ -342,7 +390,7 @@ func RemoveSearchTools(tools []string) []string {
 
 // AppendPlanTools appends plan tools to the given tools slice if they are not already present.
 func AppendPlanTools(tools []string) []string {
-	for _, tool := range planTools {
+	for _, tool := range planModeTools {
 		if !slices.Contains(tools, tool) {
 			tools = append(tools, tool)
 		}
@@ -352,7 +400,7 @@ func AppendPlanTools(tools []string) []string {
 
 // RemovePlanTools removes plan tools from the given tools slice.
 func RemovePlanTools(tools []string) []string {
-	for _, tool := range planTools {
+	for _, tool := range planModeTools {
 		tools = slices.DeleteFunc(tools, func(t string) bool {
 			return t == tool
 		})
@@ -622,6 +670,10 @@ func getOpenTools() []*OpenTool {
 	// Switch Agent tool
 	switchAgentTool := getSwitchAgentTool()
 	tools = append(tools, switchAgentTool)
+
+	// build_agent tool
+	buildAgentTool := getBuildAgentTool()
+	tools = append(tools, buildAgentTool)
 
 	// list_agent tool - List all available agents
 	listAgentTool := getListAgentTool()
@@ -1171,6 +1223,116 @@ When a switch occurs, if an instruction is provided, it replaces the original pr
 		Function: &switchAgentFunc,
 	}
 	return &switchAgentTool
+}
+
+// getBuildAgentTool returns the JSON Schema definition for the build_agent tool.
+// Enum arrays constrain both tools and capabilities to the exact valid values
+// present in the gllm registry, eliminating taxonomic drift at the schema level.
+func getBuildAgentTool() *OpenTool {
+	// Build the valid embedding tool enum from the authoritative registry list
+	// (excludes feature-injected tools which are appended via capabilities)
+	embedToolEnum := make([]interface{}, len(embeddingTools))
+	for i, t := range embeddingTools {
+		embedToolEnum[i] = t
+	}
+	capsEnum := make([]interface{}, len(embeddingCapabilities))
+	for i, c := range embeddingCapabilities {
+		capsEnum[i] = c
+	}
+
+	buildAgentFunc := OpenFunctionDefinition{
+		Name: ToolBuildAgent,
+		Description: `Build a new, specialized AI agent definition and save it to the agents directory.
+This tool empowers you to create custom-tailored agents with specific personas, tools, and capabilities to handle specialized workflows.
+
+When to use this tool:
+- When asked to create a new agent, persona, or expert.
+- When you recognize a complex task would be best handled by a specialized sub-agent with a unique system prompt and focused toolset.
+
+How to use:
+- Carefully craft the system_prompt to be comprehensive, giving the new agent clear instructions, constraints, and a well-defined persona.
+- Select ONLY the tools and capabilities necessary for the agent's specific purpose to minimize context bloat and distraction.
+- Call this tool ONCE with all fields fully populated; this is a single atomic operation that creates the agent file immediately.
+
+Available Embedding Tools (select from these for the 'tools' field):
+- shell: Execute local shell commands.
+- read_file: Read file contents.
+- write_file: Create or overwrite a file.
+- edit_file: Modify parts of a file using unified diffs.
+- delete_file: Remove a file.
+- create_directory: Create a new folder.
+- list_directory: View files in a folder.
+- delete_directory: Remove a folder.
+- move: Rename or move files/folders.
+- copy: Duplicate files/folders.
+- read_multiple_files: Load several files at once.
+- search_files: Find files by regex pattern.
+- search_text_in_file: Grep codebase for strings.
+- web_fetch: Retrieve text from web URLs.
+- ask_user: Prompt user for clarification or input.
+
+Capability details (CRITICAL: Do NOT place these tools in the 'tools' field. Enable the valid capability instead):
+- mcp_servers: enables communication with locally running MCP servers.
+- agent_skills: lightweight, open format for extending AI agent workflows (injects 'activate_skill' tool).
+- agent_memory: allows agents to remember important facts across sessions (injects 'list_memory', 'save_memory' tools).
+- sub_agents: allow you to create and manage a pool of specialized agents (injects 'switch_agent', 'build_agent' tools).
+- agent_delegation: allow an agent to delegate tasks or hand off control to other agents (injects 'spawn_subagents', 'list_agent' tool).
+- web_search: enables the agent to search the web for real-time information (injects 'web_search' tool).
+- token_usage: allows agents to track their token usage.
+- markdown_output: allows agents to generate final response in Markdown format.
+- auto_compression: automatically compresses session context using a summary when context window limits are reached.
+- plan_mode: allows agents to plan their work before executing tasks (injects 'enter_plan_mode', 'exit_plan_mode' tools).`,
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"name": map[string]interface{}{
+					"type":        "string",
+					"description": "Unique agent identifier. Lowercase, alphanumeric, hyphens allowed (e.g. 'git-expert', 'code-reviewer').",
+				},
+				"description": map[string]interface{}{
+					"type":        "string",
+					"description": "A concise summary of what this agent specialises in.",
+				},
+				"tools": map[string]interface{}{
+					"type": "array",
+					"items": map[string]interface{}{
+						"type": "string",
+						"enum": embedToolEnum,
+					},
+					"description": "Embedding tools to enable. Select only what the agent genuinely needs.",
+				},
+				"capabilities": map[string]interface{}{
+					"type": "array",
+					"items": map[string]interface{}{
+						"type": "string",
+						"enum": capsEnum,
+					},
+					"description": "Feature capabilities. Each injects additional tools and context into the agent automatically.",
+				},
+				"think": map[string]interface{}{
+					"type":        "string",
+					"enum":        []interface{}{"off", "minimal", "low", "medium", "high"},
+					"description": "Reasoning depth. 'off' = fastest/cheapest, 'high' = deepest reasoning.",
+					"default":     "off",
+				},
+				"max_recursions": map[string]interface{}{
+					"type":        "integer",
+					"description": "Maximum tool-call turns per session. Default 50. Use -1 for unlimited.",
+					"default":     50,
+				},
+				"system_prompt": map[string]interface{}{
+					"type":        "string",
+					"description": "Full persona and behavioural instructions for this agent. Be comprehensive — this is the only instruction source.",
+				},
+			},
+			"required": []string{"name", "description", "tools", "capabilities", "think", "system_prompt"},
+		},
+	}
+	buildAgentTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &buildAgentFunc,
+	}
+	return &buildAgentTool
 }
 
 func getListAgentTool() *OpenTool {

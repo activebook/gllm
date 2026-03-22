@@ -36,7 +36,7 @@ func init() {
 
 // buildToolsOptions creates sorted huh.Option list for tools with all selected by default
 func buildToolsOptions() []huh.Option[string] {
-	toolsList := service.GetAllEmbeddingTools()
+	toolsList := service.GetEmbeddingTools()
 	var options []huh.Option[string]
 	for _, tool := range toolsList {
 		// All tools selected by default for new agents
@@ -234,8 +234,9 @@ func RunInitWizard() error {
 			huh.NewOption("Enable Agent Skills", service.CapabilityAgentSkills).Selected(true),
 			huh.NewOption("Enable Agent Memory", service.CapabilityAgentMemory).Selected(true),
 			huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(true),
+			huh.NewOption("Enable Agent Delegation", service.CapabilityAgentDelegation).Selected(true),
 		).Value(&selectedFeatures)
-	featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
+	featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, service.GetCapabilityDescHighlight)
 
 	// Details Group
 	// We use a dynamic form to set the default model
