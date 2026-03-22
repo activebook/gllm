@@ -207,7 +207,7 @@ func GetAllOpenTools() []string {
 
 // IsAvailableTool checks if a tool is available for the current agent.
 // It checks if the tool is available in the
-// embedding tools, search tools, skill tools, memory tools, subagent tools, or MCP tools.
+// embedding tools, search tools, skill tools, memory tools, subagent tools, agent delegation tools, or MCP tools.
 func IsAvailableOpenTool(toolName string) bool {
 	return AvailableEmbeddingTool(toolName) ||
 		AvailableSearchTool(toolName) ||
@@ -268,6 +268,7 @@ func AvailableSubagentTool(toolName string) bool {
 	return false
 }
 
+// AvailableAgentDelegationTool checks if a tool is available in the agent delegation tools.
 func AvailableAgentDelegationTool(toolName string) bool {
 	for _, tool := range agentDelegationTools {
 		if tool == toolName {
