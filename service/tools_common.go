@@ -120,7 +120,6 @@ var (
 	}
 	subagentTools = []string{
 		// Sub-agent orchestration tools
-		ToolListAgent,
 		ToolSwitchAgent,
 		ToolBuildAgent,
 	}
@@ -1265,8 +1264,8 @@ Capability details (CRITICAL: Do NOT place these tools in the 'tools' field. Ena
 - mcp_servers: enables communication with locally running MCP servers.
 - agent_skills: lightweight, open format for extending AI agent workflows (injects 'activate_skill' tool).
 - agent_memory: allows agents to remember important facts across sessions (injects 'list_memory', 'save_memory' tools).
-- sub_agents: allow you to create and manage a pool of specialized agents (injects 'switch_agent', 'build_agent', 'list_agent' tools).
-- agent_delegation: allow an agent to delegate tasks or hand off control to other agents (injects 'spawn_subagents' tool).
+- sub_agents: allow you to create and manage a pool of specialized agents (injects 'switch_agent', 'build_agent' tools).
+- agent_delegation: allow an agent to delegate tasks or hand off control to other agents (injects 'spawn_subagents', 'list_agent' tool).
 - web_search: enables the agent to search the web for real-time information (injects 'web_search' tool).
 - token_usage: allows agents to track their token usage.
 - markdown_output: allows agents to generate final response in Markdown format.
