@@ -13,16 +13,16 @@ import (
 )
 
 const (
-	EmbeddingToolsDescription = `[Tools]() enable file system operations, command execution, and agent switching.
+	EmbeddingToolsDescription = `[Tools]() enable file system operations, command execution, and other essential functions.
 
 Run shell command or script ( [shell]()):
    - _Use when need to run a local command such as python, node, bash, etc._
    - _Or run any other command-line tool or script_
    - _Best for: "Run this python script and give me result"_
 
-Automatic agent switch ( [switch\\_agent]()):
-   - _Use when you want to delegate control completely to another agent_
-   - _Best for: "Already done the planning, switch to code mode"_`
+Security Warning ( [important]()):
+   - _Tools like shell execution and file modification have direct access to your system._
+   - _Grant these tools only to trusted agents._`
 )
 
 func init() {

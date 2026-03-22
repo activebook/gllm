@@ -1232,22 +1232,46 @@ func getBuildAgentTool() *OpenTool {
 
 	buildAgentFunc := OpenFunctionDefinition{
 		Name: ToolBuildAgent,
-		Description: `Build a new gllm agent definition and save it to the agents directory.
-Call ONCE with all fields populated — this is a single atomic operation.
+		Description: `Build a new, specialized AI agent definition and save it to the agents directory.
+This tool empowers you to create custom-tailored agents with specific personas, tools, and capabilities to handle specialized workflows.
 
-The agent is immediately available after creation via 'gllm agent switch <name>'.
+When to use this tool:
+- When asked to create a new agent, persona, or expert.
+- When you recognize a complex task would be best handled by a specialized sub-agent with a unique system prompt and focused toolset.
 
-Tool groups:
-- Execution: shell
-- File I/O: read_file, write_file, edit_file, delete_file, create_directory, list_directory, delete_directory, move, copy, read_multiple_files
-- Search: search_files, search_text_in_file
-- Web: web_fetch
-- Agent: switch_agent, build_agent
-- Interactive: ask_user
+How to use:
+- Carefully craft the system_prompt to be comprehensive, giving the new agent clear instructions, constraints, and a well-defined persona.
+- Select ONLY the tools and capabilities necessary for the agent's specific purpose to minimize context bloat and distraction.
+- Call this tool ONCE with all fields fully populated; this is a single atomic operation that creates the agent file immediately.
 
-Capability notes:
-- web_search, activate_skill, list_memory/save_memory, spawn_subagents and plan tools are injected automatically by their respective capabilities.
-- Do NOT place those in the 'tools' field; enable their capability instead.`,
+Available Embedding Tools (select from these for the 'tools' field):
+- shell: Execute local shell commands.
+- read_file: Read file contents.
+- write_file: Create or overwrite a file.
+- edit_file: Modify parts of a file using unified diffs.
+- delete_file: Remove a file.
+- create_directory: Create a new folder.
+- list_directory: View files in a folder.
+- delete_directory: Remove a folder.
+- move: Rename or move files/folders.
+- copy: Duplicate files/folders.
+- read_multiple_files: Load several files at once.
+- search_files: Find files by regex pattern.
+- search_text_in_file: Grep codebase for strings.
+- web_fetch: Retrieve text from web URLs.
+- ask_user: Prompt user for clarification or input.
+
+Capability details (CRITICAL: Do NOT place these tools in the 'tools' field. Enable the valid capability instead):
+- mcp_servers: enables communication with locally running MCP servers.
+- agent_skills: lightweight, open format for extending AI agent workflows (injects 'activate_skill' tool).
+- agent_memory: allows agents to remember important facts across sessions (injects 'list_memory', 'save_memory' tools).
+- sub_agents: allow you to create and manage a pool of specialized agents (injects 'switch_agent', 'build_agent', 'list_agent' tools).
+- agent_delegation: allow an agent to delegate tasks or hand off control to other agents (injects 'spawn_subagents' tool).
+- web_search: enables the agent to search the web for real-time information (injects 'web_search' tool).
+- token_usage: allows agents to track their token usage.
+- markdown_output: allows agents to generate final response in Markdown format.
+- auto_compression: automatically compresses session context using a summary when context window limits are reached.
+- plan_mode: allows agents to plan their work before executing tasks (injects 'enter_plan_mode', 'exit_plan_mode' tools).`,
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
