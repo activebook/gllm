@@ -214,6 +214,7 @@ func IsAvailableOpenTool(toolName string) bool {
 		AvailableSkillTool(toolName) ||
 		AvailableMemoryTool(toolName) ||
 		AvailableSubagentTool(toolName) ||
+		AvailableAgentDelegationTool(toolName) ||
 		AvailablePlanTool(toolName)
 }
 
@@ -260,6 +261,15 @@ func AvailableMemoryTool(toolName string) bool {
 // AvailableSubagentTool checks if a tool is available in the subagent tools.
 func AvailableSubagentTool(toolName string) bool {
 	for _, tool := range subagentTools {
+		if tool == toolName {
+			return true
+		}
+	}
+	return false
+}
+
+func AvailableAgentDelegationTool(toolName string) bool {
+	for _, tool := range agentDelegationTools {
 		if tool == toolName {
 			return true
 		}
