@@ -189,12 +189,12 @@ func GetAllTools(agent *data.AgentConfig) string {
 	// to tell user those tools are not switchable
 	// they are built-in capabilities tools
 	for _, tool := range sortedTools {
-		displayName := tool
+		asterisk := ""
 		if !service.AvailableEmbeddingTool(tool) {
-			displayName += "'"
+			asterisk = "*"
 		}
 		indicator := ui.FormatEnabledIndicator(enabledSet[tool])
-		toolsList += fmt.Sprintf("%s %s\n", indicator, displayName)
+		toolsList += fmt.Sprintf("%s %s %s\n", indicator, tool, asterisk)
 	}
 
 	return toolsList
@@ -210,5 +210,5 @@ func ListAllTools() {
 
 	toolsList := GetAllTools(agent)
 	fmt.Println(toolsList)
-	fmt.Println("' behind the tool name means it is a built-in capabilities tool which can be switched on/off in agent capabilities settings.")
+	fmt.Println("* behind the tool name means it is a built-in capabilities tool which can be switched on/off in agent capabilities settings.")
 }
