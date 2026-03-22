@@ -1380,7 +1380,12 @@ func buildAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tool
 	}
 
 	// ── Confirm before writing ───────────────────────────────────────────────
-	if !toolsUse.AutoApprove {
+	// Check for confirmation
+	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
+	if !ok {
+		needConfirm = true // Default to true
+	}
+	if needConfirm && !toolsUse.AutoApprove {
 		purpose := fmt.Sprintf("build agent '%s' with %d tools and %d capabilities", name, len(selectedTools), len(selectedCaps))
 		event.RequestConfirm(purpose, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {

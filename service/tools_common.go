@@ -1324,6 +1324,11 @@ Capability details (CRITICAL: Do NOT place these tools in the 'tools' field. Ena
 					"type":        "string",
 					"description": "Full persona and behavioural instructions for this agent. Be comprehensive — this is the only instruction source.",
 				},
+				"need_confirm": map[string]interface{}{
+					"type":        "boolean",
+					"description": "Whether to prompt the user for confirmation before building agents. Defaults to true.",
+					"default":     true,
+				},
 			},
 			"required": []string{"name", "description", "tools", "capabilities", "think", "system_prompt"},
 		},
