@@ -24,10 +24,27 @@ import (
 //   - Raw() returns the raw JSON value (e.g. `"some text"` or `null` or “ for omitted).
 //   - We previously strings.Trim to unquote rather than json.Unmarshal, matching the streaming
 //     incremental nature of the data, but encountered escaped \n and unicode concerns in practice.
-func extractDeltaReasoning(delta *openai.ChatCompletionChunkChoiceDelta) string {
+func (oa *OpenAI) extractDeltaReasoning(delta *openai.ChatCompletionChunkChoiceDelta) string {
 	if delta == nil {
 		return ""
 	}
+
+	// Fast path: use cached key if found previously in this stream
+	if oa.reasoningKey != "" {
+		field, ok := delta.JSON.ExtraFields[oa.reasoningKey]
+		if ok && !field.Valid() {
+			raw := field.Raw()
+			if raw != "" && raw != "null" {
+				var unescaped string
+				if err := json.Unmarshal([]byte(raw), &unescaped); err == nil {
+					return unescaped
+				}
+			}
+		}
+		// If cached key failed for some reason, we give up (unlikely)
+		return ""
+	}
+
 	for _, key := range []string{"reasoning_content", "reasoning"} {
 		field, ok := delta.JSON.ExtraFields[key]
 		if !ok || field.Valid() {
@@ -40,6 +57,7 @@ func extractDeltaReasoning(delta *openai.ChatCompletionChunkChoiceDelta) string 
 		// Correctly unescape JSON string (handles \n, \t, etc)
 		var unescaped string
 		if err := json.Unmarshal([]byte(raw), &unescaped); err == nil {
+			oa.reasoningKey = key // Cache the key for future chunks in this stream
 			return unescaped
 		}
 		// Fallback if it fails
@@ -255,9 +273,10 @@ func (ag *Agent) GenerateOpenAIStream() error {
 
 // OpenAI manages the state of an ongoing session with an AI assistant
 type OpenAI struct {
-	client *openai.Client
-	tools  []openai.ChatCompletionToolUnionParam
-	op     *OpenProcessor
+	client       *openai.Client
+	tools        []openai.ChatCompletionToolUnionParam
+	op           *OpenProcessor
+	reasoningKey string // Cache for the vendor-specific reasoning extra field key
 }
 
 func (oa *OpenAI) process(ag *Agent) error {
@@ -441,7 +460,7 @@ func (oa *OpenAI) processStream(stream *ssestream.Stream[openai.ChatCompletionCh
 			// (The official SDK param struct has no reasoning_content field.)
 			// Extract vendor reasoning content (DeepSeek R1 → "reasoning_content",
 			// OpenRouter/others → "reasoning") from ExtraFields.
-			if rcText := extractDeltaReasoning(&delta); rcText != "" {
+			if rcText := oa.extractDeltaReasoning(&delta); rcText != "" {
 				reasoningBuffer.WriteString(rcText)
 				if oa.op.status.Peek() != StatusReasoning {
 					// If reasoning content is not empty, switch to reasoning state
