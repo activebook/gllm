@@ -143,7 +143,7 @@ var capsSwitchCmd = &cobra.Command{
 			Description("Use space to toggle, enter to confirm.").
 			Options(options...).
 			Value(&selected)
-		featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, service.GetCapabilityDescription)
+		featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, service.GetCapabilityDescHighlight)
 		err := huh.NewForm(
 			huh.NewGroup(msfeatures, featureNote),
 		).Run()

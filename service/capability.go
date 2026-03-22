@@ -86,10 +86,12 @@ var (
 	}
 )
 
+// GetAllEmbeddingCapabilities returns all capabilities that are enabled by default.
 func GetAllEmbeddingCapabilities() []string {
 	return embeddingCapabilities
 }
 
+// GetCapabilityTitle returns the title of a capability.
 func GetCapabilityTitle(cap string) string {
 	switch cap {
 	case CapabilityMCPServers:
@@ -117,7 +119,9 @@ func GetCapabilityTitle(cap string) string {
 	}
 }
 
-func GetCapabilityDescription(cap string) string {
+// GetCapabilityDescHighlight returns the description of a capability with highlight.
+// This is used for the dynamic note in the capabilities switch.
+func GetCapabilityDescHighlight(cap string) string {
 	switch cap {
 	case CapabilityMCPServers, CapabilityMCPTitle:
 		return CapabilityMCPDescriptionHighlight
@@ -139,6 +143,34 @@ func GetCapabilityDescription(cap string) string {
 		return CapabilityAutoCompressDescriptionHighlight
 	case CapabilityPlanMode, CapabilityPlanModeTitle:
 		return CapabilityPlanModeDescriptionHighlight
+	default:
+		return ""
+	}
+}
+
+// GetCapabilityDescription returns the description of a capability.
+func GetCapabilityDescription(cap string) string {
+	switch cap {
+	case CapabilityMCPServers, CapabilityMCPTitle:
+		return CapabilityMCPDescription
+	case CapabilityAgentSkills, CapabilitySkillsTitle:
+		return CapabilitySkillsDescription
+	case CapabilityTokenUsage, CapabilityTokenUsageTitle:
+		return CapabilityTokenUsageDescription
+	case CapabilityMarkdown, CapabilityMarkdownTitle:
+		return CapabilityMarkdownDescription
+	case CapabilitySubAgents, CapabilitySubAgentsTitle:
+		return CapabilitySubAgentsDescription
+	case CapabilityAgentDelegation, CapabilityDelegationTitle:
+		return CapabilityDelegationDescription
+	case CapabilityAgentMemory, CapabilityMemoryTitle:
+		return CapabilityMemoryDescription
+	case CapabilityWebSearch, CapabilityWebSearchTitle:
+		return CapabilityWebSearchDescription
+	case CapabilityAutoCompression, CapabilityAutoCompressTitle:
+		return CapabilityAutoCompressDescription
+	case CapabilityPlanMode, CapabilityPlanModeTitle:
+		return CapabilityPlanModeDescription
 	default:
 		return ""
 	}

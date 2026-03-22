@@ -236,7 +236,7 @@ func RunInitWizard() error {
 			huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(true),
 			huh.NewOption("Enable Agent Delegation", service.CapabilityAgentDelegation).Selected(true),
 		).Value(&selectedFeatures)
-	featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, service.GetCapabilityDescription)
+	featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, service.GetCapabilityDescHighlight)
 
 	// Details Group
 	// We use a dynamic form to set the default model
