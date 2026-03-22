@@ -7,10 +7,30 @@ const (
 	CapabilityTokenUsage      = "token_usage"
 	CapabilityMarkdown        = "markdown_output"
 	CapabilitySubAgents       = "sub_agents"
+	CapabilityAgentDelegation = "agent_delegation"
 	CapabilityWebSearch       = "web_search"
 	CapabilityAutoCompression = "auto_compression"
 	CapabilityPlanMode        = "plan_mode"
 )
+
+var (
+	embeddingCapabilities = []string{
+		CapabilityMCPServers,
+		CapabilityAgentSkills,
+		CapabilityAgentMemory,
+		CapabilityTokenUsage,
+		CapabilityMarkdown,
+		CapabilitySubAgents,
+		CapabilityAgentDelegation,
+		CapabilityWebSearch,
+		CapabilityAutoCompression,
+		CapabilityPlanMode,
+	}
+)
+
+func GetAllEmbeddingCapabilities() []string {
+	return embeddingCapabilities
+}
 
 /*
  * Capability Utils
@@ -117,6 +137,21 @@ func EnableSubAgents(capabilities []string) []string {
 
 func DisableSubAgents(capabilities []string) []string {
 	return disableCapability(capabilities, CapabilitySubAgents)
+}
+
+/*
+ * Agent Delegation
+ */
+func IsAgentDelegationEnabled(capabilities []string) bool {
+	return isCapabilityEnabled(capabilities, CapabilityAgentDelegation)
+}
+
+func EnableAgentDelegation(capabilities []string) []string {
+	return enableCapability(capabilities, CapabilityAgentDelegation)
+}
+
+func DisableAgentDelegation(capabilities []string) []string {
+	return disableCapability(capabilities, CapabilityAgentDelegation)
 }
 
 /*

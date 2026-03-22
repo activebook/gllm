@@ -17,6 +17,7 @@ const (
 	AgentSkillsTitle       = "Agent Skills"
 	AgentMemoryTitle       = "Agent Memory"
 	AgentSubAgentsTitle    = "Sub Agents"
+	AgentDelegationTitle   = "Agent Delegation"
 	AgentWebSearchTitle    = "Web Search"
 	AgentTokenUsageTitle   = "Token usage"
 	AgentMarkdownTitle     = "Markdown output"
@@ -27,16 +28,19 @@ const (
 	AgentSkillsTitleHighlight       = "[Agent Skills]()"
 	AgentMemoryTitleHighlight       = "[Agent Memory]()"
 	AgentSubAgentsTitleHighlight    = "[Sub Agents]()"
+	AgentDelegationTitleHighlight   = "[Agent Delegation]()"
 	AgentWebSearchTitleHighlight    = "[Web Search]()"
 	AgentTokenUsageTitleHighlight   = "[Token usage]()"
 	AgentMarkdownTitleHighlight     = "[Markdown output]()"
 	AgentAutoCompressTitleHighlight = "[Auto Compression]()"
 	AgentPlanModeTitleHighlight     = "[Plan Mode]()"
 
-	AgentMCPBody          = "enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."
-	AgentSkillsBody       = "are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.\nAfter integrating skills, **agent** will use skills automatically."
-	AgentMemoryBody       = "allows agents to remember important facts about you across sessions.\nFacts are used to personalize responses."
-	AgentSubAgentsBody    = "allow an agent to respawn other agents to perform tasks or workflows.\nUse when you need to orchestrate multiple agents working in parallel."
+	AgentMCPBody        = "enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."
+	AgentSkillsBody     = "are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.\nAfter integrating skills, **agent** will use skills automatically."
+	AgentMemoryBody     = "allows agents to remember important facts about you across sessions.\nFacts are used to personalize responses."
+	AgentSubAgentsBody  = "allow you to create and manage a pool of specialized agents.\nUse to define, configure, and list agents that can be delegated tasks."
+	AgentDelegationBody = "allow an agent to delegate tasks or hand off control to other agents.\nUse when you need to orchestrate parallel work or fully transfer execution to a specialized agent."
+
 	AgentWebSearchBody    = "enables the agent to search the web for real-time information.\nYou must configure a search engine (Google, Bing, Tavily) to use this feature."
 	AgentTokenUsageBody   = "allows agents to track their token usage.\nThis helps you to control the cost of using the agent."
 	AgentMarkdownBody     = "allows agents to generate final response in Markdown format.\nThis helps you to format the response in a more readable way."
@@ -47,6 +51,7 @@ const (
 	AgentSkillsDescription       = AgentSkillsTitle + " " + AgentSkillsBody
 	AgentMemoryDescription       = AgentMemoryTitle + " " + AgentMemoryBody
 	AgentSubAgentsDescription    = AgentSubAgentsTitle + " " + AgentSubAgentsBody
+	AgentDelegationDescription   = AgentDelegationTitle + " " + AgentDelegationBody
 	AgentWebSearchDescription    = AgentWebSearchTitle + " " + AgentWebSearchBody
 	AgentTokenUsageDescription   = AgentTokenUsageTitle + " " + AgentTokenUsageBody
 	AgentMarkdownDescription     = AgentMarkdownTitle + " " + AgentMarkdownBody
@@ -58,6 +63,7 @@ const (
 	AgentSkillsDescriptionHighlight       = AgentSkillsTitleHighlight + AgentSkillsBody
 	AgentMemoryDescriptionHighlight       = AgentMemoryTitleHighlight + AgentMemoryBody
 	AgentSubAgentsDescriptionHighlight    = AgentSubAgentsTitleHighlight + AgentSubAgentsBody
+	AgentDelegationDescriptionHighlight   = AgentDelegationTitleHighlight + AgentDelegationBody
 	AgentWebSearchDescriptionHighlight    = AgentWebSearchTitleHighlight + AgentWebSearchBody
 	AgentTokenUsageDescriptionHighlight   = AgentTokenUsageTitleHighlight + AgentTokenUsageBody
 	AgentMarkdownDescriptionHighlight     = AgentMarkdownTitleHighlight + AgentMarkdownBody
@@ -147,6 +153,14 @@ var capsSwitchCmd = &cobra.Command{
 			options = append(options, huh.NewOption("Subagents Workflow", service.CapabilitySubAgents))
 		}
 
+		// Agent Delegation
+		if service.IsAgentDelegationEnabled(agent.Capabilities) {
+			options = append(options, huh.NewOption("Agent Delegation", service.CapabilityAgentDelegation).Selected(true))
+			selected = append(selected, service.CapabilityAgentDelegation)
+		} else {
+			options = append(options, huh.NewOption("Agent Delegation", service.CapabilityAgentDelegation))
+		}
+
 		// Agent Memory
 		if service.IsAgentMemoryEnabled(agent.Capabilities) {
 			options = append(options, huh.NewOption("Agent Memory", service.CapabilityAgentMemory).Selected(true))
@@ -211,6 +225,7 @@ var capsSwitchCmd = &cobra.Command{
 			service.CapabilityTokenUsage,
 			service.CapabilityMarkdown,
 			service.CapabilitySubAgents,
+			service.CapabilityAgentDelegation,
 			service.CapabilityAgentMemory,
 			service.CapabilityWebSearch,
 			service.CapabilityAutoCompression,
@@ -247,6 +262,8 @@ func getFeatureDescription(cap string) string {
 		return AgentMarkdownDescriptionHighlight
 	case service.CapabilitySubAgents:
 		return AgentSubAgentsDescriptionHighlight
+	case service.CapabilityAgentDelegation:
+		return AgentDelegationDescriptionHighlight
 	case service.CapabilityAgentMemory:
 		return AgentMemoryDescriptionHighlight
 	case service.CapabilityWebSearch:
@@ -271,6 +288,7 @@ func printCapSummary(caps []string) {
 	printCapStatus("Agent Skills", service.IsAgentSkillsEnabled(caps))
 	printCapStatus("Agent Memory", service.IsAgentMemoryEnabled(caps))
 	printCapStatus("Sub Agents", service.IsSubAgentsEnabled(caps))
+	printCapStatus("Agent Delegation", service.IsAgentDelegationEnabled(caps))
 	printCapStatus("Auto Compression", service.IsAutoCompressionEnabled(caps))
 	printCapStatus("Plan Mode", service.IsPlanModeEnabled(caps))
 
@@ -289,6 +307,8 @@ func printCapStatus(name string, enabled bool) {
 		desc = AgentSkillsDescription
 	case "Sub Agents":
 		desc = AgentSubAgentsDescription
+	case "Agent Delegation":
+		desc = AgentDelegationDescription
 	case "Agent Memory":
 		desc = AgentMemoryDescription
 	case "Web Search":

@@ -141,7 +141,7 @@ var agentAddCmd = &cobra.Command{
 		ui.SortOptions(modelOptions, "")
 
 		// Tools
-		toolsList := service.GetAllEmbeddingTools()
+		toolsList := service.GetEmbeddingTools()
 		var toolsOptions []huh.Option[string]
 		for _, s := range toolsList {
 			toolsOptions = append(toolsOptions, huh.NewOption(s, s).Selected(true))
@@ -278,6 +278,7 @@ var agentAddCmd = &cobra.Command{
 				huh.NewOption("Enable Agent Skills", service.CapabilityAgentSkills).Selected(false),
 				huh.NewOption("Enable Agent Memory", service.CapabilityAgentMemory).Selected(false),
 				huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(false),
+				huh.NewOption("Enable Agent Delegation", service.CapabilityAgentDelegation).Selected(false),
 				huh.NewOption("Enable Web Search", service.CapabilityWebSearch).Selected(false)).
 			Value(&capabilities)
 		featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
@@ -403,7 +404,7 @@ var agentSetCmd = &cobra.Command{
 		ui.SortOptions(modelOptions, model)
 
 		// Tools - build options with pre-selected state
-		toolsList := service.GetAllEmbeddingTools()
+		toolsList := service.GetEmbeddingTools()
 		toolsSet := make(map[string]bool)
 		for _, t := range tools {
 			toolsSet[t] = true
@@ -524,6 +525,7 @@ var agentSetCmd = &cobra.Command{
 			huh.NewOption("Enable Agent Skills", service.CapabilityAgentSkills).Selected(capsSet[service.CapabilityAgentSkills]),
 			huh.NewOption("Enable Agent Memory", service.CapabilityAgentMemory).Selected(capsSet[service.CapabilityAgentMemory]),
 			huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(capsSet[service.CapabilitySubAgents]),
+			huh.NewOption("Enable Agent Delegation", service.CapabilityAgentDelegation).Selected(capsSet[service.CapabilityAgentDelegation]),
 			huh.NewOption("Enable Web Search", service.CapabilityWebSearch).Selected(capsSet[service.CapabilityWebSearch]),
 		}
 		ui.SortMultiOptions(capsOpts, capabilities)

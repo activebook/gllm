@@ -1252,6 +1252,162 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Too
 	return fmt.Sprintf("Switching to agent '%s'...", name), SwitchAgentError{TargetAgent: name, Instruction: instruction}
 }
 
+// buildAgentToolCallImpl handles the build_agent tool call.
+// It performs deterministic validation of all enum-constrained fields
+// before writing the agent .md file, returning a structured corrective
+// error message to the LLM on any validation failure (reflection loop).
+func buildAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+	if err := CheckToolPermission(ToolBuildAgent, argsMap); err != nil {
+		return "", err
+	}
+
+	args := *argsMap
+
+	// ── Extract required string fields ──────────────────────────────────────
+	name, _ := args["name"].(string)
+	description, _ := args["description"].(string)
+	think, _ := args["think"].(string)
+	systemPrompt, _ := args["system_prompt"].(string)
+
+	if strings.TrimSpace(name) == "" {
+		return "Error: 'name' is required.", nil
+	}
+	if strings.TrimSpace(systemPrompt) == "" {
+		return "Error: 'system_prompt' is required.", nil
+	}
+
+	// ── Validate think level ─────────────────────────────────────────────────
+	validThinkLevels := map[string]bool{"off": true, "minimal": true, "low": true, "medium": true, "high": true}
+	if think == "" {
+		think = "off"
+	}
+	if !validThinkLevels[think] {
+		validKeys := make([]string, 0, len(validThinkLevels))
+		for k := range validThinkLevels {
+			validKeys = append(validKeys, k)
+		}
+		return fmt.Sprintf(
+			"Error: 'think' value '%s' is invalid.\nYou should only use valid think levels as: %v",
+			think, validKeys,
+		), nil
+	}
+
+	// ── Validate and extract tools ───────────────────────────────────────────
+	var selectedTools []string
+	validEmbedTools := GetEmbeddingTools()
+	validEmbedSet := make(map[string]bool, len(validEmbedTools))
+	for _, t := range validEmbedTools {
+		validEmbedSet[t] = true
+	}
+
+	toolsRaw, _ := args["tools"].([]interface{})
+	var invalidTools []string
+	for _, v := range toolsRaw {
+		t, ok := v.(string)
+		if !ok {
+			continue
+		}
+		if !validEmbedSet[t] {
+			invalidTools = append(invalidTools, t)
+		} else {
+			selectedTools = append(selectedTools, t)
+		}
+	}
+	if len(invalidTools) > 0 {
+		validFeatureTools := GetAllFeatureInjectedTools()
+		return fmt.Sprintf(
+			"Error: The following tool names are invalid: %v\n"+
+				"Valid embedding tools: %v\n"+
+				"Note: Feature-injected tools (%v) must NOT be placed in 'tools'; enable their corresponding capability instead.",
+			invalidTools, validEmbedTools, validFeatureTools,
+		), nil
+	}
+
+	// ── Validate and extract capabilities ────────────────────────────────────
+	validCaps := GetAllEmbeddingCapabilities()
+	validCapsSet := make(map[string]bool, len(validCaps))
+	for _, c := range validCaps {
+		validCapsSet[c] = true
+	}
+	var selectedCaps []string
+	capsRaw, _ := args["capabilities"].([]interface{})
+	var invalidCaps []string
+	for _, v := range capsRaw {
+		c, ok := v.(string)
+		if !ok {
+			continue
+		}
+		if !validCapsSet[c] {
+			invalidCaps = append(invalidCaps, c)
+		} else {
+			selectedCaps = append(selectedCaps, c)
+		}
+	}
+	if len(invalidCaps) > 0 {
+		return fmt.Sprintf(
+			"Error: The following capability names are invalid: %v\nYou should only use valid capabilities as bellow: %v",
+			invalidCaps, validCaps,
+		), nil
+	}
+
+	// ── Get model from active agent ────────────────────────────────────────
+	store := data.NewConfigStore()
+	activeAgent := store.GetActiveAgent()
+	if activeAgent == nil {
+		return "Error: No active agent found.", nil
+	}
+	// Use agent model as default model of the new agent
+	model := activeAgent.Model.Name
+
+	// ── Check for duplicate name ─────────────────────────────────────────────
+	if existing := store.GetAgent(name); existing != nil {
+		agentNames := store.GetAgentNames()
+		return fmt.Sprintf(
+			"Error: Agent name '%s' is already taken. The following names are unavailable, choose a name that is not in this list: %v",
+			name, agentNames,
+		), nil
+	}
+
+	// ── optional max_recursions ──────────────────────────────────────────────
+	maxRecursions := 50
+	if v, ok := args["max_recursions"]; ok {
+		switch mv := v.(type) {
+		case float64:
+			maxRecursions = int(mv)
+		case int:
+			maxRecursions = mv
+		}
+	}
+
+	// ── Confirm before writing ───────────────────────────────────────────────
+	if !toolsUse.AutoApprove {
+		purpose := fmt.Sprintf("build agent '%s' with %d tools and %d capabilities", name, len(selectedTools), len(selectedCaps))
+		event.RequestConfirm(purpose, toolsUse)
+		if toolsUse.Confirm == data.ToolConfirmCancel {
+			return fmt.Sprintf("Operation cancelled by user: build agent '%s'", name), UserCancelError{Reason: UserCancelReasonDeny}
+		}
+	}
+
+	// ── Write the agent file ─────────────────────────────────────────────────
+	agentConfig := &data.AgentConfig{
+		Name:          name,
+		Description:   description,
+		Model:         data.Model{Name: model},
+		Tools:         selectedTools,
+		Capabilities:  selectedCaps,
+		Think:         think,
+		MaxRecursions: maxRecursions,
+		SystemPrompt:  strings.TrimSpace(systemPrompt),
+	}
+
+	if err := data.WriteAgentFile(agentConfig); err != nil {
+		return fmt.Sprintf("Error writing agent file: %v", err), nil
+	}
+
+	// tell model agent is ready
+	return fmt.Sprintf("Successfully created agent '%s'.", name), nil
+}
+
 // listAgentToolCallImpl handles the list_agent tool call
 // Returns a formatted list of all available agents with their capabilities
 func listAgentToolCallImpl() (string, error) {

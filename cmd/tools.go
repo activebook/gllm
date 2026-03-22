@@ -63,7 +63,7 @@ var toolsSwCmd = &cobra.Command{
 		}
 
 		// Get all available tools
-		allTools := service.GetAllEmbeddingTools()
+		allTools := service.GetEmbeddingTools()
 
 		// Get currently enabled tools
 		enabledTools := agent.Tools
@@ -138,7 +138,7 @@ func GetAllTools(agent *data.AgentConfig) string {
 
 	// Add skill tools if skills are enabled
 	if service.IsAgentSkillsEnabled(agent.Capabilities) {
-		skillTools := service.GetAllSkillTools()
+		skillTools := service.GetSkillTools()
 		for _, t := range skillTools {
 			enabledSet[t] = true
 		}
@@ -146,7 +146,7 @@ func GetAllTools(agent *data.AgentConfig) string {
 
 	// Add web search tools if web search is enabled
 	if service.IsWebSearchEnabled(agent.Capabilities) {
-		webSearchTools := service.GetAllSearchTools()
+		webSearchTools := service.GetSearchTools()
 		for _, t := range webSearchTools {
 			enabledSet[t] = true
 		}
@@ -154,15 +154,23 @@ func GetAllTools(agent *data.AgentConfig) string {
 
 	// Add sub agents tools if sub agents are enabled
 	if service.IsSubAgentsEnabled(agent.Capabilities) {
-		subAgentsTools := service.GetAllSubagentTools()
+		subAgentsTools := service.GetSubagentTools()
 		for _, t := range subAgentsTools {
+			enabledSet[t] = true
+		}
+	}
+
+	// Add agent delegation tools if agent delegation is enabled
+	if service.IsAgentDelegationEnabled(agent.Capabilities) {
+		agentDelegationTools := service.GetAgentDelegationTools()
+		for _, t := range agentDelegationTools {
 			enabledSet[t] = true
 		}
 	}
 
 	// Add agent memory tools if agent memory is enabled
 	if service.IsAgentMemoryEnabled(agent.Capabilities) {
-		agentMemoryTools := service.GetAllMemoryTools()
+		agentMemoryTools := service.GetMemoryTools()
 		for _, t := range agentMemoryTools {
 			enabledSet[t] = true
 		}
@@ -170,7 +178,7 @@ func GetAllTools(agent *data.AgentConfig) string {
 
 	// Add plan mode tools if plan mode is enabled
 	if service.IsPlanModeEnabled(agent.Capabilities) {
-		agentPlanModeTools := service.GetAllPlanModeTools()
+		agentPlanModeTools := service.GetPlanModeTools()
 		for _, t := range agentPlanModeTools {
 			enabledSet[t] = true
 		}

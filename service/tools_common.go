@@ -37,6 +37,7 @@ const (
 	ToolReadMultipleFiles = "read_multiple_files"
 	ToolWebFetch          = "web_fetch"
 	ToolSwitchAgent       = "switch_agent"
+	ToolBuildAgent        = "build_agent"
 	ToolAskUser           = "ask_user"
 	ToolWebSearch         = "web_search"
 	ToolActivateSkill     = "activate_skill"
@@ -101,8 +102,6 @@ var (
 		ToolReadMultipleFiles,
 		// web tools
 		ToolWebFetch,
-		// agent tools
-		ToolSwitchAgent,
 		// Interactive tools
 		ToolAskUser,
 	}
@@ -122,13 +121,21 @@ var (
 	subagentTools = []string{
 		// Sub-agent orchestration tools
 		ToolListAgent,
+		ToolSwitchAgent,
+		ToolBuildAgent,
+	}
+
+	agentDelegationTools = []string{
+		// Agent delegation tools
+		ToolListAgent,
 		ToolSpawnSubAgents,
 		// shared state tools
 		ToolGetState,
 		ToolSetState,
 		ToolListState,
 	}
-	planTools = []string{
+
+	planModeTools = []string{
 		// Plan mode
 		ToolExitPlanMode,
 		ToolEnterPlanMode,
@@ -154,37 +161,48 @@ var (
 	}
 )
 
-func GetAllEmbeddingTools() []string {
+func GetEmbeddingTools() []string {
 	return embeddingTools
 }
 
-func GetAllSearchTools() []string {
+func GetSearchTools() []string {
 	return searchTools
 }
 
-func GetAllSkillTools() []string {
+func GetSkillTools() []string {
 	return skillTools
 }
 
-func GetAllMemoryTools() []string {
+func GetMemoryTools() []string {
 	return memoryTools
 }
 
-func GetAllSubagentTools() []string {
+func GetSubagentTools() []string {
 	return subagentTools
 }
 
-func GetAllPlanModeTools() []string {
-	return planTools
+func GetAgentDelegationTools() []string {
+	return agentDelegationTools
+}
+
+func GetPlanModeTools() []string {
+	return planModeTools
+}
+
+func GetAllFeatureInjectedTools() []string {
+	tools := []string{}
+	tools = append(tools, GetSearchTools()...)
+	tools = append(tools, GetSkillTools()...)
+	tools = append(tools, GetMemoryTools()...)
+	tools = append(tools, GetSubagentTools()...)
+	tools = append(tools, GetAgentDelegationTools()...)
+	tools = append(tools, GetPlanModeTools()...)
+	return tools
 }
 
 func GetAllOpenTools() []string {
-	tools := GetAllEmbeddingTools()
-	tools = append(tools, GetAllSearchTools()...)
-	tools = append(tools, GetAllSkillTools()...)
-	tools = append(tools, GetAllMemoryTools()...)
-	tools = append(tools, GetAllSubagentTools()...)
-	tools = append(tools, GetAllPlanModeTools()...)
+	tools := GetEmbeddingTools()
+	tools = append(tools, GetAllFeatureInjectedTools()...)
 	return tools
 }
 
@@ -252,7 +270,7 @@ func AvailableSubagentTool(toolName string) bool {
 
 // AvailablePlanTool checks if a tool is available in the plan tools.
 func AvailablePlanTool(toolName string) bool {
-	for _, tool := range planTools {
+	for _, tool := range planModeTools {
 		if tool == toolName {
 			return true
 		}
@@ -273,6 +291,26 @@ func AppendSubagentTools(tools []string) []string {
 // RemoveSubagentTools removes subagent tools from the given tools slice.
 func RemoveSubagentTools(tools []string) []string {
 	for _, tool := range subagentTools {
+		tools = slices.DeleteFunc(tools, func(t string) bool {
+			return t == tool
+		})
+	}
+	return tools
+}
+
+// AppendAgentDelegationTools appends agent delegation tools to the given tools slice if they are not already present.
+func AppendAgentDelegationTools(tools []string) []string {
+	for _, tool := range agentDelegationTools {
+		if !slices.Contains(tools, tool) {
+			tools = append(tools, tool)
+		}
+	}
+	return tools
+}
+
+// RemoveAgentDelegationTools removes agent delegation tools from the given tools slice.
+func RemoveAgentDelegationTools(tools []string) []string {
+	for _, tool := range agentDelegationTools {
 		tools = slices.DeleteFunc(tools, func(t string) bool {
 			return t == tool
 		})
@@ -342,7 +380,7 @@ func RemoveSearchTools(tools []string) []string {
 
 // AppendPlanTools appends plan tools to the given tools slice if they are not already present.
 func AppendPlanTools(tools []string) []string {
-	for _, tool := range planTools {
+	for _, tool := range planModeTools {
 		if !slices.Contains(tools, tool) {
 			tools = append(tools, tool)
 		}
@@ -352,7 +390,7 @@ func AppendPlanTools(tools []string) []string {
 
 // RemovePlanTools removes plan tools from the given tools slice.
 func RemovePlanTools(tools []string) []string {
-	for _, tool := range planTools {
+	for _, tool := range planModeTools {
 		tools = slices.DeleteFunc(tools, func(t string) bool {
 			return t == tool
 		})
@@ -622,6 +660,10 @@ func getOpenTools() []*OpenTool {
 	// Switch Agent tool
 	switchAgentTool := getSwitchAgentTool()
 	tools = append(tools, switchAgentTool)
+
+	// build_agent tool
+	buildAgentTool := getBuildAgentTool()
+	tools = append(tools, buildAgentTool)
 
 	// list_agent tool - List all available agents
 	listAgentTool := getListAgentTool()
@@ -1171,6 +1213,92 @@ When a switch occurs, if an instruction is provided, it replaces the original pr
 		Function: &switchAgentFunc,
 	}
 	return &switchAgentTool
+}
+
+// getBuildAgentTool returns the JSON Schema definition for the build_agent tool.
+// Enum arrays constrain both tools and capabilities to the exact valid values
+// present in the gllm registry, eliminating taxonomic drift at the schema level.
+func getBuildAgentTool() *OpenTool {
+	// Build the valid embedding tool enum from the authoritative registry list
+	// (excludes feature-injected tools which are appended via capabilities)
+	embedToolEnum := make([]interface{}, len(embeddingTools))
+	for i, t := range embeddingTools {
+		embedToolEnum[i] = t
+	}
+	capsEnum := make([]interface{}, len(embeddingCapabilities))
+	for i, c := range embeddingCapabilities {
+		capsEnum[i] = c
+	}
+
+	buildAgentFunc := OpenFunctionDefinition{
+		Name: ToolBuildAgent,
+		Description: `Build a new gllm agent definition and save it to the agents directory.
+Call ONCE with all fields populated — this is a single atomic operation.
+
+The agent is immediately available after creation via 'gllm agent switch <name>'.
+
+Tool groups:
+- Execution: shell
+- File I/O: read_file, write_file, edit_file, delete_file, create_directory, list_directory, delete_directory, move, copy, read_multiple_files
+- Search: search_files, search_text_in_file
+- Web: web_fetch
+- Agent: switch_agent, build_agent
+- Interactive: ask_user
+
+Capability notes:
+- web_search, activate_skill, list_memory/save_memory, spawn_subagents and plan tools are injected automatically by their respective capabilities.
+- Do NOT place those in the 'tools' field; enable their capability instead.`,
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"name": map[string]interface{}{
+					"type":        "string",
+					"description": "Unique agent identifier. Lowercase, alphanumeric, hyphens allowed (e.g. 'git-expert', 'code-reviewer').",
+				},
+				"description": map[string]interface{}{
+					"type":        "string",
+					"description": "A concise summary of what this agent specialises in.",
+				},
+				"tools": map[string]interface{}{
+					"type": "array",
+					"items": map[string]interface{}{
+						"type": "string",
+						"enum": embedToolEnum,
+					},
+					"description": "Embedding tools to enable. Select only what the agent genuinely needs.",
+				},
+				"capabilities": map[string]interface{}{
+					"type": "array",
+					"items": map[string]interface{}{
+						"type": "string",
+						"enum": capsEnum,
+					},
+					"description": "Feature capabilities. Each injects additional tools and context into the agent automatically.",
+				},
+				"think": map[string]interface{}{
+					"type":        "string",
+					"enum":        []interface{}{"off", "minimal", "low", "medium", "high"},
+					"description": "Reasoning depth. 'off' = fastest/cheapest, 'high' = deepest reasoning.",
+					"default":     "off",
+				},
+				"max_recursions": map[string]interface{}{
+					"type":        "integer",
+					"description": "Maximum tool-call turns per session. Default 50. Use -1 for unlimited.",
+					"default":     50,
+				},
+				"system_prompt": map[string]interface{}{
+					"type":        "string",
+					"description": "Full persona and behavioural instructions for this agent. Be comprehensive — this is the only instruction source.",
+				},
+			},
+			"required": []string{"name", "description", "tools", "capabilities", "think", "system_prompt"},
+		},
+	}
+	buildAgentTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &buildAgentFunc,
+	}
+	return &buildAgentTool
 }
 
 func getListAgentTool() *OpenTool {
