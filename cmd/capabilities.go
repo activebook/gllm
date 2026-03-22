@@ -12,65 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	AgentMCPTitle          = "MCP (Model Context Protocol)"
-	AgentSkillsTitle       = "Agent Skills"
-	AgentMemoryTitle       = "Agent Memory"
-	AgentSubAgentsTitle    = "Sub Agents"
-	AgentDelegationTitle   = "Agent Delegation"
-	AgentWebSearchTitle    = "Web Search"
-	AgentTokenUsageTitle   = "Token usage"
-	AgentMarkdownTitle     = "Markdown output"
-	AgentAutoCompressTitle = "Auto Compression"
-	AgentPlanModeTitle     = "Plan Mode"
-
-	AgentMCPTitleHighlight          = "[MCP (Model Context Protocol)]()"
-	AgentSkillsTitleHighlight       = "[Agent Skills]()"
-	AgentMemoryTitleHighlight       = "[Agent Memory]()"
-	AgentSubAgentsTitleHighlight    = "[Sub Agents]()"
-	AgentDelegationTitleHighlight   = "[Agent Delegation]()"
-	AgentWebSearchTitleHighlight    = "[Web Search]()"
-	AgentTokenUsageTitleHighlight   = "[Token usage]()"
-	AgentMarkdownTitleHighlight     = "[Markdown output]()"
-	AgentAutoCompressTitleHighlight = "[Auto Compression]()"
-	AgentPlanModeTitleHighlight     = "[Plan Mode]()"
-
-	AgentMCPBody        = "enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."
-	AgentSkillsBody     = "are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.\nAfter integrating skills, **agent** will use skills automatically."
-	AgentMemoryBody     = "allows agents to remember important facts about you across sessions.\nFacts are used to personalize responses."
-	AgentSubAgentsBody  = "allow you to create and manage a pool of specialized agents.\nUse to define, configure, and list agents that can be delegated tasks."
-	AgentDelegationBody = "allow an agent to delegate tasks or hand off control to other agents.\nUse when you need to orchestrate parallel work or fully transfer execution to a specialized agent."
-
-	AgentWebSearchBody    = "enables the agent to search the web for real-time information.\nYou must configure a search engine (Google, Bing, Tavily) to use this feature."
-	AgentTokenUsageBody   = "allows agents to track their token usage.\nThis helps you to control the cost of using the agent."
-	AgentMarkdownBody     = "allows agents to generate final response in Markdown format.\nThis helps you to format the response in a more readable way."
-	AgentAutoCompressBody = "automatically compresses session context using a summary when context window limits are reached.\nThis provides an infinite context window continuity with minimal detail loss."
-	AgentPlanModeBody     = "allows agents to plan their work before executing tasks.\nUse for deepresearch, complex tasks, or collaborative work"
-
-	AgentMCPDescription          = AgentMCPTitle + " " + AgentMCPBody
-	AgentSkillsDescription       = AgentSkillsTitle + " " + AgentSkillsBody
-	AgentMemoryDescription       = AgentMemoryTitle + " " + AgentMemoryBody
-	AgentSubAgentsDescription    = AgentSubAgentsTitle + " " + AgentSubAgentsBody
-	AgentDelegationDescription   = AgentDelegationTitle + " " + AgentDelegationBody
-	AgentWebSearchDescription    = AgentWebSearchTitle + " " + AgentWebSearchBody
-	AgentTokenUsageDescription   = AgentTokenUsageTitle + " " + AgentTokenUsageBody
-	AgentMarkdownDescription     = AgentMarkdownTitle + " " + AgentMarkdownBody
-	AgentAutoCompressDescription = AgentAutoCompressTitle + " " + AgentAutoCompressBody
-	AgentPlanModeDescription     = AgentPlanModeTitle + " " + AgentPlanModeBody
-
-	// Agent Features Description Highlight
-	AgentMCPDescriptionHighlight          = AgentMCPTitleHighlight + AgentMCPBody
-	AgentSkillsDescriptionHighlight       = AgentSkillsTitleHighlight + AgentSkillsBody
-	AgentMemoryDescriptionHighlight       = AgentMemoryTitleHighlight + AgentMemoryBody
-	AgentSubAgentsDescriptionHighlight    = AgentSubAgentsTitleHighlight + AgentSubAgentsBody
-	AgentDelegationDescriptionHighlight   = AgentDelegationTitleHighlight + AgentDelegationBody
-	AgentWebSearchDescriptionHighlight    = AgentWebSearchTitleHighlight + AgentWebSearchBody
-	AgentTokenUsageDescriptionHighlight   = AgentTokenUsageTitleHighlight + AgentTokenUsageBody
-	AgentMarkdownDescriptionHighlight     = AgentMarkdownTitleHighlight + AgentMarkdownBody
-	AgentAutoCompressDescriptionHighlight = AgentAutoCompressTitleHighlight + AgentAutoCompressBody
-	AgentPlanModeDescriptionHighlight     = AgentPlanModeTitleHighlight + AgentPlanModeBody
-)
-
 func init() {
 	rootCmd.AddCommand(capsCmd)
 	capsCmd.AddCommand(capsSwitchCmd)
@@ -147,10 +88,10 @@ var capsSwitchCmd = &cobra.Command{
 
 		// Subagents Workflow
 		if service.IsSubAgentsEnabled(agent.Capabilities) {
-			options = append(options, huh.NewOption("Subagents Workflow", service.CapabilitySubAgents).Selected(true))
+			options = append(options, huh.NewOption("Sub Agents", service.CapabilitySubAgents).Selected(true))
 			selected = append(selected, service.CapabilitySubAgents)
 		} else {
-			options = append(options, huh.NewOption("Subagents Workflow", service.CapabilitySubAgents))
+			options = append(options, huh.NewOption("Sub Agents", service.CapabilitySubAgents))
 		}
 
 		// Agent Delegation
@@ -202,7 +143,7 @@ var capsSwitchCmd = &cobra.Command{
 			Description("Use space to toggle, enter to confirm.").
 			Options(options...).
 			Value(&selected)
-		featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
+		featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, service.GetCapabilityDescription)
 		err := huh.NewForm(
 			huh.NewGroup(msfeatures, featureNote),
 		).Run()
@@ -250,47 +191,20 @@ var capsSwitchCmd = &cobra.Command{
 	},
 }
 
-func getFeatureDescription(cap string) string {
-	switch cap {
-	case service.CapabilityMCPServers:
-		return AgentMCPDescriptionHighlight
-	case service.CapabilityAgentSkills:
-		return AgentSkillsDescriptionHighlight
-	case service.CapabilityTokenUsage:
-		return AgentTokenUsageDescriptionHighlight
-	case service.CapabilityMarkdown:
-		return AgentMarkdownDescriptionHighlight
-	case service.CapabilitySubAgents:
-		return AgentSubAgentsDescriptionHighlight
-	case service.CapabilityAgentDelegation:
-		return AgentDelegationDescriptionHighlight
-	case service.CapabilityAgentMemory:
-		return AgentMemoryDescriptionHighlight
-	case service.CapabilityWebSearch:
-		return AgentWebSearchDescriptionHighlight
-	case service.CapabilityAutoCompression:
-		return AgentAutoCompressDescriptionHighlight
-	case service.CapabilityPlanMode:
-		return AgentPlanModeDescriptionHighlight
-	default:
-		return ""
-	}
-}
-
 func printCapSummary(caps []string) {
 	fmt.Println("Current Agent Features and Capabilities:")
 	fmt.Println()
 
-	printCapStatus("Token Usage", service.IsTokenUsageEnabled(caps))
-	printCapStatus("Markdown Output", service.IsMarkdownEnabled(caps))
-	printCapStatus("Web Search", service.IsWebSearchEnabled(caps))
-	printCapStatus("MCP Servers", service.IsMCPServersEnabled(caps))
-	printCapStatus("Agent Skills", service.IsAgentSkillsEnabled(caps))
-	printCapStatus("Agent Memory", service.IsAgentMemoryEnabled(caps))
-	printCapStatus("Sub Agents", service.IsSubAgentsEnabled(caps))
-	printCapStatus("Agent Delegation", service.IsAgentDelegationEnabled(caps))
-	printCapStatus("Auto Compression", service.IsAutoCompressionEnabled(caps))
-	printCapStatus("Plan Mode", service.IsPlanModeEnabled(caps))
+	printCapStatus(service.CapabilityTokenUsageTitle, service.IsTokenUsageEnabled(caps))
+	printCapStatus(service.CapabilityMarkdownTitle, service.IsMarkdownEnabled(caps))
+	printCapStatus(service.CapabilityWebSearchTitle, service.IsWebSearchEnabled(caps))
+	printCapStatus(service.CapabilityMCPTitle, service.IsMCPServersEnabled(caps))
+	printCapStatus(service.CapabilitySkillsTitle, service.IsAgentSkillsEnabled(caps))
+	printCapStatus(service.CapabilityMemoryTitle, service.IsAgentMemoryEnabled(caps))
+	printCapStatus(service.CapabilitySubAgentsTitle, service.IsSubAgentsEnabled(caps))
+	printCapStatus(service.CapabilityDelegationTitle, service.IsAgentDelegationEnabled(caps))
+	printCapStatus(service.CapabilityAutoCompressTitle, service.IsAutoCompressionEnabled(caps))
+	printCapStatus(service.CapabilityPlanModeTitle, service.IsPlanModeEnabled(caps))
 
 	fmt.Printf("%s = Enabled capability\n", ui.FormatEnabledIndicator(true))
 }
@@ -299,30 +213,7 @@ func printCapStatus(name string, enabled bool) {
 	indicator := ui.FormatEnabledIndicator(enabled)
 	fmt.Printf("%s %s\n", indicator, name)
 
-	var desc string
-	switch name {
-	case "MCP Servers":
-		desc = AgentMCPDescription
-	case "Agent Skills":
-		desc = AgentSkillsDescription
-	case "Sub Agents":
-		desc = AgentSubAgentsDescription
-	case "Agent Delegation":
-		desc = AgentDelegationDescription
-	case "Agent Memory":
-		desc = AgentMemoryDescription
-	case "Web Search":
-		desc = AgentWebSearchDescription
-	case "Token Usage":
-		desc = AgentTokenUsageDescription
-	case "Markdown Output":
-		desc = AgentMarkdownDescription
-	case "Auto Compression":
-		desc = AgentAutoCompressDescription
-	case "Plan Mode":
-		desc = AgentPlanModeDescription
-	}
-
+	desc := service.GetCapabilityDescription(name)
 	if desc != "" {
 		lines := strings.Split(desc, "\n")
 		for _, line := range lines {

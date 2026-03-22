@@ -281,7 +281,7 @@ var agentAddCmd = &cobra.Command{
 				huh.NewOption("Enable Agent Delegation", service.CapabilityAgentDelegation).Selected(false),
 				huh.NewOption("Enable Web Search", service.CapabilityWebSearch).Selected(false)).
 			Value(&capabilities)
-		featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
+		featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, service.GetCapabilityDescription)
 		err = huh.NewForm(
 			huh.NewGroup(
 				msfeatures,
@@ -534,7 +534,7 @@ var agentSetCmd = &cobra.Command{
 			Description("Use space to toggle, enter to confirm.").
 			Options(capsOpts...).
 			Value(&capabilities)
-		featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, getFeatureDescription)
+		featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, service.GetCapabilityDescription)
 		err = huh.NewForm(
 			huh.NewGroup(
 				msfeatures,

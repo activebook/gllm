@@ -13,6 +13,64 @@ const (
 	CapabilityPlanMode        = "plan_mode"
 )
 
+const (
+	CapabilityMCPTitle          = "MCP (Model Context Protocol)"
+	CapabilitySkillsTitle       = "Agent Skills"
+	CapabilityMemoryTitle       = "Agent Memory"
+	CapabilitySubAgentsTitle    = "Sub Agents"
+	CapabilityDelegationTitle   = "Agent Delegation"
+	CapabilityWebSearchTitle    = "Web Search"
+	CapabilityTokenUsageTitle   = "Token Usage"
+	CapabilityMarkdownTitle     = "Markdown Output"
+	CapabilityAutoCompressTitle = "Auto Compression"
+	CapabilityPlanModeTitle     = "Plan Mode"
+
+	CapabilityMCPTitleHighlight          = "[MCP (Model Context Protocol)]()"
+	CapabilitySkillsTitleHighlight       = "[Agent Skills]()"
+	CapabilityMemoryTitleHighlight       = "[Agent Memory]()"
+	CapabilitySubAgentsTitleHighlight    = "[Sub Agents]()"
+	CapabilityDelegationTitleHighlight   = "[Agent Delegation]()"
+	CapabilityWebSearchTitleHighlight    = "[Web Search]()"
+	CapabilityTokenUsageTitleHighlight   = "[Token Usage]()"
+	CapabilityMarkdownTitleHighlight     = "[Markdown Output]()"
+	CapabilityAutoCompressTitleHighlight = "[Auto Compression]()"
+	CapabilityPlanModeTitleHighlight     = "[Plan Mode]()"
+
+	CapabilityMCPBody          = "enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."
+	CapabilitySkillsBody       = "are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.\nAfter integrating skills, **agent** will use skills automatically."
+	CapabilityMemoryBody       = "allows agents to remember important facts about you across sessions.\nFacts are used to personalize responses."
+	CapabilitySubAgentsBody    = "allow you to create and manage a pool of specialized agents.\nUse to define, configure, and list agents that can be delegated tasks."
+	CapabilityDelegationBody   = "allow an agent to delegate tasks or hand off control to other agents.\nUse when you need to orchestrate parallel work or fully transfer execution to a specialized agent."
+	CapabilityWebSearchBody    = "enables the agent to search the web for real-time information.\nYou must configure a search engine (Google, Bing, Tavily) to use this feature."
+	CapabilityTokenUsageBody   = "allows agents to track their token usage.\nThis helps you to control the cost of using the agent."
+	CapabilityMarkdownBody     = "allows agents to generate final response in Markdown format.\nThis helps you to format the response in a more readable way."
+	CapabilityAutoCompressBody = "automatically compresses session context using a summary when context window limits are reached.\nThis provides an infinite context window continuity with minimal detail loss."
+	CapabilityPlanModeBody     = "allows agents to plan their work before executing tasks.\nUse for deepresearch, complex tasks, or collaborative work"
+
+	CapabilityMCPDescription          = CapabilityMCPTitle + " " + CapabilityMCPBody
+	CapabilitySkillsDescription       = CapabilitySkillsTitle + " " + CapabilitySkillsBody
+	CapabilityMemoryDescription       = CapabilityMemoryTitle + " " + CapabilityMemoryBody
+	CapabilitySubAgentsDescription    = CapabilitySubAgentsTitle + " " + CapabilitySubAgentsBody
+	CapabilityDelegationDescription   = CapabilityDelegationTitle + " " + CapabilityDelegationBody
+	CapabilityWebSearchDescription    = CapabilityWebSearchTitle + " " + CapabilityWebSearchBody
+	CapabilityTokenUsageDescription   = CapabilityTokenUsageTitle + " " + CapabilityTokenUsageBody
+	CapabilityMarkdownDescription     = CapabilityMarkdownTitle + " " + CapabilityMarkdownBody
+	CapabilityAutoCompressDescription = CapabilityAutoCompressTitle + " " + CapabilityAutoCompressBody
+	CapabilityPlanModeDescription     = CapabilityPlanModeTitle + " " + CapabilityPlanModeBody
+
+	// Agent Features Description Highlight
+	CapabilityMCPDescriptionHighlight          = CapabilityMCPTitleHighlight + CapabilityMCPBody
+	CapabilitySkillsDescriptionHighlight       = CapabilitySkillsTitleHighlight + CapabilitySkillsBody
+	CapabilityMemoryDescriptionHighlight       = CapabilityMemoryTitleHighlight + CapabilityMemoryBody
+	CapabilitySubAgentsDescriptionHighlight    = CapabilitySubAgentsTitleHighlight + CapabilitySubAgentsBody
+	CapabilityDelegationDescriptionHighlight   = CapabilityDelegationTitleHighlight + CapabilityDelegationBody
+	CapabilityWebSearchDescriptionHighlight    = CapabilityWebSearchTitleHighlight + CapabilityWebSearchBody
+	CapabilityTokenUsageDescriptionHighlight   = CapabilityTokenUsageTitleHighlight + CapabilityTokenUsageBody
+	CapabilityMarkdownDescriptionHighlight     = CapabilityMarkdownTitleHighlight + CapabilityMarkdownBody
+	CapabilityAutoCompressDescriptionHighlight = CapabilityAutoCompressTitleHighlight + CapabilityAutoCompressBody
+	CapabilityPlanModeDescriptionHighlight     = CapabilityPlanModeTitleHighlight + CapabilityPlanModeBody
+)
+
 var (
 	embeddingCapabilities = []string{
 		CapabilityMCPServers,
@@ -30,6 +88,60 @@ var (
 
 func GetAllEmbeddingCapabilities() []string {
 	return embeddingCapabilities
+}
+
+func GetCapabilityTitle(cap string) string {
+	switch cap {
+	case CapabilityMCPServers:
+		return CapabilityMCPTitle
+	case CapabilityAgentSkills:
+		return CapabilitySkillsTitle
+	case CapabilityAgentMemory:
+		return CapabilityMemoryTitle
+	case CapabilityTokenUsage:
+		return CapabilityTokenUsageTitle
+	case CapabilityMarkdown:
+		return CapabilityMarkdownTitle
+	case CapabilitySubAgents:
+		return CapabilitySubAgentsTitle
+	case CapabilityAgentDelegation:
+		return CapabilityDelegationTitle
+	case CapabilityWebSearch:
+		return CapabilityWebSearchTitle
+	case CapabilityAutoCompression:
+		return CapabilityAutoCompressTitle
+	case CapabilityPlanMode:
+		return CapabilityPlanModeTitle
+	default:
+		return "Unknown"
+	}
+}
+
+func GetCapabilityDescription(cap string) string {
+	switch cap {
+	case CapabilityMCPServers, CapabilityMCPTitle:
+		return CapabilityMCPDescriptionHighlight
+	case CapabilityAgentSkills, CapabilitySkillsTitle:
+		return CapabilitySkillsDescriptionHighlight
+	case CapabilityTokenUsage, CapabilityTokenUsageTitle:
+		return CapabilityTokenUsageDescriptionHighlight
+	case CapabilityMarkdown, CapabilityMarkdownTitle:
+		return CapabilityMarkdownDescriptionHighlight
+	case CapabilitySubAgents, CapabilitySubAgentsTitle:
+		return CapabilitySubAgentsDescriptionHighlight
+	case CapabilityAgentDelegation, CapabilityDelegationTitle:
+		return CapabilityDelegationDescriptionHighlight
+	case CapabilityAgentMemory, CapabilityMemoryTitle:
+		return CapabilityMemoryDescriptionHighlight
+	case CapabilityWebSearch, CapabilityWebSearchTitle:
+		return CapabilityWebSearchDescriptionHighlight
+	case CapabilityAutoCompression, CapabilityAutoCompressTitle:
+		return CapabilityAutoCompressDescriptionHighlight
+	case CapabilityPlanMode, CapabilityPlanModeTitle:
+		return CapabilityPlanModeDescriptionHighlight
+	default:
+		return ""
+	}
 }
 
 /*
