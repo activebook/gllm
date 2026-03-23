@@ -362,13 +362,13 @@ func (ri *ReplInfo) clearContext() {
 		return
 	}
 	// Construct session manager
-	cm, err := service.ConstructSessionManager(sessionName, agent.Model.Provider)
+	session, err := service.ConstructSession(sessionName, agent.Model.Provider)
 	if err != nil {
 		util.Errorf("Error constructing session manager: %v\n", err)
 		return
 	}
 	// Clear session history
-	err = cm.Clear()
+	err = session.Clear()
 	if err != nil {
 		util.Errorf("Error clearing context: %v\n", err)
 		return

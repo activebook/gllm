@@ -7,20 +7,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
 
-	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/util"
 )
 
-const (
-	MainSessionName = "main"
-)
-
-// SessionManager is an interface for handling session history
-type SessionManager interface {
+// Session is an interface for handling session history
+type Session interface {
 	SetPath(title string)
 	GetPath() string
 	GetName() string
@@ -57,7 +50,7 @@ func (s *BaseSession) SetPath(title string) {
 		sessionName = util.GetSanitizeTitle(parts[1])
 	}
 
-	s.Path = filepath.Join(dir, sessionID, sessionName+".jsonl")
+	s.Path = filepath.Join(dir, sessionID, sessionName+SessionSuffix)
 }
 
 func (s *BaseSession) GetPath() string {
@@ -201,125 +194,4 @@ func (s *BaseSession) Clear() error {
 		return fmt.Errorf("failed to clear session: %w", err)
 	}
 	return nil
-}
-
-/*
- * Get the sorted list of sessions in the given directory
- * sorted by modTime descending
- */
-
-type SessionMeta struct {
-	Name     string
-	Provider string
-	ModTime  int64
-	Empty    bool
-}
-
-func GetSessionsDir() string {
-	dir := data.GetSessionsDirPath()
-	os.MkdirAll(dir, 0750)
-	return dir
-}
-
-// ClearEmptySessionsAsync clears all empty sessions in background
-// An empty session is a folder whose main.jsonl file is empty or missing.
-func ClearEmptySessionsAsync() {
-	go func() {
-		entries, err := os.ReadDir(GetSessionsDir())
-		if err != nil {
-			return
-		}
-		for _, entry := range entries {
-			// Skip flat files in the root sessions directory
-			if !entry.IsDir() {
-				continue
-			}
-
-			sessionDir := filepath.Join(GetSessionsDir(), entry.Name())
-			mainFile := filepath.Join(sessionDir, MainSessionName+".jsonl")
-
-			info, err := os.Stat(mainFile)
-			// Remove the entire folder if main.jsonl doesn't exist or is empty
-			if err != nil || info.Size() == 0 {
-				os.RemoveAll(sessionDir)
-			}
-		}
-	}()
-}
-
-// FindSessionByIndex finds a session by index
-// If the index is out of range, it returns an error
-// If the index is valid, it returns the session name
-func FindSessionByIndex(idx string) (string, error) {
-	if strings.TrimSpace(idx) == "" {
-		return "", nil
-	}
-	// check if it's an index
-	index, err := strconv.Atoi(idx)
-	if err == nil {
-		// It's an index, resolve to session name using your sorted list logic
-		sessions, err := ListSortedSessions(GetSessionsDir(), false, false)
-		if err != nil {
-			return "", err
-		}
-		if index < 1 || index > len(sessions) {
-			// handle out of range
-			return "", fmt.Errorf("session index out of range: %d", index)
-		} else {
-			title := sessions[index-1].Name
-			return title, nil
-		}
-	} else {
-		// idx is not a index
-		return idx, nil
-	}
-}
-
-// ListSortedSessions returns a slice of sessionMeta sorted by modTime descending
-// ListSortedSessions(dir, false, false)  // Fast - no file reads
-// ListSortedSessions(dir, true, false)   // Fast - only metadata
-// ListSortedSessions(dir, false, true)   // Slow - reads all files for provider
-func ListSortedSessions(sessionDir string, onlyNonEmpty bool, detectProvider bool) ([]SessionMeta, error) {
-	entries, err := os.ReadDir(sessionDir)
-	if err != nil {
-		return nil, fmt.Errorf("fail to read session directory: %v", err)
-	}
-
-	var sessions []SessionMeta
-	for _, entry := range entries {
-		// Only look at directories
-		if !entry.IsDir() {
-			continue
-		}
-
-		title := entry.Name() // folder name is the sanitized session title
-		mainFile := filepath.Join(sessionDir, title, MainSessionName+".jsonl")
-
-		info, err := os.Stat(mainFile)
-		if err != nil {
-			// Skip if no main.jsonl exists (not a valid session folder)
-			continue
-		}
-
-		if onlyNonEmpty && info.Size() == 0 {
-			continue
-		}
-
-		var provider string
-		if detectProvider {
-			provider = DetectMessageProvider(mainFile)
-		}
-
-		sessions = append(sessions, SessionMeta{
-			Name:     title,
-			Provider: provider,
-			ModTime:  info.ModTime().Unix(),
-			Empty:    info.Size() == 0,
-		})
-	}
-
-	sort.Slice(sessions, func(i, j int) bool {
-		return sessions[i].ModTime > sessions[j].ModTime
-	})
-	return sessions, nil
 }

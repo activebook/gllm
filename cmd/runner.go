@@ -248,12 +248,12 @@ func EnsureSessionCompatibility(agent *data.AgentConfig, sessionName string) err
 
 // GetSessionData retrieves session data.
 func GetSessionData(sessionName string, provider string) (data []byte, name string, err error) {
-	cm, err := service.ConstructSessionManager(sessionName, provider)
+	session, err := service.ConstructSession(sessionName, provider)
 	if err != nil {
 		return nil, "", fmt.Errorf("error constructing session manager: %v", err)
 	}
 
-	sessionPath := cm.GetPath()
+	sessionPath := session.GetPath()
 	if _, err := os.Stat(sessionPath); os.IsNotExist(err) {
 		return nil, "", err
 	}
@@ -269,12 +269,12 @@ func GetSessionData(sessionName string, provider string) (data []byte, name stri
 
 // WriteSessionData writes session data for a specific provider.
 func WriteSessionData(sessionName string, data []byte, provider string) error {
-	cm, err := service.ConstructSessionManager(sessionName, provider)
+	session, err := service.ConstructSession(sessionName, provider)
 	if err != nil {
 		return fmt.Errorf("error constructing session manager: %v", err)
 	}
 
-	sessionPath := cm.GetPath()
+	sessionPath := session.GetPath()
 	// Preserving original file mode if it exists, roughly
 	// But os.WriteFile will create if not exists with 0666 before umask
 	// We can check stat first if we want to be strict, but standard WriteFile is usually fine for this app

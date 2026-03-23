@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -43,15 +41,7 @@ var sessionListCmd = &cobra.Command{
 	Short:   "List all sessions",
 	Long:    `List all available sessions in sorted order.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		sessionDir := service.GetSessionsDir()
-
-		// Check if directory exists
-		if _, err := os.Stat(sessionDir); os.IsNotExist(err) {
-			fmt.Println("No sessions found.")
-			return nil
-		}
-
-		sessions, err := service.ListSortedSessions(sessionDir, false, true)
+		sessions, err := service.ListSortedSessions(false, true)
 		if err != nil {
 			fmt.Println(err)
 			return nil
@@ -90,14 +80,13 @@ gllm session remove 10-20 --force
 gllm session remove "2 - 5" --force`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		sessionDir := service.GetSessionsDir()
-		var matches []string
+		var names []string
 		var pattern string
 		if len(args) > 0 {
 			pattern = args[0]
 		} else {
 			// Select sessions to remove
-			sessions, err := service.ListSortedSessions(sessionDir, false, true)
+			sessions, err := service.ListSortedSessions(false, true)
 			if err != nil || len(sessions) == 0 {
 				fmt.Println("No sessions found.")
 				return nil
@@ -113,97 +102,77 @@ gllm session remove "2 - 5" --force`,
 			}
 			height := io.GetTermFitHeight(len(options))
 
-			var selected []string
 			err = huh.NewMultiSelect[string]().
 				Title("Select Sessions to Remove").
 				Description("Choose one or more sessions to delete permanently").
 				Height(height).
 				Options(options...).
-				Value(&selected).
+				Value(&names).
 				Run()
 			if err != nil {
 				return nil
 			}
-			if len(selected) == 0 {
+			if len(names) == 0 {
 				return nil
 			}
-
-			// We treat selected names as specific matches
-			var matches []string
-			var names []string
-			for _, s := range selected {
-				names = append(names, s)
-				matches = append(matches, filepath.Join(sessionDir, s))
-			}
-
-			// Confirm if not forced
-			force, _ := cmd.Flags().GetBool("force")
-			if !force {
-				var confirm bool
-				err = huh.NewConfirm().
-					Title(fmt.Sprintf("Are you sure you want to remove %d sessions?", len(matches))).
-					Description(strings.Join(names, "\n")).
-					Value(&confirm).
-					Run()
-				if err != nil || !confirm {
-					fmt.Println("Operation cancelled.")
-					return nil
-				}
-			}
-
-			for _, match := range matches {
-				if err := os.RemoveAll(match); err != nil {
-					fmt.Printf("Failed to remove '%s': %v\n", filepath.Base(match), err)
-				} else {
-					fmt.Printf("Session '%s' removed successfully.\n", filepath.Base(match))
-				}
-			}
-			return nil
 		}
 
-		// Check if pattern is a range
-		rangePattern := strings.ReplaceAll(pattern, " ", "")
-		rangeParts := strings.Split(rangePattern, "-")
-		if len(rangeParts) == 2 {
-			// Handle range removal
-			start, err1 := strconv.Atoi(rangeParts[0])
-			end, err2 := strconv.Atoi(rangeParts[1])
+		if pattern != "" {
+			// Check if pattern is a range
+			rangePattern := strings.ReplaceAll(pattern, " ", "")
+			rangeParts := strings.Split(rangePattern, "-")
+			if len(rangeParts) == 2 {
+				// Handle range removal
+				start, err1 := strconv.Atoi(rangeParts[0])
+				end, err2 := strconv.Atoi(rangeParts[1])
 
-			if err1 == nil && err2 == nil {
-				sessions, err := service.ListSortedSessions(sessionDir, false, true)
-				if err != nil {
-					fmt.Println(err)
-					return nil
-				}
-				if len(sessions) == 0 {
-					fmt.Println("No sessions found.")
-					return nil
-				}
+				if err1 == nil && err2 == nil {
+					sessions, err := service.ListSortedSessions(false, false)
+					if err != nil {
+						fmt.Println(err)
+						return nil
+					}
+					if len(sessions) == 0 {
+						fmt.Println("No sessions found.")
+						return nil
+					}
 
-				// Validate range
-				if start < 1 || end < 1 || start > len(sessions) || end > len(sessions) {
-					return fmt.Errorf("range %d-%d out of range (1-%d)", start, end, len(sessions))
-				}
-				if start > end {
-					return fmt.Errorf("invalid range: start (%d) cannot be greater than end (%d)", start, end)
-				}
+					// Validate range
+					if start < 1 || end < 1 || start > len(sessions) || end > len(sessions) {
+						return fmt.Errorf("range %d-%d out of range (1-%d)", start, end, len(sessions))
+					}
+					if start > end {
+						return fmt.Errorf("invalid range: start (%d) cannot be greater than end (%d)", start, end)
+					}
 
-				// Collect matching directories in range
-				for i := start; i <= end; i++ {
-					sessionPath := filepath.Join(sessionDir, sessions[i-1].Name)
-					matches = append(matches, sessionPath)
+					// Collect matching directories in range
+					for i := start; i <= end; i++ {
+						names = append(names, sessions[i-1].Name)
+					}
+				} else {
+					// Not a valid range, treat as regular pattern
+					var err error
+					names, err = service.FindSessionsByPattern(pattern)
+					if err != nil {
+						fmt.Printf("Error finding sessions: %v\n", err)
+						return nil
+					}
 				}
 			} else {
-				// Not a valid range, treat as regular pattern
-				matches = handleAsPattern(pattern, sessionDir)
+				// Regular pattern handling
+				var err error
+				names, err = service.FindSessionsByPattern(pattern)
+				if err != nil {
+					fmt.Printf("Error finding sessions: %v\n", err)
+					return nil
+				}
 			}
-		} else {
-			// Regular pattern handling
-			matches = handleAsPattern(pattern, sessionDir)
 		}
 
-		if len(matches) == 0 {
-			fmt.Printf("No sessions found matching '%s'.\n", pattern)
+		if len(names) == 0 {
+			if pattern != "" {
+				fmt.Printf("No sessions found matching '%s'.\n", pattern)
+			}
 			return nil
 		}
 
@@ -211,13 +180,13 @@ gllm session remove "2 - 5" --force`,
 		force, _ := cmd.Flags().GetBool("force")
 		if !force {
 			fmt.Printf("The following sessions will be removed:\n")
-			for _, match := range matches {
-				fmt.Printf("  - %s\n", filepath.Base(match))
+			for _, name := range names {
+				fmt.Printf("  - %s\n", name)
 			}
 
 			var confirm bool
 			err := huh.NewConfirm().
-				Title("Are you sure you want to remove these sessions?").
+				Title(fmt.Sprintf("Are you sure you want to remove %d sessions?", len(names))).
 				Value(&confirm).
 				Run()
 			if err != nil || !confirm {
@@ -226,51 +195,17 @@ gllm session remove "2 - 5" --force`,
 			}
 		}
 
-		// Remove the matching directories
-		for _, match := range matches {
-			if err := os.RemoveAll(match); err != nil {
-				fmt.Printf("Failed to remove '%s': %v\n", filepath.Base(match), err)
+		// Remove the matching sessions
+		for _, name := range names {
+			if err := service.RemoveSession(name); err != nil {
+				fmt.Printf("Failed to remove '%s': %v\n", name, err)
 			} else {
-				fmt.Printf("Session '%s' removed successfully.\n", filepath.Base(match))
+				fmt.Printf("Session '%s' removed successfully.\n", name)
 			}
 		}
 
 		return nil
 	},
-}
-
-// handleAsPattern handles the pattern as either an index or a file pattern
-func handleAsPattern(pattern string, sessionDir string) []string {
-	var matches []string
-
-	// Try to parse as index
-	index, err := strconv.Atoi(pattern)
-	if err == nil {
-		sessions, err := service.ListSortedSessions(sessionDir, false, true)
-		if err != nil {
-			fmt.Println(err)
-			return matches
-		}
-		if len(sessions) == 0 {
-			return matches
-		}
-		if index >= 1 && index <= len(sessions) {
-			// Use the resolved file name as the pattern
-			pattern = sessions[index-1].Name
-		}
-	}
-
-	// Now pattern is either a name or a wildcard
-	sessionPathPattern := filepath.Join(sessionDir, pattern)
-
-	// Find matching directories using the pattern
-	matches, err = filepath.Glob(sessionPathPattern)
-	if err != nil {
-		fmt.Printf("Failed to parse pattern: %v\n", err)
-		return []string{}
-	}
-
-	return matches
 }
 
 var sessionClearCmd = &cobra.Command{
@@ -283,9 +218,8 @@ Example:
 gllm session clear
 gllm session clear --force`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		sessionDir := service.GetSessionsDir()
-		// Check if directory exists
-		if _, err := os.Stat(sessionDir); os.IsNotExist(err) {
+		sessions, err := service.ListSortedSessions(false, false)
+		if err != nil || len(sessions) == 0 {
 			fmt.Println("No sessions found.")
 			return nil
 		}
@@ -305,33 +239,12 @@ gllm session clear --force`,
 			}
 		}
 
-		files, err := os.ReadDir(sessionDir)
-		if err != nil {
-			return fmt.Errorf("fail to read session directory: %v", err)
-		}
-
-		for _, file := range files {
-			if file.IsDir() {
-				// Only remove valid session directories (containing main.jsonl)
-				// or empty directories
-				name := file.Name()
-				mainFile := filepath.Join(sessionDir, name, service.MainSessionName+".jsonl")
-				
-				// Always try to remove if it's a directory in the sessions folder
-				// to ensure thorough cleanup
-				if err := os.RemoveAll(filepath.Join(sessionDir, name)); err != nil {
-					// Don't fail the whole operation if one fails, but print the error
-					fmt.Printf("failed to remove session directory %s: %v\n", name, err)
-					continue
-				}
-				
-				// Only print if it was actually a session folder
-				if _, err := os.Stat(mainFile); err == nil {
-					fmt.Printf("  - '%s' removed.\n", name)
-				} else {
-				    // Print anyway if it was removed
-				    fmt.Printf("  - '%s' removed.\n", name)
-				}
+		for _, session := range sessions {
+			name := session.Name
+			if err := service.RemoveSession(name); err != nil {
+				fmt.Printf("failed to remove session directory %s: %v\n", name, err)
+			} else {
+				fmt.Printf("  - '%s' removed.\n", name)
 			}
 		}
 
@@ -348,13 +261,12 @@ var sessionInfoCmd = &cobra.Command{
 	Long:    `Display detailed information about a specific session.`,
 	Args:    cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		sessionDir := service.GetSessionsDir()
 		var sessionName string
 		if len(args) > 0 {
 			sessionName = args[0]
 		} else {
 			// Select session
-			sessions, err := service.ListSortedSessions(sessionDir, false, true)
+			sessions, err := service.ListSortedSessions(false, true)
 			if err != nil || len(sessions) == 0 {
 				fmt.Println("No sessions found.")
 				return nil
@@ -382,34 +294,24 @@ var sessionInfoCmd = &cobra.Command{
 			}
 		}
 
-		// If sessionName is a number, treat it as an index
-		index, err := strconv.Atoi(sessionName)
-		if err == nil {
-			sessions, err := service.ListSortedSessions(sessionDir, false, true)
-			if err != nil {
-				fmt.Println(err)
-				return nil
-			}
-			if len(sessions) == 0 {
-				fmt.Println("No sessions found.")
-				return nil
-			}
-			if index < 1 || index > len(sessions) {
-				return fmt.Errorf("index %d out of range (1-%d)", index, len(sessions))
-			}
-			sessionName = sessions[index-1].Name
+		// Try to resolve name if it's an index
+		resolvedName, err := service.FindSessionByIndex(sessionName)
+		if err != nil {
+			return err
 		}
-
-		sessionPath := filepath.Join(sessionDir, sessionName, service.MainSessionName+".jsonl")
+		if resolvedName == "" {
+			return fmt.Errorf("session '%s' not found", sessionName)
+		}
+		sessionName = resolvedName
 
 		// Check if session exists
-		if _, err := os.Stat(sessionPath); os.IsNotExist(err) {
+		if !service.SessionExists(sessionName) {
 			fmt.Printf("Session '%s' not found.\n", sessionName)
 			return nil
 		}
 
-		// Read and parse the session file
-		data, err := os.ReadFile(sessionPath)
+		// Read the session file
+		data, err := service.ReadSessionContent(sessionName)
 		if err != nil {
 			return fmt.Errorf("error reading session file: %v", err)
 		}
@@ -454,7 +356,6 @@ var sessionRenameCmd = &cobra.Command{
 	Long:  `Rename an existing session to a new name.`,
 	Args:  cobra.MaximumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		sessionDir := service.GetSessionsDir()
 		var oldName, newName string
 
 		if len(args) >= 2 {
@@ -466,7 +367,7 @@ var sessionRenameCmd = &cobra.Command{
 			}
 		} else {
 			// Select session to rename
-			sessions, err := service.ListSortedSessions(sessionDir, false, true)
+			sessions, err := service.ListSortedSessions(false, true)
 			if err != nil || len(sessions) == 0 {
 				fmt.Println("No sessions found.")
 				return nil
@@ -521,40 +422,19 @@ var sessionRenameCmd = &cobra.Command{
 			}
 		}
 
-		// If oldName is a number, treat it as an index
-		index, err := strconv.Atoi(oldName)
-		if err == nil {
-			sessions, err := service.ListSortedSessions(sessionDir, false, true)
-			if err != nil {
-				fmt.Println(err)
-				return nil
-			}
-			if len(sessions) == 0 {
-				fmt.Println("No sessions found.")
-				return nil
-			}
-			if index < 1 || index > len(sessions) {
-				return fmt.Errorf("index %d out of range (1-%d)", index, len(sessions))
-			}
-			oldName = sessions[index-1].Name
+		// Try to resolve name if it's an index
+		resolvedName, err := service.FindSessionByIndex(oldName)
+		if err != nil {
+			return err
 		}
+		if resolvedName == "" {
+			return fmt.Errorf("session '%s' not found", oldName)
+		}
+		oldName = resolvedName
 
 		if strings.EqualFold(oldName, newName) {
 			fmt.Println("No changes made.")
 			return nil
-		}
-
-		oldPath := filepath.Join(sessionDir, oldName)
-		newPath := filepath.Join(sessionDir, newName)
-
-		// Check if source exists
-		if _, err := os.Stat(oldPath); os.IsNotExist(err) {
-			return fmt.Errorf("session '%s' not found", oldName)
-		}
-
-		// Check if target exists
-		if _, err := os.Stat(newPath); err == nil {
-			return fmt.Errorf("session '%s' already exists", newName)
 		}
 
 		// Ask for confirmation
@@ -572,8 +452,8 @@ var sessionRenameCmd = &cobra.Command{
 		}
 
 		// Perform the rename
-		if err := os.Rename(oldPath, newPath); err != nil {
-			return fmt.Errorf("failed to rename session: %v", err)
+		if err := service.RenameSession(oldName, newName); err != nil {
+			return err
 		}
 
 		fmt.Printf("Session renamed from '%s' to '%s' successfully.\n", oldName, newName)
@@ -605,33 +485,11 @@ var sessionShareCmd = &cobra.Command{
 		}
 		sessionName = resolvedName
 
-		sessionDir := service.GetSessionsDir()
-		sourcePath := filepath.Join(sessionDir, sessionName, service.MainSessionName+".jsonl")
-
-		if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
-			return fmt.Errorf("session '%s' not found", sessionName)
+		if err := service.ExportSession(sessionName, destPath); err != nil {
+			return err
 		}
 
-		data, err := os.ReadFile(sourcePath)
-		if err != nil {
-			return fmt.Errorf("failed to read session: %v", err)
-		}
-
-		// If destPath is not given, use session name in local path
-		if destPath == "" {
-			destPath = sessionName + ".jsonl"
-		} else {
-			// If destPath is a directory, append the filename
-			if info, err := os.Stat(destPath); err == nil && info.IsDir() {
-				destPath = filepath.Join(destPath, sessionName+".jsonl")
-			}
-		}
-
-		if err := os.WriteFile(destPath, data, 0644); err != nil {
-			return fmt.Errorf("failed to export session: %v", err)
-		}
-
-		fmt.Printf("Session '%s' exported to '%s'\n", sessionName, destPath)
+		fmt.Printf("Session '%s' exported successfully\n", sessionName)
 		return nil
 	},
 }
