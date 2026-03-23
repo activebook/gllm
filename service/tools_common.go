@@ -1364,7 +1364,13 @@ func getSpawnSubAgentsTool() *OpenTool {
 		Description: `Spawn multiple sub-agents to perform parallel or sequential tasks.
 
 This tool allows you to delegate work to specialized agents, manage dependencies between tasks,
-and collect results in a structured way. Sub-agents run in isolated contexts (no shared sessions).
+and collect results in a structured way. Sub-agents run in isolated contexts to the main agent.
+
+SESSION PERSISTENCE: Each sub-agent's conversation history is automatically saved and tied to the
+task_key. This means:
+- SAME task_key → resumes the subagent's prior session (full conversation history is restored)
+- NEW task_key  → starts a completely fresh subagent session with no prior context
+The tool response will indicate whether each task is [new] or [resume] so you always know the state.
 
 CRITICAL: Assign a unique, semantic task_key to each task—this is your ONLY mechanism to retrieve results
 and correlate outputs across the workflow. Returns progress summary; use get_state(task_key) for full detailed results.
@@ -1380,7 +1386,7 @@ Differs from switch_agent:
 					"items": map[string]interface{}{
 						"type": "object",
 						"properties": map[string]interface{}{
-							"agent": map[string]interface{}{
+							"agent_name": map[string]interface{}{
 								"type":        "string",
 								"description": "Name of the agent to invoke. Use list_agent to see available agents.",
 							},
@@ -1390,7 +1396,7 @@ Differs from switch_agent:
 							},
 							"task_key": map[string]interface{}{
 								"type":        "string",
-								"description": "A unique, semantic string identifier for this specific task execution. This key acts as the 'Primary Key' for the task's output. It serves three critical roles: 1. ADDRESS: It is the specific key used to write the full result into SharedState memory. 2. STORAGE: It forms the unique suffix of the persistent output filename (e.g., ..._analysis_codereview.md), enabling debuggability. 3. RETRIEVAL: You MUST use this exact key with get_state to read the sub-agent's work. Example: 'code_review_auth_module', 'market_analysis_competitor_A'.",
+								"description": "A unique, semantic string identifier for this task. It serves FOUR roles:\n1. SESSION IDENTITY: The subagent's conversation history is persisted under this key. Reuse the SAME key to resume a prior subagent session (the subagent will remember previous context). Use a NEW key to start a fresh session.\n2. ADDRESS: The key used to write the full result into SharedState memory.\n3. STORAGE: Forms the unique suffix of the persistent output filename (e.g., ..._analysis.md) for debuggability.\n4. RETRIEVAL: Use this exact key with get_state to read the sub-agent's output.\nExamples: 'code_review_auth', 'market_analysis_competitor_a'. The tool response shows [new] or [resume] for each task.",
 							},
 							"input_keys": map[string]interface{}{
 								"type": "array",

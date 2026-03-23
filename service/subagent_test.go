@@ -34,7 +34,7 @@ func setupTestConfig() {
 func TestSubAgentExecutor_Lifecycle(t *testing.T) {
 	setupTestConfig()
 	state := data.NewSharedState()
-	executor := NewSubAgentExecutor(state, 2)
+	executor := NewSubAgentExecutor(state, 2, "test_session")
 
 	// Swap runner with mock
 	executor.runner = mockRunner
@@ -72,7 +72,7 @@ func TestSubAgentExecutor_Lifecycle(t *testing.T) {
 func TestSubAgentExecutor_Batch(t *testing.T) {
 	setupTestConfig()
 	state := data.NewSharedState()
-	executor := NewSubAgentExecutor(state, 5)
+	executor := NewSubAgentExecutor(state, 5, "test_session")
 	executor.runner = mockRunner
 
 	tasks := []*SubAgentTask{
@@ -95,7 +95,7 @@ func TestSubAgentExecutor_Batch(t *testing.T) {
 func TestSubAgentExecutor_Cancel(t *testing.T) {
 	setupTestConfig()
 	state := data.NewSharedState()
-	executor := NewSubAgentExecutor(state, 2)
+	executor := NewSubAgentExecutor(state, 2, "test_session")
 
 	// Slow runner
 	executor.runner = func(op *AgentOptions) error {

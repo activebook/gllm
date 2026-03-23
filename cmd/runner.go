@@ -3,8 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/activebook/gllm/data"
@@ -71,7 +69,7 @@ func RunAgent(prompt string, files []*service.FileData, sessionName string, outp
 
 		// Ensure session compatibility
 		if sessionName != "" {
-			if err := EnsureSessionCompatibility(agent, sessionName); err != nil {
+			if err := service.EnsureSessionCompatibility(agent, sessionName); err != nil {
 				return err
 			}
 		}
@@ -212,103 +210,7 @@ func ProcessAttachment(path string) *service.FileData {
 	return service.NewFileData(format, data, path)
 }
 
-// EnsureSessionCompatibility checks if the existing session is compatible with the current agent's provider.
-// If not, it attempts to convert the session history.
-func EnsureSessionCompatibility(agent *data.AgentConfig, sessionName string) error {
-	// 1. Get session Data
-	sessionData, _, err := GetSessionData(sessionName, agent.Model.Provider)
-	if err != nil {
-		// If session doesn't exist, that's fine, nothing to check/convert
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
 
-	// 2. Check Compatibility
-	isCompatible, provider, modelProvider := CheckSessionFormat(agent, sessionData)
-	if !isCompatible {
-		util.Debugf("session '%s' [%s] is not compatible with the current model provider [%s].\n", sessionName, provider, modelProvider)
-
-		// 3. Convert Data
-		convertData, err := service.ConvertMessages(sessionData, provider, modelProvider)
-		if err != nil {
-			return fmt.Errorf("error converting session: %v", err)
-		}
-
-		// 4. Write Back
-		if err := WriteSessionData(sessionName, convertData, modelProvider); err != nil {
-			return err
-		}
-		util.Debugf("session '%s' converted to compatible format [%s].\n", sessionName, modelProvider)
-	}
-
-	return nil
-}
-
-// GetSessionData retrieves session data.
-func GetSessionData(sessionName string, provider string) (data []byte, name string, err error) {
-	cm, err := service.ConstructSessionManager(sessionName, provider)
-	if err != nil {
-		return nil, "", fmt.Errorf("error constructing session manager: %v", err)
-	}
-
-	sessionPath := cm.GetPath()
-	if _, err := os.Stat(sessionPath); os.IsNotExist(err) {
-		return nil, "", err
-	}
-
-	data, err = os.ReadFile(sessionPath)
-	if err != nil {
-		return nil, "", fmt.Errorf("error reading session file: %v", err)
-	}
-
-	name = strings.TrimSuffix(filepath.Base(sessionPath), filepath.Ext(sessionPath))
-	return data, name, nil
-}
-
-// WriteSessionData writes session data for a specific provider.
-func WriteSessionData(sessionName string, data []byte, provider string) error {
-	cm, err := service.ConstructSessionManager(sessionName, provider)
-	if err != nil {
-		return fmt.Errorf("error constructing session manager: %v", err)
-	}
-
-	sessionPath := cm.GetPath()
-	// Preserving original file mode if it exists, roughly
-	// But os.WriteFile will create if not exists with 0666 before umask
-	// We can check stat first if we want to be strict, but standard WriteFile is usually fine for this app
-
-	// Check if session exists to get mode, though checking existence to write might be overkill
-	// unless we want to preserve permissions strictly.
-	// Copied logic from chat.go for safety
-	var fi os.FileInfo
-	if fi, err = os.Stat(sessionPath); os.IsNotExist(err) {
-		// If not exist, write with default perm
-		return os.WriteFile(sessionPath, data, 0644)
-	}
-
-	return os.WriteFile(sessionPath, data, fi.Mode())
-}
-
-// CheckSessionFormat verifies if the session data is compatible with the agent's provider.
-func CheckSessionFormat(agent *data.AgentConfig, sessionData []byte) (isCompatible bool, provider string, modelProvider string) {
-	modelProvider = agent.Model.Provider
-
-	// Detect provider based on message format
-	provider = service.DetectMessageProviderByContent(sessionData)
-
-	// Check compatibility
-	isCompatible = provider == modelProvider
-	if !isCompatible {
-		isCompatible = provider == service.ModelProviderUnknown ||
-			(provider == service.ModelProviderOpenAI && modelProvider == service.ModelProviderOpenAICompatible) ||
-			(provider == service.ModelProviderOpenAICompatible && modelProvider == service.ModelProviderOpenAI) ||
-			(provider == service.ModelProviderOpenAICompatible && modelProvider == service.ModelProviderAnthropic)
-	}
-
-	return isCompatible, provider, modelProvider
-}
 
 // StartLoadMCPServer launches background MCP preloading (non-blocking).
 func StartLoadMCPServer(agent *data.AgentConfig) {

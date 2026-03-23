@@ -56,7 +56,7 @@ type Agent struct {
 	StdOutput       io.Output           // Standard I/O
 	FileOutput      io.Output           // File I/O
 	Status          StatusStack         // Stack to manage streaming status
-	Session         SessionManager      // Session manager
+	Session         Session             // Session
 	Context         ContextManager      // Context manager
 	LastWrittenData string              // Last written data
 
@@ -223,7 +223,8 @@ func constructEnabledTools(tools []string, capabilities []string) []string {
 	return enabledTools
 }
 
-func ConstructSessionManager(sessionName string, provider string) (SessionManager, error) {
+// ConstructSession constructs a new session based on the provider
+func ConstructSession(sessionName string, provider string) (Session, error) {
 	switch provider {
 	case ModelProviderOpenAICompatible:
 		// Used for Chinese Models
@@ -404,7 +405,7 @@ func CallAgent(op *AgentOptions) error {
 	}
 
 	// Construct session manager
-	cm, err := ConstructSessionManager(op.SessionName, ag.Model.Provider)
+	cm, err := ConstructSession(op.SessionName, ag.Model.Provider)
 	if err != nil {
 		return err
 	}

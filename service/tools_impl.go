@@ -1512,7 +1512,9 @@ func spawnSubAgentsToolCallImpl(
 				taskDesc.WriteString("\n")
 			}
 			if tm, ok := task.(map[string]interface{}); ok {
-				taskDesc.WriteString(fmt.Sprintf("- Task %d: %s (Agent: %s)", i+1, tm["task_key"], tm["agent"]))
+				taskKey, _ := tm["task_key"].(string)
+				agentName, _ := tm["agent_name"].(string)
+				taskDesc.WriteString(fmt.Sprintf("- Task %d: %s [Agent: %s]", i+1, taskKey, agentName))
 			}
 		}
 		event.RequestConfirm(taskDesc.String(), toolsUse)
@@ -1529,9 +1531,9 @@ func spawnSubAgentsToolCallImpl(
 			return "", fmt.Errorf("task at index %d is not a valid object", i)
 		}
 
-		agentName, ok := taskMap["agent"].(string)
+		agentName, ok := taskMap["agent_name"].(string)
 		if !ok || agentName == "" {
-			return "", fmt.Errorf("task at index %d missing required 'agent' field", i)
+			return "", fmt.Errorf("task at index %d missing required 'agent_name' field", i)
 		}
 
 		instruction, ok := taskMap["instruction"].(string)
