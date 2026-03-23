@@ -41,10 +41,26 @@ func GetSessionMainFilePath(name string) string {
 	return filepath.Join(GetSessionPath(name), MainSessionName+SessionSuffix)
 }
 
-// SessionExists checks if a session exists (the folder exists)
+// SessionExists checks if a top-level session folder exists
 func SessionExists(name string) bool {
-	info, err := os.Stat(GetSessionPath(name))
+	path := GetSessionPath(name)
+	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
+}
+
+// SubAgentSessionExists checks if a subagent session file exists for the given main session and task key
+// A session is considered to exist if the file is present and not empty
+func SubAgentSessionExists(mainSessionName, taskKey string) bool {
+	if mainSessionName == "" || taskKey == "" {
+		return false
+	}
+	path := filepath.Join(
+		GetSessionsDir(),
+		util.GetSanitizeTitle(mainSessionName),
+		util.GetSanitizeTitle(taskKey)+SessionSuffix,
+	)
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir() && info.Size() > 0
 }
 
 // RenameSession renames an existing session directory
@@ -83,7 +99,7 @@ func ReadSessionContent(name string) ([]byte, error) {
 // WriteSessionContent writes the data into the main.jsonl file
 func WriteSessionContent(name string, data []byte) error {
 	mainFilePath := GetSessionMainFilePath(name)
-	
+
 	// Preserve original file mode if it exists
 	if fi, err := os.Stat(mainFilePath); err == nil {
 		return os.WriteFile(mainFilePath, data, fi.Mode())
