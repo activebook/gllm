@@ -53,31 +53,19 @@ func GetSessionMainFilePath(name string) string {
 }
 
 // SessionExists checks if a top-level session folder exists, or if a subagent file exists
-func SessionExists(name string) bool {
+func SessionExists(name string, checkSubAgent bool) bool {
 	parts := strings.Split(name, ":")
-	if len(parts) == 2 {
+	if len(parts) >= 2 {
+		if !checkSubAgent {
+			return false
+		}
 		path := GetSessionFilePath(name)
 		info, err := os.Stat(path)
-		return err == nil && !info.IsDir()
+		return err == nil && !info.IsDir() && info.Size() > 0
 	}
 	path := GetSessionPath(name)
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
-}
-
-// SubAgentSessionExists checks if a subagent session file exists for the given main session and task key
-// A session is considered to exist if the file is present and not empty
-func SubAgentSessionExists(mainSessionName, taskKey string) bool {
-	if mainSessionName == "" || taskKey == "" {
-		return false
-	}
-	path := filepath.Join(
-		GetSessionsDir(),
-		util.GetSanitizeTitle(mainSessionName),
-		util.GetSanitizeTitle(taskKey)+SessionSuffix,
-	)
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir() && info.Size() > 0
 }
 
 // RenameSession renames an existing session directory

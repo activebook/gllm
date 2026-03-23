@@ -471,7 +471,7 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 
 	// Determine whether this is a new or resumed session, then execute
 	mode := "Executing"
-	if SubAgentSessionExists(e.mainSessionName, task.TaskKey) {
+	if SessionExists(sessionName, true) {
 		mode = "Resuming"
 	}
 	fmt.Printf("==> %s task: %s [agent: %s] ...\n", mode, task.TaskKey, task.AgentName)
