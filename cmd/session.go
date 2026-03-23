@@ -52,12 +52,19 @@ var sessionListCmd = &cobra.Command{
 		}
 
 		fmt.Println("Available sessions:")
+		width := len(fmt.Sprintf("%d", len(sessions)))
 		for index, session := range sessions {
+			// Visually indent sub-sessions
+			prefix := ""
+			if strings.Contains(session.Name, ":") {
+				prefix = "└─ "
+			}
+
 			// Display with title if available
 			if session.Provider != "" {
-				fmt.Printf("- [%d] %s [%s]\n", index+1, session.Name, session.Provider)
+				fmt.Printf("[%*d] %s%s [%s]\n", width, index+1, prefix, session.Name, session.Provider)
 			} else {
-				fmt.Printf("- [%d] %s\n", index+1, session.Name)
+				fmt.Printf("[%*d] %s%s\n", width, index+1, prefix, session.Name)
 			}
 		}
 		return nil

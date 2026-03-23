@@ -36,13 +36,30 @@ func GetSessionPath(name string) string {
 	return filepath.Join(GetSessionsDir(), name)
 }
 
+// GetSessionFilePath returns the absolute file path for a session's specific jsonl file.
+// If name is "sessionA:taskB", it returns "sessions/sessionA/taskB.jsonl"
+// If name is "sessionA", it returns "sessions/sessionA/main.jsonl"
+func GetSessionFilePath(name string) string {
+	parts := strings.Split(name, ":")
+	if len(parts) == 2 {
+		return filepath.Join(GetSessionPath(parts[0]), util.GetSanitizeTitle(parts[1])+SessionSuffix)
+	}
+	return filepath.Join(GetSessionPath(name), MainSessionName+SessionSuffix)
+}
+
 // GetSessionMainFilePath returns the absolute file path for a session's main.jsonl
 func GetSessionMainFilePath(name string) string {
 	return filepath.Join(GetSessionPath(name), MainSessionName+SessionSuffix)
 }
 
-// SessionExists checks if a top-level session folder exists
+// SessionExists checks if a top-level session folder exists, or if a subagent file exists
 func SessionExists(name string) bool {
+	parts := strings.Split(name, ":")
+	if len(parts) == 2 {
+		path := GetSessionFilePath(name)
+		info, err := os.Stat(path)
+		return err == nil && !info.IsDir()
+	}
 	path := GetSessionPath(name)
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
@@ -84,30 +101,32 @@ func RemoveSession(name string) error {
 	return os.RemoveAll(path)
 }
 
-// ClearSession clears the main session contents (deletes main.jsonl)
+// ClearSession deletes the specific session or subagent file.
+// Passing only the top-level name "my_session" will only delete "main.jsonl".
 func ClearSession(name string) error {
-	mainFilePath := GetSessionMainFilePath(name)
-	return os.Remove(mainFilePath)
+	filePath := GetSessionFilePath(name)
+	return os.Remove(filePath)
 }
 
-// ReadSessionContent reads the contents of the main.jsonl file
+// ReadSessionContent reads the contents of a session or subagent jsonl file
 func ReadSessionContent(name string) ([]byte, error) {
-	mainFilePath := GetSessionMainFilePath(name)
-	return os.ReadFile(mainFilePath)
+	filePath := GetSessionFilePath(name)
+	return os.ReadFile(filePath)
 }
 
-// WriteSessionContent writes the data into the main.jsonl file
+// WriteSessionContent writes the data into a session or subagent jsonl file
 func WriteSessionContent(name string, data []byte) error {
-	mainFilePath := GetSessionMainFilePath(name)
+	filePath := GetSessionFilePath(name)
 
 	// Preserve original file mode if it exists
-	if fi, err := os.Stat(mainFilePath); err == nil {
-		return os.WriteFile(mainFilePath, data, fi.Mode())
+	if fi, err := os.Stat(filePath); err == nil {
+		return os.WriteFile(filePath, data, fi.Mode())
 	}
 
 	// If not exist, ensure dir exists and write with default perm
-	os.MkdirAll(GetSessionPath(name), 0750)
-	return os.WriteFile(mainFilePath, data, 0644)
+	sessionFolder := GetSessionPath(strings.Split(name, ":")[0])
+	os.MkdirAll(sessionFolder, 0750)
+	return os.WriteFile(filePath, data, 0644)
 }
 
 // EnsureSessionCompatibility checks if the existing session is compatible with the current agent's provider.
@@ -251,30 +270,50 @@ func ListSortedSessions(onlyNonEmpty bool, detectProvider bool) ([]SessionMeta, 
 			continue
 		}
 
-		title := entry.Name() // folder name is the sanitized session title
-		mainFile := filepath.Join(sessionDir, title, MainSessionName+SessionSuffix)
+		sessionName := entry.Name() // folder name is the sanitized session title
+		sessionPath := filepath.Join(sessionDir, sessionName)
 
-		info, err := os.Stat(mainFile)
+		// Read all .jsonl files in this session directory
+		files, err := os.ReadDir(sessionPath)
 		if err != nil {
-			// Skip if no main.jsonl exists (not a valid session folder)
 			continue
 		}
 
-		if onlyNonEmpty && info.Size() == 0 {
-			continue
-		}
+		for _, file := range files {
+			if file.IsDir() || !strings.HasSuffix(file.Name(), SessionSuffix) {
+				continue
+			}
 
-		var provider string
-		if detectProvider {
-			provider = DetectMessageProvider(mainFile)
-		}
+			filePath := filepath.Join(sessionPath, file.Name())
 
-		sessions = append(sessions, SessionMeta{
-			Name:     title,
-			Provider: provider,
-			ModTime:  info.ModTime().Unix(),
-			Empty:    info.Size() == 0,
-		})
+			info, err := file.Info()
+			if err != nil {
+				continue
+			}
+
+			if onlyNonEmpty && info.Size() == 0 {
+				continue
+			}
+
+			var provider string
+			if detectProvider {
+				provider = DetectMessageProvider(filePath)
+			}
+
+			// Generate the display name based on whether it's main or subagent
+			taskKey := strings.TrimSuffix(file.Name(), SessionSuffix)
+			displayName := sessionName
+			if taskKey != MainSessionName {
+				displayName = sessionName + ":" + taskKey
+			}
+
+			sessions = append(sessions, SessionMeta{
+				Name:     displayName,
+				Provider: provider,
+				ModTime:  info.ModTime().Unix(),
+				Empty:    info.Size() == 0,
+			})
+		}
 	}
 
 	sort.Slice(sessions, func(i, j int) bool {
