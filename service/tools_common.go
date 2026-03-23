@@ -1386,7 +1386,7 @@ Differs from switch_agent:
 					"items": map[string]interface{}{
 						"type": "object",
 						"properties": map[string]interface{}{
-							"agent": map[string]interface{}{
+							"agent_name": map[string]interface{}{
 								"type":        "string",
 								"description": "Name of the agent to invoke. Use list_agent to see available agents.",
 							},

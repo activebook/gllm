@@ -1551,9 +1551,9 @@ func spawnSubAgentsToolCallImpl(
 			return "", fmt.Errorf("task at index %d is not a valid object", i)
 		}
 
-		agentName, ok := taskMap["agent"].(string)
+		agentName, ok := taskMap["agent_name"].(string)
 		if !ok || agentName == "" {
-			return "", fmt.Errorf("task at index %d missing required 'agent' field", i)
+			return "", fmt.Errorf("task at index %d missing required 'agent_name' field", i)
 		}
 
 		instruction, ok := taskMap["instruction"].(string)
