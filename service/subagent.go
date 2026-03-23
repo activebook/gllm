@@ -222,7 +222,6 @@ func (e *SubAgentExecutor) Execute(timeout time.Duration) []SubAgentResult {
 			te.cancel = taskCancel
 			e.mu.Unlock()
 
-			fmt.Printf("==> Executing task: %s ...\n", te.task.TaskKey)
 			// Execute the task
 			e.executeTask(taskCtx, te)
 			// Show progress executing task/total tasks
@@ -476,6 +475,13 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 		return
 	default:
 	}
+
+	// Determine whether this is a new or resumed session, then execute
+	mode := "Executing"
+	if sessionName != "" && SessionExists(sessionName) {
+		mode = "Resuming"
+	}
+	fmt.Printf("==> %s task: %s [agent: %s] ...\n", mode, task.TaskKey, task.AgentName)
 
 	// Execute the agent
 	err := e.runner(&op)
