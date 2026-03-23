@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,10 +15,15 @@ import (
 	"github.com/activebook/gllm/util"
 )
 
+const (
+	MainSessionName = "main"
+)
+
 // SessionManager is an interface for handling session history
 type SessionManager interface {
 	SetPath(title string)
 	GetPath() string
+	GetName() string
 	Load() error
 	Save() error
 	Open(title string) error
@@ -40,11 +46,26 @@ func (s *BaseSession) SetPath(title string) {
 		return
 	}
 	dir := GetSessionsDir()
-	s.Path = util.JoinFilePath(dir, title+".jsonl")
+
+	// Format is expected to be "SessionName" or "SessionName:TaskKey"
+	parts := strings.SplitN(title, ":", 2)
+	sessionID := util.GetSanitizeTitle(parts[0])
+
+	// Default session name is main
+	sessionName := MainSessionName
+	if len(parts) == 2 && parts[1] != "" {
+		sessionName = util.GetSanitizeTitle(parts[1])
+	}
+
+	s.Path = filepath.Join(dir, sessionID, sessionName+".jsonl")
 }
 
 func (s *BaseSession) GetPath() string {
 	return s.Path
+}
+
+func (s *BaseSession) GetName() string {
+	return s.Name
 }
 
 // readFile reads the JSONL file and returns each line as a separate byte slice.
@@ -95,6 +116,12 @@ func (s *BaseSession) appendFile(data []byte) error {
 	if s.Name == "" {
 		return nil
 	}
+
+	// Ensure parent directory exists
+	if err := os.MkdirAll(filepath.Dir(s.Path), 0750); err != nil {
+		return fmt.Errorf("failed to create session directory: %w", err)
+	}
+
 	file, err := os.OpenFile(s.Path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open file for append: %w", err)
@@ -113,6 +140,12 @@ func (s *BaseSession) writeFile(data []byte) error {
 	if s.Name == "" {
 		return nil
 	}
+
+	// Ensure parent directory exists
+	if err := os.MkdirAll(filepath.Dir(s.Path), 0750); err != nil {
+		return fmt.Errorf("failed to create session directory: %w", err)
+	}
+
 	return os.WriteFile(s.Path, data, 0644)
 }
 
@@ -126,9 +159,9 @@ func (s *BaseSession) GetMessages() interface{} {
 func (s *BaseSession) SetMessages(messages interface{}) {
 }
 
-// Open initializes an OpenChatsession with the provided title, resolving
-// an index to the actual session name if necessary. It resets the messages,
-// sanitizes the session name for the path, and sets the internal path accordingly.
+// Open initializes a session with the provided title, resolving
+// an index to the actual session name if necessary. It sanitizes the
+// session name for the path, and sets the internal path accordingly.
 // Returns an error if the title cannot be resolved.
 func (s *BaseSession) Open(title string) error {
 	// If title is still empty, no session found
@@ -141,9 +174,10 @@ func (s *BaseSession) Open(title string) error {
 		return err
 	}
 	// Set the name and path
+	// The name remains the original display name (or "name:task_key")
 	s.Name = title
-	sanitized := util.GetSanitizeTitle(s.Name)
-	s.SetPath(sanitized)
+	// SetPath will handle splitting and sanitizing the components
+	s.SetPath(title)
 	return nil
 }
 
@@ -159,10 +193,12 @@ func (s *BaseSession) Clear() error {
 	if s.Name == "" {
 		return nil
 	}
-	// Delete file instead of clearing content
-	err := os.Remove(s.Path)
+	// Delete the entire session folder
+	// s.Path is sessions/<session_id>/<handler>.jsonl, so filepath.Dir(s.Path) is the folder
+	sessionDir := filepath.Dir(s.Path)
+	err := os.RemoveAll(sessionDir)
 	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to clear file: %w", err)
+		return fmt.Errorf("failed to clear session: %w", err)
 	}
 	return nil
 }
@@ -186,22 +222,26 @@ func GetSessionsDir() string {
 }
 
 // ClearEmptySessionsAsync clears all empty sessions in background
+// An empty session is a folder whose main.jsonl file is empty or missing.
 func ClearEmptySessionsAsync() {
 	go func() {
-		files, err := os.ReadDir(GetSessionsDir())
+		entries, err := os.ReadDir(GetSessionsDir())
 		if err != nil {
 			return
 		}
-		for _, file := range files {
-			if !file.IsDir() && strings.HasSuffix(file.Name(), ".jsonl") {
-				fullPath := util.JoinFilePath(GetSessionsDir(), file.Name())
-				info, err := file.Info()
-				if err != nil {
-					continue
-				}
-				if info.Size() == 0 {
-					os.Remove(fullPath)
-				}
+		for _, entry := range entries {
+			// Skip flat files in the root sessions directory
+			if !entry.IsDir() {
+				continue
+			}
+
+			sessionDir := filepath.Join(GetSessionsDir(), entry.Name())
+			mainFile := filepath.Join(sessionDir, MainSessionName+".jsonl")
+
+			info, err := os.Stat(mainFile)
+			// Remove the entire folder if main.jsonl doesn't exist or is empty
+			if err != nil || info.Size() == 0 {
+				os.RemoveAll(sessionDir)
 			}
 		}
 	}()
@@ -240,37 +280,42 @@ func FindSessionByIndex(idx string) (string, error) {
 // ListSortedSessions(dir, true, false)   // Fast - only metadata
 // ListSortedSessions(dir, false, true)   // Slow - reads all files for provider
 func ListSortedSessions(sessionDir string, onlyNonEmpty bool, detectProvider bool) ([]SessionMeta, error) {
-	files, err := os.ReadDir(sessionDir)
+	entries, err := os.ReadDir(sessionDir)
 	if err != nil {
 		return nil, fmt.Errorf("fail to read session directory: %v", err)
 	}
 
 	var sessions []SessionMeta
-	for _, file := range files {
-		if !file.IsDir() && strings.HasSuffix(file.Name(), ".jsonl") {
-			title := strings.TrimSuffix(file.Name(), ".jsonl")
-			fullPath := util.JoinFilePath(sessionDir, file.Name())
-
-			// Use file.Info() instead of os.Stat()
-			info, err := file.Info()
-			if err != nil {
-				continue
-			}
-
-			if onlyNonEmpty && info.Size() == 0 {
-				continue
-			}
-			var provider string
-			if detectProvider {
-				provider = DetectMessageProvider(fullPath)
-			}
-			sessions = append(sessions, SessionMeta{
-				Name:     title,
-				Provider: provider,
-				ModTime:  info.ModTime().Unix(),
-				Empty:    info.Size() == 0,
-			})
+	for _, entry := range entries {
+		// Only look at directories
+		if !entry.IsDir() {
+			continue
 		}
+
+		title := entry.Name() // folder name is the sanitized session title
+		mainFile := filepath.Join(sessionDir, title, MainSessionName+".jsonl")
+
+		info, err := os.Stat(mainFile)
+		if err != nil {
+			// Skip if no main.jsonl exists (not a valid session folder)
+			continue
+		}
+
+		if onlyNonEmpty && info.Size() == 0 {
+			continue
+		}
+
+		var provider string
+		if detectProvider {
+			provider = DetectMessageProvider(mainFile)
+		}
+
+		sessions = append(sessions, SessionMeta{
+			Name:     title,
+			Provider: provider,
+			ModTime:  info.ModTime().Unix(),
+			Empty:    info.Size() == 0,
+		})
 	}
 
 	sort.Slice(sessions, func(i, j int) bool {

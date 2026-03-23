@@ -16,6 +16,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/event"
+	"github.com/activebook/gllm/util"
 )
 
 // Tool robustness constants
@@ -1504,6 +1505,22 @@ func spawnSubAgentsToolCallImpl(
 		needConfirm = true // Default to true for safety
 	}
 
+	// Pre-check for existing task keys to determine New vs Resume
+	resumeMap := make(map[string]bool)
+	if executor.mainSessionName != "" {
+		sessDir := filepath.Join(GetSessionsDir(), util.GetSanitizeTitle(executor.mainSessionName))
+		for _, taskInterface := range tasksInterface {
+			if tm, ok := taskInterface.(map[string]interface{}); ok {
+				if taskKey, ok := tm["task_key"].(string); ok && taskKey != "" {
+					filePath := filepath.Join(sessDir, util.GetSanitizeTitle(taskKey)+".jsonl")
+					if info, err := os.Stat(filePath); err == nil && info.Size() > 0 {
+						resumeMap[taskKey] = true
+					}
+				}
+			}
+		}
+	}
+
 	if needConfirm && !toolsUse.AutoApprove {
 		// Build brief description of tasks
 		var taskDesc strings.Builder
@@ -1512,7 +1529,12 @@ func spawnSubAgentsToolCallImpl(
 				taskDesc.WriteString("\n")
 			}
 			if tm, ok := task.(map[string]interface{}); ok {
-				taskDesc.WriteString(fmt.Sprintf("- Task %d: %s (Agent: %s)", i+1, tm["task_key"], tm["agent"]))
+				status := "new"
+				taskKey, _ := tm["task_key"].(string)
+				if resumeMap[taskKey] {
+					status = "resume"
+				}
+				taskDesc.WriteString(fmt.Sprintf("- Task %d: %s [%s] (Agent: %s)", i+1, taskKey, status, tm["agent"]))
 			}
 		}
 		event.RequestConfirm(taskDesc.String(), toolsUse)

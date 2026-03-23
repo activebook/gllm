@@ -48,7 +48,7 @@ type SubAgentTask struct {
 	ID          string   // Unique task ID
 	AgentName   string   // Agent profile to use
 	Instruction string   // Task instruction/prompt
-	TaskKey     string   // Key to store result in SharedState
+	TaskKey     string   // Key to store result in SharedState, and also the session name
 	InputKeys   []string // Keys to read as input context (virtual files)
 	Wait        bool     // If true, wait for ALL prior tasks before starting
 }
@@ -72,10 +72,11 @@ type AgentRunner func(*AgentOptions) error
 
 // SubAgentExecutor manages sub-agent lifecycle and execution
 type SubAgentExecutor struct {
-	state      *data.SharedState
-	maxWorkers int
-	taskID     atomic.Int64
-	runner     AgentRunner // Function to execute agent (default: CallAgent)
+	state           *data.SharedState
+	maxWorkers      int
+	taskID          atomic.Int64
+	runner          AgentRunner // Function to execute agent (default: CallAgent)
+	mainSessionName string      // Orchestrator session name (e.g., "my project")
 
 	// Task tracking
 	mu       sync.RWMutex
@@ -90,18 +91,19 @@ type taskEntry struct {
 }
 
 // NewSubAgentExecutor creates a new SubAgentExecutor
-func NewSubAgentExecutor(state *data.SharedState, maxWorkers int) *SubAgentExecutor {
+func NewSubAgentExecutor(state *data.SharedState, maxWorkers int, mainSessionName string) *SubAgentExecutor {
 	if maxWorkers <= 0 {
 		maxWorkers = MaxWorkersParalleled
 	} else if maxWorkers > MaxWorkersParalleled {
 		maxWorkers = MaxWorkersParalleled
 	}
 	return &SubAgentExecutor{
-		state:      state,
-		maxWorkers: maxWorkers,
-		tasks:      make(map[string]*taskEntry),
-		mcpStore:   data.NewMCPStore(),
-		runner:     CallAgent, // Default runner
+		state:           state,
+		maxWorkers:      maxWorkers,
+		mainSessionName: mainSessionName,
+		tasks:           make(map[string]*taskEntry),
+		mcpStore:        data.NewMCPStore(),
+		runner:          CallAgent, // Default runner
 	}
 }
 
@@ -436,6 +438,13 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 		}
 	}
 
+	// Build subagent session name as "mainSession:taskKey"
+	// Both components will be sanitized by SetPath
+	sessionName := ""
+	if e.mainSessionName != "" && task.TaskKey != "" {
+		sessionName = e.mainSessionName + ":" + task.TaskKey
+	}
+
 	// Prepare agent options
 	op := AgentOptions{
 		Prompt:        finalInstruction,
@@ -449,7 +458,7 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 		YoloMode:      true, // Sub-agents always auto-approve
 		QuietMode:     true, // Sub-agents run quietly
 		OutputFile:    outputFile,
-		SessionName:   "", // No session persistence for sub-agents
+		SessionName:   sessionName,
 		MCPConfig:     mcpConfig,
 		SharedState:   e.state,
 		AgentName:     task.AgentName,

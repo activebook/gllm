@@ -132,8 +132,8 @@ gllm session remove "2 - 5" --force`,
 			var matches []string
 			var names []string
 			for _, s := range selected {
-				names = append(names, s+".jsonl")
-				matches = append(matches, filepath.Join(sessionDir, s+".jsonl"))
+				names = append(names, s)
+				matches = append(matches, filepath.Join(sessionDir, s))
 			}
 
 			// Confirm if not forced
@@ -152,10 +152,10 @@ gllm session remove "2 - 5" --force`,
 			}
 
 			for _, match := range matches {
-				if err := os.Remove(match); err != nil {
-					fmt.Printf("Failed to remove '%s': %v\n", strings.TrimSuffix(filepath.Base(match), filepath.Ext(match)), err)
+				if err := os.RemoveAll(match); err != nil {
+					fmt.Printf("Failed to remove '%s': %v\n", filepath.Base(match), err)
 				} else {
-					fmt.Printf("Session '%s' removed successfully.\n", strings.TrimSuffix(filepath.Base(match), filepath.Ext(match)))
+					fmt.Printf("Session '%s' removed successfully.\n", filepath.Base(match))
 				}
 			}
 			return nil
@@ -188,9 +188,9 @@ gllm session remove "2 - 5" --force`,
 					return fmt.Errorf("invalid range: start (%d) cannot be greater than end (%d)", start, end)
 				}
 
-				// Collect matching files in range
+				// Collect matching directories in range
 				for i := start; i <= end; i++ {
-					sessionPath := filepath.Join(sessionDir, sessions[i-1].Name+".jsonl")
+					sessionPath := filepath.Join(sessionDir, sessions[i-1].Name)
 					matches = append(matches, sessionPath)
 				}
 			} else {
@@ -212,7 +212,7 @@ gllm session remove "2 - 5" --force`,
 		if !force {
 			fmt.Printf("The following sessions will be removed:\n")
 			for _, match := range matches {
-				fmt.Printf("  - %s\n", strings.TrimSuffix(filepath.Base(match), filepath.Ext(match)))
+				fmt.Printf("  - %s\n", filepath.Base(match))
 			}
 
 			var confirm bool
@@ -226,12 +226,12 @@ gllm session remove "2 - 5" --force`,
 			}
 		}
 
-		// Remove the matching files
+		// Remove the matching directories
 		for _, match := range matches {
-			if err := os.Remove(match); err != nil {
-				fmt.Printf("Failed to remove '%s': %v\n", strings.TrimSuffix(filepath.Base(match), filepath.Ext(match)), err)
+			if err := os.RemoveAll(match); err != nil {
+				fmt.Printf("Failed to remove '%s': %v\n", filepath.Base(match), err)
 			} else {
-				fmt.Printf("Session '%s' removed successfully.\n", strings.TrimSuffix(filepath.Base(match), filepath.Ext(match)))
+				fmt.Printf("Session '%s' removed successfully.\n", filepath.Base(match))
 			}
 		}
 
@@ -261,9 +261,9 @@ func handleAsPattern(pattern string, sessionDir string) []string {
 	}
 
 	// Now pattern is either a name or a wildcard
-	sessionPathPattern := filepath.Join(sessionDir, pattern+".jsonl")
+	sessionPathPattern := filepath.Join(sessionDir, pattern)
 
-	// Find matching files using the pattern
+	// Find matching directories using the pattern
 	matches, err = filepath.Glob(sessionPathPattern)
 	if err != nil {
 		fmt.Printf("Failed to parse pattern: %v\n", err)
@@ -311,12 +311,27 @@ gllm session clear --force`,
 		}
 
 		for _, file := range files {
-			if !file.IsDir() && strings.HasSuffix(file.Name(), ".jsonl") {
-				name := strings.TrimSuffix(file.Name(), ".jsonl")
-				if err := os.Remove(filepath.Join(sessionDir, name+".jsonl")); err != nil {
-					return fmt.Errorf("failed to remove session: %v", err)
+			if file.IsDir() {
+				// Only remove valid session directories (containing main.jsonl)
+				// or empty directories
+				name := file.Name()
+				mainFile := filepath.Join(sessionDir, name, service.MainSessionName+".jsonl")
+				
+				// Always try to remove if it's a directory in the sessions folder
+				// to ensure thorough cleanup
+				if err := os.RemoveAll(filepath.Join(sessionDir, name)); err != nil {
+					// Don't fail the whole operation if one fails, but print the error
+					fmt.Printf("failed to remove session directory %s: %v\n", name, err)
+					continue
 				}
-				fmt.Printf("  - '%s' removed.\n", name)
+				
+				// Only print if it was actually a session folder
+				if _, err := os.Stat(mainFile); err == nil {
+					fmt.Printf("  - '%s' removed.\n", name)
+				} else {
+				    // Print anyway if it was removed
+				    fmt.Printf("  - '%s' removed.\n", name)
+				}
 			}
 		}
 
@@ -385,7 +400,7 @@ var sessionInfoCmd = &cobra.Command{
 			sessionName = sessions[index-1].Name
 		}
 
-		sessionPath := filepath.Join(sessionDir, sessionName+".jsonl")
+		sessionPath := filepath.Join(sessionDir, sessionName, service.MainSessionName+".jsonl")
 
 		// Check if session exists
 		if _, err := os.Stat(sessionPath); os.IsNotExist(err) {
@@ -529,8 +544,8 @@ var sessionRenameCmd = &cobra.Command{
 			return nil
 		}
 
-		oldPath := util.JoinFilePath(sessionDir, oldName+".jsonl")
-		newPath := util.JoinFilePath(sessionDir, newName+".jsonl")
+		oldPath := filepath.Join(sessionDir, oldName)
+		newPath := filepath.Join(sessionDir, newName)
 
 		// Check if source exists
 		if _, err := os.Stat(oldPath); os.IsNotExist(err) {
@@ -591,7 +606,7 @@ var sessionShareCmd = &cobra.Command{
 		sessionName = resolvedName
 
 		sessionDir := service.GetSessionsDir()
-		sourcePath := util.JoinFilePath(sessionDir, sessionName+".jsonl")
+		sourcePath := filepath.Join(sessionDir, sessionName, service.MainSessionName+".jsonl")
 
 		if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
 			return fmt.Errorf("session '%s' not found", sessionName)
