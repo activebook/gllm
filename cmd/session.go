@@ -52,12 +52,19 @@ var sessionListCmd = &cobra.Command{
 		}
 
 		fmt.Println("Available sessions:")
+		width := len(fmt.Sprintf("%d", len(sessions)))
 		for index, session := range sessions {
+			// Visually indent sub-sessions
+			prefix := ""
+			if strings.Contains(session.Name, ":") {
+				prefix = "└─ "
+			}
+
 			// Display with title if available
 			if session.Provider != "" {
-				fmt.Printf("- [%d] %s [%s]\n", index+1, session.Name, session.Provider)
+				fmt.Printf("[%*d] %s%s [%s]\n", width, index+1, prefix, session.Name, session.Provider)
 			} else {
-				fmt.Printf("- [%d] %s\n", index+1, session.Name)
+				fmt.Printf("[%*d] %s%s\n", width, index+1, prefix, session.Name)
 			}
 		}
 		return nil
@@ -85,7 +92,8 @@ gllm session remove "2 - 5" --force`,
 		if len(args) > 0 {
 			pattern = args[0]
 		} else {
-			// Select sessions to remove
+			// Select sessions to remove — only show top-level sessions.
+			// Removing a parent folder purges all nested subagent sessions automatically.
 			sessions, err := service.ListSortedSessions(false, true)
 			if err != nil || len(sessions) == 0 {
 				fmt.Println("No sessions found.")
@@ -94,6 +102,9 @@ gllm session remove "2 - 5" --force`,
 
 			var options []huh.Option[string]
 			for _, c := range sessions {
+				if strings.Contains(c.Name, ":") {
+					continue // skip subagent sessions
+				}
 				label := c.Name
 				if c.Provider != "" {
 					label = fmt.Sprintf("%s [%s]", c.Name, c.Provider)
@@ -278,7 +289,12 @@ var sessionInfoCmd = &cobra.Command{
 				if c.Provider != "" {
 					label = fmt.Sprintf("%s [%s]", c.Name, c.Provider)
 				}
-				options = append(options, huh.NewOption(label, c.Name))
+				// Visually indent sub-sessions
+				prefix := ""
+				if strings.Contains(c.Name, ":") {
+					prefix = "└─ "
+				}
+				options = append(options, huh.NewOption(prefix+label, c.Name))
 			}
 			height := io.GetTermFitHeight(len(options))
 
@@ -305,7 +321,7 @@ var sessionInfoCmd = &cobra.Command{
 		sessionName = resolvedName
 
 		// Check if session exists
-		if !service.SessionExists(sessionName) {
+		if !service.SessionExists(sessionName, true) {
 			fmt.Printf("Session '%s' not found.\n", sessionName)
 			return nil
 		}
@@ -351,10 +367,11 @@ var sessionInfoCmd = &cobra.Command{
 
 // sessionRenameCmd represents the session rename command
 var sessionRenameCmd = &cobra.Command{
-	Use:   "rename [oldname|index] [newname]",
-	Short: "Rename a session",
-	Long:  `Rename an existing session to a new name.`,
-	Args:  cobra.MaximumNArgs(2),
+	Use:     "rename [oldname|index] [newname]",
+	Aliases: []string{"rn"},
+	Short:   "Rename a session",
+	Long:    `Rename an existing session to a new name.`,
+	Args:    cobra.MaximumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var oldName, newName string
 
@@ -378,6 +395,9 @@ var sessionRenameCmd = &cobra.Command{
 			} else {
 				var options []huh.Option[string]
 				for _, c := range sessions {
+					if strings.Contains(c.Name, ":") {
+						continue // skip subagent sessions – renaming a parent covers them
+					}
 					label := c.Name
 					if c.Provider != "" {
 						label = fmt.Sprintf("%s [%s]", c.Name, c.Provider)

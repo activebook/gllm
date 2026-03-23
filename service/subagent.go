@@ -411,15 +411,6 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 	// Load MCP config (if error, just continue)
 	mcpConfig, _ := e.mcpStore.Load()
 
-	// Generate output file path (persistent)
-	// Use TaskKey in filename for better traceability
-	keyPart := ""
-	if task.TaskKey != "" {
-		keyPart = "_" + util.GetSanitizeTitle(task.TaskKey)
-	}
-	outputFile := data.GenerateTaskFilePath(fmt.Sprintf("subagent_%s%s", task.AgentName, keyPart), ".md")
-	result.OutputFile = outputFile
-
 	// Prepare input context from SharedState dependencies
 	// Instead of virtual files, we embed the context directly into the prompt
 	finalInstruction := task.Instruction
@@ -456,7 +447,6 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 		Capabilities:  agentConfig.Capabilities,
 		YoloMode:      true, // Sub-agents always auto-approve
 		QuietMode:     true, // Sub-agents run quietly
-		OutputFile:    outputFile,
 		SessionName:   sessionName,
 		MCPConfig:     mcpConfig,
 		SharedState:   e.state,
@@ -478,7 +468,7 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 
 	// Determine whether this is a new or resumed session, then execute
 	mode := "Executing"
-	if SubAgentSessionExists(e.mainSessionName, task.TaskKey) {
+	if SessionExists(sessionName, true) {
 		mode = "Resuming"
 	}
 	fmt.Printf("==> %s task: %s [agent: %s] ...\n", mode, task.TaskKey, task.AgentName)
@@ -497,11 +487,21 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 		result.Status = StatusCompleted
 		result.Progress = fmt.Sprintf("Completed in %s", result.Duration.Round(time.Millisecond))
 
-		// Store output in SharedState if TaskKey is specified
+		// Compress the subagent's session into a semantic summary for the orchestrator.
+		// This is the Map-Reduce boundary: full context stays in the session file,
+		// only the distilled summary crosses into SharedState.
 		if task.TaskKey != "" && e.state != nil {
-			content, err := util.GetFileContent(outputFile)
-			if err == nil {
-				e.state.Set(task.TaskKey, content, task.AgentName)
+			sessionData, readErr := ReadSessionContent(sessionName)
+			if readErr == nil {
+				summary, compressErr := CompressSession(agentConfig, sessionData)
+				if compressErr != nil {
+					// Fallback: store a diagnostic error so the orchestrator isn't silently blocked
+					e.state.Set(task.TaskKey, fmt.Sprintf("[compression failed: %v]", compressErr), task.AgentName)
+				} else {
+					e.state.Set(task.TaskKey, summary, task.AgentName)
+				}
+			} else {
+				e.state.Set(task.TaskKey, fmt.Sprintf("[session read failed: %v]", readErr), task.AgentName)
 			}
 		}
 	}

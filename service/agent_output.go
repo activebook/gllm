@@ -51,9 +51,9 @@ func (ag *Agent) StartReasoning() {
 			event.StartIndicator(InTheThinking)
 		}
 	}
-	if ag.FileOutput != nil {
-		ag.FileOutput.Writeln(StartThinking)
-	}
+	// if ag.FileOutput != nil {
+	// 	ag.FileOutput.Writeln(StartThinking)
+	// }
 }
 
 func (ag *Agent) CompleteReasoning() {
@@ -66,9 +66,9 @@ func (ag *Agent) CompleteReasoning() {
 			// ag.Std.Writeln()
 		}
 	}
-	if ag.FileOutput != nil {
-		ag.FileOutput.Writeln(EndThinking)
-	}
+	// if ag.FileOutput != nil {
+	// 	ag.FileOutput.Writeln(EndThinking)
+	// }
 }
 
 /*
@@ -88,9 +88,11 @@ func (ag *Agent) WriteReasoning(text string) {
 			}
 		}
 	}
-	if ag.FileOutput != nil {
-		ag.FileOutput.Writef("%s", text)
-	}
+
+	// Don't write reasoning text to file
+	// if ag.FileOutput != nil {
+	// 	ag.FileOutput.Writef("%s", text)
+	// }
 }
 
 func (ag *Agent) WriteMarkdown() {
@@ -222,9 +224,11 @@ func (ag *Agent) WriteFunctionCall(text string) {
 			event.StartIndicator("")
 		}
 	}
-	if ag.FileOutput != nil {
-		ag.FileOutput.Writef("\n%s\n", text)
-	}
+
+	// Don't write function call to file
+	// if ag.FileOutput != nil {
+	// 	ag.FileOutput.Writef("\n%s\n", text)
+	// }
 }
 
 func (ag *Agent) WriteFunctionCallOver() {
@@ -267,7 +271,7 @@ func (ag *Agent) Error(text string) {
 	// 	Errorf("Agent: %v\n", text)
 	// }
 	if ag.FileOutput != nil {
-		ag.FileOutput.Writef("\n%s\n", text)
+		ag.FileOutput.Writef("\nError:\n%s\n", text)
 	}
 }
 
@@ -276,7 +280,7 @@ func (ag *Agent) Warn(text string) {
 		util.Warnf("%s\n", text)
 	}
 	if ag.FileOutput != nil {
-		ag.FileOutput.Writef("\n%s\n", text)
+		ag.FileOutput.Writef("\nWarning:\n%s\n", text)
 	}
 }
 

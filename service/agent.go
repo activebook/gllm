@@ -274,11 +274,11 @@ type AgentOptions struct {
 	ModelInfo     *data.Model
 	MaxRecursions int
 	ThinkingLevel string
-	EnabledTools  []string // List of enabled embedding tools
-	Capabilities  []string // List of enabled capabilities
-	YoloMode      bool     // Whether to automatically approve tools
-	QuietMode     bool     // If Quiet mode then don't print to console
-	OutputFile    string   // If OutputFile is set then write to file
+	EnabledTools  []string         // List of enabled embedding tools
+	Capabilities  []string         // List of enabled capabilities
+	YoloMode      bool   // Whether to automatically approve tools
+	QuietMode     bool   // If Quiet mode then don't print to console
+	OutputFile    string // If OutputFile is set then write to file
 	SessionName   string
 	MCPConfig     map[string]*data.MCPServer
 
