@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/event"
@@ -55,6 +56,7 @@ type Agent struct {
 	TokenUsage      *TokenUsage         // Token usage metainfo
 	StdOutput       io.Output           // Standard I/O
 	FileOutput      io.Output           // File I/O
+	OutputBuffer    *strings.Builder    // Sink buffer for final output text
 	Status          StatusStack         // Stack to manage streaming status
 	Session         Session             // Session
 	Context         ContextManager      // Context manager
@@ -274,11 +276,12 @@ type AgentOptions struct {
 	ModelInfo     *data.Model
 	MaxRecursions int
 	ThinkingLevel string
-	EnabledTools  []string // List of enabled embedding tools
-	Capabilities  []string // List of enabled capabilities
-	YoloMode      bool     // Whether to automatically approve tools
-	QuietMode     bool     // If Quiet mode then don't print to console
-	OutputFile    string   // If OutputFile is set then write to file
+	EnabledTools  []string         // List of enabled embedding tools
+	Capabilities  []string         // List of enabled capabilities
+	YoloMode      bool             // Whether to automatically approve tools
+	QuietMode     bool             // If Quiet mode then don't print to console
+	OutputFile    string           // If OutputFile is set then write to file
+	OutputBuffer  *strings.Builder // Sink buffer for final output text
 	SessionName   string
 	MCPConfig     map[string]*data.MCPServer
 
@@ -397,6 +400,7 @@ func CallAgent(op *AgentOptions) error {
 		TokenUsage:    tu,
 		StdOutput:     stdIO,
 		FileOutput:    fileIO,
+		OutputBuffer:  op.OutputBuffer,
 		Status:        StatusStack{},
 		SharedState:   op.SharedState,
 		AgentName:     op.AgentName,

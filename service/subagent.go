@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -411,15 +412,6 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 	// Load MCP config (if error, just continue)
 	mcpConfig, _ := e.mcpStore.Load()
 
-	// Generate output file path (persistent)
-	// Use TaskKey in filename for better traceability
-	keyPart := ""
-	if task.TaskKey != "" {
-		keyPart = "_" + util.GetSanitizeTitle(task.TaskKey)
-	}
-	outputFile := data.GenerateTaskFilePath(fmt.Sprintf("subagent_%s%s", task.AgentName, keyPart), ".md")
-	result.OutputFile = outputFile
-
 	// Prepare input context from SharedState dependencies
 	// Instead of virtual files, we embed the context directly into the prompt
 	finalInstruction := task.Instruction
@@ -445,6 +437,7 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 	}
 
 	// Prepare agent options
+	var outBuf strings.Builder
 	op := AgentOptions{
 		Prompt:        finalInstruction,
 		SysPrompt:     sysPrompt,
@@ -456,7 +449,7 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 		Capabilities:  agentConfig.Capabilities,
 		YoloMode:      true, // Sub-agents always auto-approve
 		QuietMode:     true, // Sub-agents run quietly
-		OutputFile:    outputFile,
+		OutputBuffer:  &outBuf,
 		SessionName:   sessionName,
 		MCPConfig:     mcpConfig,
 		SharedState:   e.state,
@@ -499,10 +492,7 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 
 		// Store output in SharedState if TaskKey is specified
 		if task.TaskKey != "" && e.state != nil {
-			content, err := util.GetFileContent(outputFile)
-			if err == nil {
-				e.state.Set(task.TaskKey, content, task.AgentName)
-			}
+			e.state.Set(task.TaskKey, outBuf.String(), task.AgentName)
 		}
 	}
 }
