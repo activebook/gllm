@@ -388,7 +388,7 @@ func (ri *ReplInfo) showHistory() {
 	}
 
 	// Get session data
-	sessionData, sessionName, err := GetSessionData(sessionName, agent.Model.Provider)
+	sessionData, err := service.ReadSessionContent(sessionName)
 	if err != nil {
 		if os.IsNotExist(err) {
 			fmt.Println("No available session yet.")
@@ -399,7 +399,7 @@ func (ri *ReplInfo) showHistory() {
 	}
 
 	// Detect provider based on message format
-	isCompatible, provider, modelProvider := CheckSessionFormat(agent, sessionData)
+	isCompatible, provider, modelProvider := service.CheckSessionFormat(agent, sessionData)
 	if !isCompatible {
 		// Warn about potential incompatibility if providers differ
 		util.Warnf("Session '%s' [%s] is not compatible with the current model provider [%s].\n", sessionName, provider, modelProvider)
@@ -442,7 +442,7 @@ func (ri *ReplInfo) compressContext() {
 	}
 
 	// Get session data
-	sessionData, sessionName, err := GetSessionData(sessionName, agent.Model.Provider)
+	sessionData, err := service.ReadSessionContent(sessionName)
 	if err != nil {
 		if os.IsNotExist(err) {
 			fmt.Println("No available session yet.")
@@ -470,7 +470,7 @@ func (ri *ReplInfo) compressContext() {
 	}
 
 	// Save back to the file format
-	err = WriteSessionData(sessionName, newData, agent.Model.Provider)
+	err = service.WriteSessionContent(sessionName, newData)
 	if err != nil {
 		util.Errorf("Failed to save compressed session: %v\n", err)
 		return

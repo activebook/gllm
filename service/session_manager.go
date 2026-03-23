@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/util"
 )
 
 const (
@@ -77,6 +78,73 @@ func ClearSession(name string) error {
 func ReadSessionContent(name string) ([]byte, error) {
 	mainFilePath := GetSessionMainFilePath(name)
 	return os.ReadFile(mainFilePath)
+}
+
+// WriteSessionContent writes the data into the main.jsonl file
+func WriteSessionContent(name string, data []byte) error {
+	mainFilePath := GetSessionMainFilePath(name)
+	
+	// Preserve original file mode if it exists
+	if fi, err := os.Stat(mainFilePath); err == nil {
+		return os.WriteFile(mainFilePath, data, fi.Mode())
+	}
+
+	// If not exist, ensure dir exists and write with default perm
+	os.MkdirAll(GetSessionPath(name), 0750)
+	return os.WriteFile(mainFilePath, data, 0644)
+}
+
+// EnsureSessionCompatibility checks if the existing session is compatible with the current agent's provider.
+// If not, it attempts to convert the session history.
+func EnsureSessionCompatibility(agent *data.AgentConfig, sessionName string) error {
+	// 1. Get session Data
+	sessionData, err := ReadSessionContent(sessionName)
+	if err != nil {
+		// If session doesn't exist, that's fine, nothing to check/convert
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	// 2. Check Compatibility
+	isCompatible, provider, modelProvider := CheckSessionFormat(agent, sessionData)
+	if !isCompatible {
+		util.Debugf("session '%s' [%s] is not compatible with the current model provider [%s].\n", sessionName, provider, modelProvider)
+
+		// 3. Convert Data
+		convertData, err := ConvertMessages(sessionData, provider, modelProvider)
+		if err != nil {
+			return fmt.Errorf("error converting session: %v", err)
+		}
+
+		// 4. Write Back
+		if err := WriteSessionContent(sessionName, convertData); err != nil {
+			return err
+		}
+		util.Debugf("session '%s' converted to compatible format [%s].\n", sessionName, modelProvider)
+	}
+
+	return nil
+}
+
+// CheckSessionFormat verifies if the session data is compatible with the agent's provider.
+func CheckSessionFormat(agent *data.AgentConfig, sessionData []byte) (isCompatible bool, provider string, modelProvider string) {
+	modelProvider = agent.Model.Provider
+
+	// Detect provider based on message format
+	provider = DetectMessageProviderByContent(sessionData)
+
+	// Check compatibility
+	isCompatible = provider == modelProvider
+	if !isCompatible {
+		isCompatible = provider == ModelProviderUnknown ||
+			(provider == ModelProviderOpenAI && modelProvider == ModelProviderOpenAICompatible) ||
+			(provider == ModelProviderOpenAICompatible && modelProvider == ModelProviderOpenAI) ||
+			(provider == ModelProviderOpenAICompatible && modelProvider == ModelProviderAnthropic)
+	}
+
+	return isCompatible, provider, modelProvider
 }
 
 // ExportSession exports a session's main.jsonl to a destination path
