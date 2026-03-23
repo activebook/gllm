@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -437,7 +436,6 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 	}
 
 	// Prepare agent options
-	var outBuf strings.Builder
 	op := AgentOptions{
 		Prompt:        finalInstruction,
 		SysPrompt:     sysPrompt,
@@ -449,7 +447,6 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 		Capabilities:  agentConfig.Capabilities,
 		YoloMode:      true, // Sub-agents always auto-approve
 		QuietMode:     true, // Sub-agents run quietly
-		OutputBuffer:  &outBuf,
 		SessionName:   sessionName,
 		MCPConfig:     mcpConfig,
 		SharedState:   e.state,
@@ -490,9 +487,22 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 		result.Status = StatusCompleted
 		result.Progress = fmt.Sprintf("Completed in %s", result.Duration.Round(time.Millisecond))
 
-		// Store output in SharedState if TaskKey is specified
+		// Compress the subagent's session into a semantic summary for the orchestrator.
+		// This is the Map-Reduce boundary: full context stays in the session file,
+		// only the distilled summary crosses into SharedState.
 		if task.TaskKey != "" && e.state != nil {
-			e.state.Set(task.TaskKey, outBuf.String(), task.AgentName)
+			sessionData, readErr := ReadSessionContent(sessionName)
+			if readErr == nil {
+				summary, compressErr := CompressSession(agentConfig, sessionData)
+				if compressErr != nil {
+					// Fallback: store a diagnostic error so the orchestrator isn't silently blocked
+					e.state.Set(task.TaskKey, fmt.Sprintf("[compression failed: %v]", compressErr), task.AgentName)
+				} else {
+					e.state.Set(task.TaskKey, summary, task.AgentName)
+				}
+			} else {
+				e.state.Set(task.TaskKey, fmt.Sprintf("[session read failed: %v]", readErr), task.AgentName)
+			}
 		}
 	}
 }

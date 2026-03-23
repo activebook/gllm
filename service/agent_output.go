@@ -32,9 +32,6 @@ func (ag *Agent) WriteText(text string) {
 	if ag.FileOutput != nil {
 		ag.FileOutput.Writef("%s", text)
 	}
-	if ag.OutputBuffer != nil {
-		ag.OutputBuffer.WriteString(text)
-	}
 }
 
 /*
@@ -276,9 +273,6 @@ func (ag *Agent) Error(text string) {
 	if ag.FileOutput != nil {
 		ag.FileOutput.Writef("\nError:\n%s\n", text)
 	}
-	if ag.OutputBuffer != nil {
-		fmt.Fprintf(ag.OutputBuffer, "\nError:\n%s\n", text)
-	}
 }
 
 func (ag *Agent) Warn(text string) {
@@ -287,9 +281,6 @@ func (ag *Agent) Warn(text string) {
 	}
 	if ag.FileOutput != nil {
 		ag.FileOutput.Writef("\nWarning:\n%s\n", text)
-	}
-	if ag.OutputBuffer != nil {
-		fmt.Fprintf(ag.OutputBuffer, "\nWarning:\n%s\n", text)
 	}
 }
 
