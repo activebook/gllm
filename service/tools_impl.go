@@ -1492,9 +1492,6 @@ func spawnSubAgentsToolCallImpl(
 		return "No tasks provided. Please specify at least one task.", nil
 	}
 
-	store := data.NewConfigStore()
-	callerAgent := store.GetActiveAgentName()
-
 	// Check if confirmation is needed
 	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
 	if !ok {
@@ -1554,7 +1551,7 @@ func spawnSubAgentsToolCallImpl(
 		}
 
 		tasks = append(tasks, &SubAgentTask{
-			CallerAgentName: callerAgent,
+			CallerAgentName: toolsUse.AgentName,
 			AgentName:       agentName,
 			Instruction:     instruction,
 			TaskKey:         taskKey,

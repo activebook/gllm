@@ -220,7 +220,7 @@ func (ag *Agent) GenerateOpenAIStream() error {
 	// Initialize sub-agent executor if SharedState is available
 	var executor *SubAgentExecutor
 	if ag.SharedState != nil {
-		executor = NewSubAgentExecutor(ag.SharedState, ag.Session.GetName())
+		executor = NewSubAgentExecutor(ag.SharedState, ag.Session.GetTopSessionName())
 	}
 
 	op := OpenProcessor{

@@ -17,6 +17,7 @@ type Session interface {
 	SetPath(title string)
 	GetPath() string
 	GetName() string
+	GetTopSessionName() string
 	Load() error
 	Save() error
 	Open(title string) error
@@ -59,6 +60,15 @@ func (s *BaseSession) GetPath() string {
 
 func (s *BaseSession) GetName() string {
 	return s.Name
+}
+
+// GetTopSessionName returns the top session name, which is the first part of the session name.
+// The session name is in the format of "SessionName::TaskKey"
+// For example, if the session name is "Main::Task1", the top session name is "Main"
+// if the session name is "Main", the top session name is "Main"
+func (s *BaseSession) GetTopSessionName() string {
+	parts := strings.SplitN(s.Name, "::", 2)
+	return parts[0]
 }
 
 // readFile reads the JSONL file and returns each line as a separate byte slice.
