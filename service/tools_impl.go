@@ -1189,7 +1189,10 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Too
 	if name == "list" {
 		agents := store.GetAllAgents()
 		var sb strings.Builder
-		sb.WriteString("Available Agents:\n")
+
+		// Title
+		sb.WriteString("# Available Agents\n\n")
+		sb.WriteString(fmt.Sprintf("Total: %d agent(s)\n\n", len(agents)))
 
 		var names []string
 		for n := range agents {
@@ -1200,15 +1203,20 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Too
 		// List all agents with details
 		for _, n := range names {
 			ag := agents[n]
-			sb.WriteString(fmt.Sprintf("- %s: Model=%s, ThinkingLevel=%s, Tools=%v, Capabilities=%v\n",
-				n, ag.Model.Model, ag.Think, ag.Tools, ag.Capabilities))
-			if ag.SystemPrompt != "" {
-				// Show more of the system prompt to help the model decide
-				sysPrompt := strings.ReplaceAll(ag.SystemPrompt, "\n", " ")
-				sb.WriteString(fmt.Sprintf("  System Prompt: %s\n", sysPrompt))
-			}
+			sb.WriteString(formatAgentInfo(n, ag))
 		}
-		sb.WriteString("\nTo switch to an agent, use this tool with the agent's name.")
+
+		// Capability Glossary
+		sb.WriteString("---\n\n")
+		sb.WriteString("## Capability Glossary\n\n")
+		sb.WriteString(GetAllCapabilitiesDescription())
+		sb.WriteString("\n\n")
+
+		// Instructions
+		sb.WriteString("---\n\n")
+		sb.WriteString("## Usage\n\n")
+		sb.WriteString("- Use `switch_agent` with the exact agent name to hand off execution\n")
+
 		return sb.String(), nil
 	}
 
@@ -1428,7 +1436,10 @@ func listAgentToolCallImpl() (string, error) {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Available Agents (%d total):\n\n", len(agents)))
+
+	// Title
+	sb.WriteString("# Available Agents\n\n")
+	sb.WriteString(fmt.Sprintf("Total: %d agent(s)\n\n", len(agents)))
 
 	// Sort agent names for consistent output
 	var names []string
@@ -1439,33 +1450,46 @@ func listAgentToolCallImpl() (string, error) {
 
 	for _, name := range names {
 		ag := agents[name]
-		sb.WriteString(fmt.Sprintf("## %s\n", name))
-		sb.WriteString(fmt.Sprintf("  Name: %s\n", name))
-		sb.WriteString(fmt.Sprintf("  Model: %s\n", ag.Model.Model))
-		sb.WriteString(fmt.Sprintf("  Provider: %s\n", ag.Model.Provider))
-		sb.WriteString(fmt.Sprintf("  Thinking Level: %s\n", ag.Think))
-
-		if len(ag.Tools) > 0 {
-			sb.WriteString(fmt.Sprintf("  Tools: %v\n", ag.Tools))
-		} else {
-			sb.WriteString("  Tools: none\n")
-		}
-
-		if len(ag.Capabilities) > 0 {
-			sb.WriteString(fmt.Sprintf("  Capabilities: %v\n", ag.Capabilities))
-		}
-
-		if ag.SystemPrompt != "" {
-			// Show more system prompt to help model understand the agent
-			sysPrompt := strings.ReplaceAll(ag.SystemPrompt, "\n", " ")
-			sb.WriteString(fmt.Sprintf("  System Prompt: %s\n", sysPrompt))
-		}
-
-		sb.WriteString("\n")
+		sb.WriteString(formatAgentInfo(name, ag))
 	}
 
-	sb.WriteString("Use spawn_subagents to invoke a sub-agent, or switch_agent to hand off to another agent.")
+	// Capability Glossary
+	sb.WriteString("---\n\n")
+	sb.WriteString("## Capability Glossary\n\n")
+	sb.WriteString(GetAllCapabilitiesDescription())
+	sb.WriteString("\n\n")
+
+	// Instructions
+	sb.WriteString("---\n\n")
+	sb.WriteString("## Usage\n\n")
+	sb.WriteString("- Use `spawn_subagents` to invoke a sub-agent\n")
+	sb.WriteString("- Use `switch_agent` to hand off to another agent\n")
+
 	return sb.String(), nil
+}
+
+func formatAgentInfo(name string, ag *data.AgentConfig) string {
+	var sb strings.Builder
+
+	sb.WriteString(fmt.Sprintf("## Agent: `%s`\n\n", name))
+	sb.WriteString(fmt.Sprintf("- **Description:** %s\n", ag.Description))
+	sb.WriteString(fmt.Sprintf("- **Model:** %s (%s)\n", ag.Model.Model, ag.Model.Provider))
+	sb.WriteString(fmt.Sprintf("- **Thinking Level:** %s\n", ag.Think))
+
+	if len(ag.Tools) > 0 {
+		sb.WriteString(fmt.Sprintf("- **Tools:** %s\n", strings.Join(ag.Tools, ", ")))
+	} else {
+		sb.WriteString("- **Tools:** _(none)_\n")
+	}
+
+	if len(ag.Capabilities) > 0 {
+		sb.WriteString(fmt.Sprintf("- **Capabilities:** %s\n", strings.Join(ag.Capabilities, ", ")))
+	} else {
+		sb.WriteString("- **Capabilities:** _(none)_\n")
+	}
+
+	sb.WriteString("\n")
+	return sb.String()
 }
 
 // spawnSubAgentsToolCallImpl handles the spawn_subagents tool call
