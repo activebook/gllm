@@ -1440,6 +1440,7 @@ func listAgentToolCallImpl() (string, error) {
 	for _, name := range names {
 		ag := agents[name]
 		sb.WriteString(fmt.Sprintf("## %s\n", name))
+		sb.WriteString(fmt.Sprintf("  Name: %s\n", name))
 		sb.WriteString(fmt.Sprintf("  Model: %s\n", ag.Model.Model))
 		sb.WriteString(fmt.Sprintf("  Provider: %s\n", ag.Model.Provider))
 		sb.WriteString(fmt.Sprintf("  Thinking Level: %s\n", ag.Think))
@@ -1491,12 +1492,8 @@ func spawnSubAgentsToolCallImpl(
 		return "No tasks provided. Please specify at least one task.", nil
 	}
 
-	timeout := 300 * time.Second // Default 5 minutes
-	if timeoutVal, exists := (*argsMap)["timeout"]; exists {
-		if timeoutFloat, ok := timeoutVal.(float64); ok && timeoutFloat > 0 {
-			timeout = time.Duration(timeoutFloat) * time.Second
-		}
-	}
+	store := data.NewConfigStore()
+	callerAgent := store.GetActiveAgentName()
 
 	// Check if confirmation is needed
 	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
@@ -1556,27 +1553,23 @@ func spawnSubAgentsToolCallImpl(
 			}
 		}
 
-		// Parse optional wait flag (explicit barrier)
-		wait := false
-		if waitVal, ok := taskMap["wait"].(bool); ok {
-			wait = waitVal
-		}
-
 		tasks = append(tasks, &SubAgentTask{
-			AgentName:   agentName,
-			Instruction: instruction,
-			TaskKey:     taskKey,
-			InputKeys:   inputKeys,
-			Wait:        wait,
+			CallerAgentName: callerAgent,
+			AgentName:       agentName,
+			Instruction:     instruction,
+			TaskKey:         taskKey,
+			InputKeys:       inputKeys,
 		})
 	}
 
-	// Submit and execute all tasks (always wait)
-	executor.SubmitBatch(tasks)
-	results := executor.Execute(timeout)
+	// Dispatch tasks concurrently via the actor model
+	responses, err := executor.Dispatch(tasks)
+	if err != nil {
+		return "", fmt.Errorf("failed to dispatch sub-agents: %v", err)
+	}
 
 	// Return formatted summary
-	return executor.FormatSummary(results), nil
+	return executor.FormatSummary(responses), nil
 }
 
 // getStateToolCallImpl handles the get_state tool call

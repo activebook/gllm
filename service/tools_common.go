@@ -1363,17 +1363,18 @@ func getSpawnSubAgentsTool() *OpenTool {
 		Name: ToolSpawnSubAgents,
 		Description: `Spawn multiple sub-agents to perform parallel or sequential tasks.
 
-This tool allows you to delegate work to specialized agents, manage dependencies between tasks,
-and collect results in a structured way. Sub-agents run in isolated contexts to the main agent.
+Sub-agents are persistent actors that run in their own isolated sessions.
+All tasks in a single call execute CONCURRENTLY — never put dependent tasks in the same call.
 
-SESSION PERSISTENCE: Each sub-agent's conversation history is automatically saved and tied to the
-task_key. This means:
-- SAME task_key → resumes the subagent's prior session (full conversation history is restored)
-- NEW task_key  → starts a completely fresh subagent session with no prior context
-The tool response will indicate whether each task is [new] or [resume] so you always know the state.
+KEY NAMING CONVENTION (important!):
+You supply a short semantic 'task_key' per task (e.g. 'auth_review').
+The system automatically namespaces it as 'agentName_taskKey' (e.g. 'reviewer_auth_review').
+This full namespaced key is what gets written to SharedState and returned in the result summary.
+Always use the FULL 'agentName_taskKey' key when calling get_state or specifying input_keys.
 
-CRITICAL: Assign a unique, semantic task_key to each task—this is your ONLY mechanism to retrieve results
-and correlate outputs across the workflow. Returns progress summary; use get_state(task_key) for full detailed results.
+SESSION PERSISTENCE:
+- Same agent + same task_key → resumes prior subagent session (context restored)
+- Same agent + new  task_key → fresh subagent session, no prior context
 
 Differs from switch_agent:
 - spawn_subagents: Sub-agents return results to you; you maintain control
@@ -1396,22 +1397,17 @@ Differs from switch_agent:
 							},
 							"task_key": map[string]interface{}{
 								"type":        "string",
-								"description": "A unique, semantic string identifier for this task. It serves FOUR roles:\n1. SESSION IDENTITY: The subagent's conversation history is persisted under this key. Reuse the SAME key to resume a prior subagent session (the subagent will remember previous context). Use a NEW key to start a fresh session.\n2. ADDRESS: The key used to write the full result into SharedState memory.\n3. STORAGE: Forms the unique suffix of the persistent output filename (e.g., ..._analysis.md) for debuggability.\n4. RETRIEVAL: Use this exact key with get_state to read the sub-agent's output.\nExamples: 'code_review_auth', 'market_analysis_competitor_a'. The tool response shows [new] or [resume] for each task.",
+								"description": "A short, semantic identifier you choose for this task (e.g. 'auth_review', 'competitor_a').\nThe system stores the result in SharedState under the FULL key 'agentName_taskKey' (e.g. 'reviewer_auth_review').\nThe full key is listed in the result summary after execution — always use the FULL key with get_state or input_keys.\nReuse the same task_key for the same agent to RESUME that agent's prior session; use a new key to start fresh.",
 							},
 							"input_keys": map[string]interface{}{
 								"type": "array",
 								"items": map[string]interface{}{
 									"type": "string",
 								},
-								"description": "Optional list of task_keys from PREVIOUS tasks. The output content of these keys will be automatically retrieved from SharedState and injected into this sub-agent's context. Use this to pass the results of 'agent A' as input to 'agent B'.",
-							},
-							"wait": map[string]interface{}{
-								"type":        "boolean",
-								"description": "If true, wait for ALL preceding tasks to complete before starting. Use for explicit barriers. Default is false (auto-waits based on input_keys dependencies).",
-								"default":     false,
+								"description": "Optional. Full SharedState keys in 'agentName_taskKey' format (e.g. 'reviewer_auth_review') whose stored content is injected into this sub-agent's prompt as context. Use keys printed in a PREVIOUS spawn_subagents result, or from list_state. All tasks in one call are concurrent — never reference a result from the same batch.",
 							},
 						},
-						"required": []string{"agent", "instruction", "task_key"},
+						"required": []string{"agent_name", "instruction", "task_key"},
 					},
 					"description": "Array of tasks to execute. Each task invokes a sub-agent with the given instruction.",
 				},
@@ -1419,11 +1415,6 @@ Differs from switch_agent:
 					"type":        "boolean",
 					"description": "Whether to prompt the user for confirmation before spawning sub-agents. Defaults to true.",
 					"default":     true,
-				},
-				"timeout": map[string]interface{}{
-					"type":        "integer",
-					"description": "Timeout in seconds for all tasks. Default is 300 (5 minutes).",
-					"default":     300,
 				},
 			},
 			"required": []string{"tasks"},

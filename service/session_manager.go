@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	MainSessionName = "main"
-	SessionSuffix   = ".jsonl"
+	MainSessionName      = "main"
+	SessionFileExtension = ".jsonl"
 )
 
 // SessionMeta metadata for a session
@@ -37,24 +37,24 @@ func GetSessionPath(name string) string {
 }
 
 // GetSessionFilePath returns the absolute file path for a session's specific jsonl file.
-// If name is "sessionA:taskB", it returns "sessions/sessionA/taskB.jsonl"
+// If name is "sessionA::taskB", it returns "sessions/sessionA/taskB.jsonl"
 // If name is "sessionA", it returns "sessions/sessionA/main.jsonl"
 func GetSessionFilePath(name string) string {
-	parts := strings.Split(name, ":")
+	parts := strings.Split(name, "::")
 	if len(parts) == 2 {
-		return filepath.Join(GetSessionPath(parts[0]), util.GetSanitizeTitle(parts[1])+SessionSuffix)
+		return filepath.Join(GetSessionPath(parts[0]), util.GetSanitizeTitle(parts[1])+SessionFileExtension)
 	}
-	return filepath.Join(GetSessionPath(name), MainSessionName+SessionSuffix)
+	return filepath.Join(GetSessionPath(name), MainSessionName+SessionFileExtension)
 }
 
 // GetSessionMainFilePath returns the absolute file path for a session's main.jsonl
 func GetSessionMainFilePath(name string) string {
-	return filepath.Join(GetSessionPath(name), MainSessionName+SessionSuffix)
+	return filepath.Join(GetSessionPath(name), MainSessionName+SessionFileExtension)
 }
 
 // SessionExists checks if a top-level session folder exists, or if a subagent file exists
 func SessionExists(name string, checkSubAgent bool) bool {
-	parts := strings.Split(name, ":")
+	parts := strings.Split(name, "::")
 	if len(parts) >= 2 {
 		if !checkSubAgent {
 			return false
@@ -68,8 +68,33 @@ func SessionExists(name string, checkSubAgent bool) bool {
 	return err == nil && info.IsDir()
 }
 
-// RenameSession renames an existing session directory
+// RenameSession renames an existing session directory or subagent file
 func RenameSession(oldName, newName string) error {
+	partsOld := strings.Split(oldName, "::")
+
+	if len(partsOld) == 2 {
+		partsNew := strings.Split(newName, "::")
+		if len(partsNew) == 1 {
+			newName = partsOld[0] + "::" + newName
+		} else if partsNew[0] != partsOld[0] {
+			return fmt.Errorf("cannot move subagent session to a different parent session")
+		} else if len(partsNew) == 2 {
+			newName = partsOld[0] + "::" + partsNew[1]
+		}
+
+		oldPath := GetSessionFilePath(oldName)
+		newPath := GetSessionFilePath(newName)
+
+		if _, err := os.Stat(oldPath); os.IsNotExist(err) {
+			return fmt.Errorf("subagent session '%s' not found", oldName)
+		}
+		if _, err := os.Stat(newPath); err == nil {
+			return fmt.Errorf("subagent session '%s' already exists", newName)
+		}
+
+		return os.Rename(oldPath, newPath)
+	}
+
 	oldPath := GetSessionPath(oldName)
 	newPath := GetSessionPath(newName)
 
@@ -83,8 +108,12 @@ func RenameSession(oldName, newName string) error {
 	return os.Rename(oldPath, newPath)
 }
 
-// RemoveSession deletes an entire session directory
+// RemoveSession deletes an entire session directory or a specific subagent file
 func RemoveSession(name string) error {
+	parts := strings.Split(name, "::")
+	if len(parts) == 2 {
+		return os.Remove(GetSessionFilePath(name))
+	}
 	path := GetSessionPath(name)
 	return os.RemoveAll(path)
 }
@@ -112,7 +141,7 @@ func WriteSessionContent(name string, data []byte) error {
 	}
 
 	// If not exist, ensure dir exists and write with default perm
-	sessionFolder := GetSessionPath(strings.Split(name, ":")[0])
+	sessionFolder := GetSessionPath(strings.Split(name, "::")[0])
 	os.MkdirAll(sessionFolder, 0750)
 	return os.WriteFile(filePath, data, 0644)
 }
@@ -178,9 +207,9 @@ func ExportSession(name, destPath string) error {
 	}
 
 	if destPath == "" {
-		destPath = name + SessionSuffix
+		destPath = name + SessionFileExtension
 	} else if info, err := os.Stat(destPath); err == nil && info.IsDir() {
-		destPath = filepath.Join(destPath, name+SessionSuffix)
+		destPath = filepath.Join(destPath, name+SessionFileExtension)
 	}
 
 	return os.WriteFile(destPath, data, 0644)
@@ -201,7 +230,7 @@ func ClearEmptySessionsAsync() {
 			}
 
 			sessionDir := filepath.Join(GetSessionsDir(), entry.Name())
-			mainFile := filepath.Join(sessionDir, MainSessionName+SessionSuffix)
+			mainFile := filepath.Join(sessionDir, MainSessionName+SessionFileExtension)
 
 			info, err := os.Stat(mainFile)
 			// Remove the entire folder if main.jsonl doesn't exist or is empty
@@ -223,7 +252,7 @@ func FindSessionByIndex(idx string) (string, error) {
 	index, err := strconv.Atoi(idx)
 	if err == nil {
 		// It's an index, resolve to session name using your sorted list logic
-		sessions, err := ListSortedSessions(false, false)
+		sessions, err := ListSortedSessions(false, true)
 		if err != nil {
 			return "", err
 		}
@@ -241,10 +270,9 @@ func FindSessionByIndex(idx string) (string, error) {
 }
 
 // ListSortedSessions returns a slice of sessionMeta sorted by modTime descending
-// ListSortedSessions(false, false)  // Fast - no file reads
-// ListSortedSessions(true, false)   // Fast - only metadata
-// ListSortedSessions(false, true)   // Slow - reads all files for provider
-func ListSortedSessions(onlyNonEmpty bool, detectProvider bool) ([]SessionMeta, error) {
+// detectProvider: whether to detect the provider of the session
+// includeSubAgents: whether to include subagent sessions
+func ListSortedSessions(detectProvider bool, includeSubAgents bool) ([]SessionMeta, error) {
 	sessionDir := GetSessionsDir()
 	entries, err := os.ReadDir(sessionDir)
 	if err != nil {
@@ -268,7 +296,7 @@ func ListSortedSessions(onlyNonEmpty bool, detectProvider bool) ([]SessionMeta, 
 		}
 
 		for _, file := range files {
-			if file.IsDir() || !strings.HasSuffix(file.Name(), SessionSuffix) {
+			if file.IsDir() || !strings.HasSuffix(file.Name(), SessionFileExtension) {
 				continue
 			}
 
@@ -279,20 +307,19 @@ func ListSortedSessions(onlyNonEmpty bool, detectProvider bool) ([]SessionMeta, 
 				continue
 			}
 
-			if onlyNonEmpty && info.Size() == 0 {
-				continue
-			}
-
 			var provider string
 			if detectProvider {
 				provider = DetectMessageProvider(filePath)
 			}
 
 			// Generate the display name based on whether it's main or subagent
-			taskKey := strings.TrimSuffix(file.Name(), SessionSuffix)
+			taskKey := strings.TrimSuffix(file.Name(), SessionFileExtension)
 			displayName := sessionName
 			if taskKey != MainSessionName {
-				displayName = sessionName + ":" + taskKey
+				if !includeSubAgents {
+					continue
+				}
+				displayName = sessionName + "::" + taskKey
 			}
 
 			sessions = append(sessions, SessionMeta{
@@ -322,27 +349,25 @@ func FindSessionsByPattern(pattern string) ([]string, error) {
 			return nil, err
 		}
 		if index >= 1 && index <= len(sessions) {
-			// Use the resolved file name as the pattern
-			pattern = sessions[index-1].Name
+			// Specific index matched, return just that one
+			return []string{sessions[index-1].Name}, nil
 		}
 	}
 
-	// Now pattern is either a name or a wildcard
-	sessionDir := GetSessionsDir()
-	sessionPathPattern := filepath.Join(sessionDir, pattern)
-
-	// Find matching directories using the pattern
-	paths, err := filepath.Glob(sessionPathPattern)
+	// Now pattern is either a name or a wildcard. We match against all available sessions.
+	sessions, err := ListSortedSessions(false, true)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse pattern: %w", err)
+		return nil, err
 	}
 
-	// Convert paths to session names (base dir name)
-	for _, p := range paths {
-		info, err := os.Stat(p)
-		// Only include if it's a directory
-		if err == nil && info.IsDir() {
-			matches = append(matches, filepath.Base(p))
+	for _, session := range sessions {
+		matched, err := filepath.Match(pattern, session.Name)
+		if err != nil {
+			// Malformed pattern
+			return nil, fmt.Errorf("failed to parse pattern: %w", err)
+		}
+		if matched {
+			matches = append(matches, session.Name)
 		}
 	}
 

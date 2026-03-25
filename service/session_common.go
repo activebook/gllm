@@ -40,8 +40,8 @@ func (s *BaseSession) SetPath(title string) {
 	}
 	dir := GetSessionsDir()
 
-	// Format is expected to be "SessionName" or "SessionName:TaskKey"
-	parts := strings.SplitN(title, ":", 2)
+	// Format is expected to be "SessionName" or "SessionName::TaskKey"
+	parts := strings.SplitN(title, "::", 2)
 	sessionID := util.GetSanitizeTitle(parts[0])
 
 	// Default session name is main
@@ -50,7 +50,7 @@ func (s *BaseSession) SetPath(title string) {
 		sessionName = util.GetSanitizeTitle(parts[1])
 	}
 
-	s.Path = filepath.Join(dir, sessionID, sessionName+SessionSuffix)
+	s.Path = filepath.Join(dir, sessionID, sessionName+SessionFileExtension)
 }
 
 func (s *BaseSession) GetPath() string {

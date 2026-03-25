@@ -41,7 +41,7 @@ var sessionListCmd = &cobra.Command{
 	Short:   "List all sessions",
 	Long:    `List all available sessions in sorted order.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		sessions, err := service.ListSortedSessions(false, true)
+		sessions, err := service.ListSortedSessions(true, true)
 		if err != nil {
 			fmt.Println(err)
 			return nil
@@ -56,7 +56,7 @@ var sessionListCmd = &cobra.Command{
 		for index, session := range sessions {
 			// Visually indent sub-sessions
 			prefix := ""
-			if strings.Contains(session.Name, ":") {
+			if strings.Contains(session.Name, "::") {
 				prefix = "└─ "
 			}
 
@@ -92,9 +92,7 @@ gllm session remove "2 - 5" --force`,
 		if len(args) > 0 {
 			pattern = args[0]
 		} else {
-			// Select sessions to remove — only show top-level sessions.
-			// Removing a parent folder purges all nested subagent sessions automatically.
-			sessions, err := service.ListSortedSessions(false, true)
+			sessions, err := service.ListSortedSessions(true, true)
 			if err != nil || len(sessions) == 0 {
 				fmt.Println("No sessions found.")
 				return nil
@@ -102,14 +100,15 @@ gllm session remove "2 - 5" --force`,
 
 			var options []huh.Option[string]
 			for _, c := range sessions {
-				if strings.Contains(c.Name, ":") {
-					continue // skip subagent sessions
-				}
 				label := c.Name
 				if c.Provider != "" {
 					label = fmt.Sprintf("%s [%s]", c.Name, c.Provider)
 				}
-				options = append(options, huh.NewOption(label, c.Name))
+				prefix := ""
+				if strings.Contains(c.Name, "::") {
+					prefix = "└─ "
+				}
+				options = append(options, huh.NewOption(prefix+label, c.Name))
 			}
 			height := io.GetTermFitHeight(len(options))
 
@@ -138,7 +137,7 @@ gllm session remove "2 - 5" --force`,
 				end, err2 := strconv.Atoi(rangeParts[1])
 
 				if err1 == nil && err2 == nil {
-					sessions, err := service.ListSortedSessions(false, false)
+					sessions, err := service.ListSortedSessions(false, true)
 					if err != nil {
 						fmt.Println(err)
 						return nil
@@ -277,7 +276,7 @@ var sessionInfoCmd = &cobra.Command{
 			sessionName = args[0]
 		} else {
 			// Select session
-			sessions, err := service.ListSortedSessions(false, true)
+			sessions, err := service.ListSortedSessions(true, true)
 			if err != nil || len(sessions) == 0 {
 				fmt.Println("No sessions found.")
 				return nil
@@ -291,7 +290,7 @@ var sessionInfoCmd = &cobra.Command{
 				}
 				// Visually indent sub-sessions
 				prefix := ""
-				if strings.Contains(c.Name, ":") {
+				if strings.Contains(c.Name, "::") {
 					prefix = "└─ "
 				}
 				options = append(options, huh.NewOption(prefix+label, c.Name))
@@ -383,8 +382,7 @@ var sessionRenameCmd = &cobra.Command{
 				return err
 			}
 		} else {
-			// Select session to rename
-			sessions, err := service.ListSortedSessions(false, true)
+			sessions, err := service.ListSortedSessions(true, true)
 			if err != nil || len(sessions) == 0 {
 				fmt.Println("No sessions found.")
 				return nil
@@ -395,14 +393,15 @@ var sessionRenameCmd = &cobra.Command{
 			} else {
 				var options []huh.Option[string]
 				for _, c := range sessions {
-					if strings.Contains(c.Name, ":") {
-						continue // skip subagent sessions – renaming a parent covers them
-					}
 					label := c.Name
 					if c.Provider != "" {
 						label = fmt.Sprintf("%s [%s]", c.Name, c.Provider)
 					}
-					options = append(options, huh.NewOption(label, c.Name))
+					prefix := ""
+					if strings.Contains(c.Name, "::") {
+						prefix = "└─ "
+					}
+					options = append(options, huh.NewOption(prefix+label, c.Name))
 				}
 				height := io.GetTermFitHeight(len(options))
 
@@ -420,6 +419,11 @@ var sessionRenameCmd = &cobra.Command{
 
 			// Get new name
 			newName = oldName // set default value
+			parentSession := ""
+			if strings.Contains(newName, "::") {
+				parentSession = strings.Split(newName, "::")[0]
+				newName = strings.Split(newName, "::")[1]
+			}
 			err = huh.NewInput().
 				Title("New Name").
 				Value(&newName).
@@ -439,6 +443,9 @@ var sessionRenameCmd = &cobra.Command{
 				Run()
 			if err != nil {
 				return nil
+			}
+			if parentSession != "" {
+				newName = parentSession + "::" + newName
 			}
 		}
 
