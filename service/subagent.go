@@ -222,8 +222,6 @@ func (e *SubAgentExecutor) executeTask(agent *ActiveAgent, task *SubAgentTask) *
 	result := &SubAgentResult{
 		AgentName: agent.Name,
 		TaskKey:   task.TaskKey,
-		Status:    StatusRunning,
-		StartTime: time.Now(),
 	}
 
 	// Both components form the key suffix
@@ -242,6 +240,9 @@ func (e *SubAgentExecutor) executeTask(agent *ActiveAgent, task *SubAgentTask) *
 
 	// The key used to store the output in SharedState
 	result.StateKey = agentTaskKey
+
+	// Set task start status and print the start message
+	e.setTaskStart(result, task, sessionName)
 
 	// Load MCP config
 	mcpConfig, _ := e.mcpStore.Load()
@@ -279,46 +280,66 @@ func (e *SubAgentExecutor) executeTask(agent *ActiveAgent, task *SubAgentTask) *
 		ModelName:     agent.Config.Model.Name,
 	}
 
+	// Execute the agent (synchronous blocking call within this goroutine)
+	err := e.runner(&op)
+	if err != nil {
+		e.setTaskError(result, task.TaskKey, err)
+	}
+
+	// Map-Reduce boundary: Compress session and write to SharedState
+	if agentTaskKey != "" && e.state != nil {
+		sessionData, readErr := ReadSessionContent(sessionName)
+		if readErr == nil {
+			summary, compressErr := CompressSession(agent.Config, sessionData)
+			if compressErr != nil {
+				e.state.Set(agentTaskKey, fmt.Sprintf("[compression failed: %v]", compressErr), agent.Name)
+				e.setTaskError(result, task.TaskKey, compressErr)
+			} else {
+				e.state.Set(agentTaskKey, summary, agent.Name)
+				e.setTaskCompleted(result, task.TaskKey)
+			}
+		} else {
+			e.setTaskError(result, task.TaskKey, readErr)
+		}
+	} else {
+		e.setTaskError(result, "", fmt.Errorf("failed to write session to SharedState: no task key or shared state"))
+	}
+
+	return result
+}
+
+// setTaskStart sets the task to running status and prints the start message.
+func (e *SubAgentExecutor) setTaskStart(result *SubAgentResult, task *SubAgentTask, sessionName string) {
+	result.Status = StatusRunning
+	result.StartTime = time.Now()
+	result.Error = nil
+
 	// Determine whether this is a new or resumed session
 	mode := "Executing"
 	if SessionExists(sessionName, true) {
 		mode = "Resuming"
 	}
 	fmt.Printf("==> %s task: %s %s[%s -> %s]%s ...\n", mode, task.TaskKey, data.AgentRoleColor, task.CallerAgentName, task.AgentName, data.ResetSeq)
+}
 
-	// Execute the agent (synchronous blocking call within this goroutine)
-	err := e.runner(&op)
-
+// setTaskCompleted sets the task to completed status and prints the success message.
+func (e *SubAgentExecutor) setTaskCompleted(result *SubAgentResult, taskKey string) {
+	result.Status = StatusCompleted
 	result.EndTime = time.Now()
 	result.Duration = result.EndTime.Sub(result.StartTime)
+	result.Error = nil
+	result.Progress = fmt.Sprintf("Completed in %s", result.Duration.Round(time.Millisecond))
+	fmt.Printf("%s✓ > Task completed: %s%s\n", data.StatusSuccessColor, taskKey, data.ResetSeq)
+}
 
-	if err != nil {
-		result.Status = StatusFailed
-		result.Error = err
-		result.Progress = fmt.Sprintf("Failed after %s: %v", result.Duration.Round(time.Millisecond), err)
-		fmt.Printf("%s✗ > Task failed: %s - %v%s\n", data.StatusErrorColor, task.TaskKey, err, data.ResetSeq)
-	} else {
-		result.Status = StatusCompleted
-		result.Progress = fmt.Sprintf("Completed in %s", result.Duration.Round(time.Millisecond))
-		fmt.Printf("%s✓ > Task completed: %s%s\n", data.StatusSuccessColor, task.TaskKey, data.ResetSeq)
-
-		// Map-Reduce boundary: Compress session and write to SharedState
-		if agentTaskKey != "" && e.state != nil {
-			sessionData, readErr := ReadSessionContent(sessionName)
-			if readErr == nil {
-				summary, compressErr := CompressSession(agent.Config, sessionData)
-				if compressErr != nil {
-					e.state.Set(agentTaskKey, fmt.Sprintf("[compression failed: %v]", compressErr), agent.Name)
-				} else {
-					e.state.Set(agentTaskKey, summary, agent.Name)
-				}
-			} else {
-				e.state.Set(agentTaskKey, fmt.Sprintf("[session read failed: %v]", readErr), agent.Name)
-			}
-		}
-	}
-
-	return result
+// setTaskError sets the task to failed status and prints the error message.
+func (e *SubAgentExecutor) setTaskError(result *SubAgentResult, taskKey string, err error) {
+	result.Status = StatusFailed
+	result.EndTime = time.Now()
+	result.Duration = result.EndTime.Sub(result.StartTime)
+	result.Error = err
+	result.Progress = fmt.Sprintf("Failed after %s: %v", result.Duration.Round(time.Millisecond), err)
+	fmt.Printf("%s✗ > Task failed: %s - %v%s\n", data.StatusErrorColor, taskKey, err, data.ResetSeq)
 }
 
 // FormatSummary returns a brief summary of task execution
