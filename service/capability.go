@@ -1,5 +1,10 @@
 package service
 
+import (
+	"fmt"
+	"strings"
+)
+
 const (
 	CapabilityMCPServers      = "mcp_servers"
 	CapabilityAgentSkills     = "agent_skills"
@@ -89,6 +94,19 @@ var (
 // GetAllEmbeddingCapabilities returns all capabilities that are enabled by default.
 func GetAllEmbeddingCapabilities() []string {
 	return embeddingCapabilities
+}
+
+// GetAllCapabilitiesDescription returns all capabilities description.
+func GetAllCapabilitiesDescription() string {
+	var sb strings.Builder
+	for _, cap := range embeddingCapabilities {
+		desc := GetCapabilityDescription(cap)
+		if desc != "" {
+			desc = strings.ReplaceAll(desc, "\n", " ")
+			sb.WriteString(fmt.Sprintf("- **%s**: %s\n", cap, desc))
+		}
+	}
+	return sb.String()
 }
 
 // GetCapabilityTitle returns the title of a capability.

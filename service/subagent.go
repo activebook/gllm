@@ -1,10 +1,8 @@
 package service
 
 import (
-	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/activebook/gllm/data"
@@ -20,10 +18,6 @@ const (
 	StatusCompleted
 	StatusFailed
 	StatusCancelled
-)
-
-const (
-	MaxWorkersParalleled = 5
 )
 
 func (s SubAgentStatus) String() string {
@@ -45,382 +39,221 @@ func (s SubAgentStatus) String() string {
 
 // SubAgentTask represents a single sub-agent invocation request
 type SubAgentTask struct {
-	ID          string   // Unique task ID
-	AgentName   string   // Agent profile to use
-	Instruction string   // Task instruction/prompt
-	TaskKey     string   // Key to store result in SharedState, and also the session name
-	InputKeys   []string // Keys to read as input context (virtual files)
-	Wait        bool     // If true, wait for ALL prior tasks before starting
+	CallerAgentName string   // Caller agent name
+	AgentName       string   // Agent profile to use
+	Instruction     string   // Task instruction/prompt
+	TaskKey         string   // Key to store result in SharedState (becomes agentName_taskKey)
+	InputKeys       []string // Keys to read as input context (virtual files), injected into instruction
 }
 
 // SubAgentResult represents the outcome of a sub-agent execution
 type SubAgentResult struct {
-	TaskID     string         // Task ID
 	AgentName  string         // Agent that executed
 	Status     SubAgentStatus // Execution status
 	Progress   string         // Human-readable progress description
 	OutputFile string         // Path to detailed output
-	TaskKey    string         // Key where result was stored in SharedState
+	TaskKey    string         // Original task key
+	StateKey   string         // Key where result was stored in SharedState (agentName_taskKey)
 	Error      error          // Error if failed
 	Duration   time.Duration  // Execution duration
 	StartTime  time.Time      // When execution started
 	EndTime    time.Time      // When execution ended
 }
 
+// AgentMessage is a task delivery envelope sent on an agent's TaskChan.
+type AgentMessage struct {
+	Task     *SubAgentTask
+	RespChan chan<- AgentResponse // caller-owned, per-request
+}
+
+// AgentResponse is the signal sent back to the caller when a task finishes.
+type AgentResponse struct {
+	TaskKey string
+	Result  *SubAgentResult
+	Err     error
+}
+
+// ActiveAgent is a persistent, resident subagent actor.
+type ActiveAgent struct {
+	Name     string
+	Config   *data.AgentConfig
+	TaskChan chan AgentMessage // event loop inbox
+	executor *SubAgentExecutor // reference to the parent executor to access state/runner
+}
+
 // AgentRunner defines the function signature for executing an agent
 type AgentRunner func(*AgentOptions) error
 
-// SubAgentExecutor manages sub-agent lifecycle and execution
+// SubAgentExecutor manages sub-agent lifecycle and message routing
 type SubAgentExecutor struct {
 	state           *data.SharedState
-	maxWorkers      int
-	taskID          atomic.Int64
 	runner          AgentRunner // Function to execute agent (default: CallAgent)
 	mainSessionName string      // Orchestrator session name (e.g., "my project")
 
-	// Task tracking
-	mu       sync.RWMutex
-	tasks    map[string]*taskEntry
-	mcpStore *data.MCPStore
-}
-
-type taskEntry struct {
-	task   *SubAgentTask
-	result *SubAgentResult
-	cancel context.CancelFunc
+	mu           sync.RWMutex
+	activeAgents map[string]*ActiveAgent
+	mcpStore     *data.MCPStore
 }
 
 // NewSubAgentExecutor creates a new SubAgentExecutor
-func NewSubAgentExecutor(state *data.SharedState, maxWorkers int, mainSessionName string) *SubAgentExecutor {
-	if maxWorkers <= 0 {
-		maxWorkers = MaxWorkersParalleled
-	} else if maxWorkers > MaxWorkersParalleled {
-		maxWorkers = MaxWorkersParalleled
-	}
+func NewSubAgentExecutor(state *data.SharedState, mainSessionName string) *SubAgentExecutor {
 	return &SubAgentExecutor{
 		state:           state,
-		maxWorkers:      maxWorkers,
 		mainSessionName: mainSessionName,
-		tasks:           make(map[string]*taskEntry),
+		activeAgents:    make(map[string]*ActiveAgent),
 		mcpStore:        data.NewMCPStore(),
 		runner:          CallAgent, // Default runner
 	}
 }
 
-// generateTaskID generates a unique task ID
-func (e *SubAgentExecutor) generateTaskID() string {
-	id := e.taskID.Add(1)
-	return fmt.Sprintf("task-%d-%d", time.Now().UnixNano(), id)
-}
-
-// Submit submits a single task for execution and returns the task ID
-func (e *SubAgentExecutor) Submit(task *SubAgentTask) string {
-	if task.ID == "" {
-		task.ID = e.generateTaskID()
-	}
-
+// startSubAgent returns a running ActiveAgent, launching its event loop if it doesn't exist yet.
+func (e *SubAgentExecutor) startSubAgent(agentName string) (*ActiveAgent, error) {
 	e.mu.Lock()
-	e.tasks[task.ID] = &taskEntry{
-		task: task,
-		result: &SubAgentResult{
-			TaskID:    task.ID,
-			AgentName: task.AgentName,
-			Status:    StatusPending,
-			TaskKey:   task.TaskKey,
-		},
-	}
-	e.mu.Unlock()
+	defer e.mu.Unlock()
 
-	return task.ID
-}
-
-// SubmitBatch submits multiple tasks and returns their IDs
-func (e *SubAgentExecutor) SubmitBatch(tasks []*SubAgentTask) []string {
-	ids := make([]string, len(tasks))
-	for i, task := range tasks {
-		ids[i] = e.Submit(task)
-	}
-	return ids
-}
-
-// Execute runs all pending tasks and waits for completion
-// Uses DAG-based dependency resolution: tasks with input_keys wait for those dependencies
-func (e *SubAgentExecutor) Execute(timeout time.Duration) []SubAgentResult {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	// Collect pending tasks in submission order
-	e.mu.RLock()
-	var pendingTasks []*taskEntry
-	var taskOrder []string // Track submission order for Wait flag
-	for _, entry := range e.tasks {
-		if entry.result.Status == StatusPending {
-			pendingTasks = append(pendingTasks, entry)
-			taskOrder = append(taskOrder, entry.task.TaskKey)
-		}
-	}
-	e.mu.RUnlock()
-
-	if len(pendingTasks) == 0 {
-		return nil
+	// 1. Check if already running
+	if agent, exists := e.activeAgents[agentName]; exists {
+		return agent, nil
 	}
 
-	// Build dependency graph and check for cycles
-	deps := e.buildDependencyGraph(pendingTasks, taskOrder)
-	if cycle := e.detectCycle(deps); cycle != "" {
-		// Mark all tasks as failed due to cycle
-		for _, entry := range pendingTasks {
-			entry.result.Status = StatusFailed
-			entry.result.Error = fmt.Errorf("circular dependency detected: %s", cycle)
-		}
-		return e.collectResults(pendingTasks)
-	}
-
-	// Synchronization primitives for dependency tracking
-	completed := make(map[string]bool)
-	var completedMu sync.RWMutex
-	completedCond := sync.NewCond(&completedMu)
-
-	// Use semaphore to limit concurrent workers
-	sem := make(chan struct{}, e.maxWorkers)
-	var wg sync.WaitGroup
-
-	for _, entry := range pendingTasks {
-		wg.Add(1)
-		go func(te *taskEntry) {
-			defer wg.Done()
-
-			// Wait for dependencies before acquiring worker slot
-			completedMu.Lock()
-			for !e.allDepsReady(te.task, deps, completed, ctx) {
-				// Check for context cancellation while waiting
-				select {
-				case <-ctx.Done():
-					completedMu.Unlock()
-					te.result.Status = StatusCancelled
-					te.result.Error = ctx.Err()
-					return
-				default:
-				}
-				completedCond.Wait()
-			}
-			completedMu.Unlock()
-
-			// Acquire semaphore (worker slot)
-			select {
-			case sem <- struct{}{}:
-				defer func() { <-sem }()
-			case <-ctx.Done():
-				te.result.Status = StatusCancelled
-				te.result.Error = ctx.Err()
-				return
-			}
-
-			// Create cancellable context for this task
-			taskCtx, taskCancel := context.WithCancel(ctx)
-			e.mu.Lock()
-			te.cancel = taskCancel
-			e.mu.Unlock()
-
-			// Execute the task
-			e.executeTask(taskCtx, te)
-			// Show progress executing task/total tasks
-			dones, total := e.GetProgressStatistics()
-
-			switch te.result.Status {
-			case StatusCompleted:
-				fmt.Printf("%s✓ > Task completed (%d/%d): %s%s\n", data.StatusSuccessColor, dones, total, te.task.TaskKey, data.ResetSeq)
-			case StatusFailed:
-				fmt.Printf("%s✗ > Task failed (%d/%d): %s - %v%s\n", data.StatusErrorColor, dones, total, te.task.TaskKey, te.result.Error, data.ResetSeq)
-			case StatusCancelled:
-				fmt.Printf("%s! > Task cancelled (%d/%d): %s%s\n", data.StatusWarnColor, dones, total, te.task.TaskKey, data.ResetSeq)
-			}
-
-			// Mark task as completed and broadcast to waiting tasks
-			completedMu.Lock()
-			completed[te.task.TaskKey] = true
-			completedCond.Broadcast()
-			completedMu.Unlock()
-		}(entry)
-	}
-
-	wg.Wait()
-
-	return e.collectResults(pendingTasks)
-}
-
-// buildDependencyGraph constructs a dependency map from input_keys and Wait flags
-// Returns: task_key -> list of task_keys it must wait for
-func (e *SubAgentExecutor) buildDependencyGraph(tasks []*taskEntry, taskOrder []string) map[string][]string {
-	deps := make(map[string][]string)
-	taskKeySet := make(map[string]bool)
-
-	// Build set of valid task_keys in this batch
-	for _, te := range tasks {
-		taskKeySet[te.task.TaskKey] = true
-	}
-
-	// Map task_key to position for Wait flag processing
-	orderIndex := make(map[string]int)
-	for i, key := range taskOrder {
-		orderIndex[key] = i
-	}
-
-	for _, te := range tasks {
-		var taskDeps []string
-
-		// If Wait=true, depend on ALL prior tasks
-		if te.task.Wait {
-			myIndex := orderIndex[te.task.TaskKey]
-			for _, priorKey := range taskOrder[:myIndex] {
-				if taskKeySet[priorKey] {
-					taskDeps = append(taskDeps, priorKey)
-				}
-			}
-		} else {
-			// Otherwise, depend only on input_keys that exist in this batch
-			for _, inputKey := range te.task.InputKeys {
-				if taskKeySet[inputKey] {
-					taskDeps = append(taskDeps, inputKey)
-				}
-			}
-		}
-
-		deps[te.task.TaskKey] = taskDeps
-	}
-
-	return deps
-}
-
-// detectCycle checks for circular dependencies using DFS
-// Returns the cycle path as a string if found, empty string otherwise
-func (e *SubAgentExecutor) detectCycle(deps map[string][]string) string {
-	visited := make(map[string]int) // 0=unvisited, 1=in-progress, 2=done
-	var path []string
-
-	var dfs func(key string) bool
-	dfs = func(key string) bool {
-		if visited[key] == 1 {
-			// Found cycle - build path string
-			cycleStart := -1
-			for i, k := range path {
-				if k == key {
-					cycleStart = i
-					break
-				}
-			}
-			if cycleStart >= 0 {
-				_ = append(path[cycleStart:], key) // Cycle detected; path used for reconstruction in outer loop
-				return true
-			}
-			return true
-		}
-		if visited[key] == 2 {
-			return false
-		}
-
-		visited[key] = 1
-		path = append(path, key)
-
-		for _, dep := range deps[key] {
-			if dfs(dep) {
-				return true
-			}
-		}
-
-		path = path[:len(path)-1]
-		visited[key] = 2
-		return false
-	}
-
-	for key := range deps {
-		if visited[key] == 0 {
-			if dfs(key) {
-				// Reconstruct cycle for error message
-				var cycleParts []string
-				inCycle := false
-				for _, k := range path {
-					if k == path[len(path)-1] || inCycle {
-						inCycle = true
-						cycleParts = append(cycleParts, k)
-					}
-				}
-				if len(cycleParts) > 0 {
-					return fmt.Sprintf("%v", cycleParts)
-				}
-				return "cycle detected"
-			}
-		}
-	}
-
-	return ""
-}
-
-// allDepsReady checks if all dependencies for a task are satisfied
-func (e *SubAgentExecutor) allDepsReady(task *SubAgentTask, deps map[string][]string, completed map[string]bool, ctx context.Context) bool {
-	// Check context first
-	select {
-	case <-ctx.Done():
-		return true // Return true to exit wait loop, caller handles cancellation
-	default:
-	}
-
-	for _, depKey := range deps[task.TaskKey] {
-		if !completed[depKey] {
-			return false
-		}
-	}
-	return true
-}
-
-// collectResults gathers results from all task entries
-func (e *SubAgentExecutor) collectResults(tasks []*taskEntry) []SubAgentResult {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	results := make([]SubAgentResult, 0, len(tasks))
-	for _, entry := range tasks {
-		results = append(results, *entry.result)
-	}
-	return results
-}
-
-// executeTask runs a single sub-agent task
-func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
-	task := entry.task
-	result := entry.result
-
-	result.StartTime = time.Now()
-	result.Status = StatusRunning
-
-	// Load agent configuration
+	// 2. Load agent config to verify it exists
 	store := data.NewConfigStore()
-	agentConfig := store.GetAgent(task.AgentName)
+	agentConfig := store.GetAgent(agentName)
 	if agentConfig == nil {
-		result.Status = StatusFailed
-		result.Error = fmt.Errorf("agent '%s' not found", task.AgentName)
-		result.EndTime = time.Now()
-		result.Duration = result.EndTime.Sub(result.StartTime)
-		result.Progress = fmt.Sprintf("Failed: %v", result.Error)
-		return
+		return nil, fmt.Errorf("agent '%s' not found", agentName)
 	}
 
-	// Build system prompt
-	sysPrompt := agentConfig.SystemPrompt
+	// 3. Create active agent structure
+	agent := &ActiveAgent{
+		Name:     agentName,
+		Config:   agentConfig,
+		TaskChan: make(chan AgentMessage, 8), // small buffer to absorb bursts
+		executor: e,
+	}
 
-	// Load MCP config (if error, just continue)
+	// 4. Register
+	e.activeAgents[agentName] = agent
+
+	// 5. Start the event loop
+	go e.agentLoop(agent)
+
+	return agent, nil
+}
+
+// Shutdown closes all agent task channels, allowing their event loops to exit.
+func (e *SubAgentExecutor) Shutdown() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	for _, agent := range e.activeAgents {
+		close(agent.TaskChan)
+	}
+	// Clear the registry
+	e.activeAgents = make(map[string]*ActiveAgent)
+}
+
+// agentLoop is the persistent goroutine that receives tasks and dispatches workers.
+func (e *SubAgentExecutor) agentLoop(agent *ActiveAgent) {
+	for msg := range agent.TaskChan {
+		// Spawn a goroutine to handle the task so the loop never blocks
+		go e.handleMsg(agent, msg)
+	}
+}
+
+// handleMsg performs the work requested by an AgentMessage.
+func (e *SubAgentExecutor) handleMsg(agent *ActiveAgent, msg AgentMessage) {
+	// Execute the task
+	result := e.executeTask(agent, msg.Task)
+
+	// Send the response back to the caller
+	msg.RespChan <- AgentResponse{
+		TaskKey: msg.Task.TaskKey,
+		Result:  result,
+		Err:     result.Error,
+	}
+}
+
+// Dispatch fans out tasks asynchronously to subagents and waits for all responses.
+func (e *SubAgentExecutor) Dispatch(tasks []*SubAgentTask) ([]AgentResponse, error) {
+	if len(tasks) == 0 {
+		return nil, nil
+	}
+
+	// Buffered channel avoids goroutine leak if the caller panics or gives up early
+	respChan := make(chan AgentResponse, len(tasks))
+
+	// Fan-out Phase: Start tasks concurrently
+	for _, task := range tasks {
+		agent, err := e.startSubAgent(task.AgentName)
+		if err != nil {
+			// Fast-fail if agent config is missing before trying to send
+			respChan <- AgentResponse{
+				TaskKey: task.TaskKey,
+				Err:     err,
+			}
+			continue
+		}
+
+		// Capture loop variable
+		t := task
+
+		// Send non-blockingly (to the dispatch loop, not the actual receiver)
+		// If TaskChan buffer is full, we must use a goroutine to wait
+		go func(a *ActiveAgent, t *SubAgentTask) {
+			a.TaskChan <- AgentMessage{
+				Task:     t,
+				RespChan: respChan,
+			}
+		}(agent, t)
+	}
+
+	// Fan-in Phase: Collect all responses
+	results := make([]AgentResponse, 0, len(tasks))
+	for i := 0; i < len(tasks); i++ {
+		resp := <-respChan
+		results = append(results, resp)
+	}
+
+	return results, nil
+}
+
+// executeTask runs the LLM call for a sub-agent task.
+func (e *SubAgentExecutor) executeTask(agent *ActiveAgent, task *SubAgentTask) *SubAgentResult {
+	result := &SubAgentResult{
+		AgentName: agent.Name,
+		TaskKey:   task.TaskKey,
+	}
+
+	// Both components form the key suffix
+	agentTaskKey := ""
+	if task.TaskKey != "" {
+		// Because agentTaskKey would be used as file name, we use "_" as separator
+		agentTaskKey = fmt.Sprintf("%s_%s", agent.Name, task.TaskKey)
+	}
+
+	// Build subagent session name as "mainSession::agentName_taskKey"
+	sessionName := ""
+	if e.mainSessionName != "" && agentTaskKey != "" {
+		// Because mainSessionName only as a logic namespace, we use "::" as separator
+		sessionName = fmt.Sprintf("%s::%s", e.mainSessionName, agentTaskKey)
+	}
+
+	// The key used to store the output in SharedState
+	result.StateKey = agentTaskKey
+
+	// Set task start status and print the start message
+	e.setTaskStart(result, task, sessionName)
+
+	// Load MCP config
 	mcpConfig, _ := e.mcpStore.Load()
 
-	// Prepare input context from SharedState dependencies
-	// Instead of virtual files, we embed the context directly into the prompt
+	// Prepare input context from SharedState
 	finalInstruction := task.Instruction
 	if len(task.InputKeys) > 0 && e.state != nil {
 		finalInstruction += "\n\n# Context from previous tasks:\n"
 		for _, key := range task.InputKeys {
 			if val, ok := e.state.Get(key); ok {
-				// Convert value to string representation
 				contentStr := fmt.Sprintf("%v", val)
-				// Append to instruction with clear separation
 				finalInstruction += fmt.Sprintf("\n## Output from '%s':\n%s\n", util.GetSanitizeTitle(key), contentStr)
 			} else {
 				util.Warnf("Sub-agent input key '%s' not found in SharedState, skipping.\n", key)
@@ -428,242 +261,110 @@ func (e *SubAgentExecutor) executeTask(ctx context.Context, entry *taskEntry) {
 		}
 	}
 
-	// Build subagent session name as "mainSession:taskKey"
-	// Both components will be sanitized by SetPath
-	sessionName := ""
-	if e.mainSessionName != "" && task.TaskKey != "" {
-		sessionName = e.mainSessionName + ":" + task.TaskKey
-	}
-
 	// Prepare agent options
 	op := AgentOptions{
 		Prompt:        finalInstruction,
-		SysPrompt:     sysPrompt,
+		SysPrompt:     agent.Config.SystemPrompt,
 		Files:         nil,
-		ModelInfo:     &agentConfig.Model,
-		MaxRecursions: agentConfig.MaxRecursions,
-		ThinkingLevel: agentConfig.Think,
-		EnabledTools:  agentConfig.Tools,
-		Capabilities:  agentConfig.Capabilities,
+		ModelInfo:     &agent.Config.Model,
+		MaxRecursions: agent.Config.MaxRecursions,
+		ThinkingLevel: agent.Config.Think,
+		EnabledTools:  agent.Config.Tools,
+		Capabilities:  agent.Config.Capabilities,
 		YoloMode:      true, // Sub-agents always auto-approve
 		QuietMode:     true, // Sub-agents run quietly
 		SessionName:   sessionName,
 		MCPConfig:     mcpConfig,
 		SharedState:   e.state,
-		AgentName:     task.AgentName,
-		ModelName:     agentConfig.Model.Name,
+		AgentName:     agent.Name,
+		ModelName:     agent.Config.Model.Name,
 	}
 
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		result.Status = StatusCancelled
-		result.Error = ctx.Err()
-		result.EndTime = time.Now()
-		result.Duration = result.EndTime.Sub(result.StartTime)
-		result.Progress = "Cancelled"
-		return
-	default:
-	}
-
-	// Determine whether this is a new or resumed session, then execute
-	mode := "Executing"
-	if SessionExists(sessionName, true) {
-		mode = "Resuming"
-	}
-	fmt.Printf("==> %s task: %s [agent: %s] ...\n", mode, task.TaskKey, task.AgentName)
-
-	// Execute the agent
+	// Execute the agent (synchronous blocking call within this goroutine)
 	err := e.runner(&op)
-
-	result.EndTime = time.Now()
-	result.Duration = result.EndTime.Sub(result.StartTime)
-
 	if err != nil {
-		result.Status = StatusFailed
-		result.Error = err
-		result.Progress = fmt.Sprintf("Failed after %s: %v", result.Duration.Round(time.Millisecond), err)
-	} else {
-		result.Status = StatusCompleted
-		result.Progress = fmt.Sprintf("Completed in %s", result.Duration.Round(time.Millisecond))
+		e.setTaskError(result, task.TaskKey, err)
+	}
 
-		// Compress the subagent's session into a semantic summary for the orchestrator.
-		// This is the Map-Reduce boundary: full context stays in the session file,
-		// only the distilled summary crosses into SharedState.
-		if task.TaskKey != "" && e.state != nil {
-			sessionData, readErr := ReadSessionContent(sessionName)
-			if readErr == nil {
-				summary, compressErr := CompressSession(agentConfig, sessionData)
-				if compressErr != nil {
-					// Fallback: store a diagnostic error so the orchestrator isn't silently blocked
-					e.state.Set(task.TaskKey, fmt.Sprintf("[compression failed: %v]", compressErr), task.AgentName)
-				} else {
-					e.state.Set(task.TaskKey, summary, task.AgentName)
-				}
+	// Map-Reduce boundary: Compress session and write to SharedState
+	if agentTaskKey != "" && e.state != nil {
+		sessionData, readErr := ReadSessionContent(sessionName)
+		if readErr == nil {
+			summary, compressErr := CompressSession(agent.Config, sessionData)
+			if compressErr != nil {
+				e.state.Set(agentTaskKey, fmt.Sprintf("[compression failed: %v]", compressErr), agent.Name)
+				e.setTaskError(result, task.TaskKey, compressErr)
 			} else {
-				e.state.Set(task.TaskKey, fmt.Sprintf("[session read failed: %v]", readErr), task.AgentName)
+				e.state.Set(agentTaskKey, summary, agent.Name)
+				e.setTaskCompleted(result, task.TaskKey)
 			}
+		} else {
+			e.setTaskError(result, task.TaskKey, readErr)
 		}
-	}
-}
-
-// GetProgressStatistics returns the number of done and total tasks
-func (e *SubAgentExecutor) GetProgressStatistics() (int, int) {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-	dones := 0
-	for _, entry := range e.tasks {
-		if entry.result.Status == StatusCompleted {
-			dones++
-		}
-	}
-	return dones, len(e.tasks)
-}
-
-// GetProgress returns the current result for a task
-func (e *SubAgentExecutor) GetProgress(taskID string) *SubAgentResult {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	if entry, exists := e.tasks[taskID]; exists {
-		resultCopy := *entry.result
-		return &resultCopy
-	}
-	return nil
-}
-
-// GetAllProgress returns progress for all tasks
-func (e *SubAgentExecutor) GetAllProgress() []SubAgentResult {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	results := make([]SubAgentResult, 0, len(e.tasks))
-	for _, entry := range e.tasks {
-		results = append(results, *entry.result)
-	}
-	return results
-}
-
-// Cancel cancels a running task
-func (e *SubAgentExecutor) Cancel(taskID string) error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	entry, exists := e.tasks[taskID]
-	if !exists {
-		return fmt.Errorf("task %s not found", taskID)
-	}
-
-	if entry.cancel != nil {
-		entry.cancel()
-		entry.result.Status = StatusCancelled
-		return nil
-	}
-
-	if entry.result.Status == StatusPending {
-		entry.result.Status = StatusCancelled
-		return nil
-	}
-
-	return fmt.Errorf("task %s cannot be cancelled (status: %s)", taskID, entry.result.Status)
-}
-
-// CancelAll cancels all running tasks
-func (e *SubAgentExecutor) CancelAll() {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	for _, entry := range e.tasks {
-		if entry.cancel != nil {
-			entry.cancel()
-			entry.result.Status = StatusCancelled
-		} else if entry.result.Status == StatusPending {
-			entry.result.Status = StatusCancelled
-		}
-	}
-}
-
-// Clear removes all completed/failed/cancelled tasks
-func (e *SubAgentExecutor) Clear() {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	for id, entry := range e.tasks {
-		status := entry.result.Status
-		if status == StatusCompleted || status == StatusFailed || status == StatusCancelled {
-			delete(e.tasks, id)
-		}
-	}
-}
-
-// ClearAll removes all tasks
-func (e *SubAgentExecutor) ClearAll() {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	e.tasks = make(map[string]*taskEntry)
-}
-
-// FormatProgress returns a formatted string of all task progress
-func (e *SubAgentExecutor) FormatProgress() string {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	if len(e.tasks) == 0 {
-		return "No sub-agent tasks have been submitted."
-	}
-
-	var result string
-	result = fmt.Sprintf("Sub-agent tasks (%d total):\n\n", len(e.tasks))
-
-	for _, entry := range e.tasks {
-		r := entry.result
-		result += fmt.Sprintf("Task: %s\n", r.TaskID)
-		result += fmt.Sprintf("  Agent: %s\n", r.AgentName)
-		result += fmt.Sprintf("  Status: %s\n", r.Status)
-		result += fmt.Sprintf("  Progress: %s\n", r.Progress)
-		if r.TaskKey != "" {
-			result += fmt.Sprintf("  Task Key: %s\n", r.TaskKey)
-		}
-		if r.OutputFile != "" {
-			result += fmt.Sprintf("  Output File: %s\n", r.OutputFile)
-		}
-		if r.Duration > 0 {
-			result += fmt.Sprintf("  Duration: %s\n", r.Duration.Round(time.Millisecond))
-		}
-		result += "\n"
+	} else {
+		e.setTaskError(result, "", fmt.Errorf("failed to write session to SharedState: no task key or shared state"))
 	}
 
 	return result
 }
 
+// setTaskStart sets the task to running status and prints the start message.
+func (e *SubAgentExecutor) setTaskStart(result *SubAgentResult, task *SubAgentTask, sessionName string) {
+	result.Status = StatusRunning
+	result.StartTime = time.Now()
+	result.Error = nil
+
+	// Determine whether this is a new or resumed session
+	mode := "Executing"
+	if SessionExists(sessionName, true) {
+		mode = "Resuming"
+	}
+	fmt.Printf("==> %s task: %s %s[%s -> %s]%s ...\n", mode, task.TaskKey, data.AgentRoleColor, task.CallerAgentName, task.AgentName, data.ResetSeq)
+}
+
+// setTaskCompleted sets the task to completed status and prints the success message.
+func (e *SubAgentExecutor) setTaskCompleted(result *SubAgentResult, taskKey string) {
+	result.Status = StatusCompleted
+	result.EndTime = time.Now()
+	result.Duration = result.EndTime.Sub(result.StartTime)
+	result.Error = nil
+	result.Progress = fmt.Sprintf("Completed in %s", result.Duration.Round(time.Millisecond))
+	fmt.Printf("%s✓ > Task completed: %s%s\n", data.StatusSuccessColor, taskKey, data.ResetSeq)
+}
+
+// setTaskError sets the task to failed status and prints the error message.
+func (e *SubAgentExecutor) setTaskError(result *SubAgentResult, taskKey string, err error) {
+	result.Status = StatusFailed
+	result.EndTime = time.Now()
+	result.Duration = result.EndTime.Sub(result.StartTime)
+	result.Error = err
+	result.Progress = fmt.Sprintf("Failed after %s: %v", result.Duration.Round(time.Millisecond), err)
+	fmt.Printf("%s✗ > Task failed: %s - %v%s\n", data.StatusErrorColor, taskKey, err, data.ResetSeq)
+}
+
 // FormatSummary returns a brief summary of task execution
-func (e *SubAgentExecutor) FormatSummary(results []SubAgentResult) string {
-	if len(results) == 0 {
+func (e *SubAgentExecutor) FormatSummary(responses []AgentResponse) string {
+	if len(responses) == 0 {
 		return "No tasks were executed."
 	}
 
 	completed := 0
 	failed := 0
-	cancelled := 0
 	var outputs []string
 
-	for _, r := range results {
-		switch r.Status {
-		case StatusCompleted:
-			completed++
-			if r.TaskKey != "" {
-				outputs = append(outputs, r.TaskKey)
-			}
-		case StatusFailed:
+	for _, r := range responses {
+		if r.Err != nil || (r.Result != nil && r.Result.Status == StatusFailed) {
 			failed++
-		case StatusCancelled:
-			cancelled++
+		} else {
+			completed++
+			if r.Result != nil && r.Result.StateKey != "" {
+				outputs = append(outputs, r.Result.StateKey)
+			}
 		}
 	}
 
-	summary := fmt.Sprintf("Executed %d sub-agent task(s): %d completed, %d failed, %d cancelled.",
-		len(results), completed, failed, cancelled)
+	summary := fmt.Sprintf("Executed %d sub-agent task(s): %d completed, %d failed.",
+		len(responses), completed, failed)
 
 	if len(outputs) > 0 {
 		summary += fmt.Sprintf("\nResults stored in SharedState keys: %v", outputs)

@@ -297,7 +297,7 @@ func CallAgent(op *AgentOptions) error {
 	se := constructSearchEngine(op.Capabilities)
 
 	// Set up tools use settings
-	toolsUse := data.ToolsUse{AutoApprove: op.YoloMode}
+	toolsUse := data.ToolsUse{AutoApprove: op.YoloMode, AgentName: op.AgentName}
 
 	// Set up code tool settings
 	exeCode := IsCodeExecutionEnabled()
