@@ -3,7 +3,6 @@ package service
 import (
 	"fmt"
 
-	"github.com/activebook/gllm/data"
 	"google.golang.org/genai"
 )
 
@@ -56,15 +55,7 @@ func (ga *GeminiAgent) geminiShowDiffConfirm(diff, filePath, newContent string) 
 	// Function call is over
 	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusFunctionCallingOver}, ga.ProceedChan)
 
-	settings := data.GetSettingsStore()
-	// Dispatch VSCode inline diff if the global plugin is enabled
-	if settings.IsPluginEnabled(PluginVSCodeCompanion) && filePath != "" {
-		go func(p, c string) {
-			if err := SendVSCodeDiff(p, c); err != nil {
-				// Non-fatal: we don't block or error out the CLI on companion failure
-			}
-		}(filePath, newContent)
-	}
+	SendVSCodePreview(filePath, newContent)
 
 	// Show the diff confirm
 	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Data: diff, Status: StatusDiffConfirm}, ga.ProceedChan)

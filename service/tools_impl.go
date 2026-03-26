@@ -197,6 +197,7 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tools
 		event.RequestConfirm(purpose, toolsUse)
 		closeDiff() // Close the diff
 		if toolsUse.Confirm == data.ToolConfirmCancel {
+			SendVSCodeDiscard(path)
 			return fmt.Sprintf("Operation cancelled by user: write to file %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
@@ -210,8 +211,11 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tools
 	// Write the file
 	err := os.WriteFile(path, []byte(content), 0644)
 	if err != nil {
+		SendVSCodeDiscard(path)
 		return fmt.Sprintf("Error writing file %s: %v", path, err), nil
 	}
+
+	SendVSCodeSaved(path)
 
 	return fmt.Sprintf("Successfully wrote to file %s", path), nil
 }
@@ -961,6 +965,7 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsU
 		event.RequestConfirm(purpose, toolsUse)
 		closeDiff() // Close the diff
 		if toolsUse.Confirm == data.ToolConfirmCancel {
+			SendVSCodeDiscard(path)
 			return fmt.Sprintf(ToolRespDiscardEditFile, path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
@@ -968,8 +973,11 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsU
 	// Write the modified content back to the file
 	err = os.WriteFile(path, []byte(modifiedContent), 0644)
 	if err != nil {
+		SendVSCodeDiscard(path)
 		return fmt.Sprintf("Error writing file %s: %v", path, err), nil
 	}
+
+	SendVSCodeSaved(path)
 
 	// Build success message
 	var result strings.Builder
