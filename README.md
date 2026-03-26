@@ -18,13 +18,14 @@
 - **Multi-turn Sessions**: Engage in multiple rounds of conversation and manage session history.
 - **Command Agent Mode**: Let LLMs plan and execute commands with your confirmation.
 - **Plan Mode**: Review and approve the agent's proposed plan before execution.
+- **Yolo Mode**: Skip confirmations and let the agent execute actions immediately for faster, uninterrupted task completion.
 - **Model Context Protocol (MCP) Support**: Connect to external MCP servers to access additional tools and data sources.
 - **Token Usage Tracking**: Monitor your token consumption.
 - **Configuration Management**: Easily manage models, templates, system prompts, and search engines.
 - **Memory Management**: Remember important facts about you across sessions for personalized responses.
 - **Context-Aware Agent Switching**: Agents can hand off tasks to other specialized agents with full context and instructions across different LLM providers.
 - **Context Compression**: Auto compress session history to avoid exceeding the model's context window by using summarization or truncate oldest messages.
-- **Agentic Workflow**: Orchestrate sophisticated multi-agent behaviors using state-of-the-art models for parallel task execution and save context window.
+- **Sub-agents and Delegation**: Orchestrate sophisticated multi-agent behaviors using state-of-the-art models for parallel task execution and save context window.
 - **Agent Skills**: Support agent skills, switch skills on and off, install from Git/local paths with smart discovery, and update from remote sources.
 - **@ Reference Support**: Reference files and directories directly in prompts using @ syntax for seamless context inclusion.
 - **Workflow & Skills Commands**: Define and execute workflows and skills as commands for streamlined operations.
@@ -356,9 +357,9 @@ Plan Mode allows you to review and approve the agent's proposed actions before t
 |:-------------------:|:--------------:|
 | ![Plan Mode 1](screenshots/plan_mode_1.png) | ![Plan Mode 2](screenshots/plan_mode_2.png) |
 
-### Agentic Workflows
+### Sub-agents and Delegation
 
-`gllm` introduces a powerful **Agentic Workflow** system that leverages **Agent Tools** and **State Tools** to orchestrate complex, multi-agent tasks. This approach solves the traditional context window limitations by decoupling agent execution and using a shared state memory. SOTA LLMs like Gemini 3.0 and GPT-5.2 can handle complex workflows with ease.
+`gllm` introduces a powerful **Sub-agents and Delegation** system that leverages **Agent Tools** and **State Tools** to orchestrate complex, multi-agent tasks. This approach solves the traditional context window limitations by decoupling agent execution and using a shared state memory. SOTA LLMs like Gemini 3.0 and GPT-5.2 can handle complex workflows with ease.
 
 #### How it Works
 
@@ -368,9 +369,9 @@ Plan Mode allows you to review and approve the agent's proposed actions before t
     - Sub-agents can run in parallel, maximizing efficiency.
 
 2.  **State Tools (`set_state`, `get_state`)**:
-    - Instead of passing massive context strings, agents communicate via a high-speed, in-memory **Shared State**.
-    - An agent writes its output to a specific key in the shared state (e.g., `set_state(key="research_report", value="...")`).
-    - The next agent reads that key (e.g., `get_state(key="research_report")`) to continue the work.
+    - Instead of passing massive context strings, agents communicate via a high-speed, in-memory **Shared State** (also known as a **Blackboard**).
+    - An agent writes its output to a specific key in the blackboard (e.g., `set_state(key="research_report", value="...")`).
+    - The next agent reads that key (e.g., `get_state(key="research_report")`) to retrieve information from the blackboard.
     - This keeps the communication channel lightweight while preserving the full depth of data in memory.
 
 #### Deep Research Workflows
