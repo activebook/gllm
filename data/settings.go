@@ -36,15 +36,21 @@ type UpdateSettings struct {
 	CheckAt time.Time `json:"checkAt"`
 }
 
+// PluginSettings holds global plugin on/off toggles.
+type PluginSettings struct {
+	Enabled []string `json:"enabled"` // List of enabled plugin IDs
+}
+
 // Settings represents the structure of settings.json.
 type Settings struct {
-	MCP     MCPSettings     `json:"mcp"`
-	Skills  SkillsSettings  `json:"skills"`
-	Search  SearchSettings  `json:"search"`
+	MCP     MCPSettings    `json:"mcp"`
+	Skills  SkillsSettings `json:"skills"`
+	Search  SearchSettings `json:"search"`
 	Verbose VerboseSettings `json:"verbose"`
-	Theme   string          `json:"theme"`
-	Editor  string          `json:"editor"`
-	Update  UpdateSettings  `json:"update"`
+	Plugin  PluginSettings `json:"plugin"`
+	Theme   string         `json:"theme"`
+	Editor  string         `json:"editor"`
+	Update  UpdateSettings `json:"update"`
 }
 
 // SettingsStore provides access to settings.json.
@@ -84,6 +90,9 @@ func NewSettingsStore() *SettingsStore {
 			},
 			Verbose: VerboseSettings{
 				Enabled: false, // Default to false (minimal output)
+			},
+			Plugin: PluginSettings{
+				Enabled: []string{},
 			},
 			Theme:  "", // Default empty, will fall back to DefaultThemeName
 			Editor: "", // Default empty, will use auto-detection
@@ -309,6 +318,61 @@ func (s *SettingsStore) GetLastUpdateCheck() time.Time {
 func (s *SettingsStore) SetLastUpdateCheck(t time.Time) error {
 	s.mu.Lock()
 	s.settings.Update.CheckAt = t
+	s.mu.Unlock()
+	return s.Save()
+}
+
+// GetEnabledPlugins returns the list of enabled plugin IDs.
+func (s *SettingsStore) GetEnabledPlugins() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.settings.Plugin.Enabled
+}
+
+// IsPluginEnabled checks if the given plugin ID is enabled.
+func (s *SettingsStore) IsPluginEnabled(id string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, p := range s.settings.Plugin.Enabled {
+		if p == id {
+			return true
+		}
+	}
+	return false
+}
+
+// EnablePlugin adds the plugin ID to the enabled list.
+func (s *SettingsStore) EnablePlugin(id string) error {
+	s.mu.Lock()
+	for _, p := range s.settings.Plugin.Enabled {
+		if p == id {
+			s.mu.Unlock()
+			return nil // Already enabled
+		}
+	}
+	s.settings.Plugin.Enabled = append(s.settings.Plugin.Enabled, id)
+	s.mu.Unlock()
+	return s.Save()
+}
+
+// DisablePlugin removes the plugin ID from the enabled list.
+func (s *SettingsStore) DisablePlugin(id string) error {
+	s.mu.Lock()
+	newEnabled := make([]string, 0, len(s.settings.Plugin.Enabled))
+	for _, p := range s.settings.Plugin.Enabled {
+		if p != id {
+			newEnabled = append(newEnabled, p)
+		}
+	}
+	s.settings.Plugin.Enabled = newEnabled
+	s.mu.Unlock()
+	return s.Save()
+}
+
+// SetEnabledPlugins replaces the entire list of enabled plugins.
+func (s *SettingsStore) SetEnabledPlugins(ids []string) error {
+	s.mu.Lock()
+	s.settings.Plugin.Enabled = ids
 	s.mu.Unlock()
 	return s.Save()
 }

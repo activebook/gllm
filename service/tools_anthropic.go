@@ -93,13 +93,9 @@ func (op *OpenProcessor) dispatchAnthropicToolCall(toolCall anthropic.ToolUseBlo
 	case ToolReadFile:
 		return runAnthropicTool(toolCall.ID, func() (string, error) { return readFileToolCallImpl(a) })
 	case ToolWriteFile:
-		return runAnthropicTool(toolCall.ID, func() (string, error) {
-			return writeFileToolCallImpl(a, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
-		})
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return writeFileToolCallImpl(a, op) })
 	case ToolEditFile:
-		return runAnthropicTool(toolCall.ID, func() (string, error) {
-			return editFileToolCallImpl(a, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
-		})
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return editFileToolCallImpl(a, op) })
 	case ToolCreateDirectory:
 		return runAnthropicTool(toolCall.ID, func() (string, error) { return createDirectoryToolCallImpl(a, op.toolsUse) })
 	case ToolListDirectory:

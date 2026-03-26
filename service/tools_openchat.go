@@ -141,13 +141,9 @@ func (op *OpenProcessor) dispatchOpenChatToolCall(toolCall *model.ToolCall, a *m
 	case ToolReadFile:
 		return runOpenChatTool(toolCall, func() (string, error) { return readFileToolCallImpl(a) })
 	case ToolWriteFile:
-		return runOpenChatTool(toolCall, func() (string, error) {
-			return writeFileToolCallImpl(a, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
-		})
+		return runOpenChatTool(toolCall, func() (string, error) { return writeFileToolCallImpl(a, op) })
 	case ToolEditFile:
-		return runOpenChatTool(toolCall, func() (string, error) {
-			return editFileToolCallImpl(a, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
-		})
+		return runOpenChatTool(toolCall, func() (string, error) { return editFileToolCallImpl(a, op) })
 	case ToolCreateDirectory:
 		return runOpenChatTool(toolCall, func() (string, error) { return createDirectoryToolCallImpl(a, op.toolsUse) })
 	case ToolListDirectory:
