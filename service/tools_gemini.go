@@ -6,73 +6,12 @@ import (
 	"google.golang.org/genai"
 )
 
-/*
-A limitation of Gemini is that you can't use a function call and a built-in tool at the same time. ADK,
-when using Gemini as the underlying LLM, takes advantage of Gemini's built-in ability to do Google searches,
-and uses function calling to invoke your custom ADK tools.
-So agent tools can come in handy, as you can have a main agent,
-that delegates live searches to a search agent that has the GoogleSearchTool configured,
-and another tool agent that makes use of a custom tool function.
-
-Usually, this happens when you get a mysterious error like this one
-(reported against ADK for Python):
-{'error': {'code': 400, 'message': 'Tool use with function calling is unsupported',
- 'status': 'INVALID_ARGUMENT'}}.
-This means that you can't use a built-in tool and function calling at the same time in the same agent.
-*/
-
-// Tool definitions for Gemini
-func (ga *GeminiAgent) getGeminiTools() *genai.Tool {
-	// Get filtered tools based on agent's enabled tools list
-	openTools := GetOpenToolsFiltered(ga.EnabledTools)
-	var funcs []*genai.FunctionDeclaration
-
-	for _, openTool := range openTools {
-		geminiTool := openTool.ToGeminiFunctions()
-		funcs = append(funcs, geminiTool)
-	}
-
-	// The Gemini API expects all function declarations to be grouped together under a single Tool object.
-	return &genai.Tool{
-		FunctionDeclarations: funcs,
-	}
-}
-
-func (ga *GeminiAgent) getGeminiWebSearchTool() *genai.Tool {
-	// return google embedding search tool
-	tool := &genai.Tool{GoogleSearch: &genai.GoogleSearch{}}
-	return tool
-}
-
-func (ga *GeminiAgent) getGeminiCodeExecTool() *genai.Tool {
-	// return google embedding search tool
-	tool := &genai.Tool{CodeExecution: &genai.ToolCodeExecution{}}
-	return tool
-}
-
-// Diff confirm func
-func (ga *GeminiAgent) geminiShowDiffConfirm(diff, filePath, newContent string) {
-	// Function call is over
-	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusFunctionCallingOver}, ga.ProceedChan)
-
-	SendVSCodePreview(filePath, newContent)
-
-	// Show the diff confirm
-	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Data: diff, Status: StatusDiffConfirm}, ga.ProceedChan)
-}
-
-// Diff close func
-func (ga *GeminiAgent) geminiCloseDiffConfirm() {
-	// Confirm diff is over
-	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusDiffConfirmOver}, ga.ProceedChan)
-}
-
-func (ga *GeminiAgent) geminiMCPToolCall(call *genai.FunctionCall, a *map[string]interface{}) (*genai.FunctionResponse, error) {
+func (op *OpenProcessor) geminiMCPToolCall(call *genai.FunctionCall, a *map[string]interface{}) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
 	}
-	if ga.MCPClient == nil {
+	if op.mcpClient == nil {
 		err := fmt.Errorf("MCP client not initialized")
 		error := fmt.Sprintf("Error: MCP tool call failed: %v", err)
 		resp.Response = map[string]any{
@@ -93,7 +32,7 @@ func (ga *GeminiAgent) geminiMCPToolCall(call *genai.FunctionCall, a *map[string
 	}
 
 	// Call the MCP tool
-	result, err := ga.MCPClient.CallTool(call.Name, *a)
+	result, err := op.mcpClient.CallTool(call.Name, *a)
 	if err != nil {
 		error := fmt.Sprintf("Error: MCP tool call failed: %v", err)
 		resp.Response = map[string]any{
@@ -125,14 +64,14 @@ func (ga *GeminiAgent) geminiMCPToolCall(call *genai.FunctionCall, a *map[string
 	return &resp, nil
 }
 
-func (ga *GeminiAgent) geminiSwitchAgentToolCall(call *genai.FunctionCall, a *map[string]interface{}) (*genai.FunctionResponse, error) {
+func (op *OpenProcessor) geminiSwitchAgentToolCall(call *genai.FunctionCall, a *map[string]interface{}) (*genai.FunctionResponse, error) {
 	resp := genai.FunctionResponse{
 		ID:   call.ID,
 		Name: call.Name,
 	}
 
 	// Call shared implementation
-	response, err := switchAgentToolCallImpl(a, &ga.ToolsUse)
+	response, err := switchAgentToolCallImpl(a, op.toolsUse)
 	error := ""
 	if err != nil {
 		if IsSwitchAgentError(err) {
@@ -155,7 +94,7 @@ func (ga *GeminiAgent) geminiSwitchAgentToolCall(call *genai.FunctionCall, a *ma
 // runGeminiTool wraps a (string, error) result into a genai.FunctionResponse.
 // IMPORTANT: When only the error field is set with an empty output, the Gemini API
 // model often hangs or returns empty responses. We always ensure output is set.
-func (ga *GeminiAgent) runGeminiTool(call *genai.FunctionCall, fn ToolFunc) (*genai.FunctionResponse, error) {
+func runGeminiTool(call *genai.FunctionCall, fn ToolFunc) (*genai.FunctionResponse, error) {
 	response, err := fn()
 	errStr := ""
 	if err != nil {
@@ -175,69 +114,65 @@ func (ga *GeminiAgent) runGeminiTool(call *genai.FunctionCall, fn ToolFunc) (*ge
 }
 
 // dispatchGeminiToolCall handles the routing of Gemini tool calls to the correct implementation.
-func (ga *GeminiAgent) dispatchGeminiToolCall(call *genai.FunctionCall, a *map[string]interface{}) (*genai.FunctionResponse, error) {
+func (op *OpenProcessor) dispatchGeminiToolCall(call *genai.FunctionCall, a *map[string]interface{}) (*genai.FunctionResponse, error) {
 	switch call.Name {
 	case ToolShell:
-		return ga.runGeminiTool(call, func() (string, error) { return shellToolCallImpl(a, &ga.ToolsUse) })
+		return runGeminiTool(call, func() (string, error) { return shellToolCallImpl(a, op.toolsUse) })
 	case ToolReadFile:
-		return ga.runGeminiTool(call, func() (string, error) { return readFileToolCallImpl(a) })
+		return runGeminiTool(call, func() (string, error) { return readFileToolCallImpl(a) })
 	case ToolWriteFile:
-		return ga.runGeminiTool(call, func() (string, error) {
-			return writeFileToolCallImpl(a, &ga.ToolsUse, ga.geminiShowDiffConfirm, ga.geminiCloseDiffConfirm)
-		})
+		return runGeminiTool(call, func() (string, error) { return writeFileToolCallImpl(a, op) })
 	case ToolCreateDirectory:
-		return ga.runGeminiTool(call, func() (string, error) { return createDirectoryToolCallImpl(a, &ga.ToolsUse) })
+		return runGeminiTool(call, func() (string, error) { return createDirectoryToolCallImpl(a, op.toolsUse) })
 	case ToolListDirectory:
-		return ga.runGeminiTool(call, func() (string, error) { return listDirectoryToolCallImpl(a) })
+		return runGeminiTool(call, func() (string, error) { return listDirectoryToolCallImpl(a) })
 	case ToolDeleteFile:
-		return ga.runGeminiTool(call, func() (string, error) { return deleteFileToolCallImpl(a, &ga.ToolsUse) })
+		return runGeminiTool(call, func() (string, error) { return deleteFileToolCallImpl(a, op.toolsUse) })
 	case ToolDeleteDirectory:
-		return ga.runGeminiTool(call, func() (string, error) { return deleteDirectoryToolCallImpl(a, &ga.ToolsUse) })
+		return runGeminiTool(call, func() (string, error) { return deleteDirectoryToolCallImpl(a, op.toolsUse) })
 	case ToolMove:
-		return ga.runGeminiTool(call, func() (string, error) { return moveToolCallImpl(a, &ga.ToolsUse) })
+		return runGeminiTool(call, func() (string, error) { return moveToolCallImpl(a, op.toolsUse) })
 	case ToolCopy:
-		return ga.runGeminiTool(call, func() (string, error) { return copyToolCallImpl(a, &ga.ToolsUse) })
+		return runGeminiTool(call, func() (string, error) { return copyToolCallImpl(a, op.toolsUse) })
 	case ToolSearchFiles:
-		return ga.runGeminiTool(call, func() (string, error) { return searchFilesToolCallImpl(a) })
+		return runGeminiTool(call, func() (string, error) { return searchFilesToolCallImpl(a) })
 	case ToolSearchTextInFile:
-		return ga.runGeminiTool(call, func() (string, error) { return searchTextInFileToolCallImpl(a) })
+		return runGeminiTool(call, func() (string, error) { return searchTextInFileToolCallImpl(a) })
 	case ToolReadMultipleFiles:
-		return ga.runGeminiTool(call, func() (string, error) { return readMultipleFilesToolCallImpl(a) })
+		return runGeminiTool(call, func() (string, error) { return readMultipleFilesToolCallImpl(a) })
 	case ToolWebFetch:
-		return ga.runGeminiTool(call, func() (string, error) { return webFetchToolCallImpl(a) })
+		return runGeminiTool(call, func() (string, error) { return webFetchToolCallImpl(a) })
 	case ToolEditFile:
-		return ga.runGeminiTool(call, func() (string, error) {
-			return editFileToolCallImpl(a, &ga.ToolsUse, ga.geminiShowDiffConfirm, ga.geminiCloseDiffConfirm)
-		})
+		return runGeminiTool(call, func() (string, error) { return editFileToolCallImpl(a, op) })
 	case ToolListMemory:
-		return ga.runGeminiTool(call, func() (string, error) { return listMemoryToolCallImpl() })
+		return runGeminiTool(call, func() (string, error) { return listMemoryToolCallImpl() })
 	case ToolSaveMemory:
-		return ga.runGeminiTool(call, func() (string, error) { return saveMemoryToolCallImpl(a) })
+		return runGeminiTool(call, func() (string, error) { return saveMemoryToolCallImpl(a) })
 	case ToolListAgent:
-		return ga.runGeminiTool(call, func() (string, error) { return listAgentToolCallImpl() })
+		return runGeminiTool(call, func() (string, error) { return listAgentToolCallImpl() })
 	case ToolSpawnSubAgents:
-		return ga.runGeminiTool(call, func() (string, error) { return spawnSubAgentsToolCallImpl(a, &ga.ToolsUse, ga.executor) })
+		return runGeminiTool(call, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op.toolsUse, op.executor) })
 	case ToolGetState:
-		return ga.runGeminiTool(call, func() (string, error) { return getStateToolCallImpl(a, ga.SharedState) })
+		return runGeminiTool(call, func() (string, error) { return getStateToolCallImpl(a, op.sharedState) })
 	case ToolSetState:
-		return ga.runGeminiTool(call, func() (string, error) { return setStateToolCallImpl(a, ga.AgentName, ga.SharedState) })
+		return runGeminiTool(call, func() (string, error) { return setStateToolCallImpl(a, op.agentName, op.sharedState) })
 	case ToolListState:
-		return ga.runGeminiTool(call, func() (string, error) { return listStateToolCallImpl(ga.SharedState) })
+		return runGeminiTool(call, func() (string, error) { return listStateToolCallImpl(op.sharedState) })
 	case ToolActivateSkill:
-		return ga.runGeminiTool(call, func() (string, error) { return activateSkillToolCallImpl(a, &ga.ToolsUse) })
+		return runGeminiTool(call, func() (string, error) { return activateSkillToolCallImpl(a, op.toolsUse) })
 	case ToolAskUser:
-		return ga.runGeminiTool(call, func() (string, error) { return askUserToolCallImpl(a) })
+		return runGeminiTool(call, func() (string, error) { return askUserToolCallImpl(a) })
 	case ToolExitPlanMode:
-		return ga.runGeminiTool(call, func() (string, error) { return exitPlanModeToolCallImpl(a, &ga.ToolsUse) })
+		return runGeminiTool(call, func() (string, error) { return exitPlanModeToolCallImpl(a, op.toolsUse) })
 	case ToolEnterPlanMode:
-		return ga.runGeminiTool(call, func() (string, error) { return enterPlanModeToolCallImpl(a, &ga.ToolsUse) })
+		return runGeminiTool(call, func() (string, error) { return enterPlanModeToolCallImpl(a, op.toolsUse) })
 	case ToolBuildAgent:
-		return ga.runGeminiTool(call, func() (string, error) { return buildAgentToolCallImpl(a, &ga.ToolsUse) })
+		return runGeminiTool(call, func() (string, error) { return buildAgentToolCallImpl(a, op.toolsUse) })
 	case ToolSwitchAgent:
-		return ga.geminiSwitchAgentToolCall(call, a)
+		return op.geminiSwitchAgentToolCall(call, a)
 	default:
-		if ga.MCPClient != nil && ga.MCPClient.FindTool(call.Name) != nil {
-			return ga.geminiMCPToolCall(call, a)
+		if op.mcpClient != nil && op.mcpClient.FindTool(call.Name) != nil {
+			return op.geminiMCPToolCall(call, a)
 		}
 		// Unknown function
 		resp := &genai.FunctionResponse{
@@ -248,7 +183,7 @@ func (ga *GeminiAgent) dispatchGeminiToolCall(call *genai.FunctionCall, a *map[s
 				"error":   fmt.Sprintf("Error: Unknown function '%s'. This function is not available. Please use one of the available functions from the tool list.", call.Name),
 			},
 		}
-		ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", call.Name)}, nil)
+		op.status.ChangeTo(op.notify, StreamNotify{Status: StatusWarn, Data: fmt.Sprintf("Model attempted to call unknown function: %s", call.Name)}, nil)
 		return resp, nil
 	}
 }

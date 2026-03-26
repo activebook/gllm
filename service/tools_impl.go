@@ -150,7 +150,7 @@ func readFileToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	return response, nil
 }
 
-func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse, showDiff func(diff, path, content string), closeDiff func()) (string, error) {
+func writeFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolWriteFile, argsMap); err != nil {
 		return "", err
 	}
@@ -172,7 +172,7 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tools
 		needConfirm = true
 	}
 
-	if needConfirm && !toolsUse.AutoApprove {
+	if needConfirm && !op.toolsUse.AutoApprove {
 		// Check if file exists and read current content
 		var currentContent string
 		if _, err := os.Stat(path); err == nil {
@@ -185,7 +185,8 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tools
 
 		// Show diff if we have current content
 		diff := event.RequestDiff(currentContent, content, 3)
-		showDiff(diff, path, content)
+		op.fileHooks.Preview(path, content)
+		op.showDiffConfirm(diff)
 
 		// Get purpose if provided
 		purpose, _ := (*argsMap)["purpose"].(string)
@@ -194,10 +195,10 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tools
 		}
 
 		// Prompt user for confirmation
-		event.RequestConfirm(purpose, toolsUse)
-		closeDiff() // Close the diff
-		if toolsUse.Confirm == data.ToolConfirmCancel {
-			SendVSCodeDiscard(path)
+		event.RequestConfirm(purpose, op.toolsUse)
+		op.closeDiffConfirm() // Close the diff
+		if op.toolsUse.Confirm == data.ToolConfirmCancel {
+			op.fileHooks.Discard(path)
 			return fmt.Sprintf("Operation cancelled by user: write to file %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
@@ -211,12 +212,10 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tools
 	// Write the file
 	err := os.WriteFile(path, []byte(content), 0644)
 	if err != nil {
-		SendVSCodeDiscard(path)
+		op.fileHooks.Discard(path)
 		return fmt.Sprintf("Error writing file %s: %v", path, err), nil
 	}
-
-	SendVSCodeSaved(path)
-
+	op.fileHooks.Saved(path)
 	return fmt.Sprintf("Successfully wrote to file %s", path), nil
 }
 
@@ -870,7 +869,7 @@ func webSearchToolCallImpl(argsMap *map[string]interface{}, queries *[]string, r
 	return string(resultsJSON), nil
 }
 
-func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse, showDiff func(diff, path, content string), closeDiff func()) (string, error) {
+func editFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolEditFile, argsMap); err != nil {
 		return "", err
 	}
@@ -950,10 +949,11 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsU
 	}
 
 	// If confirmation is needed, show the diff and ask the user
-	if needConfirm && !toolsUse.AutoApprove {
+	if needConfirm && !op.toolsUse.AutoApprove {
 		// Show the diff
 		diff := event.RequestDiff(content, modifiedContent, 3)
-		showDiff(diff, path, modifiedContent)
+		op.fileHooks.Preview(path, modifiedContent)
+		op.showDiffConfirm(diff)
 
 		// Get purpose if provided
 		purpose, _ := (*argsMap)["purpose"].(string)
@@ -962,10 +962,10 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsU
 		}
 
 		// Response with a prompt to let user confirm
-		event.RequestConfirm(purpose, toolsUse)
-		closeDiff() // Close the diff
-		if toolsUse.Confirm == data.ToolConfirmCancel {
-			SendVSCodeDiscard(path)
+		event.RequestConfirm(purpose, op.toolsUse)
+		op.closeDiffConfirm() // Close the diff
+		if op.toolsUse.Confirm == data.ToolConfirmCancel {
+			op.fileHooks.Discard(path)
 			return fmt.Sprintf(ToolRespDiscardEditFile, path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
@@ -973,11 +973,10 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsU
 	// Write the modified content back to the file
 	err = os.WriteFile(path, []byte(modifiedContent), 0644)
 	if err != nil {
-		SendVSCodeDiscard(path)
+		op.fileHooks.Discard(path)
 		return fmt.Sprintf("Error writing file %s: %v", path, err), nil
 	}
-
-	SendVSCodeSaved(path)
+	op.fileHooks.Saved(path)
 
 	// Build success message
 	var result strings.Builder

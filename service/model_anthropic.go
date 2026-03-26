@@ -134,6 +134,7 @@ func (ag *Agent) GenerateAnthropicStream() error {
 		references: make([]map[string]interface{}, 0),
 		status:     &ag.Status,
 		mcpClient:  ag.MCPClient,
+		fileHooks:  NewFileHooks(),
 		// Sub-agent orchestration
 		sharedState: ag.SharedState,
 		executor:    executor,

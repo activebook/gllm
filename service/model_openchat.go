@@ -216,6 +216,7 @@ func (ag *Agent) GenerateOpenChatStream() error {
 		references: make([]map[string]interface{}, 0), // Updated to match new field type
 		status:     &ag.Status,
 		mcpClient:  ag.MCPClient,
+		fileHooks:  NewFileHooks(),
 		// Sub-agent orchestration
 		sharedState: ag.SharedState,
 		executor:    executor,

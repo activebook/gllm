@@ -1780,6 +1780,7 @@ type OpenProcessor struct {
 	references []map[string]interface{} // keep track of the references
 	status     *StatusStack             // Stack to manage streaming status
 	mcpClient  *MCPClient               // MCP client for MCP tool calls
+	fileHooks  FileHooks                // lifecycle hooks for file write/edit events
 
 	// Sub-agent orchestration
 	sharedState *data.SharedState // Shared state for inter-agent communication
@@ -1788,12 +1789,9 @@ type OpenProcessor struct {
 }
 
 // Diff confirm func
-func (op *OpenProcessor) showDiffConfirm(diff, filePath, newContent string) {
+func (op *OpenProcessor) showDiffConfirm(diff string) {
 	// Function call is over
 	op.status.ChangeTo(op.notify, StreamNotify{Status: StatusFunctionCallingOver}, op.proceed)
-
-	// Dispatch VSCode inline diff if the global plugin is enabled
-	SendVSCodePreview(filePath, newContent)
 
 	// Show the diff confirm
 	op.status.ChangeTo(op.notify, StreamNotify{Data: diff, Status: StatusDiffConfirm}, op.proceed)

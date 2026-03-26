@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"iter"
 
 	"github.com/activebook/gllm/util"
 	"google.golang.org/genai"
@@ -44,20 +45,18 @@ func (ag *Agent) getGeminiFilePart(file *FileData) genai.Part {
 	}
 }
 
-type GeminiAgent struct {
-	// With *Agent embedded, GeminiAgent automatically has access to all of Agent's fields and methods.
-	*Agent   // Embedded pointer to Agent
-	ctx      context.Context
-	client   *genai.Client
-	executor *SubAgentExecutor
+type Gemini struct {
+	// With *Agent embedded, Gemini Agent automatically has access to all of Agent's fields and methods.
+	// *Agent // Embedded pointer to Agent
+	client *genai.Client
+	op     *OpenProcessor
 }
 
-func (ag *Agent) initGeminiAgent() (*GeminiAgent, error) {
+func (ag *Agent) initGeminiAgent(ctx context.Context) (*Gemini, error) {
 	// Setup the Gemini client
 	// In multi-turn session, even though we create it each time
 	// it can still be cached for advanced gemini models such as 2.5 flash/pro
 	// so it's a server side job
-	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey:  ag.Model.ApiKey,
 		Backend: genai.BackendGeminiAPI,
@@ -71,9 +70,7 @@ func (ag *Agent) initGeminiAgent() (*GeminiAgent, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &GeminiAgent{
-		Agent:  ag,
-		ctx:    ctx,
+	return &Gemini{
 		client: client,
 	}, nil
 }
@@ -124,7 +121,8 @@ func (ag *Agent) SortGeminiMessagesByOrder() error {
 // systemPrompt is the system prompt to be used for the sync generation, it's majorly a role.
 // the last message is the user prompt to do the task.
 func (ag *Agent) GenerateGeminiSync(messages []*genai.Content, systemPrompt string) (string, error) {
-	ga, err := ag.initGeminiAgent()
+	ctx := context.Background()
+	ga, err := ag.initGeminiAgent(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -140,7 +138,7 @@ func (ag *Agent) GenerateGeminiSync(messages []*genai.Content, systemPrompt stri
 		config.SystemInstruction = &genai.Content{Parts: []*genai.Part{{Text: systemPrompt}}}
 	}
 
-	resp, err := ga.client.Models.GenerateContent(ga.ctx, ga.Model.Model, messages, config)
+	resp, err := ga.client.Models.GenerateContent(ctx, ag.Model.Model, messages, config)
 	if err != nil {
 		return "", fmt.Errorf("sync chat completion error: %w", err)
 	}
@@ -162,16 +160,37 @@ func (ag *Agent) GenerateGeminiSync(messages []*genai.Content, systemPrompt stri
 func (ag *Agent) GenerateGeminiStream() error {
 	var err error
 	// Check the setup of Gemini client
-	ga, err := ag.initGeminiAgent()
+	ctx := context.Background()
+	ga, err := ag.initGeminiAgent(ctx)
 	if err != nil {
 		return err
 	}
 
 	// Initialize sub-agent executor if SharedState is available
+	var executor *SubAgentExecutor
 	if ag.SharedState != nil {
-		ga.executor = NewSubAgentExecutor(ag.SharedState, ag.Session.GetTopSessionName())
-		defer ga.executor.Shutdown()
+		executor = NewSubAgentExecutor(ag.SharedState, ag.Session.GetTopSessionName())
+		defer executor.Shutdown()
 	}
+
+	op := OpenProcessor{
+		ctx:        ctx,
+		notify:     ag.NotifyChan,
+		data:       ag.DataChan,
+		proceed:    ag.ProceedChan,
+		search:     ag.SearchEngine,
+		toolsUse:   &ag.ToolsUse,
+		queries:    make([]string, 0),
+		references: make([]map[string]interface{}, 0),
+		status:     &ag.Status,
+		mcpClient:  ag.MCPClient,
+		fileHooks:  NewFileHooks(),
+		// Sub-agent orchestration
+		sharedState: ag.SharedState,
+		executor:    executor,
+		agentName:   ag.AgentName,
+	}
+	ga.op = &op
 
 	// Configure Model Parameters
 	thinking := ag.ThinkingLevel.ToGeminiConfig(ag.Model.Model)
@@ -200,7 +219,7 @@ func (ag *Agent) GenerateGeminiStream() error {
 	var tool *genai.Tool
 	if len(ag.EnabledTools) > 0 {
 		// get tools(functions)
-		tool = ga.getGeminiTools()
+		tool = ag.getGeminiTools()
 	}
 	if ag.MCPClient != nil {
 		// Append MCP tools(functions) to the existing tools
@@ -261,11 +280,7 @@ func (ag *Agent) GenerateGeminiStream() error {
 	return nil
 }
 
-func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) error {
-	// Signal that streaming has started
-	// Wait for the main goroutine to tell sub-goroutine to proceed
-	ag.Status.ChangeTo(ag.NotifyChan, StreamNotify{Status: StatusProcessing}, ag.ProceedChan)
-
+func (ga *Gemini) process(ag *Agent, config *genai.GenerateContentConfig) error {
 	// Stream the responses
 	references := make([]map[string]interface{}, 0, 1)
 	queries := make([]string, 0, 1)
@@ -273,6 +288,7 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 	// Use maxRecursions from LangLogic
 	maxRecursions := ag.MaxRecursions
 	for i := 0; i < maxRecursions; i++ {
+		ga.op.status.ChangeTo(ga.op.notify, StreamNotify{Status: StatusProcessing}, ga.op.proceed)
 
 		// Create a chat session - this is the important part
 		// Get all history messages - MUST be inside loop to pick up newly pushed messages
@@ -295,8 +311,13 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 			ag.Session.Save()
 		}
 
-		// Call API
-		modelContent, resp, err := ga.processGeminiStream(ga.ctx, ga.client, config, messages, &references, &queries)
+		// Stream the response
+		stream := ga.client.Models.GenerateContentStream(ga.op.ctx, ag.Model.Model, messages, config)
+		// Wait for the main goroutine to tell sub-goroutine to proceed
+		ga.op.status.ChangeTo(ga.op.notify, StreamNotify{Status: StatusStarted}, ga.op.proceed)
+
+		// Process the stream and collect tool calls
+		modelContent, resp, err := ga.processStream(stream, &references, &queries)
 		if err != nil {
 			return err
 		}
@@ -308,7 +329,7 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 		}
 
 		// Record token usage
-		ga.addUpGeminiTokenUsage(resp)
+		ag.addUpGeminiTokenUsage(resp)
 
 		// Check for function calls in the model content
 		funcCalls := []*genai.FunctionCall{}
@@ -325,7 +346,7 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 
 		for _, funcCall := range funcCalls {
 			// Handle tool call
-			funcResp, err := ga.processGeminiToolCall(funcCall)
+			funcResp, err := ga.processToolCall(funcCall)
 			if err != nil {
 				// Switch agent signal, pop up
 				if IsSwitchAgentError(err) {
@@ -374,7 +395,7 @@ func (ga *GeminiAgent) process(ag *Agent, config *genai.GenerateContentConfig) e
 // Because model supports interleaved tool calls and responses, aka ReAct
 // If error happened or user cancelled, in order to maintain session integrity, we need to save the session
 // So that we can resume the session from the last saved state
-func (ga *GeminiAgent) saveToSession(ag *Agent, content *genai.Content) error {
+func (ga *Gemini) saveToSession(ag *Agent, content *genai.Content) error {
 	// Save the session history(curated)
 	err := ag.Session.Push(content)
 	if err != nil {
@@ -383,17 +404,9 @@ func (ga *GeminiAgent) saveToSession(ag *Agent, content *genai.Content) error {
 	return nil
 }
 
-func (ga *GeminiAgent) processGeminiStream(ctx context.Context,
-	client *genai.Client, config *genai.GenerateContentConfig,
-	messages []*genai.Content,
+func (ga *Gemini) processStream(stream iter.Seq2[*genai.GenerateContentResponse, error],
 	refs *[]map[string]interface{},
 	queries *[]string) (*genai.Content, *genai.GenerateContentResponse, error) {
-
-	// Stream the response
-	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusProcessing}, ga.ProceedChan)
-	iter := client.Models.GenerateContentStream(ctx, ga.Model.Model, messages, config)
-	// Wait for the main goroutine to tell sub-goroutine to proceed
-	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusStarted}, ga.ProceedChan)
 
 	modelContent := &genai.Content{
 		Role:  genai.RoleModel,
@@ -401,7 +414,7 @@ func (ga *GeminiAgent) processGeminiStream(ctx context.Context,
 	}
 	var finalResp *genai.GenerateContentResponse
 
-	for resp, err := range iter {
+	for resp, err := range stream {
 		if err != nil {
 			return nil, nil, err
 		}
@@ -422,7 +435,7 @@ func (ga *GeminiAgent) processGeminiStream(ctx context.Context,
 					// Check for unknown tools BEFORE saving to history to prevent "orphan" tool calls (calls with no response)
 					if part.FunctionCall != nil {
 						funcName := part.FunctionCall.Name
-						if funcName != "" && !IsAvailableOpenTool(funcName) && !IsAvailableMCPTool(funcName, ga.MCPClient) {
+						if funcName != "" && !IsAvailableOpenTool(funcName) && !IsAvailableMCPTool(funcName, ga.op.mcpClient) {
 							// Skip unknown tools so they don't pollute history and cause 400 errors (Missing function response)
 							util.Warnf("Skipping tool call with unknown function name: %s\n", funcName)
 							continue
@@ -438,24 +451,24 @@ func (ga *GeminiAgent) processGeminiStream(ctx context.Context,
 				}
 
 				// State transitions
-				switch ga.Status.Peek() {
+				switch ga.op.status.Peek() {
 				case StatusReasoning:
 					if !part.Thought {
-						ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusReasoningOver}, ga.ProceedChan)
+						ga.op.status.ChangeTo(ga.op.notify, StreamNotify{Status: StatusReasoningOver}, ga.op.proceed)
 					}
 				default:
 					if part.Thought {
-						ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusReasoning}, ga.ProceedChan)
+						ga.op.status.ChangeTo(ga.op.notify, StreamNotify{Status: StatusReasoning}, ga.op.proceed)
 					}
 				}
 
 				// Actual text data (don't trim text, because we need to keep the spaces between them)
 				if part.Thought && part.Text != "" {
 					// Reasoning data
-					ga.DataChan <- StreamData{Text: (part.Text), Type: DataTypeReasoning}
+					ga.op.data <- StreamData{Text: (part.Text), Type: DataTypeReasoning}
 				} else if part.Text != "" {
 					// Normal text data
-					ga.DataChan <- StreamData{Text: (part.Text), Type: DataTypeNormal}
+					ga.op.data <- StreamData{Text: (part.Text), Type: DataTypeNormal}
 				}
 			}
 
@@ -473,7 +486,7 @@ func (ga *GeminiAgent) processGeminiStream(ctx context.Context,
 	return modelContent, finalResp, nil
 }
 
-func (ga *GeminiAgent) processGeminiToolCall(call *genai.FunctionCall) (*genai.Content, error) {
+func (ga *Gemini) processToolCall(call *genai.FunctionCall) (*genai.Content, error) {
 
 	var filteredArgs map[string]interface{}
 	if call.Name == ToolEditFile || call.Name == ToolWriteFile || call.Name == ToolAskUser {
@@ -490,12 +503,12 @@ func (ga *GeminiAgent) processGeminiToolCall(call *genai.FunctionCall) (*genai.C
 		"args":     filteredArgs,
 	}
 	jsonData, _ := json.Marshal(toolCallData)
-	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusFunctionCalling, Data: string(jsonData)}, ga.ProceedChan)
+	ga.op.status.ChangeTo(ga.op.notify, StreamNotify{Status: StatusFunctionCalling, Data: string(jsonData)}, ga.op.proceed)
 
 	var resp *genai.FunctionResponse
 	var err error
 	// Dispatch tool call - call.Args is map[string]any which is identical to map[string]interface{}
-	resp, err = ga.dispatchGeminiToolCall(call, &call.Args)
+	resp, err = ga.op.dispatchGeminiToolCall(call, &call.Args)
 
 	// Function response only has one part
 	respPart := genai.Part{FunctionResponse: resp}
@@ -505,7 +518,7 @@ func (ga *GeminiAgent) processGeminiToolCall(call *genai.FunctionCall) (*genai.C
 	}
 
 	// Function call is done
-	ga.Status.ChangeTo(ga.NotifyChan, StreamNotify{Status: StatusFunctionCallingOver}, ga.ProceedChan)
+	ga.op.status.ChangeTo(ga.op.notify, StreamNotify{Status: StatusFunctionCallingOver}, ga.op.proceed)
 	return respContent, err
 }
 
@@ -514,18 +527,62 @@ func (ga *GeminiAgent) processGeminiToolCall(call *genai.FunctionCall) (*genai.C
 // Each response may contain tool calls that trigger additional processing
 // New responses are generated based on tool call results
 // Each of these interactions consumes tokens that should be tracked
-func (ga *GeminiAgent) addUpGeminiTokenUsage(resp *genai.GenerateContentResponse) {
-	if resp != nil && resp.UsageMetadata != nil && ga.TokenUsage != nil {
+func (ag *Agent) addUpGeminiTokenUsage(resp *genai.GenerateContentResponse) {
+	if resp != nil && resp.UsageMetadata != nil && ag.TokenUsage != nil {
 		// For gemini model, cache read tokens are not included in the usage metadata
 		// The total number of tokens for the entire request. This is the sum of `prompt_token_count`,
 		// `candidates_token_count`, `tool_use_prompt_token_count`, and `thoughts_token_count`.
-		ga.TokenUsage.CachedTokensInPrompt = true
-		ga.TokenUsage.RecordTokenUsage(int(resp.UsageMetadata.PromptTokenCount),
+		ag.TokenUsage.CachedTokensInPrompt = true
+		ag.TokenUsage.RecordTokenUsage(int(resp.UsageMetadata.PromptTokenCount),
 			int(resp.UsageMetadata.CandidatesTokenCount),
 			int(resp.UsageMetadata.CachedContentTokenCount),
 			int(resp.UsageMetadata.ThoughtsTokenCount),
 			int(resp.UsageMetadata.TotalTokenCount))
 	}
+}
+
+/*
+A limitation of Gemini is that you can't use a function call and a built-in tool at the same time. ADK,
+when using Gemini as the underlying LLM, takes advantage of Gemini's built-in ability to do Google searches,
+and uses function calling to invoke your custom ADK tools.
+So agent tools can come in handy, as you can have a main agent,
+that delegates live searches to a search agent that has the GoogleSearchTool configured,
+and another tool agent that makes use of a custom tool function.
+
+Usually, this happens when you get a mysterious error like this one
+(reported against ADK for Python):
+{'error': {'code': 400, 'message': 'Tool use with function calling is unsupported',
+ 'status': 'INVALID_ARGUMENT'}}.
+This means that you can't use a built-in tool and function calling at the same time in the same agent.
+*/
+
+// Tool definitions for Gemini
+func (ag *Agent) getGeminiTools() *genai.Tool {
+	// Get filtered tools based on agent's enabled tools list
+	openTools := GetOpenToolsFiltered(ag.EnabledTools)
+	var funcs []*genai.FunctionDeclaration
+
+	for _, openTool := range openTools {
+		geminiTool := openTool.ToGeminiFunctions()
+		funcs = append(funcs, geminiTool)
+	}
+
+	// The Gemini API expects all function declarations to be grouped together under a single Tool object.
+	return &genai.Tool{
+		FunctionDeclarations: funcs,
+	}
+}
+
+func (ga *Gemini) getGeminiWebSearchTool() *genai.Tool {
+	// return google embedding search tool
+	tool := &genai.Tool{GoogleSearch: &genai.GoogleSearch{}}
+	return tool
+}
+
+func (ga *Gemini) getGeminiCodeExecTool() *genai.Tool {
+	// return google embedding search tool
+	tool := &genai.Tool{CodeExecution: &genai.ToolCodeExecution{}}
+	return tool
 }
 
 func appendReferences(metadata *genai.GroundingMetadata, refs *[]map[string]interface{}) {

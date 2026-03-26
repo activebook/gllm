@@ -89,13 +89,9 @@ func (op *OpenProcessor) dispatchOpenAIToolCall(toolCall openai.ChatCompletionMe
 	case ToolReadFile:
 		return runOpenAITool(toolCall, func() (string, error) { return readFileToolCallImpl(a) })
 	case ToolWriteFile:
-		return runOpenAITool(toolCall, func() (string, error) {
-			return writeFileToolCallImpl(a, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
-		})
+		return runOpenAITool(toolCall, func() (string, error) { return writeFileToolCallImpl(a, op) })
 	case ToolEditFile:
-		return runOpenAITool(toolCall, func() (string, error) {
-			return editFileToolCallImpl(a, op.toolsUse, op.showDiffConfirm, op.closeDiffConfirm)
-		})
+		return runOpenAITool(toolCall, func() (string, error) { return editFileToolCallImpl(a, op) })
 	case ToolCreateDirectory:
 		return runOpenAITool(toolCall, func() (string, error) { return createDirectoryToolCallImpl(a, op.toolsUse) })
 	case ToolListDirectory:
