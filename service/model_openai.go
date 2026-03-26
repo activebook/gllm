@@ -221,6 +221,7 @@ func (ag *Agent) GenerateOpenAIStream() error {
 	var executor *SubAgentExecutor
 	if ag.SharedState != nil {
 		executor = NewSubAgentExecutor(ag.SharedState, ag.Session.GetTopSessionName())
+		defer executor.Shutdown()
 	}
 
 	op := OpenProcessor{
