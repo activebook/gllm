@@ -150,7 +150,7 @@ func readFileToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	return response, nil
 }
 
-func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse, showDiff func(diff string), closeDiff func()) (string, error) {
+func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse, showDiff func(diff, path, content string), closeDiff func()) (string, error) {
 	if err := CheckToolPermission(ToolWriteFile, argsMap); err != nil {
 		return "", err
 	}
@@ -185,7 +185,7 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tools
 
 		// Show diff if we have current content
 		diff := event.RequestDiff(currentContent, content, 3)
-		showDiff(diff)
+		showDiff(diff, path, content)
 
 		// Get purpose if provided
 		purpose, _ := (*argsMap)["purpose"].(string)
@@ -866,7 +866,7 @@ func webSearchToolCallImpl(argsMap *map[string]interface{}, queries *[]string, r
 	return string(resultsJSON), nil
 }
 
-func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse, showDiff func(diff string), closeDiff func()) (string, error) {
+func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse, showDiff func(diff, path, content string), closeDiff func()) (string, error) {
 	if err := CheckToolPermission(ToolEditFile, argsMap); err != nil {
 		return "", err
 	}
@@ -949,7 +949,7 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsU
 	if needConfirm && !toolsUse.AutoApprove {
 		// Show the diff
 		diff := event.RequestDiff(content, modifiedContent, 3)
-		showDiff(diff)
+		showDiff(diff, path, modifiedContent)
 
 		// Get purpose if provided
 		purpose, _ := (*argsMap)["purpose"].(string)

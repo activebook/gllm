@@ -1788,9 +1788,20 @@ type OpenProcessor struct {
 }
 
 // Diff confirm func
-func (op *OpenProcessor) showDiffConfirm(diff string) {
+func (op *OpenProcessor) showDiffConfirm(diff, filePath, newContent string) {
 	// Function call is over
 	op.status.ChangeTo(op.notify, StreamNotify{Status: StatusFunctionCallingOver}, op.proceed)
+
+	settings := data.GetSettingsStore()
+	// Dispatch VSCode inline diff if the global plugin is enabled
+	if settings.IsPluginEnabled(PluginVSCodeCompanion) && filePath != "" {
+		go func(p, c string) {
+			if err := SendVSCodeDiff(p, c); err != nil {
+				// Non-fatal: we don't block or error out the CLI on companion failure
+			}
+		}(filePath, newContent)
+	}
+
 	// Show the diff confirm
 	op.status.ChangeTo(op.notify, StreamNotify{Data: diff, Status: StatusDiffConfirm}, op.proceed)
 }
