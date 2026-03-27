@@ -32,6 +32,7 @@
 - **Colorful Themes**: Supports hundreds of popular themes, compatible with light and dark modes, ANSI-color, and full true-color.
 - **API local Proxy**: Supports Multi-Protocol (OpenAI, Anthropic, Google Gemini) local API reverse proxy, ensures seamless compatibility with a wide range of applications.
 - **Cross-platform Support**: gllm is available for macOS, Windows, and Linux, and easy to install and update.
+- **VS Code Extension**: `gllm Companion` bridges the CLI tool with your IDE, enabling native inline diffs and direct workspace access.
 
 ---
 
@@ -158,6 +159,8 @@ gllm
 
 ![Chat Mode Screenshot](screenshots/chatmode.png)
 
+---
+
 Within the chat, you can use various commands:
 
 - `/help`: Show available commands.
@@ -166,6 +169,17 @@ Within the chat, you can use various commands:
 - `/attach <file>`: Attach a file to the conversation.
 - `! <command>`: Execute a shell command.
 - `@ path`: Reference a file or directory in your prompt.
+
+---
+
+## 🧩 gllm Companion (VS Code Extension)
+
+A VS Code extension that bridges the `gllm` CLI tool with direct access to IDE workspace, enabling native inline diffs for AI-suggested code changes.
+
+| gllm Companion |
+|:---:|
+| ![VS Code Extension 1](screenshots/vscode_extension1.png) |
+| ![VS Code Extension 2](screenshots/vscode_extension2.png) |
 
 ### Workflow Commands
 
