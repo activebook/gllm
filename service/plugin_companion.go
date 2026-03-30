@@ -26,10 +26,10 @@ const (
 type companionAction string
 
 const (
-	ActionPreview companionAction = "preview"
-	ActionSaved   companionAction = "saved"
-	ActionDiscard companionAction = "discard"
-	ActionContext companionAction = "context"
+	ActionOpenDiff     companionAction = "openDiff"
+	ActionDiffAccepted companionAction = "diffAccepted"
+	ActionDiffRejected companionAction = "diffRejected"
+	ActionGetContext   companionAction = "getContext"
 )
 
 // companionMsg represents the JSON payload expected by the VSCode companion extension.
@@ -67,41 +67,41 @@ func sendCompanion(msg companionMsg) error {
 	return nil
 }
 
-// SendVSCodePreview sends the proposed file changes to VSCode for inline diffing before confirmation.
-func SendVSCodePreview(filePath, newContent string) {
+// SendVSCodeOpenDiff sends the proposed file changes to VSCode for inline diffing before confirmation.
+func SendVSCodeOpenDiff(filePath, newContent string) {
 	if !data.GetSettingsStore().IsPluginEnabled(PluginVSCodeCompanion) || filePath == "" {
 		return
 	}
 	go func() {
 		_ = sendCompanion(companionMsg{
-			Action:     ActionPreview,
+			Action:     ActionOpenDiff,
 			FilePath:   filePath,
 			NewContent: newContent,
 		})
 	}()
 }
 
-// SendVSCodeSaved notifies VSCode that the file was successfully written to disk, permitting a clean reload.
-func SendVSCodeSaved(filePath string) {
+// SendVSCodeDiffAccepted notifies VSCode that the file was successfully written to disk, permitting a clean reload.
+func SendVSCodeDiffAccepted(filePath string) {
 	if !data.GetSettingsStore().IsPluginEnabled(PluginVSCodeCompanion) || filePath == "" {
 		return
 	}
 	go func() {
 		_ = sendCompanion(companionMsg{
-			Action:   ActionSaved,
+			Action:   ActionDiffAccepted,
 			FilePath: filePath,
 		})
 	}()
 }
 
-// SendVSCodeDiscard notifies VSCode that the change was cancelled, reverting any dirty buffer.
-func SendVSCodeDiscard(filePath string) {
+// SendVSCodeDiffRejected notifies VSCode that the change was cancelled, reverting any dirty buffer.
+func SendVSCodeDiffRejected(filePath string) {
 	if !data.GetSettingsStore().IsPluginEnabled(PluginVSCodeCompanion) || filePath == "" {
 		return
 	}
 	go func() {
 		_ = sendCompanion(companionMsg{
-			Action:   ActionDiscard,
+			Action:   ActionDiffRejected,
 			FilePath: filePath,
 		})
 	}()
@@ -158,7 +158,7 @@ func fetchVSCodeCurrentContext() (*EditorContext, error) {
 	}
 	defer conn.Close()
 
-	msg := companionMsg{Action: ActionContext}
+	msg := companionMsg{Action: ActionGetContext}
 	encoder := json.NewEncoder(conn)
 	if err := encoder.Encode(msg); err != nil {
 		return nil, err
