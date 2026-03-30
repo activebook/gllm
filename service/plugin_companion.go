@@ -149,8 +149,8 @@ type EditorOpenFile struct {
 	IsDirty  bool   `json:"isDirty"`
 }
 
-// fetchVSCodeContext fetches real-time state from the VSCode companion plugin synchronously.
-func fetchVSCodeContext() (*EditorContext, error) {
+// fetchVSCodeCurrentContext fetches real-time state from the VSCode companion plugin synchronously.
+func fetchVSCodeCurrentContext() (*EditorContext, error) {
 	network, addr := companionSocket()
 	conn, err := net.DialTimeout(network, addr, 500*time.Millisecond)
 	if err != nil {
@@ -185,14 +185,14 @@ func fetchVSCodeContext() (*EditorContext, error) {
 	return &ctx, nil
 }
 
-// GetVSCodeContextString formats the current VSCode state into a JSON block suitable for LLM injection.
-func GetVSCodeContextString() string {
+// GetVSCodeContext formats the current VSCode state into a JSON block suitable for LLM injection.
+func GetVSCodeContext() string {
 	if !data.GetSettingsStore().IsPluginEnabled(PluginVSCodeCompanion) {
 		return ""
 	}
 
 	// We unmarshal to validate structure and filter out omitted fields
-	ctx, err := fetchVSCodeContext()
+	ctx, err := fetchVSCodeCurrentContext()
 	if err != nil || ctx == nil {
 		return "" // Silently fallback if VSCode is not running or error
 	}

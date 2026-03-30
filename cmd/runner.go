@@ -144,14 +144,13 @@ func RunAgent(prompt string, files []*service.FileData, sessionName string, outp
 	return nil
 }
 
-// buildFinalPrompt combines user input, injects VSCode context, and processes @ references
+// buildFinalPrompt combines user input, injects registered context providers, and processes @ references
 func buildFinalPrompt(input string) string {
 	tb := TextBuilder{}
 
-	// Inject VSCode Context before user input if available
-	vscodeCtx := service.GetVSCodeContextString()
-	if vscodeCtx != "" {
-		tb.appendText(vscodeCtx)
+	// Collect context from all registered providers (e.g. VSCode Companion, future plugins)
+	if ctx := service.NewContextHooks().Collect(); ctx != "" {
+		tb.appendText(ctx)
 		tb.appendText("\n---\n\n")
 	}
 
