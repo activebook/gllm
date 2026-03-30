@@ -144,11 +144,21 @@ func RunAgent(prompt string, files []*service.FileData, sessionName string, outp
 	return nil
 }
 
-// buildFinalPrompt combines user input and processes @ references
+// buildFinalPrompt combines user input, injects VSCode context, and processes @ references
 func buildFinalPrompt(input string) string {
 	tb := TextBuilder{}
+
+	// Inject VSCode Context before user input if available
+	vscodeCtx := service.GetVSCodeContextString()
+	if vscodeCtx != "" {
+		tb.appendText(vscodeCtx)
+		tb.appendText("\n---\n\n")
+	}
+
+	// Add user input
 	tb.appendText(input)
 
+	// Inject @ references
 	rawPrompt := tb.String()
 	atRefProcessor := service.NewAtRefProcessor()
 	processedPrompt, err := atRefProcessor.ProcessText(rawPrompt)
@@ -209,8 +219,6 @@ func ProcessAttachment(path string) *service.FileData {
 	}
 	return service.NewFileData(format, data, path)
 }
-
-
 
 // StartLoadMCPServer launches background MCP preloading (non-blocking).
 func StartLoadMCPServer(agent *data.AgentConfig) {

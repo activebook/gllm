@@ -3,10 +3,12 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/activebook/gllm/data"
@@ -26,6 +28,7 @@ const (
 	ActionPreview companionAction = "preview"
 	ActionSaved   companionAction = "saved"
 	ActionDiscard companionAction = "discard"
+	ActionContext companionAction = "context"
 )
 
 // companionMsg represents the JSON payload expected by the VSCode companion extension.
@@ -101,4 +104,146 @@ func SendVSCodeDiscard(filePath string) {
 			FilePath: filePath,
 		})
 	}()
+}
+
+// EditorContext describes the state of the VSCode environment
+type EditorContext struct {
+	ActiveEditor     *ActiveEditor    `json:"activeEditor"`
+	OpenFiles        []EditorOpenFile `json:"openFiles"`
+	WorkspaceFolders []string         `json:"workspaceFolders"`
+}
+
+// ActiveEditor represents the active editor in VSCode
+// We don't need Content and VisibleRanges for now
+// For Content, model can use filePath to read the file
+// For VisibleRanges, model can use cursorPosition to infer the visible range
+type ActiveEditor struct {
+	FilePath   string `json:"filePath"`
+	LanguageId string `json:"languageId"`
+	IsDirty    bool   `json:"isDirty"`
+	// Content        string            `json:"content"`
+	Selections     []EditorSelection `json:"selections"`
+	CursorPosition EditorPosition    `json:"cursorPosition"`
+	// VisibleRanges  []EditorRange     `json:"visibleRanges"`
+}
+
+type EditorSelection struct {
+	Start EditorPosition `json:"start"`
+	End   EditorPosition `json:"end"`
+	Text  string         `json:"text"`
+}
+
+type EditorPosition struct {
+	Line      int `json:"line"`
+	Character int `json:"character"`
+}
+
+// type EditorRange struct {
+// 	Start EditorPosition `json:"start"`
+// 	End   EditorPosition `json:"end"`
+// }
+
+type EditorOpenFile struct {
+	FilePath string `json:"filePath"`
+	IsDirty  bool   `json:"isDirty"`
+}
+
+// FetchVSCodeContext fetches real-time state from the VSCode companion plugin synchronously.
+func FetchVSCodeContext() (*EditorContext, error) {
+	network, addr := companionSocket()
+	conn, err := net.DialTimeout(network, addr, 500*time.Millisecond)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to companion extension")
+	}
+	defer conn.Close()
+
+	msg := companionMsg{Action: ActionContext}
+	encoder := json.NewEncoder(conn)
+	if err := encoder.Encode(msg); err != nil {
+		return nil, err
+	}
+
+	// Try to half-close if supported
+	if unixConn, ok := conn.(*net.UnixConn); ok {
+		_ = unixConn.CloseWrite()
+	}
+
+	// Read response (extension will close socket when done or we read until EOF)
+	raw, err := io.ReadAll(conn)
+	if err != nil {
+		return nil, err
+	}
+	// Avoid trailing newlines
+	rawStr := strings.TrimSpace(string(raw))
+
+	// Workaround for a bug in the VSCode extension where it writes literal "\\n" 
+	// instead of an actual newline character.
+	rawStr = strings.TrimSuffix(rawStr, "\\n")
+
+	var ctx EditorContext
+	if err := json.Unmarshal([]byte(rawStr), &ctx); err != nil {
+		return nil, err
+	}
+
+	return &ctx, nil
+}
+
+// GetVSCodeContextString formats the current VSCode state into an XML-like block suitable for LLM injection.
+func GetVSCodeContextString() string {
+	if !data.GetSettingsStore().IsPluginEnabled(PluginVSCodeCompanion) {
+		return ""
+	}
+
+	ctx, err := FetchVSCodeContext()
+	if err != nil || ctx == nil {
+		return "" // Silently fallback if VSCode is not running or error
+	}
+
+	var sb strings.Builder
+	sb.WriteString("\n<editor_state>\n")
+
+	if ctx.ActiveEditor != nil {
+		sb.WriteString(fmt.Sprintf("Current File: %s\n", ctx.ActiveEditor.FilePath))
+		sb.WriteString(fmt.Sprintf("Cursor Position: Line %d, Character %d\n", ctx.ActiveEditor.CursorPosition.Line+1, ctx.ActiveEditor.CursorPosition.Character+1))
+
+		var validSelections []string
+		for _, sel := range ctx.ActiveEditor.Selections {
+			if strings.TrimSpace(sel.Text) != "" {
+				// Show both the text and the exact lines it spans
+				validSelections = append(validSelections, fmt.Sprintf("Lines %d to %d:\n```\n%s\n```", sel.Start.Line+1, sel.End.Line+1, sel.Text))
+			}
+		}
+		if len(validSelections) > 0 {
+			sb.WriteString("Selected Text:\n")
+			for _, s := range validSelections {
+				sb.WriteString(s + "\n")
+			}
+		}
+	} else {
+		sb.WriteString("Current File: None open\n")
+	}
+
+	if len(ctx.OpenFiles) > 0 {
+		sb.WriteString("Other Open Files:\n")
+		for _, f := range ctx.OpenFiles {
+			// Don't list the active editor twice
+			if ctx.ActiveEditor == nil || f.FilePath != ctx.ActiveEditor.FilePath {
+				dirtyStr := ""
+				if f.IsDirty {
+					dirtyStr = " (unsaved changes)"
+				}
+				sb.WriteString(fmt.Sprintf("- %s%s\n", f.FilePath, dirtyStr))
+			}
+		}
+	}
+
+	if len(ctx.WorkspaceFolders) > 0 {
+		sb.WriteString("Workspace Folders:\n")
+		for _, w := range ctx.WorkspaceFolders {
+			sb.WriteString(fmt.Sprintf("- %s\n", w))
+		}
+	}
+	sb.WriteString("</editor_state>\n")
+
+	return sb.String()
 }
