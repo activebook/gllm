@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/util"
 )
 
 // PluginVSCodeCompanion is the canonical plugin ID for the VSCode Companion integration.
@@ -109,7 +110,7 @@ func SendVSCodeDiscard(filePath string) {
 // EditorContext describes the state of the VSCode environment
 type EditorContext struct {
 	ActiveEditor     *ActiveEditor    `json:"activeEditor"`
-	OpenFiles        []EditorOpenFile `json:"openFiles"`
+	OpenFiles        []EditorOpenFile `json:"otherOpenFiles"`
 	WorkspaceFolders []string         `json:"workspaceFolders"`
 }
 
@@ -148,8 +149,8 @@ type EditorOpenFile struct {
 	IsDirty  bool   `json:"isDirty"`
 }
 
-// FetchVSCodeContext fetches real-time state from the VSCode companion plugin synchronously.
-func FetchVSCodeContext() (*EditorContext, error) {
+// fetchVSCodeContext fetches real-time state from the VSCode companion plugin synchronously.
+func fetchVSCodeContext() (*EditorContext, error) {
 	network, addr := companionSocket()
 	conn, err := net.DialTimeout(network, addr, 500*time.Millisecond)
 	if err != nil {
@@ -176,10 +177,6 @@ func FetchVSCodeContext() (*EditorContext, error) {
 	// Avoid trailing newlines
 	rawStr := strings.TrimSpace(string(raw))
 
-	// Workaround for a bug in the VSCode extension where it writes literal "\\n" 
-	// instead of an actual newline character.
-	rawStr = strings.TrimSuffix(rawStr, "\\n")
-
 	var ctx EditorContext
 	if err := json.Unmarshal([]byte(rawStr), &ctx); err != nil {
 		return nil, err
@@ -188,62 +185,24 @@ func FetchVSCodeContext() (*EditorContext, error) {
 	return &ctx, nil
 }
 
-// GetVSCodeContextString formats the current VSCode state into an XML-like block suitable for LLM injection.
+// GetVSCodeContextString formats the current VSCode state into a JSON block suitable for LLM injection.
 func GetVSCodeContextString() string {
 	if !data.GetSettingsStore().IsPluginEnabled(PluginVSCodeCompanion) {
 		return ""
 	}
 
-	ctx, err := FetchVSCodeContext()
+	// We unmarshal to validate structure and filter out omitted fields
+	ctx, err := fetchVSCodeContext()
 	if err != nil || ctx == nil {
 		return "" // Silently fallback if VSCode is not running or error
 	}
 
-	var sb strings.Builder
-	sb.WriteString("\n<editor_state>\n")
-
-	if ctx.ActiveEditor != nil {
-		sb.WriteString(fmt.Sprintf("Current File: %s\n", ctx.ActiveEditor.FilePath))
-		sb.WriteString(fmt.Sprintf("Cursor Position: Line %d, Character %d\n", ctx.ActiveEditor.CursorPosition.Line+1, ctx.ActiveEditor.CursorPosition.Character+1))
-
-		var validSelections []string
-		for _, sel := range ctx.ActiveEditor.Selections {
-			if strings.TrimSpace(sel.Text) != "" {
-				// Show both the text and the exact lines it spans
-				validSelections = append(validSelections, fmt.Sprintf("Lines %d to %d:\n```\n%s\n```", sel.Start.Line+1, sel.End.Line+1, sel.Text))
-			}
-		}
-		if len(validSelections) > 0 {
-			sb.WriteString("Selected Text:\n")
-			for _, s := range validSelections {
-				sb.WriteString(s + "\n")
-			}
-		}
-	} else {
-		sb.WriteString("Current File: None open\n")
+	jsonBytes, err := json.MarshalIndent(ctx, "", "  ")
+	if err != nil {
+		return ""
 	}
 
-	if len(ctx.OpenFiles) > 0 {
-		sb.WriteString("Other Open Files:\n")
-		for _, f := range ctx.OpenFiles {
-			// Don't list the active editor twice
-			if ctx.ActiveEditor == nil || f.FilePath != ctx.ActiveEditor.FilePath {
-				dirtyStr := ""
-				if f.IsDirty {
-					dirtyStr = " (unsaved changes)"
-				}
-				sb.WriteString(fmt.Sprintf("- %s%s\n", f.FilePath, dirtyStr))
-			}
-		}
-	}
-
-	if len(ctx.WorkspaceFolders) > 0 {
-		sb.WriteString("Workspace Folders:\n")
-		for _, w := range ctx.WorkspaceFolders {
-			sb.WriteString(fmt.Sprintf("- %s\n", w))
-		}
-	}
-	sb.WriteString("</editor_state>\n")
-
-	return sb.String()
+	context := fmt.Sprintf("Here is the user's editor context as a JSON object.\n```json\n%s\n```\n", string(jsonBytes))
+	util.Debugf("VSCode Context: %s\n", context)
+	return context
 }
