@@ -50,7 +50,7 @@ var (
 	}
 
 	replSpecMap = map[string]string{
-		"@path":     "Reference to local files, folders",
+		"@path":     "Reference to files, folders",
 		"!bash":     "Execute shell commands",
 		"/cmd":      "Execute built-in commands",
 		"shift+tab": "Toggle plan or yolo mode",
