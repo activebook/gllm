@@ -185,7 +185,7 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (
 
 		// Show diff if we have current content
 		diff := event.RequestDiff(currentContent, content, 3)
-		op.fileHooks.Preview(path, content)
+		op.fileHooks.OpenDiff(path, content)
 		op.showDiffConfirm(diff)
 
 		// Get purpose if provided
@@ -198,7 +198,7 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (
 		event.RequestConfirm(purpose, op.toolsUse)
 		op.closeDiffConfirm() // Close the diff
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
-			op.fileHooks.Discard(path)
+			op.fileHooks.RejectDiff(path)
 			return fmt.Sprintf("Operation cancelled by user: write to file %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
@@ -212,10 +212,10 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (
 	// Write the file
 	err := os.WriteFile(path, []byte(content), 0644)
 	if err != nil {
-		op.fileHooks.Discard(path)
+		op.fileHooks.RejectDiff(path)
 		return fmt.Sprintf("Error writing file %s: %v", path, err), nil
 	}
-	op.fileHooks.Saved(path)
+	op.fileHooks.AcceptDiff(path)
 	return fmt.Sprintf("Successfully wrote to file %s", path), nil
 }
 
@@ -952,7 +952,7 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (s
 	if needConfirm && !op.toolsUse.AutoApprove {
 		// Show the diff
 		diff := event.RequestDiff(content, modifiedContent, 3)
-		op.fileHooks.Preview(path, modifiedContent)
+		op.fileHooks.OpenDiff(path, modifiedContent)
 		op.showDiffConfirm(diff)
 
 		// Get purpose if provided
@@ -965,7 +965,7 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (s
 		event.RequestConfirm(purpose, op.toolsUse)
 		op.closeDiffConfirm() // Close the diff
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
-			op.fileHooks.Discard(path)
+			op.fileHooks.RejectDiff(path)
 			return fmt.Sprintf(ToolRespDiscardEditFile, path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
@@ -973,10 +973,10 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (s
 	// Write the modified content back to the file
 	err = os.WriteFile(path, []byte(modifiedContent), 0644)
 	if err != nil {
-		op.fileHooks.Discard(path)
+		op.fileHooks.RejectDiff(path)
 		return fmt.Sprintf("Error writing file %s: %v", path, err), nil
 	}
-	op.fileHooks.Saved(path)
+	op.fileHooks.AcceptDiff(path)
 
 	// Build success message
 	var result strings.Builder

@@ -1,10 +1,13 @@
 package ui
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/event"
 	"github.com/charmbracelet/huh"
 )
 
@@ -102,10 +105,38 @@ func NeedUserConfirmToolUse(info string, prompt string, description string, tool
 		huh.NewGroup(fields...),
 	)
 
-	err := form.Run()
+	// Set up context for cancellation
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Register the cancel function with the VSCode confirm bus
+	bus := event.GetVSCodeConfirmBus()
+	bus.RegisterConfirmCancel(cancel)
+	defer bus.ClearConfirmCancel()
+
+	// Run the form
+	err := form.RunWithContext(ctx)
+	
+	// Always check if the context was cancelled (e.g. by VSCode companion)
+	// huh might return nil error even if the context was cancelled.
+	if ctx.Err() != nil && errors.Is(ctx.Err(), context.Canceled) {
+		accepted := event.GetVSCodeConfirmBus().GetAccepted()
+		if accepted {
+			toolsUse.ConfirmOnce()
+		} else {
+			toolsUse.ConfirmCancel()
+		}
+		return
+	}
+
 	if err != nil {
-		// User aborted
-		toolsUse.ConfirmCancel()
+		if errors.Is(err, huh.ErrUserAborted) {
+			// User aborted
+			toolsUse.ConfirmCancel()
+		} else {
+			// Unexpected error
+			toolsUse.ConfirmCancel()
+		}
 		return
 	}
 
