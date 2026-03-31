@@ -175,6 +175,7 @@ Within the chat, you can use various commands:
 ## 🧩 gllm Companion (VS Code Extension)
 
 A VS Code extension that bridges the `gllm` CLI tool with direct access to IDE workspace, enabling native inline diffs for AI-suggested code changes.
+Support bidirectional context changes between editor and gllm. You can confirm or discard changes in either of the editor or gllm.
 
 | gllm Companion |
 |:---:|
