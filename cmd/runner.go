@@ -43,6 +43,9 @@ func EnsureActiveAgent() (*data.AgentConfig, error) {
 
 // RunAgent executes the agent with the given parameters, handling all setup and compatibility checks.
 func RunAgent(prompt string, files []*service.FileData, sessionName string, outputFile string, inputState *data.SharedState) error {
+	// Start VSCode event bus if the plugin is enabled
+	service.StartVSCodeEventBus()
+
 	// Initialize SharedState for this session (for sub-agent orchestration)
 	// If inputState is provided, use it (lifecycle managed by caller)
 	// If not, create a new one and manage lifecycle here

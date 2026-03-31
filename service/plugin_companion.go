@@ -9,9 +9,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/internal/event"
 	"github.com/activebook/gllm/util"
 )
 
@@ -30,6 +32,7 @@ const (
 	ActionDiffAccepted companionAction = "diffAccepted"
 	ActionDiffRejected companionAction = "diffRejected"
 	ActionGetContext   companionAction = "getContext"
+	ActionSubscribe    companionAction = "subscribe"
 )
 
 // companionMsg represents the JSON payload expected by the VSCode companion extension.
@@ -67,9 +70,14 @@ func sendCompanion(msg companionMsg) error {
 	return nil
 }
 
+// IsVSCodePluginEnabled checks if the VSCode plugin is enabled.
+func IsVSCodePluginEnabled() bool {
+	return data.GetSettingsStore().IsPluginEnabled(PluginVSCodeCompanion)
+}
+
 // SendVSCodeOpenDiff sends the proposed file changes to VSCode for inline diffing before confirmation.
 func SendVSCodeOpenDiff(filePath, newContent string) {
-	if !data.GetSettingsStore().IsPluginEnabled(PluginVSCodeCompanion) || filePath == "" {
+	if !IsVSCodePluginEnabled() || filePath == "" {
 		return
 	}
 	go func() {
@@ -83,7 +91,7 @@ func SendVSCodeOpenDiff(filePath, newContent string) {
 
 // SendVSCodeDiffAccepted notifies VSCode that the file was successfully written to disk, permitting a clean reload.
 func SendVSCodeDiffAccepted(filePath string) {
-	if !data.GetSettingsStore().IsPluginEnabled(PluginVSCodeCompanion) || filePath == "" {
+	if !IsVSCodePluginEnabled() || filePath == "" {
 		return
 	}
 	go func() {
@@ -96,7 +104,7 @@ func SendVSCodeDiffAccepted(filePath string) {
 
 // SendVSCodeDiffRejected notifies VSCode that the change was cancelled, reverting any dirty buffer.
 func SendVSCodeDiffRejected(filePath string) {
-	if !data.GetSettingsStore().IsPluginEnabled(PluginVSCodeCompanion) || filePath == "" {
+	if !IsVSCodePluginEnabled() || filePath == "" {
 		return
 	}
 	go func() {
@@ -187,7 +195,7 @@ func fetchVSCodeCurrentContext() (*EditorContext, error) {
 
 // GetVSCodeContext formats the current VSCode state into a JSON block suitable for LLM injection.
 func GetVSCodeContext() string {
-	if !data.GetSettingsStore().IsPluginEnabled(PluginVSCodeCompanion) {
+	if !IsVSCodePluginEnabled() {
 		return ""
 	}
 
@@ -205,4 +213,62 @@ func GetVSCodeContext() string {
 	context := fmt.Sprintf("Here is the user's editor context as a JSON object.\n```json\n%s\n```\n", string(jsonBytes))
 	util.Debugf("VSCode Context: %s\n", context)
 	return context
+}
+
+// --- VSCode Event Bus ---
+// VSCode extension can send events to the CLI to control the UI.
+// The events are sent through the companion socket, not through pipe line.
+// Note: This is a one-way communication channel from VSCode to CLI.
+
+var (
+	startVSCodeEventBusOnce sync.Once
+)
+
+// StartVSCodeEventBus connects to the extension as a subscriber and continuously
+// reads push events. Auto-reconnects on disconnect. Call once at startup.
+func StartVSCodeEventBus() {
+	if !IsVSCodePluginEnabled() {
+		return
+	}
+	// Ensure we only start the goroutine ONCE
+	startVSCodeEventBusOnce.Do(func() {
+		go func() {
+			for {
+				ListenVSCodeEvents()
+				time.Sleep(2 * time.Second) // backoff before retry
+			}
+		}()
+	})
+}
+
+// ListenVSCodeEvents listens for push events from the VSCode companion extension.
+func ListenVSCodeEvents() {
+	network, addr := companionSocket()
+	conn, err := net.DialTimeout(network, addr, 500*time.Millisecond)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+
+	// Register as subscriber — extension keeps this socket alive
+	err = json.NewEncoder(conn).Encode(companionMsg{Action: ActionSubscribe})
+	if err != nil {
+		return
+	}
+
+	decoder := json.NewDecoder(conn)
+	for {
+		var msg companionMsg
+		if err := decoder.Decode(&msg); err != nil {
+			return // EOF = disconnect
+		}
+		switch msg.Action {
+		case ActionDiffAccepted:
+			event.GetVSCodeConfirmBus().Confirm()
+		case ActionDiffRejected:
+			event.GetVSCodeConfirmBus().Reject()
+		default:
+			// Unknown action — ignore, keep listening
+		}
+	}
 }
