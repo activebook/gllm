@@ -210,6 +210,9 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 				fmt.Printf("Installation complete. Successfully installed %d skills.\n", successCount)
 			}
 		}
+
+		// Reset the global slice to avoid accumulation in REPL
+		skillsInstallPaths = nil
 	},
 }
 
@@ -627,6 +630,9 @@ Use 'gllm skills update --all' to update all skills that support updating.`,
 				// Success message already printed by executeSkillUpdate
 			}
 		}
+
+		// Reset global flag to avoid accumulation in REPL
+		skillsUpdateAll = false
 	},
 }
 
