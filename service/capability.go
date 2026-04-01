@@ -12,7 +12,6 @@ const (
 	CapabilityTokenUsage      = "token_usage"
 	CapabilityMarkdown        = "markdown_output"
 	CapabilitySubAgents       = "sub_agents"
-	CapabilityAgentDelegation = "agent_delegation"
 	CapabilityWebSearch       = "web_search"
 	CapabilityAutoCompression = "auto_compression"
 	CapabilityPlanMode        = "plan_mode"
@@ -23,7 +22,6 @@ const (
 	CapabilitySkillsTitle       = "Agent Skills"
 	CapabilityMemoryTitle       = "Agent Memory"
 	CapabilitySubAgentsTitle    = "Sub Agents"
-	CapabilityDelegationTitle   = "Agent Delegation"
 	CapabilityWebSearchTitle    = "Web Search"
 	CapabilityTokenUsageTitle   = "Token Usage"
 	CapabilityMarkdownTitle     = "Markdown Output"
@@ -34,7 +32,6 @@ const (
 	CapabilitySkillsTitleHighlight       = "[Agent Skills]()"
 	CapabilityMemoryTitleHighlight       = "[Agent Memory]()"
 	CapabilitySubAgentsTitleHighlight    = "[Sub Agents]()"
-	CapabilityDelegationTitleHighlight   = "[Agent Delegation]()"
 	CapabilityWebSearchTitleHighlight    = "[Web Search]()"
 	CapabilityTokenUsageTitleHighlight   = "[Token Usage]()"
 	CapabilityMarkdownTitleHighlight     = "[Markdown Output]()"
@@ -44,8 +41,9 @@ const (
 	CapabilityMCPBody          = "enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."
 	CapabilitySkillsBody       = "are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.\nAfter integrating skills, **agent** will use skills automatically."
 	CapabilityMemoryBody       = "allows agents to remember important facts about you across sessions.\nFacts are used to personalize responses."
-	CapabilitySubAgentsBody    = "allow you to create and manage a pool of specialized agents.\nUse to define, configure, and list agents that can be delegated tasks."
-	CapabilityDelegationBody   = "allow an agent to delegate tasks or hand off control to other agents.\nUse when you need to orchestrate parallel work or fully transfer execution to a specialized agent."
+	CapabilitySubAgentsBody = "enable multi-agent workflows where specialized agents collaborate to complete complex tasks.\n" +
+		"Use when a task benefits from parallel execution, requires a domain expert persona, " +
+		"or needs to be handed off to a more suitable agent."
 	CapabilityWebSearchBody    = "enables the agent to search the web for real-time information.\nYou must configure a search engine (Google, Bing, Tavily) to use this feature."
 	CapabilityTokenUsageBody   = "allows agents to track their token usage.\nThis helps you to control the cost of using the agent."
 	CapabilityMarkdownBody     = "allows agents to generate final response in Markdown format.\nThis helps you to format the response in a more readable way."
@@ -55,9 +53,8 @@ const (
 	CapabilityMCPDescription          = CapabilityMCPTitle + " " + CapabilityMCPBody
 	CapabilitySkillsDescription       = CapabilitySkillsTitle + " " + CapabilitySkillsBody
 	CapabilityMemoryDescription       = CapabilityMemoryTitle + " " + CapabilityMemoryBody
-	CapabilitySubAgentsDescription    = CapabilitySubAgentsTitle + " " + CapabilitySubAgentsBody
-	CapabilityDelegationDescription   = CapabilityDelegationTitle + " " + CapabilityDelegationBody
-	CapabilityWebSearchDescription    = CapabilityWebSearchTitle + " " + CapabilityWebSearchBody
+	CapabilitySubAgentsDescription = CapabilitySubAgentsTitle + " " + CapabilitySubAgentsBody
+	CapabilityWebSearchDescription = CapabilityWebSearchTitle + " " + CapabilityWebSearchBody
 	CapabilityTokenUsageDescription   = CapabilityTokenUsageTitle + " " + CapabilityTokenUsageBody
 	CapabilityMarkdownDescription     = CapabilityMarkdownTitle + " " + CapabilityMarkdownBody
 	CapabilityAutoCompressDescription = CapabilityAutoCompressTitle + " " + CapabilityAutoCompressBody
@@ -67,9 +64,8 @@ const (
 	CapabilityMCPDescriptionHighlight          = CapabilityMCPTitleHighlight + CapabilityMCPBody
 	CapabilitySkillsDescriptionHighlight       = CapabilitySkillsTitleHighlight + CapabilitySkillsBody
 	CapabilityMemoryDescriptionHighlight       = CapabilityMemoryTitleHighlight + CapabilityMemoryBody
-	CapabilitySubAgentsDescriptionHighlight    = CapabilitySubAgentsTitleHighlight + CapabilitySubAgentsBody
-	CapabilityDelegationDescriptionHighlight   = CapabilityDelegationTitleHighlight + CapabilityDelegationBody
-	CapabilityWebSearchDescriptionHighlight    = CapabilityWebSearchTitleHighlight + CapabilityWebSearchBody
+	CapabilitySubAgentsDescriptionHighlight = CapabilitySubAgentsTitleHighlight + CapabilitySubAgentsBody
+	CapabilityWebSearchDescriptionHighlight = CapabilityWebSearchTitleHighlight + CapabilityWebSearchBody
 	CapabilityTokenUsageDescriptionHighlight   = CapabilityTokenUsageTitleHighlight + CapabilityTokenUsageBody
 	CapabilityMarkdownDescriptionHighlight     = CapabilityMarkdownTitleHighlight + CapabilityMarkdownBody
 	CapabilityAutoCompressDescriptionHighlight = CapabilityAutoCompressTitleHighlight + CapabilityAutoCompressBody
@@ -84,7 +80,6 @@ var (
 		CapabilityTokenUsage,
 		CapabilityMarkdown,
 		CapabilitySubAgents,
-		CapabilityAgentDelegation,
 		CapabilityWebSearch,
 		CapabilityAutoCompression,
 		CapabilityPlanMode,
@@ -124,8 +119,6 @@ func GetCapabilityTitle(cap string) string {
 		return CapabilityMarkdownTitle
 	case CapabilitySubAgents:
 		return CapabilitySubAgentsTitle
-	case CapabilityAgentDelegation:
-		return CapabilityDelegationTitle
 	case CapabilityWebSearch:
 		return CapabilityWebSearchTitle
 	case CapabilityAutoCompression:
@@ -151,8 +144,6 @@ func GetCapabilityDescHighlight(cap string) string {
 		return CapabilityMarkdownDescriptionHighlight
 	case CapabilitySubAgents, CapabilitySubAgentsTitle:
 		return CapabilitySubAgentsDescriptionHighlight
-	case CapabilityAgentDelegation, CapabilityDelegationTitle:
-		return CapabilityDelegationDescriptionHighlight
 	case CapabilityAgentMemory, CapabilityMemoryTitle:
 		return CapabilityMemoryDescriptionHighlight
 	case CapabilityWebSearch, CapabilityWebSearchTitle:
@@ -179,8 +170,6 @@ func GetCapabilityDescription(cap string) string {
 		return CapabilityMarkdownDescription
 	case CapabilitySubAgents, CapabilitySubAgentsTitle:
 		return CapabilitySubAgentsDescription
-	case CapabilityAgentDelegation, CapabilityDelegationTitle:
-		return CapabilityDelegationDescription
 	case CapabilityAgentMemory, CapabilityMemoryTitle:
 		return CapabilityMemoryDescription
 	case CapabilityWebSearch, CapabilityWebSearchTitle:
@@ -299,21 +288,6 @@ func EnableSubAgents(capabilities []string) []string {
 
 func DisableSubAgents(capabilities []string) []string {
 	return disableCapability(capabilities, CapabilitySubAgents)
-}
-
-/*
- * Agent Delegation
- */
-func IsAgentDelegationEnabled(capabilities []string) bool {
-	return isCapabilityEnabled(capabilities, CapabilityAgentDelegation)
-}
-
-func EnableAgentDelegation(capabilities []string) []string {
-	return enableCapability(capabilities, CapabilityAgentDelegation)
-}
-
-func DisableAgentDelegation(capabilities []string) []string {
-	return disableCapability(capabilities, CapabilityAgentDelegation)
 }
 
 /*

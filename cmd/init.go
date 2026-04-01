@@ -234,7 +234,6 @@ func RunInitWizard() error {
 			huh.NewOption("Enable Agent Skills", service.CapabilityAgentSkills).Selected(true),
 			huh.NewOption("Enable Agent Memory", service.CapabilityAgentMemory).Selected(true),
 			huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(true),
-			huh.NewOption("Enable Agent Delegation", service.CapabilityAgentDelegation).Selected(true),
 		).Value(&selectedFeatures)
 	featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, service.GetCapabilityDescHighlight)
 

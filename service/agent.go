@@ -200,13 +200,6 @@ func constructEnabledTools(tools []string, capabilities []string) []string {
 		enabledTools = RemoveSubagentTools(enabledTools)
 	}
 
-	// Agent Delegation tool injection
-	if IsAgentDelegationEnabled(capabilities) {
-		enabledTools = AppendAgentDelegationTools(enabledTools)
-	} else {
-		enabledTools = RemoveAgentDelegationTools(enabledTools)
-	}
-
 	// Web Search tool injection
 	if IsWebSearchEnabled(capabilities) {
 		enabledTools = AppendSearchTools(enabledTools)

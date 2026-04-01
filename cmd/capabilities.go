@@ -94,14 +94,6 @@ var capsSwitchCmd = &cobra.Command{
 			options = append(options, huh.NewOption("Sub Agents", service.CapabilitySubAgents))
 		}
 
-		// Agent Delegation
-		if service.IsAgentDelegationEnabled(agent.Capabilities) {
-			options = append(options, huh.NewOption("Agent Delegation", service.CapabilityAgentDelegation).Selected(true))
-			selected = append(selected, service.CapabilityAgentDelegation)
-		} else {
-			options = append(options, huh.NewOption("Agent Delegation", service.CapabilityAgentDelegation))
-		}
-
 		// Agent Memory
 		if service.IsAgentMemoryEnabled(agent.Capabilities) {
 			options = append(options, huh.NewOption("Agent Memory", service.CapabilityAgentMemory).Selected(true))
@@ -166,7 +158,6 @@ var capsSwitchCmd = &cobra.Command{
 			service.CapabilityTokenUsage,
 			service.CapabilityMarkdown,
 			service.CapabilitySubAgents,
-			service.CapabilityAgentDelegation,
 			service.CapabilityAgentMemory,
 			service.CapabilityWebSearch,
 			service.CapabilityAutoCompression,
@@ -202,7 +193,6 @@ func printCapSummary(caps []string) {
 	printCapStatus(service.CapabilitySkillsTitle, service.IsAgentSkillsEnabled(caps))
 	printCapStatus(service.CapabilityMemoryTitle, service.IsAgentMemoryEnabled(caps))
 	printCapStatus(service.CapabilitySubAgentsTitle, service.IsSubAgentsEnabled(caps))
-	printCapStatus(service.CapabilityDelegationTitle, service.IsAgentDelegationEnabled(caps))
 	printCapStatus(service.CapabilityAutoCompressTitle, service.IsAutoCompressionEnabled(caps))
 	printCapStatus(service.CapabilityPlanModeTitle, service.IsPlanModeEnabled(caps))
 

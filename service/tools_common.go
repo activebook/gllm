@@ -119,16 +119,13 @@ var (
 		ToolSaveMemory,
 	}
 	subagentTools = []string{
-		// Sub-agent orchestration tools
-		ToolSwitchAgent,
-		ToolBuildAgent,
-	}
-
-	agentDelegationTools = []string{
-		// Agent delegation tools
+		// Management
 		ToolListAgent,
+		ToolBuildAgent,
+		// Interaction
+		ToolSwitchAgent,
 		ToolSpawnSubAgents,
-		// shared state tools
+		// Shared State
 		ToolGetState,
 		ToolSetState,
 		ToolListState,
@@ -180,10 +177,6 @@ func GetSubagentTools() []string {
 	return subagentTools
 }
 
-func GetAgentDelegationTools() []string {
-	return agentDelegationTools
-}
-
 func GetPlanModeTools() []string {
 	return planModeTools
 }
@@ -194,7 +187,6 @@ func GetAllFeatureInjectedTools() []string {
 	tools = append(tools, GetSkillTools()...)
 	tools = append(tools, GetMemoryTools()...)
 	tools = append(tools, GetSubagentTools()...)
-	tools = append(tools, GetAgentDelegationTools()...)
 	tools = append(tools, GetPlanModeTools()...)
 	return tools
 }
@@ -214,7 +206,6 @@ func IsAvailableOpenTool(toolName string) bool {
 		AvailableSkillTool(toolName) ||
 		AvailableMemoryTool(toolName) ||
 		AvailableSubagentTool(toolName) ||
-		AvailableAgentDelegationTool(toolName) ||
 		AvailablePlanTool(toolName)
 }
 
@@ -268,16 +259,6 @@ func AvailableSubagentTool(toolName string) bool {
 	return false
 }
 
-// AvailableAgentDelegationTool checks if a tool is available in the agent delegation tools.
-func AvailableAgentDelegationTool(toolName string) bool {
-	for _, tool := range agentDelegationTools {
-		if tool == toolName {
-			return true
-		}
-	}
-	return false
-}
-
 // AvailablePlanTool checks if a tool is available in the plan tools.
 func AvailablePlanTool(toolName string) bool {
 	for _, tool := range planModeTools {
@@ -301,26 +282,6 @@ func AppendSubagentTools(tools []string) []string {
 // RemoveSubagentTools removes subagent tools from the given tools slice.
 func RemoveSubagentTools(tools []string) []string {
 	for _, tool := range subagentTools {
-		tools = slices.DeleteFunc(tools, func(t string) bool {
-			return t == tool
-		})
-	}
-	return tools
-}
-
-// AppendAgentDelegationTools appends agent delegation tools to the given tools slice if they are not already present.
-func AppendAgentDelegationTools(tools []string) []string {
-	for _, tool := range agentDelegationTools {
-		if !slices.Contains(tools, tool) {
-			tools = append(tools, tool)
-		}
-	}
-	return tools
-}
-
-// RemoveAgentDelegationTools removes agent delegation tools from the given tools slice.
-func RemoveAgentDelegationTools(tools []string) []string {
-	for _, tool := range agentDelegationTools {
 		tools = slices.DeleteFunc(tools, func(t string) bool {
 			return t == tool
 		})
@@ -1228,8 +1189,7 @@ Capability details (CRITICAL: Do NOT place these tools in the 'tools' field. Ena
 - mcp_servers: enables communication with locally running MCP servers.
 - agent_skills: lightweight, open format for extending AI agent workflows (injects 'activate_skill' tool).
 - agent_memory: allows agents to remember important facts across sessions (injects 'list_memory', 'save_memory' tools).
-- sub_agents: allow you to create and manage a pool of specialized agents (injects 'switch_agent', 'build_agent' tools).
-- agent_delegation: allow an agent to delegate tasks or hand off control to other agents (injects 'spawn_subagents', 'list_agent' tool).
+- sub_agents: allow you to create, manage, and orchestrate specialized sub-agents (injects 'list_agent', 'build_agent', 'switch_agent', 'spawn_subagents', 'get_state', 'set_state', 'list_state' tools).
 - web_search: enables the agent to search the web for real-time information (injects 'web_search' tool).
 - token_usage: allows agents to track their token usage.
 - markdown_output: allows agents to generate final response in Markdown format.
