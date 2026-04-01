@@ -307,7 +307,9 @@ func (oa *OpenAI) process(ag *Agent) error {
 			util.Debugf("Context messages after truncation: [%d]\n", len(messages))
 			// Save back only non-system messages to keep the session clean.
 			ag.Session.SetMessages(messages)
-			ag.Session.Save()
+			if err := ag.Session.Save(); err != nil {
+				return fmt.Errorf("failed to save truncated session: %w", err)
+			}
 		}
 
 		// Prepend the fresh system prompt in-memory only — never persisted.

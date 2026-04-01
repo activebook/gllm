@@ -308,7 +308,9 @@ func (ga *Gemini) process(ag *Agent, config *genai.GenerateContentConfig) error 
 			util.Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.\n", ag.Context.GetStrategy())
 			util.Debugf("Context messages after truncation: [%d]\n", len(messages))
 			ag.Session.SetMessages(messages)
-			ag.Session.Save()
+			if err := ag.Session.Save(); err != nil {
+				return fmt.Errorf("failed to save truncated session: %w", err)
+			}
 		}
 
 		// Stream the response
