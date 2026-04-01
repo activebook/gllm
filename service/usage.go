@@ -83,15 +83,19 @@ func (tu *TokenUsage) renderLipgloss() string {
 	headerValStyle := lipgloss.NewStyle().Foreground(headerColor).Bold(true).Width(colWidth).Align(lipgloss.Right)
 
 	// Data preparation
+	totalInput := 0
+	uncached := 0
+	if tu.CachedTokensInPrompt {
+		totalInput = tu.InputTokens
+		uncached = tu.InputTokens - tu.CachedTokens
+	} else {
+		totalInput = tu.InputTokens + tu.CachedTokens
+		uncached = tu.InputTokens
+	}
+
 	cachedPercentage := 0.0
-	if tu.InputTokens > 0 {
-		if tu.CachedTokensInPrompt {
-			// Cached tokens are included in the input tokens, so we don't need to add them
-			cachedPercentage = float64(tu.CachedTokens) / float64(tu.InputTokens) * 100
-		} else {
-			// Cached tokens are not included in the input tokens, so we need to add them
-			cachedPercentage = float64(tu.CachedTokens) / float64(tu.InputTokens+tu.CachedTokens) * 100
-		}
+	if totalInput > 0 {
+		cachedPercentage = float64(tu.CachedTokens) / float64(totalInput) * 100
 	}
 
 	// Headers
@@ -106,7 +110,12 @@ func (tu *TokenUsage) renderLipgloss() string {
 	// Rows
 	rowInput := lipgloss.JoinHorizontal(lipgloss.Left,
 		labelStyle.Render("Input"),
-		valueStyle.Render(fmt.Sprintf("%d", tu.InputTokens)),
+		valueStyle.Render(fmt.Sprintf("%d", totalInput)),
+	)
+
+	rowUncached := lipgloss.JoinHorizontal(lipgloss.Left,
+		labelStyle.Render("Uncached"),
+		valueStyle.Foreground(labelColor).Render(fmt.Sprintf("%d", uncached)),
 	)
 
 	rowOutput := lipgloss.JoinHorizontal(lipgloss.Left,
@@ -153,9 +162,10 @@ func (tu *TokenUsage) renderLipgloss() string {
 		headers,
 		underline,
 		rowInput,
-		rowOutput,
+		rowUncached,
 		rowCachedVal,
 		rowCachedPct,
+		rowOutput,
 		rowThought,
 		underline,
 		rowTotal,

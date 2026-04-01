@@ -170,6 +170,11 @@ func ConstructSystemPrompt(prompt string, capabilities []string) string {
 		}
 	}
 
+	// Inject global and project instruction files (GLLM.md)
+	if instructionContent := data.GetInstructionContent(); instructionContent != "" {
+		sysPrompt += "\n\n" + instructionContent
+	}
+
 	return sysPrompt
 }
 

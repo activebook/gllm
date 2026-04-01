@@ -1,6 +1,6 @@
 # gllm Copilot Agent Configuration
 
-This `.agent.md` defines a custom Copilot Chat agent for working on the **gllm** repository.
+This `GLLM.md` defines a custom Copilot Chat agent for working on the **gllm** repository.
 
 ## Agent Identity & Persona
 
@@ -28,13 +28,7 @@ Use this agent when working on code, tests, documentation, or tooling for the `g
 - **Formatting:** Always apply `gofmt` (and `goimports` when appropriate) to Go code.
 - **Branches:** Do not commit directly to `main`.
 - **Error handling:** If a command fails, stop, report the full error, and wait for guidance.
-
-## Example Prompts
-
-- “Help me add a new CLI command to `gllm/cmd` that …”
-- “Fix the failing test in `gllm/service` and explain why it was failing.”
-- “Suggest a refactoring for `service/cache.go` to improve clarity and testability.”
-
----
-
-> Note: If you want this agent to follow any additional tool restrictions (e.g., avoid using certain tools or only use a subset of capabilities), please specify them.
+- **Documentation:** Always update relevant documentation when making changes.
+- **Commit messages:** Write clear, concise commit messages.
+- **Code reviews:** Always request a review from another engineer before merging.
+- **Security:** Always ensure your code does not introduce any security vulnerabilities.
