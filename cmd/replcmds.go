@@ -15,6 +15,7 @@ import (
 	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 var (
@@ -38,8 +39,8 @@ var (
 		"/think":    "Set thinking level",
 		"/features": "Switch agent features",
 		"/editor":   "Manage editor or open for multi-line input",
-		"/attach":   "Attach a file",
-		"/detach":   "Detach a file",
+		"/attach":   "Attach file(s) or URL(s)",
+		"/detach":   "Detach file(s) or URL(s), or 'all'",
 		"/copy":     "Copy the last result or code snippet to clipboard",
 		"/about":    "Show current settings",
 		"/theme":    "Manage and switch themes",
@@ -58,47 +59,99 @@ var (
 	}
 )
 
-// contains checks if a slice contains a string
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
+// parseCommandArgs parses a command string respecting quotes
+func parseCommandArgs(input string) []string {
+	var args []string
+	var current strings.Builder
+	inQuote := false
+	var quoteChar rune
+	emptyQuote := false
+
+	for _, r := range input {
+		if inQuote {
+			if r == quoteChar {
+				inQuote = false
+				if current.Len() == 0 {
+					emptyQuote = true
+				}
+			} else {
+				current.WriteRune(r)
+			}
+		} else {
+			switch r {
+			case ' ', '\t', '\n':
+				if current.Len() > 0 || emptyQuote {
+					args = append(args, current.String())
+					current.Reset()
+					emptyQuote = false
+				}
+			case '"', '\'':
+				inQuote = true
+				quoteChar = r
+			default:
+				current.WriteRune(r)
+			}
 		}
 	}
-	return false
+	if current.Len() > 0 || emptyQuote {
+		args = append(args, current.String())
+	}
+	return args
 }
 
 // runCommand executes a command with arguments
 func runCommand(cmd *cobra.Command, args []string) {
-	if len(args) == 0 {
-		// No arguments, call the command directly
-		if cmd.RunE != nil {
-			if err := cmd.RunE(cmd, args); err != nil {
-				util.Errorf("%v\n", err)
-			}
-		} else if cmd.Run != nil {
-			cmd.Run(cmd, args)
-		}
+	// Find the target subcommand
+	targetCmd, targetArgs, err := cmd.Find(args)
+	if err != nil {
+		util.Errorf("Command not found: %v\n", err)
 		return
 	}
 
-	// Find subcommand
-	subName := args[0]
-	for _, sub := range cmd.Commands() {
-		if sub.Name() == subName || (len(sub.Aliases) > 0 && contains(sub.Aliases, subName)) {
-			// Recurse with the subcommand and remaining args
-			runCommand(sub, args[1:])
+	// Reset flags for the target command to avoid accumulation in the REPL
+	targetCmd.Flags().VisitAll(func(f *pflag.Flag) {
+		if f.Changed {
+			// Reset simple types to their default values
+			switch f.Value.Type() {
+			case "bool", "string", "int", "int64", "float32", "float64":
+				_ = f.Value.Set(f.DefValue)
+			}
+			// Reset the changed state so pflag treats it as a fresh parse
+			f.Changed = false
+		}
+	})
+
+	// Force pflag to parse the arguments directly, bypassing Cobra's already-parsed check
+	if err := targetCmd.Flags().Parse(targetArgs); err != nil {
+		if err == pflag.ErrHelp {
+			targetCmd.Help()
+			return
+		}
+		util.Errorf("Flag error: %v\n", err)
+		return
+	}
+
+	// Get the remaining positional arguments after flag parsing
+	parsedArgs := targetCmd.Flags().Args()
+
+	// Validate positional arguments if the command has an Args validator
+	if targetCmd.Args != nil {
+		if err := targetCmd.Args(targetCmd, parsedArgs); err != nil {
+			util.Errorf("Argument error: %v\n", err)
 			return
 		}
 	}
 
-	// No subcommand found, call on current cmd with all args
-	if cmd.RunE != nil {
-		if err := cmd.RunE(cmd, args); err != nil {
+	// Execute the command's Run or RunE function
+	if targetCmd.RunE != nil {
+		if err := targetCmd.RunE(targetCmd, parsedArgs); err != nil {
 			util.Errorf("%v\n", err)
 		}
-	} else if cmd.Run != nil {
-		cmd.Run(cmd, args)
+	} else if targetCmd.Run != nil {
+		targetCmd.Run(targetCmd, parsedArgs)
+	} else {
+		// If neither Run nor RunE is defined, it might be a parent command without a default action
+		util.Errorf("Incomplete command. Use help to see available subcommands.\n")
 	}
 }
 
@@ -110,7 +163,10 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 	if cmd == "" {
 		return
 	}
-	parts := strings.Fields(cmd)
+	parts := parseCommandArgs(cmd)
+	if len(parts) == 0 {
+		return
+	}
 	command := parts[0]
 	// Construct a "parts" slice that mimics the old behavior (cmd, arg1, arg2...)
 	// but mostly we just need command and "the rest"
@@ -180,14 +236,14 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 
 	case "/attach":
 		if len(parts) < 2 {
-			fmt.Println("Please specify a file path")
+			fmt.Println("Please specify a file path or URL")
 			return
 		}
 		ri.attachFiles(cmd)
 
 	case "/detach":
 		if len(parts) < 2 {
-			fmt.Println("Please specify a file path")
+			fmt.Println("Please specify a file path, URL, or 'all'")
 			return
 		}
 		ri.detachFiles(cmd)
@@ -366,8 +422,8 @@ func (ri *ReplInfo) handleEditorCommand() {
 }
 
 func (ri *ReplInfo) attachFiles(input string) {
-	// Split input into tokens
-	tokens := strings.Fields(input)
+	// Split input into tokens respecting quotes
+	tokens := parseCommandArgs(input)
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -428,7 +484,7 @@ func (ri *ReplInfo) attachFiles(input string) {
 					fmt.Printf("Attachment loaded: %s\n", filePath)
 				}(filePath)
 			} else {
-				fmt.Println("Please specify a file path after /attach")
+				fmt.Println("Please specify a file path or URL after /attach")
 			}
 		}
 		// Ignore other tokens
@@ -452,16 +508,16 @@ func (ri *ReplInfo) detachFiles(input string) {
 		return
 	}
 
-	// Split input into tokens
-	tokens := strings.Fields(input)
+	// Split input into tokens respecting quotes
+	tokens := parseCommandArgs(input)
 
 	// Process detach commands
 	detachedAny := false
 	for i := 0; i < len(tokens); i++ {
 		if tokens[i] == "/detach" {
-			// Check if there's a file path after /detach
+			// Check if there's a file path or URL after /detach
 			if i+1 >= len(tokens) {
-				fmt.Println("Please specify a file path after /detach")
+				fmt.Println("Please specify a file path or URL after /detach")
 				continue
 			}
 
