@@ -95,33 +95,48 @@ func (c *openChatContext) truncate(messages []*model.ChatCompletionMessage, tota
 	truncated := false
 	for historyTokens > availableTokens && len(messages) > 0 {
 		removed := false
-		for i := 0; i < len(messages); i++ {
-			msg := messages[i]
-			if pairIndices := c.findToolPair(messages, i); len(pairIndices) > 0 {
-				tokensRemoved := 0
-				for j := len(pairIndices) - 1; j >= 0; j-- {
-					idx := pairIndices[j]
-					tokensRemoved += tokenCounts[idx]
-					messages = append(messages[:idx], messages[idx+1:]...)
-					tokenCounts = append(tokenCounts[:idx], tokenCounts[idx+1:]...)
-				}
-				historyTokens -= tokensRemoved
-				truncated = true
-				removed = true
-				break
+
+		if pairIndices := c.findToolPair(messages, 0); len(pairIndices) > 0 {
+			tokensRemoved := 0
+			// Remove from highest index to lowest
+			for j := len(pairIndices) - 1; j >= 0; j-- {
+				idx := pairIndices[j]
+				tokensRemoved += tokenCounts[idx]
+				messages = append(messages[:idx], messages[idx+1:]...)
+				tokenCounts = append(tokenCounts[:idx], tokenCounts[idx+1:]...)
 			}
-			if msg.Role != model.ChatMessageRoleTool && len(msg.ToolCalls) == 0 {
-				historyTokens -= tokenCounts[i]
-				messages = append(messages[:i], messages[i+1:]...)
-				tokenCounts = append(tokenCounts[:i], tokenCounts[i+1:]...)
-				truncated = true
-				removed = true
-				break
-			}
+			historyTokens -= tokensRemoved
+			truncated = true
+			removed = true
+		} else {
+			// Orphaned tool message or regular message — safe to remove
+			historyTokens -= tokenCounts[0]
+			messages = messages[1:]
+			tokenCounts = tokenCounts[1:]
+			truncated = true
+			removed = true
 		}
+
 		if !removed {
 			break
 		}
+	}
+
+	// Cleanup: ensure history starts with a valid user message.
+	for len(messages) > 0 {
+		msg := messages[0]
+		if msg == nil {
+			messages = messages[1:]
+			truncated = true
+			continue
+		}
+		role := msg.Role
+		if role == model.ChatMessageRoleAssistant || role == model.ChatMessageRoleTool {
+			messages = messages[1:]
+			truncated = true
+			continue
+		}
+		break
 	}
 
 	return messages, truncated
@@ -149,8 +164,13 @@ func (c *openChatContext) gatherToolPair(messages []*model.ChatCompletionMessage
 	callMsg := messages[callIndex]
 	for _, call := range callMsg.ToolCalls {
 		for j := callIndex + 1; j < len(messages); j++ {
-			if messages[j].ToolCallID == call.ID {
+			msg := messages[j]
+			if msg == nil || msg.Role != model.ChatMessageRoleTool {
+				break
+			}
+			if msg.ToolCallID == call.ID {
 				indices = append(indices, j)
+				break
 			}
 		}
 	}

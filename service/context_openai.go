@@ -92,35 +92,47 @@ func (c *openAIContext) truncate(messages []openai.ChatCompletionMessageParamUni
 	truncated := false
 	for historyTokens > availableTokens && len(messages) > 0 {
 		removed := false
-		for i := 0; i < len(messages); i++ {
-			msg := messages[i]
-			if pairIndices := c.findToolPair(messages, i); len(pairIndices) > 0 {
-				tokensRemoved := 0
-				for j := len(pairIndices) - 1; j >= 0; j-- {
-					idx := pairIndices[j]
-					tokensRemoved += tokenCounts[idx]
-					messages = append(messages[:idx], messages[idx+1:]...)
-					tokenCounts = append(tokenCounts[:idx], tokenCounts[idx+1:]...)
-				}
-				historyTokens -= tokensRemoved
-				truncated = true
-				removed = true
-				break
+
+		if pairIndices := c.findToolPair(messages, 0); len(pairIndices) > 0 {
+			tokensRemoved := 0
+			// Remove from highest index to lowest
+			for j := len(pairIndices) - 1; j >= 0; j-- {
+				idx := pairIndices[j]
+				tokensRemoved += tokenCounts[idx]
+				messages = append(messages[:idx], messages[idx+1:]...)
+				tokenCounts = append(tokenCounts[:idx], tokenCounts[idx+1:]...)
 			}
-			role := msg.GetRole()
-			isTool := role != nil && *role == "tool"
-			if !isTool && len(msg.GetToolCalls()) == 0 {
-				historyTokens -= tokenCounts[i]
-				messages = append(messages[:i], messages[i+1:]...)
-				tokenCounts = append(tokenCounts[:i], tokenCounts[i+1:]...)
-				truncated = true
-				removed = true
-				break
-			}
+			historyTokens -= tokensRemoved
+			truncated = true
+			removed = true
+		} else {
+			// Orphaned tool message or regular message — safe to remove
+			historyTokens -= tokenCounts[0]
+			messages = messages[1:]
+			tokenCounts = tokenCounts[1:]
+			truncated = true
+			removed = true
 		}
+
 		if !removed {
 			break
 		}
+	}
+
+	// Cleanup: ensure history starts with a valid user message.
+	for len(messages) > 0 {
+		role := messages[0].GetRole()
+		if role == nil {
+			messages = messages[1:]
+			truncated = true
+			continue
+		}
+		if *role == "assistant" || *role == "tool" {
+			messages = messages[1:]
+			truncated = true
+			continue
+		}
+		break
 	}
 
 	return messages, truncated
@@ -152,9 +164,14 @@ func (c *openAIContext) gatherToolPair(messages []openai.ChatCompletionMessagePa
 	callMsg := messages[callIndex]
 	for _, call := range callMsg.GetToolCalls() {
 		for j := callIndex + 1; j < len(messages); j++ {
+			role := messages[j].GetRole()
+			if role == nil || *role != "tool" {
+				break
+			}
 			tID := messages[j].GetToolCallID()
 			if call.OfFunction != nil && tID != nil && *tID == call.OfFunction.ID {
 				indices = append(indices, j)
+				break
 			}
 		}
 	}
