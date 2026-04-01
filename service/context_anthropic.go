@@ -117,6 +117,40 @@ func (c *anthropicContext) truncate(messages []anthropic.MessageParam, totalOver
 		}
 	}
 
+	// Cleanup: Ensure the truncated history starts with a valid user turn.
+	// Anthropic strictly requires the first message to use the 'user' role.
+	for len(messages) > 0 {
+		msg := messages[0]
+
+		if msg.Role != anthropic.MessageParamRoleUser {
+			messages = messages[1:]
+			truncated = true
+			continue
+		}
+
+		// If it's a user message, check if it contains ONLY tool results (orphaned).
+		// While Anthropic allows tool results from the user, they must follow an assistant's tool use.
+		hasToolResult := false
+		hasText := false
+		for _, block := range msg.Content {
+			if block.OfToolResult != nil {
+				hasToolResult = true
+			}
+			if block.OfText != nil {
+				hasText = true
+			}
+		}
+
+		if hasToolResult && !hasText {
+			messages = messages[1:]
+			truncated = true
+			continue
+		}
+
+		// Valid starting user message found.
+		break
+	}
+
 	return messages, truncated
 }
 
