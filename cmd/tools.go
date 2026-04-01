@@ -160,14 +160,6 @@ func GetAllTools(agent *data.AgentConfig) string {
 		}
 	}
 
-	// Add agent delegation tools if agent delegation is enabled
-	if service.IsAgentDelegationEnabled(agent.Capabilities) {
-		agentDelegationTools := service.GetAgentDelegationTools()
-		for _, t := range agentDelegationTools {
-			enabledSet[t] = true
-		}
-	}
-
 	// Add agent memory tools if agent memory is enabled
 	if service.IsAgentMemoryEnabled(agent.Capabilities) {
 		agentMemoryTools := service.GetMemoryTools()
