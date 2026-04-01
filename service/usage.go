@@ -115,7 +115,7 @@ func (tu *TokenUsage) renderLipgloss() string {
 
 	rowUncached := lipgloss.JoinHorizontal(lipgloss.Left,
 		labelStyle.Render("Uncached"),
-		valueStyle.Render(fmt.Sprintf("%d", uncached)),
+		valueStyle.Foreground(labelColor).Render(fmt.Sprintf("%d", uncached)),
 	)
 
 	rowOutput := lipgloss.JoinHorizontal(lipgloss.Left,
