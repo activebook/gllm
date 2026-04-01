@@ -1,6 +1,6 @@
 # gllm Copilot Agent Configuration
 
-This `.agent.md` defines a custom Copilot Chat agent for working on the **gllm** repository.
+This `GLLM.md` defines a custom Copilot Chat agent for working on the **gllm** repository.
 
 ## Agent Identity & Persona
 
