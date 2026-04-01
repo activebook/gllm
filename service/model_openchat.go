@@ -294,7 +294,9 @@ func (c *OpenChat) process(ag *Agent) error {
 			util.Debugf("Context messages after truncation: [%d]\n", len(messages))
 			// Session write-back is clean: system message not yet prepended at this point.
 			ag.Session.SetMessages(messages)
-			ag.Session.Save()
+			if err := ag.Session.Save(); err != nil {
+				return fmt.Errorf("failed to save truncated session: %w", err)
+			}
 		}
 
 		// Prepend the fresh system prompt in-memory only — never persisted.

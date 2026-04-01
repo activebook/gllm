@@ -486,3 +486,176 @@ func TestGeminiToolPairRemoval(t *testing.T) {
 		t.Error("Tool pair broken: hasCall =", hasCall, " hasResp =", hasResp)
 	}
 }
+
+// TestPruneGeminiMessagesFunctionCallAfterUser reproduces the exact Gemini 400 error:
+// "function call turn comes immediately after a user turn or after a function response turn".
+// Scenario: after truncation the first remaining message is a Model/FunctionCall turn,
+// which is illegal because it is not preceded by a User or FunctionResponse turn.
+func TestPruneGeminiMessagesFunctionCallAfterUser(t *testing.T) {
+	ClearTokenCache()
+	cm := &geminiContext{
+		commonContext: commonContext{
+			maxInputTokens: 20, // tight limit forces truncation
+			strategy:       StrategyTruncateOldest,
+		},
+	}
+
+	// Sequence:
+	//   [0] User  "old question"
+	//   [1] Model FunctionCall(search)
+	//   [2] User  FunctionResponse(search)
+	//   [3] Model "old answer"
+	//   [4] User  "new question"
+	//   [5] Model FunctionCall(search2)  <-- if [0-3] are dropped individually,
+	//                                        this can end up at index 0 (illegal)
+	//   [6] User  FunctionResponse(search2)
+	//   [7] Model "new answer"
+	messages := []*genai.Content{
+		{Role: genai.RoleUser, Parts: []*genai.Part{{Text: "old question"}}},
+		{
+			Role:  genai.RoleModel,
+			Parts: []*genai.Part{{FunctionCall: &genai.FunctionCall{Name: "search", Args: map[string]interface{}{"q": "x"}}}},
+		},
+		{
+			Role:  genai.RoleUser,
+			Parts: []*genai.Part{{FunctionResponse: &genai.FunctionResponse{Name: "search", Response: map[string]interface{}{"r": "y"}}}},
+		},
+		{Role: genai.RoleModel, Parts: []*genai.Part{{Text: "old answer"}}},
+		{Role: genai.RoleUser, Parts: []*genai.Part{{Text: "new question"}}},
+		{
+			Role:  genai.RoleModel,
+			Parts: []*genai.Part{{FunctionCall: &genai.FunctionCall{Name: "search2", Args: map[string]interface{}{"q": "z"}}}},
+		},
+		{
+			Role:  genai.RoleUser,
+			Parts: []*genai.Part{{FunctionResponse: &genai.FunctionResponse{Name: "search2", Response: map[string]interface{}{"r": "w"}}}},
+		},
+		{Role: genai.RoleModel, Parts: []*genai.Part{{Text: "new answer"}}},
+	}
+
+	resultAny, truncated, _ := cm.PruneMessages(messages, "", nil)
+	result := resultAny.([]*genai.Content)
+
+	if !truncated {
+		t.Fatal("Expected truncation")
+	}
+
+	// Validate the full sequence satisfies Gemini's constraints:
+	// 1. First message must be User (not Model, not FunctionResponse).
+	// 2. A FunctionCall (Model turn) must be preceded by User or FunctionResponse.
+	if len(result) == 0 {
+		return // empty is technically valid (nothing to send)
+	}
+	if result[0].Role != genai.RoleUser {
+		t.Errorf("first message role = %q, want %q", result[0].Role, genai.RoleUser)
+	}
+	for _, part := range result[0].Parts {
+		if part.FunctionResponse != nil {
+			t.Error("first message must not be a FunctionResponse")
+		}
+	}
+	for i := 1; i < len(result); i++ {
+		if result[i].Role != genai.RoleModel {
+			continue
+		}
+		for _, part := range result[i].Parts {
+			if part.FunctionCall == nil {
+				continue
+			}
+			// FunctionCall must be preceded by User or FunctionResponse
+			prev := result[i-1]
+			prevIsUser := prev.Role == genai.RoleUser
+			prevIsFuncResp := false
+			for _, pp := range prev.Parts {
+				if pp.FunctionResponse != nil {
+					prevIsFuncResp = true
+				}
+			}
+			if !prevIsUser && !prevIsFuncResp {
+				t.Errorf("message[%d] is a FunctionCall but message[%d] (role=%q) is neither User nor FunctionResponse", i, i-1, prev.Role)
+			}
+		}
+	}
+}
+
+func TestPruneGeminiMessagesRoleSequence(t *testing.T) {
+	ClearTokenCache()
+	cm := &geminiContext{
+		commonContext: commonContext{
+			maxInputTokens: 20, // Smaller limit to trigger truncation
+			strategy:       StrategyTruncateOldest,
+		},
+	}
+
+	messages := []*genai.Content{
+		{Role: genai.RoleUser, Parts: []*genai.Part{{Text: "Message 1 (User)"}}},
+		{Role: genai.RoleModel, Parts: []*genai.Part{{Text: "Message 2 (Model)"}}},
+		{Role: genai.RoleUser, Parts: []*genai.Part{{Text: "Message 3 (User)"}}},
+		{Role: genai.RoleModel, Parts: []*genai.Part{{Text: "Message 4 (Model)"}}},
+	}
+
+	// Truncation will remove "Message 1 (User)" first.
+	// We want to ensure it doesn't leave "Message 2 (Model)" as the first message.
+	resultAny, truncated, _ := cm.PruneMessages(messages, "", nil)
+	result := resultAny.([]*genai.Content)
+
+	if !truncated {
+		t.Error("Expected truncation")
+	}
+
+	if len(result) > 0 {
+		if result[0].Role != genai.RoleUser {
+			t.Errorf("First message role = %v, want %v", result[0].Role, genai.RoleUser)
+		}
+	}
+}
+
+func TestPruneGeminiMessagesToolResponseStart(t *testing.T) {
+	ClearTokenCache()
+	cm := &geminiContext{
+		commonContext: commonContext{
+			maxInputTokens: 20,
+			strategy:       StrategyTruncateOldest,
+		},
+	}
+
+	messages := []*genai.Content{
+		{Role: genai.RoleUser, Parts: []*genai.Part{{Text: "User question"}}},
+		{
+			Role: genai.RoleModel,
+			Parts: []*genai.Part{
+				{FunctionCall: &genai.FunctionCall{Name: "search", Args: map[string]interface{}{"q": "foo"}}},
+			},
+		},
+		{
+			Role: genai.RoleUser,
+			Parts: []*genai.Part{
+				{FunctionResponse: &genai.FunctionResponse{Name: "search", Response: map[string]interface{}{"res": "bar"}}},
+			},
+		},
+		{Role: genai.RoleModel, Parts: []*genai.Part{{Text: "Final answer"}}},
+	}
+
+	// If truncation removes first message, it should also remove the tool pair if the start is invalid.
+	// Actually, if it removes User, it must remove Model (Call).
+	// Then it's left with User (Response). But Response must follow a Call.
+	// So it must remove User (Response) too.
+	// And then it's left with Model (Final answer). So it must remove that too.
+	resultAny, truncated, _ := cm.PruneMessages(messages, "", nil)
+	result := resultAny.([]*genai.Content)
+
+	if !truncated {
+		t.Error("Expected truncation")
+	}
+
+	if len(result) > 0 {
+		if result[0].Role != genai.RoleUser {
+			t.Errorf("First message role = %v, want %v", result[0].Role, genai.RoleUser)
+		}
+		for _, part := range result[0].Parts {
+			if part.FunctionResponse != nil {
+				t.Error("First message should not be a tool response")
+			}
+		}
+	}
+}

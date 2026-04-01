@@ -119,8 +119,41 @@ func (c *geminiContext) truncate(messages []*genai.Content, totalOverhead int) (
 		}
 	}
 
+	// Cleanup: Ensure the truncated history starts with a valid user turn.
+	// Gemini requires that a FunctionCall must come immediately after a user turn or a function response turn.
+	for len(messages) > 0 {
+		msg := messages[0]
+
+		// If it's a model message, it's not a valid start.
+		// If it's a FunctionCall, its corresponding FunctionResponse (if any)
+		// will be removed in subsequent iterations.
+		if msg.Role == "model" || msg.Role == genai.RoleModel {
+			messages = messages[1:]
+			truncated = true
+			continue
+		}
+
+		// If it's a user message, check if it's an orphaned FunctionResponse.
+		// A FunctionResponse cannot be the first message (must follow a FunctionCall).
+		isFuncResp := false
+		for _, part := range msg.Parts {
+			if part.FunctionResponse != nil {
+				isFuncResp = true
+				break
+			}
+		}
+		if isFuncResp {
+			messages = messages[1:]
+			truncated = true
+			continue
+		}
+
+		// Valid starting user message found.
+		break
+	}
 	return messages, truncated
 }
+
 
 func (c *geminiContext) isToolMessage(msg *genai.Content) bool {
 	if msg == nil {
@@ -186,6 +219,11 @@ func (c *geminiContext) gatherToolPair(messages []*genai.Content, callIndex int)
 		msg := messages[j]
 		if msg == nil {
 			continue
+		}
+		// Stop at the next model turn — responses always live in the
+		// immediately-following user turn, never further.
+		if msg.Role == "model" || msg.Role == genai.RoleModel {
+			break
 		}
 		for _, part := range msg.Parts {
 			if part.FunctionResponse != nil && callNames[part.FunctionResponse.Name] {
