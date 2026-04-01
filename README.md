@@ -9,6 +9,7 @@
 - **Interactive Session / REPL**: Start real-time conversations by simply running `gllm`.
 - **Editor Integration**: Use your preferred text editor for comfortable multi-line input in chat mode.
 - **Prompt Templates & System Prompts**: Manage reusable prompts and instructions.
+- **Instruction Support**: Load global and project-specific instruction files (`GLLM.md`) to provide persistent context and guardrails for your agents.
 - **Attachment Support**: Process files, images, and URLs as part of your queries.
 - **Search Integration**: Use search engines to find the latest and most relevant information.
 - **Web Retrieval**: Extract comprehensive text content from URLs, including websites, raw text files, and PDF documents.
