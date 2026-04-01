@@ -25,6 +25,7 @@ gllm.7z
 *.out
 
 # IDE settings, configuration, and caches
+.worktrees/
 .idea/
 .vscode/
 .roo/
