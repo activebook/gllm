@@ -201,7 +201,9 @@ func (a *Anthropic) process(ag *Agent) error {
 			util.Debugf("Context messages after truncation: [%d]\n", len(messages))
 			// Update the session with truncated messages
 			ag.Session.SetMessages(messages)
-			ag.Session.Save()
+			if err := ag.Session.Save(); err != nil {
+				util.Errorf("Failed to save truncated session: %v\n", err)
+			}
 		}
 
 		// Create params
