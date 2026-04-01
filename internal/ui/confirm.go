@@ -8,59 +8,87 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/event"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 )
 
-// NeedUserConfirm prompts the user for confirmation using charmbracelet/huh.
-func NeedUserConfirm(info string, prompt string, description string) (bool, error) {
-	// Output the info message if provided
-	if len(strings.TrimSpace(info)) > 0 {
-		fmt.Println(info)
-	}
-
-	var confirm bool
-	var fields []huh.Field
-
-	description = strings.TrimSpace(description)
-	isLong := len(description) > 400
-
-	// If description is too long, use a Note before the Confirm field
-	if isLong {
-		fields = append(fields, GetStaticHuhNote("", description))
-	}
-
-	confirmField := huh.NewConfirm().
-		Title(prompt).
-		Value(&confirm).
-		Affirmative("Yes").
-		Negative("No")
-
-	// If description is not too long and not empty, use the built-in Description
-	if len(description) > 0 && !isLong {
-		confirmField.Description(description)
-	}
-
-	fields = append(fields, confirmField)
-
-	// Use a default styling or customize as needed
-	form := huh.NewForm(
-		huh.NewGroup(fields...),
-	)
-
-	err := form.Run()
-	if err != nil {
-		return false, fmt.Errorf("error in confirmation prompt: %v", err)
-	}
-
-	return confirm, nil
+// clearableForm is a wrapper for huh.Form that clears the view on exit.
+// It ensures the terminal remains clean by rendering an empty string as the
+// final frame when the form is completed, aborted, or externally cancelled.
+type clearableForm struct {
+	form     *huh.Form
+	quitting bool
 }
 
-// For tools use confirmation
-// If toolsUse.AutoApprove is true, return true
-// If toolsUse.AutoApprove is false, prompt the user for confirmation
-// If the user choose "All", set toolsUse.AutoApprove to true and toolsUse.Confirm to data.ToolConfirmYes
-// If the user choose "Yes", set toolsUse.Confirm to data.ToolConfirmYes
-// If the user choose "No", set toolsUse.Confirm to data.ToolConfirmCancel
+// forceQuitMsg is a custom message used to trigger a graceful shutdown
+// of the Bubble Tea program, allowing it to render one last empty frame.
+type forceQuitMsg struct{}
+
+// Init delegates initialization to the underlying huh.Form.
+func (m *clearableForm) Init() tea.Cmd {
+	return m.form.Init()
+}
+
+// Update handles incoming messages. It intercepts completion and abortion
+// states to set the quitting flag and return tea.Quit, ensuring the final
+// render is empty. It also handles forceQuitMsg for external cancellation.
+func (m *clearableForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg.(type) {
+	case forceQuitMsg:
+		m.quitting = true
+		return m, tea.Quit
+	}
+
+	res, cmd := m.form.Update(msg)
+	m.form = res.(*huh.Form)
+
+	if m.form.State == huh.StateCompleted || m.form.State == huh.StateAborted {
+		m.quitting = true
+		return m, tea.Quit
+	}
+	return m, cmd
+}
+
+// View renders the form or an empty string if the program is quitting.
+func (m *clearableForm) View() string {
+	if m.quitting {
+		return ""
+	}
+	return m.form.View()
+}
+
+// RunFormClearable runs a huh.Form with context and clears it from the terminal on exit.
+// It uses a goroutine to listen for context cancellation and sends a forceQuitMsg
+// to ensure the TUI clears the screen before the process continues.
+func RunFormClearable(form *huh.Form, ctx context.Context) error {
+	p := tea.NewProgram(&clearableForm{form: form})
+
+	// Listen for context cancellation to trigger a graceful shutdown
+	// which allows Bubble Tea to render the final empty frame and clear the screen.
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			p.Send(forceQuitMsg{})
+		case <-done:
+		}
+	}()
+
+	_, err := p.Run()
+	close(done)
+
+	if err != nil {
+		return err
+	}
+	if form.State == huh.StateAborted {
+		return huh.ErrUserAborted
+	}
+	return nil
+}
+
+// NeedUserConfirmToolUse prompts the user for tool execution confirmation.
+// If toolsUse.AutoApprove is true, it returns ToolConfirmYes immediately.
+// Otherwise, it displays a selection menu for the user to choose "once", "session", or "cancel".
 func NeedUserConfirmToolUse(info string, prompt string, description string, toolsUse *data.ToolsUse) {
 	// Output the info message if provided
 	if len(strings.TrimSpace(info)) > 0 {
@@ -115,8 +143,8 @@ func NeedUserConfirmToolUse(info string, prompt string, description string, tool
 	defer bus.ClearConfirmCancel()
 
 	// Run the form
-	err := form.RunWithContext(ctx)
-	
+	err := RunFormClearable(form, ctx)
+
 	// Always check if the context was cancelled (e.g. by VSCode companion)
 	// huh might return nil error even if the context was cancelled.
 	if ctx.Err() != nil && errors.Is(ctx.Err(), context.Canceled) {
