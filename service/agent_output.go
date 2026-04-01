@@ -293,7 +293,7 @@ func formatVerboseArgs(args map[string]interface{}) (string, string) {
 
 	var commandParts []string
 	for k, v := range args {
-		if k == "purpose" || k == "need_confirm" {
+		if k == "purpose" {
 			continue
 		}
 		var val string
@@ -332,9 +332,9 @@ func extractFirstArg(args interface{}) string {
 			}
 		}
 
-		// 3. Otherwise find the first key that isn't purpose or need_confirm
+		// 3. Otherwise find the first key that isn't purpose
 		for k, v := range m {
-			if k == "purpose" || k == "need_confirm" {
+			if k == "purpose" {
 				continue
 			}
 			// Use this value as the detail
@@ -381,7 +381,7 @@ func formatArgValue(v interface{}) string {
 
 		// If it's a map, recursively format the first key's value that isn't metadata
 		for k, subV := range val {
-			if k == "purpose" || k == "need_confirm" {
+			if k == "purpose" {
 				continue
 			}
 			return formatArgValue(subV)

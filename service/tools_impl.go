@@ -165,14 +165,7 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (
 		return "", fmt.Errorf("content not found in arguments")
 	}
 
-	// Check if confirmation is needed
-	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
-	if !ok {
-		// Default to true for safety
-		needConfirm = true
-	}
-
-	if needConfirm && !op.toolsUse.AutoApprove {
+	if !op.toolsUse.AutoApprove {
 		// Check if file exists and read current content
 		var currentContent string
 		if _, err := os.Stat(path); err == nil {
@@ -229,14 +222,7 @@ func createDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data
 		return "", fmt.Errorf("path not found in arguments")
 	}
 
-	// Check if confirmation is needed
-	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
-	if !ok {
-		// Default to true for safety
-		needConfirm = true
-	}
-
-	if needConfirm && !toolsUse.AutoApprove {
+	if !toolsUse.AutoApprove {
 		// Get purpose if provided
 		purpose, _ := (*argsMap)["purpose"].(string)
 		if purpose == "" {
@@ -323,14 +309,7 @@ func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tool
 		return "", fmt.Errorf("path not found in arguments")
 	}
 
-	// Check if confirmation is needed
-	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
-	if !ok {
-		// Default to true for safety
-		needConfirm = true
-	}
-
-	if needConfirm && !toolsUse.AutoApprove {
+	if !toolsUse.AutoApprove {
 		// Get purpose if provided
 		purpose, _ := (*argsMap)["purpose"].(string)
 		if purpose == "" {
@@ -363,14 +342,7 @@ func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data
 		return "", fmt.Errorf("path not found in arguments")
 	}
 
-	// Check if confirmation is needed
-	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
-	if !ok {
-		// Default to true for safety
-		needConfirm = true
-	}
-
-	if needConfirm && !toolsUse.AutoApprove {
+	if !toolsUse.AutoApprove {
 		// Get purpose if provided
 		purpose, _ := (*argsMap)["purpose"].(string)
 		if purpose == "" {
@@ -408,14 +380,7 @@ func moveToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) 
 		return "", fmt.Errorf("destination not found in arguments")
 	}
 
-	// Check if confirmation is needed
-	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
-	if !ok {
-		// Default to true for safety
-		needConfirm = true
-	}
-
-	if needConfirm && !toolsUse.AutoApprove {
+	if !toolsUse.AutoApprove {
 		// Get purpose if provided
 		purpose, _ := (*argsMap)["purpose"].(string)
 		if purpose == "" {
@@ -697,11 +662,6 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse)
 	if !ok {
 		return "", fmt.Errorf("command not found in arguments")
 	}
-	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
-	if !ok {
-		// Default to true for safety
-		needConfirm = true
-	}
 
 	// Get timeout from arguments, default to DefaultShellTimeout
 	timeout := DefaultShellTimeout
@@ -711,7 +671,7 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse)
 		}
 	}
 
-	if needConfirm && !toolsUse.AutoApprove {
+	if !toolsUse.AutoApprove {
 		// Directly prompt user for confirmation
 		descStr, ok := (*argsMap)["purpose"].(string)
 		if !ok {
@@ -879,13 +839,6 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (s
 		return "", fmt.Errorf("path not found in arguments")
 	}
 
-	// Check if confirmation is needed
-	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
-	if !ok {
-		// Default to true for safety
-		needConfirm = true
-	}
-
 	// Get the edits to apply
 	editsInterface, ok := (*argsMap)["edits"].([]interface{})
 	if !ok {
@@ -947,9 +900,8 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (s
 		result.WriteString("\nPlease verify the search text matches exactly (including whitespace and line endings).")
 		return result.String(), nil
 	}
-
-	// If confirmation is needed, show the diff and ask the user
-	if needConfirm && !op.toolsUse.AutoApprove {
+	// Show the diff and ask the user
+	if !op.toolsUse.AutoApprove {
 		// Show the diff
 		diff := event.RequestDiff(content, modifiedContent, 3)
 		op.fileHooks.OpenDiff(path, modifiedContent)
@@ -1005,14 +957,7 @@ func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) 
 		return "", fmt.Errorf("destination not found in arguments")
 	}
 
-	// Check if confirmation is needed
-	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
-	if !ok {
-		// Default to true for safety
-		needConfirm = true
-	}
-
-	if needConfirm && !toolsUse.AutoApprove {
+	if !toolsUse.AutoApprove {
 		// Get purpose if provided
 		purpose, _ := (*argsMap)["purpose"].(string)
 		if purpose == "" {
@@ -1237,13 +1182,7 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Too
 		return fmt.Sprintf("You are already using agent '%s'. No need to switch.", name), nil
 	}
 
-	// Check for confirmation
-	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
-	if !ok {
-		needConfirm = true // Default to true
-	}
-
-	if needConfirm && !toolsUse.AutoApprove {
+	if !toolsUse.AutoApprove {
 		purpose := fmt.Sprintf("switch to agent '%s'", name)
 		event.RequestConfirm(purpose, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
@@ -1395,12 +1334,8 @@ func buildAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tool
 	}
 
 	// ── Confirm before writing ───────────────────────────────────────────────
-	// Check for confirmation
-	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
-	if !ok {
-		needConfirm = true // Default to true
-	}
-	if needConfirm && !toolsUse.AutoApprove {
+
+	if !toolsUse.AutoApprove {
 		purpose := fmt.Sprintf("build agent '%s' with %d tools and %d capabilities", name, len(selectedTools), len(selectedCaps))
 		event.RequestConfirm(purpose, toolsUse)
 		if toolsUse.Confirm == data.ToolConfirmCancel {
@@ -1523,13 +1458,7 @@ func spawnSubAgentsToolCallImpl(
 		return "No tasks provided. Please specify at least one task.", nil
 	}
 
-	// Check if confirmation is needed
-	needConfirm, ok := (*argsMap)["need_confirm"].(bool)
-	if !ok {
-		needConfirm = true // Default to true for safety
-	}
-
-	if needConfirm && !toolsUse.AutoApprove {
+	if !toolsUse.AutoApprove {
 		// Build brief description of tasks
 		var taskDesc strings.Builder
 		for i, task := range tasksInterface {

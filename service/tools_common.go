@@ -775,12 +775,6 @@ func getWriteFileTool() *OpenTool {
 					"type":        "string",
 					"description": "A terse explanation of why this file is being written.",
 				},
-				"need_confirm": map[string]interface{}{
-					"type": "boolean",
-					"description": "Specifies whether to prompt the user for confirmation before writing to the file. " +
-						"This should always be true for safety.",
-					"default": true,
-				},
 			},
 			"required": []string{"path", "content", "purpose"},
 		},
@@ -806,12 +800,6 @@ func getCreateDirectoryTool() *OpenTool {
 				"purpose": map[string]interface{}{
 					"type":        "string",
 					"description": "A terse explanation of why this directory is being created.",
-				},
-				"need_confirm": map[string]interface{}{
-					"type": "boolean",
-					"description": "Specifies whether to prompt the user for confirmation before creating the directory. " +
-						"Default is true.",
-					"default": true,
 				},
 			},
 			"required": []string{"path", "purpose"},
@@ -861,12 +849,6 @@ func getDeleteFileTool() *OpenTool {
 					"type":        "string",
 					"description": "A terse explanation of why this file is being deleted.",
 				},
-				"need_confirm": map[string]interface{}{
-					"type": "boolean",
-					"description": "Specifies whether to prompt the user for confirmation before deleting the file. " +
-						"This should always be true for safety.",
-					"default": true,
-				},
 			},
 			"required": []string{"path", "purpose"},
 		},
@@ -892,12 +874,6 @@ func getDeleteDirectoryTool() *OpenTool {
 				"purpose": map[string]interface{}{
 					"type":        "string",
 					"description": "A terse explanation of why this directory is being deleted.",
-				},
-				"need_confirm": map[string]interface{}{
-					"type": "boolean",
-					"description": "Specifies whether to prompt the user for confirmation before deleting the directory. " +
-						"This should always be true for safety.",
-					"default": true,
 				},
 			},
 			"required": []string{"path", "purpose"},
@@ -1044,12 +1020,6 @@ func getEditFileTool() *OpenTool {
 					"type":        "string",
 					"description": "A terse explanation of why this file is being edited.",
 				},
-				"need_confirm": map[string]interface{}{
-					"type": "boolean",
-					"description": "Specifies whether to show diff and prompt for confirmation before editing the file. " +
-						"This should always be true for safety.",
-					"default": true,
-				},
 			},
 			"required": []string{"path", "edits", "purpose"},
 		},
@@ -1080,12 +1050,6 @@ func getMoveTool() *OpenTool {
 					"type":        "string",
 					"description": "A terse explanation of why this file/directory is being moved.",
 				},
-				"need_confirm": map[string]interface{}{
-					"type": "boolean",
-					"description": "Specifies whether to prompt the user for confirmation before moving the file or directory. " +
-						"This should be true for safety if it needs overwrite.",
-					"default": true,
-				},
 			},
 			"required": []string{"source", "destination", "purpose"},
 		},
@@ -1115,12 +1079,6 @@ func getCopyTool() *OpenTool {
 				"purpose": map[string]interface{}{
 					"type":        "string",
 					"description": "A terse explanation of why this file/directory is being copied.",
-				},
-				"need_confirm": map[string]interface{}{
-					"type": "boolean",
-					"description": "Specifies whether to prompt the user for confirmation before copying the file or directory. " +
-						"This should be true for safety if it needs overwrite.",
-					"default": true,
 				},
 			},
 			"required": []string{"source", "destination", "purpose"},
@@ -1208,11 +1166,6 @@ When a switch occurs, if an instruction is provided, it replaces the original pr
 				"instruction": map[string]interface{}{
 					"type":        "string",
 					"description": "Optional context or instruction to pass to the new agent. This helps the new agent understand the task and current state.",
-				},
-				"need_confirm": map[string]interface{}{
-					"type":        "boolean",
-					"description": "Whether to prompt the user for confirmation before switching agents. Defaults to true.",
-					"default":     true,
 				},
 			},
 			"required": []string{"name"},
@@ -1324,11 +1277,6 @@ Capability details (CRITICAL: Do NOT place these tools in the 'tools' field. Ena
 					"type":        "string",
 					"description": "Full persona and behavioural instructions for this agent. Be comprehensive — this is the only instruction source.",
 				},
-				"need_confirm": map[string]interface{}{
-					"type":        "boolean",
-					"description": "Whether to prompt the user for confirmation before building agents. Defaults to true.",
-					"default":     true,
-				},
 			},
 			"required": []string{"name", "description", "tools", "capabilities", "think", "system_prompt"},
 		},
@@ -1410,11 +1358,6 @@ Differs from switch_agent:
 						"required": []string{"agent_name", "instruction", "task_key"},
 					},
 					"description": "Array of tasks to execute. Each task invokes a sub-agent with the given instruction.",
-				},
-				"need_confirm": map[string]interface{}{
-					"type":        "boolean",
-					"description": "Whether to prompt the user for confirmation before spawning sub-agents. Defaults to true.",
-					"default":     true,
 				},
 			},
 			"required": []string{"tasks"},
@@ -1627,8 +1570,7 @@ User asks: "Can you list the files in my current directory?"
 LLM should call with:
 {
   "command": "ls -l",
-  "purpose": "To list the files and folders in your current directory.",
-  "need_confirm": true
+  "purpose": "To list the files and folders in your current directory."
 }
 `,
 		Parameters: map[string]interface{}{
@@ -1643,13 +1585,6 @@ LLM should call with:
 					"type": "string",
 					"description": "A clear, user-friendly explanation of what the command does and why it's being run. " +
 						"This will be shown to the user for confirmation.",
-				},
-				"need_confirm": map[string]interface{}{
-					"type": "boolean",
-					"description": "Specifies whether to prompt the user for confirmation before running the command. " +
-						"This must always be true for any command that modifies or deletes data, or has any potential side effects. " +
-						"It should only be false for simple, read-only commands explicitly requested by the user in the same turn, like 'ls' or 'pwd'.",
-					"default": true,
 				},
 				"timeout": map[string]interface{}{
 					"type":        "integer",
