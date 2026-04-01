@@ -53,3 +53,6 @@ dist/
 
 # Local environment variables
 build/.env
+
+# Documents
+docs/

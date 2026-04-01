@@ -41,10 +41,9 @@ const (
 	CapabilityMCPBody          = "enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."
 	CapabilitySkillsBody       = "are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.\nAfter integrating skills, **agent** will use skills automatically."
 	CapabilityMemoryBody       = "allows agents to remember important facts about you across sessions.\nFacts are used to personalize responses."
-	CapabilitySubAgentsBody = "allow you to create, manage, and orchestrate specialized sub-agents.\n" +
-		"Use to define agents (build_agent), list them (list_agent), hand off the session " +
-		"(switch_agent), or run parallel map-reduce workflows (spawn_subagents) with shared " +
-		"state (get_state, set_state, list_state)."
+	CapabilitySubAgentsBody = "enable multi-agent workflows where specialized agents collaborate to complete complex tasks.\n" +
+		"Use when a task benefits from parallel execution, requires a domain expert persona, " +
+		"or needs to be handed off to a more suitable agent."
 	CapabilityWebSearchBody    = "enables the agent to search the web for real-time information.\nYou must configure a search engine (Google, Bing, Tavily) to use this feature."
 	CapabilityTokenUsageBody   = "allows agents to track their token usage.\nThis helps you to control the cost of using the agent."
 	CapabilityMarkdownBody     = "allows agents to generate final response in Markdown format.\nThis helps you to format the response in a more readable way."
