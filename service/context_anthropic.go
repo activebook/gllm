@@ -88,30 +88,30 @@ func (c *anthropicContext) truncate(messages []anthropic.MessageParam, totalOver
 	truncated := false
 	for historyTokens > availableTokens && len(messages) > 0 {
 		removed := false
-		for i := 0; i < len(messages); i++ {
-			if pairIndices := c.findToolPair(messages, i); len(pairIndices) > 0 {
-				tokensRemoved := 0
-				for j := len(pairIndices) - 1; j >= 0; j-- {
-					idx := pairIndices[j]
-					if idx < len(tokenCounts) {
-						tokensRemoved += tokenCounts[idx]
-						messages = append(messages[:idx], messages[idx+1:]...)
-						tokenCounts = append(tokenCounts[:idx], tokenCounts[idx+1:]...)
-					}
+
+		if pairIndices := c.findToolPair(messages, 0); len(pairIndices) > 0 {
+			tokensRemoved := 0
+			// Remove from highest index to lowest
+			for j := len(pairIndices) - 1; j >= 0; j-- {
+				idx := pairIndices[j]
+				if idx < len(tokenCounts) {
+					tokensRemoved += tokenCounts[idx]
+					messages = append(messages[:idx], messages[idx+1:]...)
+					tokenCounts = append(tokenCounts[:idx], tokenCounts[idx+1:]...)
 				}
-				historyTokens -= tokensRemoved
-				truncated = true
-				removed = true
-				break
 			}
-			// Regular message — safe to remove
-			historyTokens -= tokenCounts[i]
-			messages = append(messages[:i], messages[i+1:]...)
-			tokenCounts = append(tokenCounts[:i], tokenCounts[i+1:]...)
+			historyTokens -= tokensRemoved
 			truncated = true
 			removed = true
-			break
+		} else {
+			// Regular message — safe to remove
+			historyTokens -= tokenCounts[0]
+			messages = messages[1:]
+			tokenCounts = tokenCounts[1:]
+			truncated = true
+			removed = true
 		}
+
 		if !removed {
 			break
 		}
@@ -131,17 +131,16 @@ func (c *anthropicContext) truncate(messages []anthropic.MessageParam, totalOver
 		// If it's a user message, check if it contains ONLY tool results (orphaned).
 		// While Anthropic allows tool results from the user, they must follow an assistant's tool use.
 		hasToolResult := false
-		hasText := false
+		hasNonToolResult := false
 		for _, block := range msg.Content {
 			if block.OfToolResult != nil {
 				hasToolResult = true
-			}
-			if block.OfText != nil {
-				hasText = true
+			} else {
+				hasNonToolResult = true
 			}
 		}
 
-		if hasToolResult && !hasText {
+		if hasToolResult && !hasNonToolResult {
 			messages = messages[1:]
 			truncated = true
 			continue
@@ -178,7 +177,7 @@ func (c *anthropicContext) findToolPair(messages []anthropic.MessageParam, index
 		for i := index - 1; i >= 0; i-- {
 			prev := messages[i]
 			if prev.Role != anthropic.MessageParamRoleAssistant {
-				continue
+				break
 			}
 			candidateIDs := make(map[string]bool)
 			for _, b := range prev.Content {

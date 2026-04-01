@@ -220,6 +220,11 @@ func (c *geminiContext) gatherToolPair(messages []*genai.Content, callIndex int)
 		if msg == nil {
 			continue
 		}
+		// Stop at the next model turn — responses always live in the
+		// immediately-following user turn, never further.
+		if msg.Role == "model" || msg.Role == genai.RoleModel {
+			break
+		}
 		for _, part := range msg.Parts {
 			if part.FunctionResponse != nil && callNames[part.FunctionResponse.Name] {
 				indices = append(indices, j)
