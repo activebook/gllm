@@ -139,7 +139,7 @@ func NeedUserConfirmToolUse(info string, prompt string, description string, tool
 
 	// Register the cancel function with the VSCode confirm bus
 	bus := event.GetVSCodeConfirmBus()
-	bus.RegisterConfirmCancel(cancel)
+	bus.RegisterConfirmCancel(cancel, toolsUse.FilePath)
 	defer bus.ClearConfirmCancel()
 
 	// Run the form

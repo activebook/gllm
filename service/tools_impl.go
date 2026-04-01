@@ -159,6 +159,7 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
 	}
+	op.toolsUse.FilePath = path // Set the file path in toolsUse for potential use in confirmation prompt
 
 	content, ok := (*argsMap)["content"].(string)
 	if !ok {
@@ -308,6 +309,7 @@ func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tool
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
 	}
+	toolsUse.FilePath = path
 
 	if !toolsUse.AutoApprove {
 		// Get purpose if provided
@@ -838,6 +840,7 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (s
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
 	}
+	op.toolsUse.FilePath = path // Set the file path in toolsUse for potential use in confirmation prompt
 
 	// Get the edits to apply
 	editsInterface, ok := (*argsMap)["edits"].([]interface{})
