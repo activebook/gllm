@@ -86,3 +86,159 @@ func TestProcessFileContentRange(t *testing.T) {
 		})
 	}
 }
+
+func TestReplaceFirstOccurrence(t *testing.T) {
+	tests := []struct {
+		name      string
+		content   string
+		search    string
+		replace   string
+		wantOut   string
+		wantCount int
+	}{
+		{
+			name:      "exact unique match",
+			content:   "foo bar baz",
+			search:    "bar",
+			replace:   "qux",
+			wantOut:   "foo qux baz",
+			wantCount: 1,
+		},
+		{
+			name:      "not found returns original",
+			content:   "foo bar baz",
+			search:    "zzz",
+			replace:   "qux",
+			wantOut:   "foo bar baz",
+			wantCount: 0,
+		},
+		{
+			name:      "ambiguous returns original and count",
+			content:   "a b a",
+			search:    "a",
+			replace:   "x",
+			wantOut:   "a b a", // unchanged
+			wantCount: 2,
+		},
+		{
+			name:      "deletion via empty replace",
+			content:   "hello world",
+			search:    "hello ",
+			replace:   "",
+			wantOut:   "world",
+			wantCount: 1,
+		},
+		{
+			name:      "only first replaced when test has unique longer context",
+			content:   "func foo() {}\nfunc bar() {}",
+			search:    "func foo() {}",
+			replace:   "func foo() { return }",
+			wantOut:   "func foo() { return }\nfunc bar() {}",
+			wantCount: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotOut, gotCount := replaceFirstOccurrence(tt.content, tt.search, tt.replace)
+			if gotCount != tt.wantCount {
+				t.Errorf("count = %d, want %d", gotCount, tt.wantCount)
+			}
+			if gotOut != tt.wantOut {
+				t.Errorf("output = %q, want %q", gotOut, tt.wantOut)
+			}
+		})
+	}
+}
+
+func TestNormalizeLineWS(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"no-op clean input", "foo\nbar", "foo\nbar"},
+		{"strips trailing spaces", "foo   \nbar  ", "foo\nbar"},
+		{"expands tabs", "\tfoo\n\tbar", "    foo\n    bar"},
+		{"normalises CRLF", "foo\r\nbar\r\n", "foo\nbar\n"},
+		{"mixed tab and trailing", "\tfoo   \n\tbar\t", "    foo\n    bar"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := normalizeLineWS(tt.input)
+			if got != tt.want {
+				t.Errorf("normalizeLineWS(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestApplyWSNormalizedReplace(t *testing.T) {
+	tests := []struct {
+		name      string
+		content   string
+		search    string
+		replace   string
+		wantFound bool
+		wantOut   string
+	}{
+		{
+			name:      "exact match passes through",
+			content:   "line1\nfunc foo() {}\nline3",
+			search:    "func foo() {}",
+			replace:   "func foo() { return }",
+			wantFound: true,
+			wantOut:   "line1\nfunc foo() { return }\nline3",
+		},
+		{
+			name:      "trailing space in search forgiven",
+			content:   "line1\nfunc foo() {}\nline3",
+			search:    "func foo() {}   ", // trailing spaces — LLM hallucination
+			replace:   "func foo() { return }",
+			wantFound: true,
+			wantOut:   "line1\nfunc foo() { return }\nline3",
+		},
+		{
+			name:      "tab vs spaces forgiven",
+			content:   "func foo() {\n    return nil\n}",
+			search:    "func foo() {\n\treturn nil\n}", // LLM used tab
+			replace:   "func foo() {\n    return 0\n}",
+			wantFound: true,
+			wantOut:   "func foo() {\n    return 0\n}",
+		},
+		{
+			name:      "CRLF in search forgiven",
+			content:   "foo\nbar",
+			search:    "foo\r\nbar",
+			replace:   "baz",
+			wantFound: true,
+			wantOut:   "baz",
+		},
+		{
+			name:      "not found returns false",
+			content:   "foo\nbar",
+			search:    "zzz",
+			replace:   "x",
+			wantFound: false,
+		},
+		{
+			name:      "ambiguous normalized match returns false",
+			content:   "return nil\nreturn nil",
+			search:    "return nil",
+			replace:   "return err",
+			wantFound: false, // 2 matches — ambiguous, must reject
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotOut, gotFound := applyWSNormalizedReplace(tt.content, tt.search, tt.replace)
+			if gotFound != tt.wantFound {
+				t.Errorf("found = %v, want %v", gotFound, tt.wantFound)
+			}
+			if tt.wantFound && gotOut != tt.wantOut {
+				t.Errorf("output = %q, want %q", gotOut, tt.wantOut)
+			}
+		})
+	}
+}

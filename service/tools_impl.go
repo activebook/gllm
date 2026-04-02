@@ -831,6 +831,78 @@ func webSearchToolCallImpl(argsMap *map[string]interface{}, queries *[]string, r
 	return string(resultsJSON), nil
 }
 
+// replaceFirstOccurrence replaces the single unique occurrence of search in content.
+// Returns (newContent, count) where count is the number of matches found:
+//   - count == 0: not found
+//   - count == 1: replaced successfully
+//   - count > 1:  ambiguous — caller must reject and request more context
+func replaceFirstOccurrence(content, search, replace string) (string, int) {
+	count := strings.Count(content, search)
+	if count != 1 {
+		return content, count
+	}
+	idx := strings.Index(content, search)
+	return content[:idx] + replace + content[idx+len(search):], 1
+}
+
+// normalizeLineWS normalizes per-line whitespace for fuzzy comparison:
+// converts CRLF→LF, expands tabs to 4 spaces, and strips trailing whitespace.
+// It does NOT alter leading indentation depth, only the character type.
+func normalizeLineWS(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	lines := strings.Split(s, "\n")
+	for i, l := range lines {
+		lines[i] = strings.TrimRight(strings.ReplaceAll(l, "\t", "    "), " \t")
+	}
+	return strings.Join(lines, "\n")
+}
+
+// applyWSNormalizedReplace finds search in content using line-level whitespace
+// normalization and replaces the matched original lines with replace.
+// Returns (result, true) on a unique normalized match; ("", false) otherwise.
+// This handles the most common LLM hallucination: minor whitespace/tab drift.
+func applyWSNormalizedReplace(content, search, replace string) (string, bool) {
+	normContent := normalizeLineWS(content)
+	normSearch := normalizeLineWS(search)
+
+	if strings.Count(normContent, normSearch) != 1 {
+		return "", false
+	}
+
+	// Line-level splice: find the matching line range in normalized space,
+	// then replace those lines in the original to preserve authentic indentation
+	// for any surrounding context that was not part of the search block.
+	origLines := strings.Split(content, "\n")
+	normLines := strings.Split(normContent, "\n")
+	searchLines := strings.Split(normSearch, "\n")
+	replaceLines := strings.Split(replace, "\n")
+	sLen := len(searchLines)
+
+	for i := 0; i <= len(normLines)-sLen; i++ {
+		match := true
+		for j := 0; j < sLen; j++ {
+			if normLines[i+j] != searchLines[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			out := make([]string, 0, len(origLines)-sLen+len(replaceLines))
+			out = append(out, origLines[:i]...)
+			out = append(out, replaceLines...)
+			out = append(out, origLines[i+sLen:]...)
+			return strings.Join(out, "\n"), true
+		}
+	}
+	return "", false
+}
+
+// editOutcome records the result of a single validated edit for the success report.
+type editOutcome struct {
+	displaySearch string
+	normalized    bool // true if matched only via WS normalization fallback
+}
+
 func editFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolEditFile, argsMap); err != nil {
 		return "", err
@@ -840,107 +912,128 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (s
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
 	}
-	op.toolsUse.FilePath = path // Set the file path in toolsUse for potential use in confirmation prompt
+	op.toolsUse.FilePath = path
 
-	// Get the edits to apply
 	editsInterface, ok := (*argsMap)["edits"].([]interface{})
 	if !ok {
 		return "", fmt.Errorf("edits not found in arguments or not an array")
 	}
 
-	// Read the original file content
+	// Read the original file content once.
 	originalContent, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Sprintf("Error reading file %s: %v", path, err), nil
 	}
 	content := string(originalContent)
 
-	// Apply all search-replace operations and track which ones didn't match
-	modifiedContent := content
-	var notFound []string
-	var applied int
+	// ── Phase 1: Validate & simulate ALL edits before touching disk ────────────
+	// We accumulate into simulatedContent so each edit operates on the result of
+	// the previous one — mirroring real application order — while the original
+	// content is preserved for the diff in Phase 3.
+	simulatedContent := content
+	var outcomes []editOutcome
+	var failures []string
 
-	for _, editInterface := range editsInterface {
+	for i, editInterface := range editsInterface {
 		editMap, ok := editInterface.(map[string]interface{})
 		if !ok {
+			failures = append(failures, fmt.Sprintf("edit[%d]: invalid format (expected object)", i))
 			continue
 		}
 
 		searchText, ok := editMap["search"].(string)
-		if !ok {
+		if !ok || searchText == "" {
+			failures = append(failures, fmt.Sprintf("edit[%d]: missing or empty 'search' field", i))
 			continue
 		}
 
-		replaceText, ok := editMap["replace"].(string)
-		if !ok {
-			replaceText = "" // Default to empty string for deletions
+		replaceText, _ := editMap["replace"].(string) // empty string is valid (deletion)
+
+		display := searchText
+		if len(display) > 60 {
+			display = display[:60] + "..."
 		}
 
-		// Check if the search text exists in the content
-		if !strings.Contains(modifiedContent, searchText) {
-			// Truncate long search text for display
-			displayText := searchText
-			if len(displayText) > 50 {
-				displayText = displayText[:50] + "..."
-			}
-			notFound = append(notFound, displayText)
+		// Strategy 1: exact match (requires uniqueness)
+		result, count := replaceFirstOccurrence(simulatedContent, searchText, replaceText)
+		if count == 1 {
+			simulatedContent = result
+			outcomes = append(outcomes, editOutcome{displaySearch: display})
+			continue
+		}
+		if count > 1 {
+			failures = append(failures, fmt.Sprintf(
+				"edit[%d]: ambiguous — search text appears %d times (must be exactly 1).\n"+
+					"         Expand the search block with more surrounding context to make it unique.\n"+
+					"         search: %q",
+				i, count, display))
 			continue
 		}
 
-		// Apply the search-replace operation
-		modifiedContent = strings.ReplaceAll(modifiedContent, searchText, replaceText)
-		applied++
+		// Strategy 2: whitespace-normalised fallback (count == 0 from exact)
+		if wsResult, found := applyWSNormalizedReplace(simulatedContent, searchText, replaceText); found {
+			simulatedContent = wsResult
+			outcomes = append(outcomes, editOutcome{displaySearch: display, normalized: true})
+			continue
+		}
+
+		// All strategies exhausted
+		failures = append(failures, fmt.Sprintf(
+			"edit[%d]: not found — search text does not appear in the file\n"+
+				"         (checked exact match and whitespace-normalised match).\n"+
+				"         Use read_file with line_numbers=true to obtain exact content before retrying.\n"+
+				"         search: %q",
+			i, display))
 	}
 
-	// If no edits were applied, return a warning
-	if applied == 0 && len(notFound) > 0 {
-		var result strings.Builder
-		result.WriteString(fmt.Sprintf("Warning: No edits were applied to %s.\n", path))
-		result.WriteString("The following search patterns were not found:\n")
-		for _, text := range notFound {
-			result.WriteString(fmt.Sprintf("  - \"%s\"\n", text))
+	// ── Phase 2: Abort ALL if any edit failed (no partial writes) ──────────────
+	if len(failures) > 0 {
+		var msg strings.Builder
+		msg.WriteString(fmt.Sprintf(
+			"EDIT ABORTED — no changes were written to %s.\n"+
+				"%d of %d edit(s) failed:\n\n",
+			path, len(failures), len(editsInterface)))
+		for _, f := range failures {
+			msg.WriteString(fmt.Sprintf("  • %s\n\n", f))
 		}
-		result.WriteString("\nPlease verify the search text matches exactly (including whitespace and line endings).")
-		return result.String(), nil
+		msg.WriteString("Fix all failing edits and retry the entire batch.")
+		return msg.String(), nil
 	}
-	// Show the diff and ask the user
+
+	// ── Phase 3: Show diff and request user confirmation ──────────────────────
 	if !op.toolsUse.AutoApprove {
-		// Show the diff
-		diff := event.RequestDiff(content, modifiedContent, 3)
-		op.fileHooks.OpenDiff(path, modifiedContent)
+		diff := event.RequestDiff(content, simulatedContent, 3)
+		op.fileHooks.OpenDiff(path, simulatedContent)
 		op.showDiffConfirm(diff)
 
-		// Get purpose if provided
 		purpose, _ := (*argsMap)["purpose"].(string)
 		if purpose == "" {
-			purpose = fmt.Sprintf("edit the file at path: %s", path)
+			purpose = fmt.Sprintf("edit file: %s", path)
 		}
-
-		// Response with a prompt to let user confirm
 		event.RequestConfirm(purpose, op.toolsUse)
-		op.closeDiffConfirm() // Close the diff
+		op.closeDiffConfirm()
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			op.fileHooks.RejectDiff(path)
 			return fmt.Sprintf(ToolRespDiscardEditFile, path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
 
-	// Write the modified content back to the file
-	err = os.WriteFile(path, []byte(modifiedContent), 0644)
-	if err != nil {
+	// ── Phase 4: Write (only reached when all edits validated and user approved) ─
+	if err := os.WriteFile(path, []byte(simulatedContent), 0644); err != nil {
 		op.fileHooks.RejectDiff(path)
 		return fmt.Sprintf("Error writing file %s: %v", path, err), nil
 	}
 	op.fileHooks.AcceptDiff(path)
 
-	// Build success message
+	// Build success report
 	var result strings.Builder
-	result.WriteString(fmt.Sprintf("Successfully edited file %s (%d edit(s) applied)", path, applied))
-	if len(notFound) > 0 {
-		result.WriteString(fmt.Sprintf("\nWarning: %d search pattern(s) were not found:", len(notFound)))
-		for _, text := range notFound {
-			result.WriteString(fmt.Sprintf("\n  - \"%s\"", text))
+	result.WriteString(fmt.Sprintf("Successfully edited %s — %d edit(s) applied:\n", path, len(outcomes)))
+	for i, o := range outcomes {
+		note := ""
+		if o.normalized {
+			note = " [whitespace-normalized]"
 		}
+		result.WriteString(fmt.Sprintf("  [%d] %s%s\n", i+1, o.displaySearch, note))
 	}
 	return result.String(), nil
 }
