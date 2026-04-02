@@ -17,10 +17,23 @@ const RenameSystemPrompt = `You are a session title generator.
 Analyze the conversation and produce a concise, descriptive title.
 
 Rules:
-1. Output ONLY the title — no punctuation, no quotes, no explanation, no extra text
-2. Use 4–10 words, each capitalized, joined by hyphens — e.g. Fix-Gemini-Context-Bug
-3. Capture the primary topic or goal of the session
-4. Avoid generic filler words like "chat", "session", "conversation", "help", "discussion"`
+1. Output ONLY the title — no punctuation, no quotes, no explanation
+2. Use 4–8 words, each capitalized, joined by hyphens
+3. Name the specific artifact, concept, or mechanism at the center of the session
+4. Include proper nouns — tool names, file names, API names, commands — when they are central
+5. Prefer noun phrases that describe the *thing* over verb phrases that describe the *action*
+
+Examples of good titles:
+- Gemini-Context-Window-Injection-Strategy
+- Uncached-Token-Cost-Fields-Breakdown
+- Vscodeignore-Packaging-And-Marketplace-Copy
+- Unix-Socket-IPC-Daemon-Architecture
+- Ask-User-Tool-Four-Mode-Schema
+
+Examples of bad titles (too generic):
+- Add-Uncached-Token-Usage-Breakdown
+- Implement-Global-Instruction-File-Support
+- Merge-Instruction-And-Usage-Updates`
 
 const RenamePromptFormat = `Generate a title for this conversation following your system instructions.
 Output ONLY the hyphenated title, nothing else.`
