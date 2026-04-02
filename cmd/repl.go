@@ -546,10 +546,10 @@ func (ri *ReplInfo) autoRenameSessionOnce() {
 			return
 		}
 
-		go func() {
-			// Do it at background
-			ri.renameSession()
-		}()
+		// Bugfix:
+		// Don't run it at background
+		// At backgound the output will break the input frame
+		ri.renameSession()
 	})
 }
 
