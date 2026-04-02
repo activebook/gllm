@@ -33,6 +33,7 @@ func FormatEnabledIndicator(enabled bool) string {
 const (
 	IndicatorLoadingMCP         = "Loading MCP servers..."
 	IndicatorCompressingContext = "Compressing context..."
+	IndicatorRenamingSession    = "Renaming session..."
 	IndicatorCheckingUpdate     = "Checking for updates..."
 	IndicatorInstallingUpdate   = "Downloading and installing..."
 )

@@ -36,6 +36,7 @@ var (
 		"/memory":   "Manage memory (list, add, clear)",
 		"/session":  "Manage sessions (list, info, remove, etc.)",
 		"/compress": "Compresses the context by replacing it with a summary",
+		"/rename":   "Rename current session using model-inferred title",
 		"/think":    "Set thinking level",
 		"/features": "Switch agent features",
 		"/editor":   "Manage editor or open for multi-line input",
@@ -220,6 +221,9 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 
 	case "/compress":
 		ri.compressContext()
+
+	case "/rename":
+		ri.renameSession()
 
 	case "/think":
 		runCommand(thinkCmd, parts[1:])
@@ -549,7 +553,6 @@ func (ri *ReplInfo) detachFiles(input string) {
 }
 
 // executeWorkflow checks if command is a workflow and executes it
-// Returns true if it was a workflow command
 func (ri *ReplInfo) executeWorkflow(command string, parts []string) bool {
 	// Strip leading /
 	name := strings.TrimPrefix(command, "/")

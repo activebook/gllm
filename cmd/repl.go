@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/activebook/gllm/data"
@@ -101,13 +102,14 @@ func init() {
 }
 
 type ReplInfo struct {
-	Files       []*service.FileData
-	QuitFlag    bool     // for cmd /quit or /exit
-	EditorInput string   // for /e editor edit
-	Instruction string   // for underlying system instructions (e.g. skill activation)
-	History     []string // for input history
-	outputFile  string
-	sharedState *data.SharedState // Persistent SharedState for the session
+	Files          []*service.FileData
+	QuitFlag       bool     // for cmd /quit or /exit
+	EditorInput    string   // for /e editor edit
+	Instruction    string   // for underlying system instructions (e.g. skill activation)
+	History        []string // for input history
+	outputFile     string
+	sharedState    *data.SharedState // Persistent SharedState for the session
+	autoRenameOnce sync.Once         // ensures auto-rename fires at most once per REPL session
 }
 
 func (ri *ReplInfo) printWelcome() {
@@ -479,6 +481,78 @@ func (ri *ReplInfo) compressContext() {
 	util.Successln("Compressed successfully!\nUse /history to view the compressed session.")
 }
 
+// renameSession uses the model synchronously to infer a meaningful name for
+// the current session and renames the session directory on disk.
+// It mirrors the /compress UX: a spinner is shown during the model call,
+// and the package-level sessionName variable is updated on success.
+func (ri *ReplInfo) renameSession() {
+	agent, err := EnsureActiveAgent()
+	if err != nil {
+		util.Errorf("%v\n", err)
+		return
+	}
+
+	sessionData, err := service.ReadSessionContent(sessionName)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("No session history yet — nothing to rename.")
+			return
+		}
+		util.Errorf("%v\n", err)
+		return
+	}
+	if len(sessionData) == 0 {
+		fmt.Println("Session is empty — nothing to rename.")
+		return
+	}
+
+	ui.GetIndicator().Start(ui.IndicatorRenamingSession)
+	newName, err := service.GenerateSessionName(agent, sessionData)
+	ui.GetIndicator().Stop()
+
+	if err != nil {
+		util.Errorf("Failed to generate session name: %v\n", err)
+		return
+	}
+	if newName == sessionName {
+		util.Successln("Session name is already optimal: " + sessionName)
+		return
+	}
+
+	if err := service.RenameSession(sessionName, newName); err != nil {
+		util.Errorf("Failed to rename session: %v\n", err)
+		return
+	}
+
+	oldName := sessionName
+	sessionName = newName
+	util.Successln(fmt.Sprintf("Session renamed: %s → %s", oldName, newName))
+}
+
+func (ri *ReplInfo) autoRenameSessionOnce() {
+	// Auto-rename: fire exactly once, asynchronously, on the first successful
+	// turn of a default-named session. The sync.Once on ReplInfo guarantees
+	// that a rapid second turn cannot trigger a duplicate rename.
+	ri.autoRenameOnce.Do(func() {
+		if !isDefaultSessionName(sessionName) {
+			return
+		}
+		agent, err := EnsureActiveAgent()
+		if err != nil {
+			util.Errorf("%v\n", err)
+			return
+		}
+		if !service.IsAutoRenameEnabled(agent.Capabilities) {
+			return
+		}
+
+		go func() {
+			// Do it at background
+			ri.renameSession()
+		}()
+	})
+}
+
 // copyLastMessage copies the last assistant response or its latest code block to the clipboard.
 func (ri *ReplInfo) copyLastMessage() {
 	lastAssistantMessage := data.GetClipboardText()
@@ -509,6 +583,9 @@ func (ri *ReplInfo) callAgent(input string) {
 		util.Errorf("%v\n", err)
 		return
 	}
+
+	// Auto-rename session once
+	ri.autoRenameSessionOnce()
 
 	// Reset the files after processing
 	ri.Files = []*service.FileData{}
@@ -546,6 +623,12 @@ func (ri *ReplInfo) executeShellCommand(command string) {
 		// shell output color
 		fmt.Printf(data.ShellOutputColor+"%s\n"+data.ResetSeq, output)
 	}
+}
+
+// isDefaultSessionName returns true when the session name is the auto-generated
+// timestamp form produced by GenerateSessionName() in repl.go: "session-YYYY-MM-DD_HH-MM-SS".
+func isDefaultSessionName(name string) bool {
+	return strings.HasPrefix(name, "session-")
 }
 
 func GenerateSessionName() string {
