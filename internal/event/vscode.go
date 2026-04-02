@@ -2,6 +2,7 @@ package event
 
 import (
 	"context"
+	"path/filepath"
 	"sync"
 )
 
@@ -15,6 +16,7 @@ type VSCodeConfirmBus struct {
 	mu         sync.Mutex
 	cancelDiff context.CancelFunc // currently active confirmation canceller
 	accepted   bool               // result from remote (nil = no result yet)
+	path       string             // file path relevant to the confirmation, if any
 }
 
 var (
@@ -28,10 +30,17 @@ func GetVSCodeConfirmBus() *VSCodeConfirmBus {
 
 // RegisterConfirmCancel is called by the UI just before blocking on a user prompt.
 // If a remote event arrives, it will call check this cancel function.
-func (b *VSCodeConfirmBus) RegisterConfirmCancel(cancel context.CancelFunc) {
+func (b *VSCodeConfirmBus) RegisterConfirmCancel(cancel context.CancelFunc, path string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.accepted = false
+	// Always use an absolute path for matching, since in worktrees and other contexts the same file may be referenced by different relative paths.
+	// Or related path can be the same in worktree, so we can not rely on relative path
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		absPath = path // fallback to original path if Abs fails for some reason
+	}
+	b.path = absPath
 	b.cancelDiff = cancel
 }
 
@@ -39,6 +48,8 @@ func (b *VSCodeConfirmBus) RegisterConfirmCancel(cancel context.CancelFunc) {
 func (b *VSCodeConfirmBus) ClearConfirmCancel() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	b.accepted = false
+	b.path = ""
 	b.cancelDiff = nil
 }
 
@@ -49,21 +60,31 @@ func (b *VSCodeConfirmBus) GetAccepted() bool {
 	return b.accepted
 }
 
-func (b *VSCodeConfirmBus) Confirm() {
+func (b *VSCodeConfirmBus) Confirm(path string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.cancelDiff != nil {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		absPath = path
+	}
+	if b.cancelDiff != nil && b.path == absPath {
 		b.accepted = true
+		b.path = ""
 		b.cancelDiff()
 		b.cancelDiff = nil
 	}
 }
 
-func (b *VSCodeConfirmBus) Reject() {
+func (b *VSCodeConfirmBus) Reject(path string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.cancelDiff != nil {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		absPath = path
+	}
+	if b.cancelDiff != nil && b.path == absPath {
 		b.accepted = false
+		b.path = ""
 		b.cancelDiff()
 		b.cancelDiff = nil
 	}

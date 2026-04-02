@@ -264,9 +264,9 @@ func ListenVSCodeEvents() {
 		}
 		switch msg.Action {
 		case ActionDiffAccepted:
-			event.GetVSCodeConfirmBus().Confirm()
+			event.GetVSCodeConfirmBus().Confirm(msg.FilePath)
 		case ActionDiffRejected:
-			event.GetVSCodeConfirmBus().Reject()
+			event.GetVSCodeConfirmBus().Reject(msg.FilePath)
 		default:
 			// Unknown action — ignore, keep listening
 		}
