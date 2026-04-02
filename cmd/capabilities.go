@@ -110,6 +110,14 @@ var capsSwitchCmd = &cobra.Command{
 			options = append(options, huh.NewOption("Web Search", service.CapabilityWebSearch))
 		}
 
+		// Auto Rename
+		if service.IsAutoRenameEnabled(agent.Capabilities) {
+			options = append(options, huh.NewOption("Auto Rename", service.CapabilityAutoRename).Selected(true))
+			selected = append(selected, service.CapabilityAutoRename)
+		} else {
+			options = append(options, huh.NewOption("Auto Rename", service.CapabilityAutoRename))
+		}
+
 		// Auto Compression
 		if service.IsAutoCompressionEnabled(agent.Capabilities) {
 			options = append(options, huh.NewOption("Auto Compression", service.CapabilityAutoCompression).Selected(true))
@@ -160,6 +168,7 @@ var capsSwitchCmd = &cobra.Command{
 			service.CapabilitySubAgents,
 			service.CapabilityAgentMemory,
 			service.CapabilityWebSearch,
+			service.CapabilityAutoRename,
 			service.CapabilityAutoCompression,
 			service.CapabilityPlanMode,
 		}
@@ -193,6 +202,7 @@ func printCapSummary(caps []string) {
 	printCapStatus(service.CapabilitySkillsTitle, service.IsAgentSkillsEnabled(caps))
 	printCapStatus(service.CapabilityMemoryTitle, service.IsAgentMemoryEnabled(caps))
 	printCapStatus(service.CapabilitySubAgentsTitle, service.IsSubAgentsEnabled(caps))
+	printCapStatus(service.CapabilityAutoRenameTitle, service.IsAutoRenameEnabled(caps))
 	printCapStatus(service.CapabilityAutoCompressTitle, service.IsAutoCompressionEnabled(caps))
 	printCapStatus(service.CapabilityPlanModeTitle, service.IsPlanModeEnabled(caps))
 

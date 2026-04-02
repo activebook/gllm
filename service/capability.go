@@ -15,6 +15,7 @@ const (
 	CapabilityWebSearch       = "web_search"
 	CapabilityAutoCompression = "auto_compression"
 	CapabilityPlanMode        = "plan_mode"
+	CapabilityAutoRename      = "auto_rename"
 )
 
 const (
@@ -27,6 +28,7 @@ const (
 	CapabilityMarkdownTitle     = "Markdown Output"
 	CapabilityAutoCompressTitle = "Auto Compression"
 	CapabilityPlanModeTitle     = "Plan Mode"
+	CapabilityAutoRenameTitle   = "Auto Rename"
 
 	CapabilityMCPTitleHighlight          = "[MCP (Model Context Protocol)]()"
 	CapabilitySkillsTitleHighlight       = "[Agent Skills]()"
@@ -37,6 +39,7 @@ const (
 	CapabilityMarkdownTitleHighlight     = "[Markdown Output]()"
 	CapabilityAutoCompressTitleHighlight = "[Auto Compression]()"
 	CapabilityPlanModeTitleHighlight     = "[Plan Mode]()"
+	CapabilityAutoRenameTitleHighlight   = "[Auto Rename]()"
 
 	CapabilityMCPBody          = "enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."
 	CapabilitySkillsBody       = "are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.\nAfter integrating skills, **agent** will use skills automatically."
@@ -49,6 +52,7 @@ const (
 	CapabilityMarkdownBody     = "allows agents to generate final response in Markdown format.\nThis helps you to format the response in a more readable way."
 	CapabilityAutoCompressBody = "automatically compresses session context using a summary when context window limits are reached.\nThis provides an infinite context window continuity with minimal detail loss."
 	CapabilityPlanModeBody     = "allows agents to plan their work before executing tasks.\nUse for deepresearch, complex tasks, or collaborative work"
+	CapabilityAutoRenameBody   = "automatically renames the session after the first turn using the model to infer a meaningful, human-readable title from the conversation content."
 
 	CapabilityMCPDescription          = CapabilityMCPTitle + " " + CapabilityMCPBody
 	CapabilitySkillsDescription       = CapabilitySkillsTitle + " " + CapabilitySkillsBody
@@ -59,6 +63,7 @@ const (
 	CapabilityMarkdownDescription     = CapabilityMarkdownTitle + " " + CapabilityMarkdownBody
 	CapabilityAutoCompressDescription = CapabilityAutoCompressTitle + " " + CapabilityAutoCompressBody
 	CapabilityPlanModeDescription     = CapabilityPlanModeTitle + " " + CapabilityPlanModeBody
+	CapabilityAutoRenameDescription   = CapabilityAutoRenameTitle + " " + CapabilityAutoRenameBody
 
 	// Agent Features Description Highlight
 	CapabilityMCPDescriptionHighlight          = CapabilityMCPTitleHighlight + CapabilityMCPBody
@@ -70,6 +75,7 @@ const (
 	CapabilityMarkdownDescriptionHighlight     = CapabilityMarkdownTitleHighlight + CapabilityMarkdownBody
 	CapabilityAutoCompressDescriptionHighlight = CapabilityAutoCompressTitleHighlight + CapabilityAutoCompressBody
 	CapabilityPlanModeDescriptionHighlight     = CapabilityPlanModeTitleHighlight + CapabilityPlanModeBody
+	CapabilityAutoRenameDescriptionHighlight   = CapabilityAutoRenameTitleHighlight + CapabilityAutoRenameBody
 )
 
 var (
@@ -83,6 +89,7 @@ var (
 		CapabilityWebSearch,
 		CapabilityAutoCompression,
 		CapabilityPlanMode,
+		CapabilityAutoRename,
 	}
 )
 
@@ -125,6 +132,8 @@ func GetCapabilityTitle(cap string) string {
 		return CapabilityAutoCompressTitle
 	case CapabilityPlanMode:
 		return CapabilityPlanModeTitle
+	case CapabilityAutoRename:
+		return CapabilityAutoRenameTitle
 	default:
 		return "Unknown"
 	}
@@ -152,6 +161,8 @@ func GetCapabilityDescHighlight(cap string) string {
 		return CapabilityAutoCompressDescriptionHighlight
 	case CapabilityPlanMode, CapabilityPlanModeTitle:
 		return CapabilityPlanModeDescriptionHighlight
+	case CapabilityAutoRename, CapabilityAutoRenameTitle:
+		return CapabilityAutoRenameDescriptionHighlight
 	default:
 		return ""
 	}
@@ -178,6 +189,8 @@ func GetCapabilityDescription(cap string) string {
 		return CapabilityAutoCompressDescription
 	case CapabilityPlanMode, CapabilityPlanModeTitle:
 		return CapabilityPlanModeDescription
+	case CapabilityAutoRename, CapabilityAutoRenameTitle:
+		return CapabilityAutoRenameDescription
 	default:
 		return ""
 	}
@@ -348,4 +361,19 @@ func EnablePlanMode(capabilities []string) []string {
 
 func DisablePlanMode(capabilities []string) []string {
 	return disableCapability(capabilities, CapabilityPlanMode)
+}
+
+/*
+ * Auto Rename
+ */
+func IsAutoRenameEnabled(capabilities []string) bool {
+	return isCapabilityEnabled(capabilities, CapabilityAutoRename)
+}
+
+func EnableAutoRename(capabilities []string) []string {
+	return enableCapability(capabilities, CapabilityAutoRename)
+}
+
+func DisableAutoRename(capabilities []string) []string {
+	return disableCapability(capabilities, CapabilityAutoRename)
 }

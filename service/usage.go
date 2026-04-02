@@ -120,7 +120,7 @@ func (tu *TokenUsage) renderLipgloss() string {
 
 	rowOutput := lipgloss.JoinHorizontal(lipgloss.Left,
 		labelStyle.Render("Output"),
-		valueStyle.Render(fmt.Sprintf("%d", tu.OutputTokens)),
+		valueStyle.Foreground(labelColor).Render(fmt.Sprintf("%d", tu.OutputTokens)),
 	)
 
 	// Split Cached into two rows

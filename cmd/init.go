@@ -230,10 +230,13 @@ func RunInitWizard() error {
 		Options(
 			huh.NewOption("Show Token Usage Stats", service.CapabilityTokenUsage).Selected(true),
 			huh.NewOption("Show Markdown Output", service.CapabilityMarkdown).Selected(true),
-			huh.NewOption("Enable MCP Servers", service.CapabilityMCPServers).Selected(true),
-			huh.NewOption("Enable Agent Skills", service.CapabilityAgentSkills).Selected(true),
-			huh.NewOption("Enable Agent Memory", service.CapabilityAgentMemory).Selected(true),
-			huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(true),
+			huh.NewOption("Auto Rename Session", service.CapabilityAutoRename).Selected(true),
+			huh.NewOption("Auto Compress Context", service.CapabilityAutoCompression).Selected(true),
+			huh.NewOption("Enable MCP Servers", service.CapabilityMCPServers).Selected(false),
+			huh.NewOption("Enable Agent Skills", service.CapabilityAgentSkills).Selected(false),
+			huh.NewOption("Enable Agent Memory", service.CapabilityAgentMemory).Selected(false),
+			huh.NewOption("Enable Sub Agents", service.CapabilitySubAgents).Selected(false),
+			huh.NewOption("Enable Web Search", service.CapabilityWebSearch).Selected(false),
 		).Value(&selectedFeatures)
 	featureNote := ui.GetDynamicHuhNote("Feature Details", msfeatures, service.GetCapabilityDescHighlight)
 
