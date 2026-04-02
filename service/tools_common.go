@@ -948,10 +948,22 @@ func getReadMultipleFilesTool() *OpenTool {
 func getEditFileTool() *OpenTool {
 	editFileFunc := OpenFunctionDefinition{
 		Name: ToolEditFile,
-		Description: "Apply targeted edits to a file using search-replace operations. " +
-			"Use this for precise code modifications, refactoring, or content updates. " +
-			"Provide search-replace blocks to specify exactly what to change. " +
-			"Each edit can modify, add, or delete specific code sections safely.",
+		Description: "Apply targeted search-replace edits to a file.\n" +
+			"\n" +
+			"UNIQUENESS CONTRACT (mandatory): each 'search' block must appear EXACTLY ONCE in the\n" +
+			"file. If it appears 0 times the edit fails (not found). If it appears 2+ times the\n" +
+			"edit fails (ambiguous) — expand the search block with more surrounding context to\n" +
+			"make it uniquely identifiable.\n" +
+			"\n" +
+			"ATOMICITY: all edits in the batch are validated before any are written to disk.\n" +
+			"If any single edit fails the ENTIRE batch is aborted and the file is left unchanged.\n" +
+			"Fix all failing edits then retry the batch as a whole.\n" +
+			"\n" +
+			"WHITESPACE TOLERANCE: minor tab/space and trailing-whitespace differences are\n" +
+			"forgiven via a normalised-match fallback, but indentation depth must be correct.\n" +
+			"\n" +
+			"BEST PRACTICE: call read_file with line_numbers=true immediately before editing to\n" +
+			"obtain the exact current file content. Never hallucinate whitespace or indentation.",
 		Parameters: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -965,8 +977,10 @@ func getEditFileTool() *OpenTool {
 						"type": "object",
 						"properties": map[string]interface{}{
 							"search": map[string]interface{}{
-								"type":        "string",
-								"description": "The exact text to find and replace. Include sufficient context for uniqueness.",
+								"type": "string",
+								"description": "The exact text to find. Must appear EXACTLY ONCE in the file — " +
+									"include enough surrounding context (e.g. the enclosing function " +
+									"signature or adjacent unique lines) to guarantee uniqueness.",
 							},
 							"replace": map[string]interface{}{
 								"type":        "string",
@@ -975,7 +989,7 @@ func getEditFileTool() *OpenTool {
 						},
 						"required": []string{"search", "replace"},
 					},
-					"description": "Array of search-replace operations to apply to the file.",
+					"description": "Array of search-replace operations. All are validated before any is written.",
 				},
 				"purpose": map[string]interface{}{
 					"type":        "string",
