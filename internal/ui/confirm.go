@@ -139,8 +139,8 @@ func NeedUserConfirmToolUse(info string, prompt string, description string, tool
 
 	// Register the cancel function with the VSCode confirm bus
 	bus := event.GetVSCodeConfirmBus()
-	bus.RegisterConfirmCancel(cancel, toolsUse.FilePath)
-	defer bus.ClearConfirmCancel()
+	bus.Register(cancel, toolsUse.FilePath)
+	defer bus.Clear()
 
 	// Run the form
 	err := RunFormClearable(form, ctx)
@@ -148,7 +148,7 @@ func NeedUserConfirmToolUse(info string, prompt string, description string, tool
 	// Always check if the context was cancelled (e.g. by VSCode companion)
 	// huh might return nil error even if the context was cancelled.
 	if ctx.Err() != nil && errors.Is(ctx.Err(), context.Canceled) {
-		accepted := event.GetVSCodeConfirmBus().GetAccepted()
+		accepted := event.GetVSCodeConfirmBus().Accepted()
 		if accepted {
 			toolsUse.ConfirmOnce()
 		} else {

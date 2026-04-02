@@ -28,9 +28,9 @@ func GetVSCodeConfirmBus() *VSCodeConfirmBus {
 	return instanceVSCodeConfirmBus
 }
 
-// RegisterConfirmCancel is called by the UI just before blocking on a user prompt.
+// Register is called by the UI just before blocking on a user prompt.
 // If a remote event arrives, it will call check this cancel function.
-func (b *VSCodeConfirmBus) RegisterConfirmCancel(cancel context.CancelFunc, path string) {
+func (b *VSCodeConfirmBus) Register(cancel context.CancelFunc, path string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.accepted = false
@@ -44,8 +44,8 @@ func (b *VSCodeConfirmBus) RegisterConfirmCancel(cancel context.CancelFunc, path
 	b.cancelDiff = cancel
 }
 
-// ClearConfirmCancel is called by the UI when the prompt finishes normally to remove the hook.
-func (b *VSCodeConfirmBus) ClearConfirmCancel() {
+// Clear is called by the UI when the prompt finishes normally to remove the hook.
+func (b *VSCodeConfirmBus) Clear() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.accepted = false
@@ -53,29 +53,22 @@ func (b *VSCodeConfirmBus) ClearConfirmCancel() {
 	b.cancelDiff = nil
 }
 
-// GetAccepted returns the remote decision, or nil if no remote event has superseded the prompt.
-func (b *VSCodeConfirmBus) GetAccepted() bool {
+// Accepted returns the remote decision, or nil if no remote event has superseded the prompt.
+func (b *VSCodeConfirmBus) Accepted() bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.accepted
 }
 
 func (b *VSCodeConfirmBus) Confirm(path string) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		absPath = path
-	}
-	if b.cancelDiff != nil && b.path == absPath {
-		b.accepted = true
-		b.path = ""
-		b.cancelDiff()
-		b.cancelDiff = nil
-	}
+	b.resolve(path, true)
 }
 
 func (b *VSCodeConfirmBus) Reject(path string) {
+	b.resolve(path, false)
+}
+
+func (b *VSCodeConfirmBus) resolve(path string, accepted bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	absPath, err := filepath.Abs(path)
@@ -83,7 +76,7 @@ func (b *VSCodeConfirmBus) Reject(path string) {
 		absPath = path
 	}
 	if b.cancelDiff != nil && b.path == absPath {
-		b.accepted = false
+		b.accepted = accepted
 		b.path = ""
 		b.cancelDiff()
 		b.cancelDiff = nil
