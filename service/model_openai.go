@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -73,8 +72,7 @@ func (ag *Agent) getOpenAIFilePart(file *FileData) (openai.ChatCompletionContent
 	// Handle based on file type
 	if IsImageMIMEType(format) {
 		// Create base64 image URL
-		base64Data := base64.StdEncoding.EncodeToString(file.Data())
-		imageURL := fmt.Sprintf("data:%s;base64,%s", file.Format(), base64Data)
+		imageURL := util.BuildDataURL(file.Format(), file.Data())
 		// Create and append image part
 		part = openai.ImageContentPart(openai.ChatCompletionContentPartImageImageURLParam{URL: imageURL})
 		return part, true

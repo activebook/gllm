@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http" // Retained as it's used by headerTransport
@@ -13,6 +12,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/event"
+	"github.com/activebook/gllm/util"
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -355,12 +355,12 @@ func (mc *MCPClient) CallTool(toolName string, args map[string]any) (*MCPToolRes
 			response.Types = append(response.Types, MCPResponseText)
 			response.Contents = append(response.Contents, cc.Text)
 		} else if cc, ok := c.(*mcp.ImageContent); ok {
-			base64Data := base64.StdEncoding.EncodeToString(cc.Data)
+			base64Data := util.GetBase64String(cc.Data)
 			str := fmt.Sprintf("data:%s;base64,%s", cc.MIMEType, base64Data)
 			response.Types = append(response.Types, MCPResponseImage)
 			response.Contents = append(response.Contents, str)
 		} else if cc, ok := c.(*mcp.AudioContent); ok {
-			base64Data := base64.StdEncoding.EncodeToString(cc.Data)
+			base64Data := util.GetBase64String(cc.Data)
 			str := fmt.Sprintf("data:%s;base64,%s", cc.MIMEType, base64Data)
 			response.Types = append(response.Types, MCPResponseAudio)
 			response.Contents = append(response.Contents, str)

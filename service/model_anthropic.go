@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -21,7 +20,7 @@ func (ag *Agent) getAnthropicFilePart(file *FileData) *anthropic.ContentBlockPar
 	if IsImageMIMEType(format) {
 		mediaType := format // Format() returns MIME type for FileData usually
 		// Encode base64
-		base64Data := base64.StdEncoding.EncodeToString(file.Data())
+		base64Data := util.GetBase64String(file.Data())
 		// Use NewImageBlockBase64 helper
 		v := anthropic.NewImageBlockBase64(mediaType, base64Data)
 		return &v
