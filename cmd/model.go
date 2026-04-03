@@ -16,6 +16,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	providerSelectDesc = "Select the provider for the model.\nps. OpenAI Compatible means the model is compatible with OpenAI API, e.g. OpenRouter, Chinese Models, etc."
+	providerSelectNote = "Provider Support Matrix:\n" +
+		"- Gemini: Text, Image, Audio, Video, PDF, Excel\n" +
+		"- OpenAI: Text, Image, Audio, PDF\n" +
+		"- Anthropic: Text, Image, PDF\n\n" +
+		"If you are using Chinese open-source models, then better choose 'Other (OpenAI Compatible)'"
+)
+
 func init() {
 	rootCmd.AddCommand(modelCmd)
 	modelCmd.AddCommand(modelListCmd)
@@ -194,7 +203,7 @@ Example:
 				huh.NewGroup(
 					huh.NewSelect[string]().
 						Title("Provider").
-						Description("Select the provider for the model.\nps. OpenAI Compatible means the model is compatible with OpenAI API, e.g. OpenRouter, Chinese Models, etc.").
+						Description(providerSelectDesc).
 						Options(
 							huh.NewOption("OpenAI", service.ModelProviderOpenAI),
 							huh.NewOption("Anthropic", service.ModelProviderAnthropic),
@@ -203,7 +212,7 @@ Example:
 						).
 						Value(&provider),
 					huh.NewNote().
-						Description("If you are using Chinese open-source models, then better choose 'Other (OpenAI Compatible)'"),
+						Description(providerSelectNote),
 				),
 			).Run()
 			if err != nil {
@@ -423,7 +432,7 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 				huh.NewGroup(
 					huh.NewSelect[string]().
 						Title("Provider").
-						Description("Select the provider for this model").
+						Description(providerSelectDesc).
 						Options(
 							huh.NewOption("OpenAI", service.ModelProviderOpenAI),
 							huh.NewOption("Anthropic", service.ModelProviderAnthropic),
@@ -432,7 +441,7 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 						).
 						Value(&provider),
 					huh.NewNote().
-						Description("If you are using Chinese open-source models, then better choose 'Other (OpenAI Compatible)'"),
+						Description(providerSelectNote),
 				),
 				huh.NewGroup(
 					huh.NewInput().
