@@ -39,3 +39,8 @@ func WriteClipboardText(text string) error {
 	}
 	return nil
 }
+
+// Read from clipboard using atotto/clipboard
+func ReadClipboardText() (string, error) {
+	return clipboard.ReadAll()
+}
