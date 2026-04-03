@@ -3,6 +3,7 @@ package data
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,27 +45,28 @@ func (m *MemoryStore) Load() ([]string, error) {
 	defer file.Close()
 
 	var memories []string
-	scanner := bufio.NewScanner(file)
+	reader := bufio.NewReader(file)
 	inMemorySection := false
 
-	for scanner.Scan() {
-		line := scanner.Text()
+	for {
+		lineBytes, err := reader.ReadBytes('\n')
+		line := strings.TrimRight(string(lineBytes), "\r\n")
 
 		if strings.TrimSpace(line) == MemoryHeader {
 			inMemorySection = true
-			continue
-		}
-
-		if inMemorySection && strings.HasPrefix(strings.TrimSpace(line), "- ") {
+		} else if inMemorySection && strings.HasPrefix(strings.TrimSpace(line), "- ") {
 			memory := strings.TrimPrefix(strings.TrimSpace(line), "- ")
 			if memory != "" {
 				memories = append(memories, memory)
 			}
 		}
-	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading memory file: %w", err)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("error reading memory file: %w", err)
+		}
 	}
 
 	return memories, nil
