@@ -26,6 +26,14 @@ func (ag *Agent) getAnthropicFilePart(file *FileData) *anthropic.ContentBlockPar
 		return &v
 	}
 
+	if IsPDFMIMEType(format) {
+		base64Data := util.GetBase64String(file.Data())
+		v := anthropic.NewDocumentBlock(anthropic.Base64PDFSourceParam{
+			Data: base64Data,
+		})
+		return &v
+	}
+
 	if IsTextMIMEType(format) {
 		v := anthropic.NewTextBlock(string(file.Data()))
 		return &v

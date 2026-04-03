@@ -236,8 +236,8 @@ Example:
 						Placeholder(defaultEndpoint).
 						Suggestions([]string{defaultEndpoint}).
 						Validate(func(s string) error {
-							if !strings.HasPrefix(s, "https://") {
-								return fmt.Errorf("endpoint must start with 'https://'")
+							if !strings.HasPrefix(s, "https://") || !strings.HasPrefix(s, "http://") {
+								return fmt.Errorf("endpoint must start with 'https://' or 'http://'")
 							}
 							return nil
 						}),
@@ -439,8 +439,8 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 						Title("Endpoint").
 						Value(&endpoint).
 						Validate(func(s string) error {
-							if !strings.HasPrefix(s, "https://") {
-								return fmt.Errorf("endpoint must start with 'https://'")
+							if !strings.HasPrefix(s, "https://") || !strings.HasPrefix(s, "http://") {
+								return fmt.Errorf("endpoint must start with 'https://' or 'http://'")
 							}
 							return nil
 						}),

@@ -570,7 +570,11 @@ func RenderOpenAISessionLog(input []byte) string {
 								sb.WriteString(fmt.Sprintf("\n    %s", indentText(part.Text, "    ")))
 							}
 						case arkmodel.ChatCompletionMessageContentPartTypeImageURL:
-							sb.WriteString(fmt.Sprintf("\n    %simage%s", ContentTypeColors["image"], data.ResetSeq))
+							sb.WriteString(fmt.Sprintf("\n    %s[Image]%s", ContentTypeColors["image"], data.ResetSeq))
+						case arkmodel.ChatCompletionMessageContentPartType("input_audio"):
+							sb.WriteString(fmt.Sprintf("\n    %s[Audio]%s", ContentTypeColors["image"], data.ResetSeq))
+						case arkmodel.ChatCompletionMessageContentPartType("file"):
+							sb.WriteString(fmt.Sprintf("\n    %s[PDF Document]%s", ContentTypeColors["image"], data.ResetSeq))
 						}
 					}
 				}
@@ -679,6 +683,8 @@ func RenderAnthropicSessionLog(input []byte) string {
 					sb.WriteString(indentText(v.Text, "    "))
 				} else if v := block.OfImage; v != nil {
 					sb.WriteString(fmt.Sprintf("\n    %s[Image]%s", ContentTypeColors["image"], data.ResetSeq))
+				} else if v := block.OfDocument; v != nil {
+					sb.WriteString(fmt.Sprintf("\n    %s[PDF Document]%s", ContentTypeColors["image"], data.ResetSeq))
 				} else if v := block.OfThinking; v != nil {
 					sb.WriteString(fmt.Sprintf("\n    %sThinking ↓%s", ContentTypeColors["reasoning"], ContentTypeColors["reset"]))
 					sb.WriteString(fmt.Sprintf("\n    %s", styleEachRune(v.Thinking, ContentTypeColors["reasoning_content"], "    ")))
