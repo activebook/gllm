@@ -37,6 +37,7 @@ func CompressSession(modelConfig *data.AgentConfig, sessionData []byte) (string,
 	ag := &Agent{
 		Model: constructModelInfo(&modelConfig.Model),
 	}
+	ag.Context = NewContextManager(ag, StrategyNone)
 
 	switch modelConfig.Model.Provider {
 

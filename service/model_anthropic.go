@@ -42,10 +42,15 @@ func (ag *Agent) getAnthropicFilePart(file *FileData) *anthropic.ContentBlockPar
 	return nil
 }
 
-// GenerateAnthropicSync generates a single, non-streaming completion using Anthropic API.
-// This is used for background tasks like context compression where streaming is unnecessary.
-// systemPrompt is the system prompt to be used for the sync generation, it's majorly a role.
-// the last message is the user prompt to do the task.
+// GenerateAnthropicSync performs a synchronous, blocking completion using the Anthropic streaming API.
+//
+// Anthropic rejects the batch endpoint (Messages.New) for large context payloads, requiring callers
+// to use the streaming transport instead. We satisfy that requirement here while still presenting a
+// simple blocking (string, error) interface to callers: the SSE stream is drained in a tight loop,
+// text deltas are accumulated, and all other events are discarded. No channels, no UI plumbing.
+//
+// systemPrompt — injected as the API-level system role.
+// the last message in messages — the instruction for the background task (rename, compress, …).
 func (ag *Agent) GenerateAnthropicSync(messages []anthropic.MessageParam, systemPrompt string) (string, error) {
 	ctx := context.Background()
 	opts := []option.RequestOption{
@@ -57,10 +62,17 @@ func (ag *Agent) GenerateAnthropicSync(messages []anthropic.MessageParam, system
 	}
 	client := anthropic.NewClient(opts...)
 
+	maxTokens := DefaultModelLimits.MaxOutputTokens
+	if ag.Context != nil {
+		maxTokens = ag.Context.GetMaxOutputTokens()
+	} else if ag.Model.MaxOutputTokens > 0 {
+		maxTokens = int(ag.Model.MaxOutputTokens)
+	}
+
 	params := anthropic.MessageNewParams{
 		Model:     anthropic.Model(ag.Model.Model),
 		Messages:  messages,
-		MaxTokens: int64(ag.Context.GetMaxOutputTokens()),
+		MaxTokens: int64(maxTokens),
 	}
 
 	if systemPrompt != "" {
@@ -76,23 +88,30 @@ func (ag *Agent) GenerateAnthropicSync(messages []anthropic.MessageParam, system
 		params.TopP = param.NewOpt(float64(ag.Model.TopP))
 	}
 
-	resp, err := client.Messages.New(ctx, params)
-	if err != nil {
-		return "", fmt.Errorf("sync chat completion error: %w", err)
-	}
+	// Use streaming transport — Anthropic rejects the batch API for large contexts.
+	// We drain all SSE events synchronously and only collect text_delta payloads.
+	stream := client.Messages.NewStreaming(ctx, params)
+	defer stream.Close()
 
-	if len(resp.Content) == 0 {
-		return "", fmt.Errorf("no content returned in sync response")
-	}
-
-	var textContent string
-	for _, block := range resp.Content {
-		if block.Type == "text" {
-			textContent += block.Text
+	var sb strings.Builder
+	for stream.Next() {
+		event := stream.Current()
+		if event.Type == "content_block_delta" {
+			delta := event.AsContentBlockDelta().Delta
+			if delta.Type == "text_delta" {
+				sb.WriteString(delta.Text)
+			}
 		}
 	}
+	if err := stream.Err(); err != nil {
+		return "", fmt.Errorf("sync streaming error: %w", err)
+	}
 
-	return textContent, nil
+	text := sb.String()
+	if text == "" {
+		return "", fmt.Errorf("no text content returned in sync response")
+	}
+	return text, nil
 }
 
 // GenerateAnthropicStream generates a streaming response using Anthropic API

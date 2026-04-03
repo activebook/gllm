@@ -73,6 +73,7 @@ func GenerateSessionName(modelConfig *data.AgentConfig, sessionData []byte) (str
 	ag := &Agent{
 		Model: constructModelInfo(&modelConfig.Model),
 	}
+	ag.Context = NewContextManager(ag, StrategyNone)
 
 	var raw string
 	var err error
