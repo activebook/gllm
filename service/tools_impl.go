@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -531,9 +532,10 @@ func searchTextInFileToolCallImpl(argsMap *map[string]interface{}) (string, erro
 	}
 	defer file.Close()
 
-	// Search for the text line by line
+	// Search for the text line by line using bufio.Reader to handle
+	// arbitrarily long lines without hitting a scanner token-size limit.
 	var result strings.Builder
-	scanner := bufio.NewScanner(file)
+	reader := bufio.NewReader(file)
 	lineNum := 0
 	foundCount := 0
 
@@ -551,9 +553,10 @@ func searchTextInFileToolCallImpl(argsMap *map[string]interface{}) (string, erro
 
 	result.WriteString(fmt.Sprintf("Search results for '%s' in %s (%s):\n", searchText, path, searchMode))
 
-	for scanner.Scan() {
+	for {
+		lineBytes, err := reader.ReadBytes('\n')
 		lineNum++
-		line := scanner.Text()
+		line := strings.TrimRight(string(lineBytes), "\r\n")
 
 		var matched bool
 		if useRegex {
@@ -568,10 +571,13 @@ func searchTextInFileToolCallImpl(argsMap *map[string]interface{}) (string, erro
 			foundCount++
 			result.WriteString(fmt.Sprintf("Line %d: %s\n", lineNum, line))
 		}
-	}
 
-	if err := scanner.Err(); err != nil {
-		return fmt.Sprintf("Error reading file %s: %v", path, err), nil
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Sprintf("Error reading file %s: %v", path, err), nil
+		}
 	}
 
 	if foundCount == 0 {

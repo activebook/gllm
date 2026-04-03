@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -73,6 +74,10 @@ func (s *BaseSession) GetTopSessionName() string {
 
 // readFile reads the JSONL file and returns each line as a separate byte slice.
 // Each line in a JSONL file is a complete JSON object representing one message.
+//
+// Uses bufio.Reader.ReadBytes instead of bufio.Scanner so that lines of
+// arbitrary length (e.g. base64-encoded images) are handled without hitting
+// the scanner's fixed token-size ceiling.
 func (s *BaseSession) readFile() ([][]byte, error) {
 	if s.Name == "" {
 		return nil, nil
@@ -87,27 +92,29 @@ func (s *BaseSession) readFile() ([][]byte, error) {
 	}
 	defer file.Close()
 
+	// 64 KB I/O read buffer — controls disk read granularity, NOT max line size.
+	reader := bufio.NewReaderSize(file, 64*1024)
 	var lines [][]byte
-	scanner := bufio.NewScanner(file)
-	buf := make([]byte, 64*1024)   // Start with 64KB
-	scanner.Buffer(buf, 1024*1024) // Can grow up to 1MB
 
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
-			continue // Skip empty lines
-		}
-		if !json.Valid(line) {
-			return nil, fmt.Errorf("invalid JSON in session file '%s'", s.Path)
-		}
-		// Make a copy since scanner reuses the buffer
-		lineCopy := make([]byte, len(line))
-		copy(lineCopy, line)
-		lines = append(lines, lineCopy)
-	}
+	for {
+		// ReadBytes reads until '\n' regardless of how large the line is.
+		// It always returns a fresh allocation, so no copy is needed.
+		line, err := reader.ReadBytes('\n')
+		line = bytes.TrimSpace(line)
 
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading session file '%s': %w", s.Path, err)
+		if len(line) > 0 {
+			if !json.Valid(line) {
+				return nil, fmt.Errorf("invalid JSON in session file '%s'", s.Path)
+			}
+			lines = append(lines, line)
+		}
+
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("error reading session file '%s': %w", s.Path, err)
+		}
 	}
 
 	return lines, nil

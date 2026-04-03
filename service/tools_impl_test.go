@@ -1,6 +1,8 @@
 package service
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -238,6 +240,104 @@ func TestApplyWSNormalizedReplace(t *testing.T) {
 			}
 			if tt.wantFound && gotOut != tt.wantOut {
 				t.Errorf("output = %q, want %q", gotOut, tt.wantOut)
+			}
+		})
+	}
+}
+
+func TestSearchTextInFileToolCallImpl(t *testing.T) {
+	// Create a temp directory for test files
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "search_test.txt")
+
+	// Create test content
+	content := "Hello World\nLine 2 contains some pattern: abc123def\nAnother line with pattern: ABC999DEF\nLast line is short.\n"
+	// To test the large line fix, append a 100KB line
+	largeLine := "HugeLine: " + strings.Repeat("x", 100*1024) + " endOfHuge\n"
+	content += largeLine
+
+	err := os.WriteFile(filePath, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	tests := []struct {
+		name            string
+		args            map[string]interface{}
+		wantContains    []string
+		wantNotContains []string
+	}{
+		{
+			name: "exact match",
+			args: map[string]interface{}{
+				"path": filePath,
+				"text": "Hello World",
+			},
+			wantContains:    []string{"Search results for 'Hello World'", "exact match", "Line 1: Hello World", "Found 1 match(es)."},
+			wantNotContains: []string{"Line 2:", "Line 3:"},
+		},
+		{
+			name: "case insensitive match",
+			args: map[string]interface{}{
+				"path":             filePath,
+				"text":             "hello world",
+				"case_insensitive": true,
+			},
+			wantContains: []string{"Search results for 'hello world'", "case-insensitive", "Line 1: Hello World", "Found 1 match(es)."},
+		},
+		{
+			name: "regex match",
+			args: map[string]interface{}{
+				"path":  filePath,
+				"text":  `abc\d{3}def`,
+				"regex": true,
+			},
+			wantContains:    []string{"regex", "Line 2: Line 2 contains some pattern: abc123def", "Found 1 match(es)."},
+			wantNotContains: []string{"ABC999DEF"},
+		},
+		{
+			name: "regex case insensitive match",
+			args: map[string]interface{}{
+				"path":             filePath,
+				"text":             `abc\d{3}def`,
+				"regex":            true,
+				"case_insensitive": true,
+			},
+			wantContains: []string{"regex, case-insensitive", "Line 2: Line 2 contains some pattern: abc123def", "Line 3: Another line with pattern: ABC999DEF", "Found 2 match(es)."},
+		},
+		{
+			name: "no match",
+			args: map[string]interface{}{
+				"path": filePath,
+				"text": "nonexistent_pattern",
+			},
+			wantContains: []string{"No matches found."},
+		},
+		{
+			name: "large line match",
+			args: map[string]interface{}{
+				"path": filePath,
+				"text": "endOfHuge",
+			},
+			wantContains: []string{"Line 5: HugeLine:", "Found 1 match(es)."},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := searchTextInFileToolCallImpl(&tt.args)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			for _, want := range tt.wantContains {
+				if !strings.Contains(got, want) {
+					t.Errorf("got:\n%s\nwant to contain: %s", got, want)
+				}
+			}
+			for _, wantNot := range tt.wantNotContains {
+				if strings.Contains(got, wantNot) {
+					t.Errorf("got:\n%s\nwant NOT to contain: %s", got, wantNot)
+				}
 			}
 		})
 	}

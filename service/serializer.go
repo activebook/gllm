@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -264,8 +265,9 @@ func DetectMessageProviderByContent(input []byte) string {
 	return ModelProviderUnknown
 }
 
-// Detects the session provider based on message format using a scanner
-// This is more efficient for large files as it doesn't read the entire file into memory
+// DetectMessageProvider detects the session provider by scanning the JSONL file.
+// Uses bufio.Reader to handle arbitrarily long lines (e.g. base64-encoded images)
+// without hitting bufio.Scanner's fixed token-size ceiling.
 func DetectMessageProvider(path string) string {
 	file, err := os.Open(path)
 	if err != nil {
@@ -273,29 +275,34 @@ func DetectMessageProvider(path string) string {
 	}
 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
-	// Increase buffer size for long messages
-	buf := make([]byte, 64*1024)
-	scanner.Buffer(buf, 1024*1024)
-
+	reader := bufio.NewReaderSize(file, 64*1024)
 	var weakMatch bool
 
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		provider := DetectMessageProviderFromLine(line)
+	for {
+		line, err := reader.ReadBytes('\n')
+		line = bytes.TrimSpace(line)
 
-		if provider != ModelProviderUnknown && provider != ModelProviderOpenAICompatible {
-			return provider // Found definitive match
+		if len(line) > 0 {
+			provider := DetectMessageProviderFromLine(line)
+			if provider != ModelProviderUnknown && provider != ModelProviderOpenAICompatible {
+				return provider
+			}
+			if provider == ModelProviderOpenAICompatible {
+				weakMatch = true
+			}
 		}
-		if provider == ModelProviderOpenAICompatible {
-			weakMatch = true
+
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return ModelProviderUnknown
 		}
 	}
 
 	if weakMatch {
 		return ModelProviderOpenAICompatible
 	}
-
 	return ModelProviderUnknown
 }
 
