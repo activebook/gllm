@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/creativeprojects/go-selfupdate"
 )
 
@@ -38,6 +39,27 @@ func CheckLatest(currentVersion string) (*ReleaseInfo, error) {
 	}
 	if !found {
 		return nil, fmt.Errorf("no release found on GitHub for %s/%s", gllmOwner, gllmRepo)
+	}
+
+	if currentVersion == "dev" || currentVersion == "" {
+		// Local development build, always assume remote is newer to allow testing updates
+		return &ReleaseInfo{
+			Version:   latest.Version(),
+			AssetURL:  latest.AssetURL,
+			AssetName: latest.AssetName,
+			Newer:     true,
+		}, nil
+	}
+
+	_, parseErr := semver.NewVersion(currentVersion)
+	if parseErr != nil {
+		// Not a valid semantic version, avoid the panic in LessOrEqual
+		return &ReleaseInfo{
+			Version:   latest.Version(),
+			AssetURL:  latest.AssetURL,
+			AssetName: latest.AssetName,
+			Newer:     true,
+		}, nil
 	}
 
 	if latest.LessOrEqual(currentVersion) {
