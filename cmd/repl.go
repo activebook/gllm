@@ -236,22 +236,7 @@ func (ri *ReplInfo) awaitInput() (string, error) {
 	})
 
 	// Define hooks for UI
-	hooks := ui.ChatInputHooks{
-		// Start load MCP server when chat input is ready
-		EventChatInputReady: func() {
-			StartLoadMCPServer(agent)
-		},
-		IsPlanModeActive: func() bool {
-			return data.IsPlanModeInSessionEnabled() && data.GetPlanModeInSession()
-		},
-		IsYoloModeActive: func() bool {
-			return data.GetYoloModeInSession()
-		},
-		ToggleSessionMode: func() {
-			// here we do a cycle [normal->plan->yolo->normal]
-			switchSessionMode()
-		},
-	}
+	hooks := ri.getChatInputHooks(agent)
 
 	// Run chat input
 	result, err := ui.RunChatInput(commands, ri.EditorInput, ri.History, hooks)
@@ -267,6 +252,41 @@ func (ri *ReplInfo) awaitInput() (string, error) {
 	ri.History = result.History
 
 	return result.Value, nil
+}
+
+// getChatInputHooks returns the hooks required for the chat input UI.
+func (ri *ReplInfo) getChatInputHooks(agent *data.AgentConfig) ui.ChatInputHooks {
+	return ui.ChatInputHooks{
+		// Start load MCP server when chat input is ready
+		EventChatInputReady: func() {
+			StartLoadMCPServer(agent)
+		},
+		IsPlanModeActive: func() bool {
+			return data.IsPlanModeInSessionEnabled() && data.GetPlanModeInSession()
+		},
+		IsYoloModeActive: func() bool {
+			return data.GetYoloModeInSession()
+		},
+		ToggleSessionMode: func() {
+			// here we do a cycle [normal->plan->yolo->normal]
+			switchSessionMode()
+		},
+		// OnPasteRequested handles Ctrl+V: reads clipboard, updates session files,
+		// and sends the appropriate PasteResultMsg back to the UI.
+		OnPasteRequested: func() {
+			img, err := data.ReadClipboardImage()
+			if err == nil && img != nil {
+				fileName := fmt.Sprintf("pasted_image_%d%s", len(ri.Files)+1, img.Ext)
+				ri.Files = append(ri.Files, service.NewFileData(img.Mime, img.Data, fileName))
+				attStr := fmt.Sprintf("Attached: %d image(s)", len(ri.Files))
+				ui.SendEvent(ui.PasteResultMsg{PastedAttachments: attStr})
+				return
+			}
+			// Fallback: read text from clipboard and instruct UI to insert it
+			text, _ := data.ReadClipboardText()
+			ui.SendEvent(ui.PasteResultMsg{PastedText: text})
+		},
+	}
 }
 
 func (ri *ReplInfo) startREPL() {

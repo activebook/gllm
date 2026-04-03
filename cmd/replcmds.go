@@ -56,6 +56,7 @@ var (
 		"/cmd":      "Execute built-in commands",
 		"shift+tab": "Toggle plan or yolo mode",
 		"ctrl+c":    "Cancel or exit session",
+		"ctrl+v":    "Paste image from clipboard",
 		"ctrl+d":    "Clear all input",
 	}
 )

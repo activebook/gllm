@@ -22,9 +22,10 @@ const (
 )
 
 const (
-	defaultHeight  = 5  // Default height of the chat input
-	maxSuggestions = 8  // Max suggestions to show
-	maxHistory     = 20 // Max history to keep
+	defaultHeight           = 5  // Default height of the chat input
+	maxSuggestions          = 8  // Max suggestions to show
+	maxHistory              = 20 // Max history to keep
+	checkingClipboardBanner = "Checking clipboard..."
 )
 
 var (
@@ -56,6 +57,11 @@ type ChatInputHooks struct {
 
 	// ToggleSessionMode toggles the session mode
 	ToggleSessionMode func()
+
+	// OnPasteRequested is called when the user presses Ctrl+V.
+	// The orchestrator is responsible for reading the clipboard and calling
+	// ui.SendEvent(PasteResultMsg{...}) with the outcome.
+	OnPasteRequested func()
 }
 
 // BannerMsg carries a notification banner text to display above the input.
@@ -66,6 +72,14 @@ type SessionModeMsg struct{ Mode SessionMode }
 
 // StatusMsg carries a background status update for the right-side banner.
 type StatusMsg struct{ Text string }
+
+// PasteResultMsg is sent back by the orchestrator (e.g. repl.go) after
+// processing a paste request initiated by the user pressing Ctrl+V.
+// The UI uses this to update banners or insert text — it performs no I/O itself.
+type PasteResultMsg struct {
+	PastedAttachments string // non-empty: show as attachment badge in pendingBanner
+	PastedText        string // non-empty: insert into the textarea (text fallback)
+}
 
 // SendEvent dispatches a message to the active chat input program.
 // Goroutine-safe; saves status globally even if no program is running.
@@ -117,7 +131,8 @@ type ChatInputModel struct {
 	historyIndex     int          // current history index
 	currentInput     string       // current input value
 	pendingBanner    string       // update notification banner (if any)
-	infoBanner       string       // info banner (if any)
+	processingBanner string       // used for transient processing info (e.g. clipboard check)
+	infoBanner       string       // info banner: plan/yolo mode (left) and mcp status (right)
 }
 
 // NewChatInputModel creates a new chat input model
@@ -374,6 +389,17 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case PasteResultMsg:
+		// Orchestrator resolved the paste: apply the result to the UI only.
+		m.processingBanner = ""
+		if msg.PastedAttachments != "" {
+			m.pendingBanner = "📎 " + msg.PastedAttachments
+		}
+		if msg.PastedText != "" {
+			m.textarea.InsertString(msg.PastedText)
+		}
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -398,9 +424,24 @@ func (m ChatInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
+			// Ignore Enter if there is no text input, preventing UI recreation loops
+			// even if images are attached (as requested by user)
+			if strings.TrimSpace(m.textarea.Value()) == "" {
+				return m, nil
+			}
+
 			// Otherwise submit the message
 			m.submitted = true
 			return m, tea.Quit
+
+		case tea.KeyCtrlV:
+			// Set the processing banner immediately, then delegate I/O to the orchestrator.
+			m.processingBanner = checkingClipboardBanner
+			if m.hooks.OnPasteRequested != nil {
+				// run at background
+				go m.hooks.OnPasteRequested()
+			}
+			return m, nil
 
 		case tea.KeyUp, tea.KeyDown:
 			if m.showSuggestions {
@@ -622,6 +663,18 @@ func (m ChatInputModel) View() string {
 	// If no suggestions, just show the input with banners
 	if !m.showSuggestions || len(m.filteredCommands) == 0 {
 		view := lipgloss.JoinVertical(lipgloss.Left, teaView)
+
+		// Render processing banner right above the textarea
+		if m.processingBanner != "" {
+			pBanner := lipgloss.NewStyle().
+				Foreground(lipgloss.Color(data.DetailHex)).
+				Italic(true).
+				Margin(0, 0, 0, 0).
+				Render("⏳ " + m.processingBanner)
+			view = lipgloss.JoinVertical(lipgloss.Left, pBanner, view)
+		}
+
+		// Render pending banner above the processing banner
 		if m.pendingBanner != "" {
 			view = lipgloss.JoinVertical(lipgloss.Left, m.pendingBanner, view)
 		}
@@ -742,5 +795,9 @@ func RunChatInput(commands []Suggestion, initialValue string, history []string, 
 	text := strings.TrimSpace(m.textarea.Value())
 	m.updateHistory(text)
 
-	return ChatInputResult{Value: text, Canceled: false, History: m.history}, nil
+	return ChatInputResult{
+		Value:    text,
+		Canceled: false,
+		History:  m.history,
+	}, nil
 }
