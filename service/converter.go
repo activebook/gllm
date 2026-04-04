@@ -17,14 +17,48 @@ import (
  * It extracts only the essential semantic content for cross-provider conversion.
  *
  * Key Design Decisions:
- * 1. Only text content and reasoning are preserved.
- * 2. Tool calls, tool responses, images, and other multimodal content are discarded.
- * 3. Role normalization: "model" (Gemini) → "assistant"
+ * 1. Text content and images are preserved via Parts.
+ * 2. Reasoning is preserved.
+ * 3. Tool calls and tool responses are discarded.
+ * 4. Role normalization: "model" (Gemini) → "assistant"
  */
 type UniversalMessage struct {
 	Role      UniversalRole // "system", "user", "assistant"
-	Content   string        // Main text content
-	Reasoning string        // Thinking/reasoning content (if any)
+	Parts     []UniversalPart
+	Reasoning string // Thinking/reasoning content (if any)
+}
+
+type UniversalPartType string
+
+const (
+	PartTypeText  UniversalPartType = "text"
+	PartTypeImage UniversalPartType = "image"
+)
+
+type UniversalPart struct {
+	Type     UniversalPartType
+	MIMEType string
+	Text     string // Populated if Type is PartTypeText
+	Data     []byte // Raw bytes, populated if Type is PartTypeImage
+}
+
+// GetTextContent returns all text parts concatenated.
+func (um *UniversalMessage) GetTextContent() string {
+	var text string
+	for _, part := range um.Parts {
+		if part.Type == PartTypeText {
+			if text != "" {
+				text += "\n"
+			}
+			text += part.Text
+		}
+	}
+	return text
+}
+
+// HasContent returns true if the message has any text, reasoning, or media parts.
+func (um *UniversalMessage) HasContent() bool {
+	return len(um.Parts) > 0 || um.Reasoning != ""
 }
 
 type UniversalRole string
@@ -41,7 +75,6 @@ func (r UniversalRole) String() string {
 
 func (r UniversalRole) ConvertToOpenAI() string {
 	// Openai uses string "assistant", "user", "system"
-	// we use model instead
 	switch r {
 	case UniversalRoleAssistant:
 		return model.ChatMessageRoleAssistant
@@ -115,8 +148,7 @@ func ConvertToUniversalRole(role string) UniversalRole {
 // ==============================
 
 // ParseOpenAIMessages converts OpenAI messages to universal format.
-// Extracts: Content, MultiContent[].Text, ReasoningContent, Tool Responses as text
-// Ignores: ToolCalls, FunctionCall, ImageURL
+// Extracts: Content text, MultiContent[].Text, Reasonings, and ImageURLs.
 func ParseOpenAIMessages(messages []openai.ChatCompletionMessageParamUnion) []UniversalMessage {
 	var result []UniversalMessage
 	for _, msg := range messages {
@@ -129,32 +161,38 @@ func ParseOpenAIMessages(messages []openai.ChatCompletionMessageParamUnion) []Un
 			Role: ConvertToUniversalRole(role),
 		}
 
-		// Try to extract content and reasoning content via JSON marshaling to be safe and robust
-		// since ChatCompletionMessageParamUnion is complex and reasoning_content might be an extra field.
+		// Try to extract content and reasoning via JSON marshaling to be safe and robust
 		data, err := json.Marshal(msg)
 		if err == nil {
 			var raw map[string]interface{}
 			if err := json.Unmarshal(data, &raw); err == nil {
 				// Content as string
 				if contentStr, ok := raw["content"].(string); ok && contentStr != "" {
-					um.Content = contentStr
+					um.Parts = append(um.Parts, UniversalPart{Type: PartTypeText, Text: contentStr})
 				} else if contentArr, ok := raw["content"].([]interface{}); ok {
 					// Content as Array of parts
 					for _, item := range contentArr {
 						if partMap, ok := item.(map[string]interface{}); ok {
-							if partType, ok := partMap["type"].(string); ok && partType == "text" {
+							partType, _ := partMap["type"].(string)
+							if partType == "text" {
 								if text, ok := partMap["text"].(string); ok && text != "" {
-									if um.Content != "" {
-										um.Content += "\n"
+									um.Parts = append(um.Parts, UniversalPart{Type: PartTypeText, Text: text})
+								}
+							} else if partType == "image_url" {
+								if imgMap, ok := partMap["image_url"].(map[string]interface{}); ok {
+									if urlStr, ok := imgMap["url"].(string); ok {
+										mimeType, decodedRaw, err := util.ParseDataURL(urlStr)
+										if err == nil {
+											um.Parts = append(um.Parts, UniversalPart{Type: PartTypeImage, MIMEType: mimeType, Data: decodedRaw})
+										}
 									}
-									um.Content += text
 								}
 							}
 						}
 					}
 				}
 
-				// Reasoning Content (Deepseek / Custom parameter — only if not already extracted)
+				// Reasoning Content
 				if reasoning, ok := raw["reasoning_content"].(string); ok && reasoning != "" {
 					um.Reasoning = reasoning
 				} else if reasoning, ok := raw["reasoning"].(string); ok && reasoning != "" {
@@ -163,16 +201,27 @@ func ParseOpenAIMessages(messages []openai.ChatCompletionMessageParamUnion) []Un
 			}
 		}
 
-		// Look for embedded <thought> tags (OpenAI compatibility workaround)
-		if um.Reasoning == "" && um.Content != "" {
-			if thinkContent, cleanedContent := util.ExtractThinkTags(um.Content); thinkContent != "" {
-				um.Reasoning = thinkContent
-				um.Content = cleanedContent
+		// Look for embedded <thought> tags wrapper text parts
+		if um.Reasoning == "" {
+			var rebuiltParts []UniversalPart
+			for _, part := range um.Parts {
+				if part.Type == PartTypeText {
+					if thinkContent, cleanedContent := util.ExtractThinkTags(part.Text); thinkContent != "" {
+						um.Reasoning = thinkContent
+						if cleanedContent != "" {
+							rebuiltParts = append(rebuiltParts, UniversalPart{Type: PartTypeText, Text: cleanedContent})
+						}
+					} else {
+						rebuiltParts = append(rebuiltParts, part)
+					}
+				} else {
+					rebuiltParts = append(rebuiltParts, part)
+				}
 			}
+			um.Parts = rebuiltParts
 		}
 
-		// Only add if there's actual content
-		if um.Content != "" || um.Reasoning != "" {
+		if um.HasContent() {
 			result = append(result, um)
 		}
 	}
@@ -192,25 +241,27 @@ func ParseOpenChatMessages(messages []model.ChatCompletionMessage) []UniversalMe
 			um.Reasoning = *msg.ReasoningContent
 		}
 
-		// Extract text content
+		// Extract content
 		if msg.Content != nil {
 			if msg.Content.StringValue != nil {
-				um.Content = *msg.Content.StringValue
+				if *msg.Content.StringValue != "" {
+					um.Parts = append(um.Parts, UniversalPart{Type: PartTypeText, Text: *msg.Content.StringValue})
+				}
 			} else if msg.Content.ListValue != nil {
-				// Extract text from list content
 				for _, part := range msg.Content.ListValue {
 					if part.Type == model.ChatCompletionMessageContentPartTypeText && part.Text != "" {
-						if um.Content != "" {
-							um.Content += "\n"
+						um.Parts = append(um.Parts, UniversalPart{Type: PartTypeText, Text: part.Text})
+					} else if part.Type == model.ChatCompletionMessageContentPartTypeImageURL && part.ImageURL != nil {
+						mimeType, decodedRaw, err := util.ParseDataURL(part.ImageURL.URL)
+						if err == nil {
+							um.Parts = append(um.Parts, UniversalPart{Type: PartTypeImage, MIMEType: mimeType, Data: decodedRaw})
 						}
-						um.Content += part.Text
 					}
 				}
 			}
 		}
 
-		// Only add if there's actual content
-		if um.Content != "" || um.Reasoning != "" {
+		if um.HasContent() {
 			result = append(result, um)
 		}
 	}
@@ -218,8 +269,6 @@ func ParseOpenChatMessages(messages []model.ChatCompletionMessage) []UniversalMe
 }
 
 // ParseAnthropicMessages converts Anthropic messages to universal format.
-// Extracts: OfText blocks, OfThinking/OfRedactedThinking blocks, OfToolResult as text
-// Ignores: OfToolUse, OfImage, OfDocument
 func ParseAnthropicMessages(messages []anthropic.MessageParam) []UniversalMessage {
 	var result []UniversalMessage
 	for _, msg := range messages {
@@ -229,10 +278,7 @@ func ParseAnthropicMessages(messages []anthropic.MessageParam) []UniversalMessag
 
 		for _, block := range msg.Content {
 			if v := block.OfText; v != nil && v.Text != "" {
-				if um.Content != "" {
-					um.Content += "\n"
-				}
-				um.Content += v.Text
+				um.Parts = append(um.Parts, UniversalPart{Type: PartTypeText, Text: v.Text})
 			} else if v := block.OfThinking; v != nil && v.Thinking != "" {
 				if um.Reasoning != "" {
 					um.Reasoning += "\n"
@@ -243,6 +289,11 @@ func ParseAnthropicMessages(messages []anthropic.MessageParam) []UniversalMessag
 					um.Reasoning += "\n"
 				}
 				um.Reasoning += "[Redacted Thinking]" + v.Data
+			} else if v := block.OfImage; v != nil && v.Source.OfBase64 != nil && v.Source.OfBase64.Data != "" {
+				rawBytes, err := util.DecodeBase64String(v.Source.OfBase64.Data)
+				if err == nil {
+					um.Parts = append(um.Parts, UniversalPart{Type: PartTypeImage, MIMEType: string(v.Source.OfBase64.MediaType), Data: rawBytes})
+				}
 			} else if v := block.OfToolResult; v != nil {
 				// Extract tool result content as plain text
 				toolText := ""
@@ -255,17 +306,12 @@ func ParseAnthropicMessages(messages []anthropic.MessageParam) []UniversalMessag
 					}
 				}
 				if toolText != "" {
-					if um.Content != "" {
-						um.Content += "\n"
-					}
-					um.Content += toolText
+					um.Parts = append(um.Parts, UniversalPart{Type: PartTypeText, Text: toolText})
 				}
 			}
-			// Skip: OfToolUse, OfImage, OfDocument
 		}
 
-		// Only add if there's actual content
-		if um.Content != "" || um.Reasoning != "" {
+		if um.HasContent() {
 			result = append(result, um)
 		}
 	}
@@ -273,9 +319,6 @@ func ParseAnthropicMessages(messages []anthropic.MessageParam) []UniversalMessag
 }
 
 // ParseGeminiMessages converts Gemini messages to universal format.
-// Extracts: Parts.Text, Parts.Thought, FunctionResponse as text
-// Ignores: FunctionCall, InlineData
-// Maps: "model" → "assistant"
 func ParseGeminiMessages(messages []*gemini.Content) []UniversalMessage {
 	var result []UniversalMessage
 	for _, msg := range messages {
@@ -284,24 +327,23 @@ func ParseGeminiMessages(messages []*gemini.Content) []UniversalMessage {
 		}
 
 		for _, part := range msg.Parts {
-			// Skip function calls
 			if part.FunctionCall != nil {
 				continue
 			}
-			// Skip inline data (images, files)
+
+			// Extract inline data
 			if part.InlineData != nil {
+				if IsImageMIMEType(part.InlineData.MIMEType) {
+					um.Parts = append(um.Parts, UniversalPart{Type: PartTypeImage, MIMEType: part.InlineData.MIMEType, Data: part.InlineData.Data})
+				}
 				continue
 			}
 
 			// Extract function response
 			if part.FunctionResponse != nil {
 				if part.FunctionResponse.Response != nil {
-					// Need to serialize the map to string to preserve as text context
 					if respBytes, err := json.Marshal(part.FunctionResponse.Response); err == nil && string(respBytes) != "{}" {
-						if um.Content != "" {
-							um.Content += "\n"
-						}
-						um.Content += string(respBytes)
+						um.Parts = append(um.Parts, UniversalPart{Type: PartTypeText, Text: string(respBytes)})
 					}
 				}
 				continue
@@ -315,16 +357,12 @@ func ParseGeminiMessages(messages []*gemini.Content) []UniversalMessage {
 					}
 					um.Reasoning += part.Text
 				} else {
-					if um.Content != "" {
-						um.Content += "\n"
-					}
-					um.Content += part.Text
+					um.Parts = append(um.Parts, UniversalPart{Type: PartTypeText, Text: part.Text})
 				}
 			}
 		}
 
-		// Only add if there's actual content
-		if um.Content != "" || um.Reasoning != "" {
+		if um.HasContent() {
 			result = append(result, um)
 		}
 	}
@@ -336,7 +374,6 @@ func ParseGeminiMessages(messages []*gemini.Content) []UniversalMessage {
 // ==============================
 
 // BuildOpenAIMessages converts universal messages to OpenAI format.
-// Preserves: system role, Content, ReasoningContent
 func BuildOpenAIMessages(messages []UniversalMessage) []openai.ChatCompletionMessageParamUnion {
 	var result []openai.ChatCompletionMessageParamUnion
 	for _, um := range messages {
@@ -344,35 +381,73 @@ func BuildOpenAIMessages(messages []UniversalMessage) []openai.ChatCompletionMes
 
 		switch role {
 		case model.ChatMessageRoleAssistant:
-			// Reasoning is not set on Request Params in v3.
-			result = append(result, openai.AssistantMessage(um.Content))
+			result = append(result, openai.AssistantMessage(um.GetTextContent()))
 		case model.ChatMessageRoleSystem:
-			result = append(result, openai.SystemMessage(um.Content))
+			result = append(result, openai.SystemMessage(um.GetTextContent()))
 		default:
-			result = append(result, openai.UserMessage(um.Content))
+			// Ensure we use parts if there are media components
+			hasMedia := false
+			var targetParts []openai.ChatCompletionContentPartUnionParam
+
+			for _, part := range um.Parts {
+				if part.Type == PartTypeText {
+					targetParts = append(targetParts, openai.TextContentPart(part.Text))
+				} else if part.Type == PartTypeImage {
+					hasMedia = true
+					dataURL := util.BuildDataURL(part.MIMEType, part.Data)
+					targetParts = append(targetParts, openai.ImageContentPart(openai.ChatCompletionContentPartImageImageURLParam{URL: dataURL}))
+				}
+			}
+
+			if hasMedia {
+				result = append(result, openai.UserMessage(targetParts))
+			} else {
+				// Fallback to simple string for text-only messages to maintain clean JSON
+				result = append(result, openai.UserMessage(um.GetTextContent()))
+			}
 		}
 	}
 	return result
 }
 
-// BuildOpenChatMessages converts universal messages to OpenChat (Volcengine) format.
-// Preserves: system role, Content, ReasoningContent
+// BuildOpenChatMessages converts universal messages to OpenChat format.
 func BuildOpenChatMessages(messages []UniversalMessage) []*model.ChatCompletionMessage {
 	var result []*model.ChatCompletionMessage
 	for _, um := range messages {
-		// Need local copies for pointer references
-		content := um.Content
 		reasoning := um.Reasoning
 
-		// Map string role to SDK constant
-		// The Role field expects a SDK constant string
 		msg := &model.ChatCompletionMessage{
 			Role: um.Role.ConvertToOpenChat(),
 		}
-		if um.Content != "" {
-			msg.Content = &model.ChatCompletionMessageContent{StringValue: &content}
+
+		var targetParts []*model.ChatCompletionMessageContentPart
+		hasMedia := false
+
+		for _, part := range um.Parts {
+			if part.Type == PartTypeText {
+				targetParts = append(targetParts, &model.ChatCompletionMessageContentPart{
+					Type: model.ChatCompletionMessageContentPartTypeText,
+					Text: part.Text,
+				})
+			} else if part.Type == PartTypeImage {
+				hasMedia = true
+				dataURL := util.BuildDataURL(part.MIMEType, part.Data)
+				targetParts = append(targetParts, &model.ChatCompletionMessageContentPart{
+					Type:     model.ChatCompletionMessageContentPartTypeImageURL,
+					ImageURL: &model.ChatMessageImageURL{URL: dataURL},
+				})
+			}
 		}
-		if um.Reasoning != "" {
+
+		if hasMedia {
+			msg.Content = &model.ChatCompletionMessageContent{ListValue: targetParts}
+		} else if text := um.GetTextContent(); text != "" {
+			// Deep copy local ref
+			textVal := text
+			msg.Content = &model.ChatCompletionMessageContent{StringValue: &textVal}
+		}
+
+		if reasoning != "" {
 			msg.ReasoningContent = &reasoning
 		}
 
@@ -382,15 +457,13 @@ func BuildOpenChatMessages(messages []UniversalMessage) []*model.ChatCompletionM
 }
 
 // BuildAnthropicMessages converts universal messages to Anthropic format.
-// Handles: System role is inlined into the first user message.
-// Preserves: OfText, OfThinking blocks
 func BuildAnthropicMessages(messages []UniversalMessage) []anthropic.MessageParam {
 	var result []anthropic.MessageParam
 
 	for _, um := range messages {
 		var blocks []anthropic.ContentBlockParamUnion
 
-		// Add reasoning as thinking block (for assistant messages)
+		// Add reasoning as thinking block
 		if um.Reasoning != "" {
 			blocks = append(blocks, anthropic.ContentBlockParamUnion{
 				OfThinking: &anthropic.ThinkingBlockParam{
@@ -399,14 +472,18 @@ func BuildAnthropicMessages(messages []UniversalMessage) []anthropic.MessagePara
 			})
 		}
 
-		// Add content as text block
-		content := um.Content
-		if content != "" {
-			blocks = append(blocks, anthropic.ContentBlockParamUnion{
-				OfText: &anthropic.TextBlockParam{
-					Text: content,
-				},
-			})
+		for _, part := range um.Parts {
+			if part.Type == PartTypeText {
+				blocks = append(blocks, anthropic.ContentBlockParamUnion{
+					OfText: &anthropic.TextBlockParam{
+						Text: part.Text,
+					},
+				})
+			} else if part.Type == PartTypeImage {
+				b64 := util.GetBase64String(part.Data)
+				imgBlock := anthropic.NewImageBlockBase64(part.MIMEType, b64)
+				blocks = append(blocks, imgBlock)
+			}
 		}
 
 		if len(blocks) > 0 {
@@ -421,16 +498,13 @@ func BuildAnthropicMessages(messages []UniversalMessage) []anthropic.MessagePara
 }
 
 // BuildGeminiMessages converts universal messages to Gemini format.
-// Handles: System role is inlined into the first user message.
-// Preserves: Parts with Text, Thought
-// Maps: "assistant" → "model"
 func BuildGeminiMessages(messages []UniversalMessage) []*gemini.Content {
 	var result []*gemini.Content
 
 	for _, um := range messages {
 		var parts []*gemini.Part
 
-		// Add reasoning as thought part (for model messages)
+		// Add reasoning as thought part
 		if um.Reasoning != "" {
 			parts = append(parts, &gemini.Part{
 				Text:    um.Reasoning,
@@ -438,12 +512,14 @@ func BuildGeminiMessages(messages []UniversalMessage) []*gemini.Content {
 			})
 		}
 
-		// Add content as text part
-		content := um.Content
-		if content != "" {
-			parts = append(parts, &gemini.Part{
-				Text: content,
-			})
+		for _, part := range um.Parts {
+			if part.Type == PartTypeText {
+				parts = append(parts, &gemini.Part{Text: part.Text})
+			} else if part.Type == PartTypeImage {
+				parts = append(parts, &gemini.Part{
+					InlineData: &gemini.Blob{MIMEType: part.MIMEType, Data: part.Data},
+				})
+			}
 		}
 
 		if len(parts) > 0 {

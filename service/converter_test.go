@@ -181,3 +181,140 @@ func TestConvertMessages_PreservesReasoning(t *testing.T) {
 		t.Errorf("Expected model message to have at least 2 parts (thought + text)")
 	}
 }
+
+func TestConvertMessages_Multimodal_OpenAIToGemini(t *testing.T) {
+	// Input: OpenAI message with image
+	input := `{"role": "user", "content": [{"type": "text", "text": "What is this?"}, {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,aGVsbG8="}}]}`
+
+	result, err := ConvertMessages([]byte(input), ModelProviderOpenAI, ModelProviderGemini)
+	if err != nil {
+		t.Fatalf("ConvertMessages failed: %v", err)
+	}
+
+	var geminiMessages []map[string]interface{}
+	if err := parseJSONL(result, &geminiMessages); err != nil {
+		t.Fatalf("Result is not valid JSONL: %v", err)
+	}
+
+	if len(geminiMessages) != 1 {
+		t.Fatalf("Expected 1 message, got %d", len(geminiMessages))
+	}
+
+	parts, ok := geminiMessages[0]["parts"].([]interface{})
+	if !ok || len(parts) != 2 {
+		t.Fatalf("Expected 2 parts in Gemini message, got %v", parts)
+	}
+
+	// First part is text
+	part1 := parts[0].(map[string]interface{})
+	if part1["text"] != "What is this?" {
+		t.Errorf("Expected first part text 'What is this?', got '%v'", part1["text"])
+	}
+
+	// Second part is image inlineData
+	part2 := parts[1].(map[string]interface{})
+	inlineData, ok := part2["inlineData"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected inlineData in second part, got %v", part2)
+	}
+	if inlineData["mimeType"] != "image/jpeg" {
+		t.Errorf("Expected mimeType 'image/jpeg', got '%v'", inlineData["mimeType"])
+	}
+	if inlineData["data"] != "aGVsbG8=" {
+		t.Errorf("Expected data 'aGVsbG8=', got '%v'", inlineData["data"])
+	}
+}
+
+func TestConvertMessages_Multimodal_GeminiToAnthropic(t *testing.T) {
+	// Input: Gemini message with image
+	input := `{"role": "user", "parts": [{"text": "Explain this diagram"}, {"inlineData": {"mimeType": "image/png", "data": "c29tZWRhdGE="}}]}`
+
+	result, err := ConvertMessages([]byte(input), ModelProviderGemini, ModelProviderAnthropic)
+	if err != nil {
+		t.Fatalf("ConvertMessages failed: %v", err)
+	}
+
+	var anthropicMessages []map[string]interface{}
+	if err := parseJSONL(result, &anthropicMessages); err != nil {
+		t.Fatalf("Result is not valid JSONL: %v", err)
+	}
+
+	if len(anthropicMessages) != 1 {
+		t.Fatalf("Expected 1 message, got %d", len(anthropicMessages))
+	}
+
+	content, ok := anthropicMessages[0]["content"].([]interface{})
+	if !ok || len(content) != 2 {
+		t.Fatalf("Expected 2 content blocks in Anthropic message, got %v", content)
+	}
+
+	// First block is text
+	block1 := content[0].(map[string]interface{})
+	if block1["text"] != "Explain this diagram" {
+		t.Errorf("Expected first block text 'Explain this diagram', got '%v'", block1["text"])
+	}
+
+	// Second block is image
+	block2 := content[1].(map[string]interface{})
+	if block2["type"] != "image" {
+		t.Errorf("Expected type 'image', got '%v'", block2["type"])
+	}
+	source, ok := block2["source"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected source in image block, got %v", block2)
+	}
+	if source["media_type"] != "image/png" {
+		t.Errorf("Expected media_type 'image/png', got '%v'", source["media_type"])
+	}
+	if source["data"] != "c29tZWRhdGE=" {
+		t.Errorf("Expected data 'c29tZWRhdGE=', got '%v'", source["data"])
+	}
+}
+
+func TestConvertMessages_Multimodal_AnthropicToOpenChat(t *testing.T) {
+	// Input: Anthropic message with image
+	input := `{"role": "user", "content": [{"type": "text", "text": "Analyze frame"}, {"type": "image", "source": {"type": "base64", "media_type": "image/webp", "data": "d2VicGRhdGE="}}]}`
+
+	result, err := ConvertMessages([]byte(input), ModelProviderAnthropic, ModelProviderOpenAICompatible)
+	if err != nil {
+		t.Fatalf("ConvertMessages failed: %v", err)
+	}
+
+	var openChatMessages []map[string]interface{}
+	if err := parseJSONL(result, &openChatMessages); err != nil {
+		t.Fatalf("Result is not valid JSONL: %v", err)
+	}
+
+	if len(openChatMessages) != 1 {
+		t.Fatalf("Expected 1 message, got %d", len(openChatMessages))
+	}
+
+	contentField := openChatMessages[0]["content"]
+	var contentArr []interface{}
+	
+	if arr, ok := contentField.([]interface{}); ok {
+		contentArr = arr
+	} else if obj, ok := contentField.(map[string]interface{}); ok {
+		contentArr = obj["ListValue"].([]interface{})
+	}
+
+	if len(contentArr) != 2 {
+		t.Fatalf("Expected content array of length 2 in OpenChat message, got %v", contentArr)
+	}
+	
+	// First block is text
+	block1 := contentArr[0].(map[string]interface{})
+	if block1["text"] != "Analyze frame" {
+		t.Errorf("Expected first block text 'Analyze frame', got '%v'", block1["text"])
+	}
+
+	// Second block is image_url
+	block2 := contentArr[1].(map[string]interface{})
+	imageURL, ok := block2["image_url"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("Expected image_url object, got '%v'", block2)
+	}
+	if imageURL["url"] != "data:image/webp;base64,d2VicGRhdGE=" {
+		t.Errorf("Expected Data URL 'data:image/webp;base64,d2VicGRhdGE=', got '%v'", imageURL["url"])
+	}
+}

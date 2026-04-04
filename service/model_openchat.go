@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,10 +23,7 @@ func (ag *Agent) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessag
 	// Handle based on file type
 	if IsImageMIMEType(format) {
 		// Create base64 image URL
-		base64Data := base64.StdEncoding.EncodeToString(file.Data())
-		//imageURL := fmt.Sprintf("data:image/%s;base64,%s", file.Format(), base64Data)
-		// data:format;base64,base64Data
-		imageURL := fmt.Sprintf("data:%s;base64,%s", file.Format(), base64Data)
+		imageURL := util.BuildDataURL(file.Format(), file.Data())
 		// Create and append image part
 		part = &model.ChatCompletionMessageContentPart{
 			Type: model.ChatCompletionMessageContentPartTypeImageURL,
@@ -37,12 +33,11 @@ func (ag *Agent) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessag
 		}
 	} else if IsVideoMIMEType(format) {
 		// Create and append video part
-		base64Data := base64.StdEncoding.EncodeToString(file.Data())
-		util.Debugf("Processing video file: format=%s, data length=%d, base64 length=%d\n", format, len(file.Data()), len(base64Data))
+		videoURL := util.BuildDataURL(file.Format(), file.Data())
 		part = &model.ChatCompletionMessageContentPart{
 			Type: model.ChatCompletionMessageContentPartTypeVideoURL,
 			VideoURL: &model.ChatMessageVideoURL{
-				URL: fmt.Sprintf("data:%s;base64,%s", format, base64Data),
+				URL: videoURL,
 			},
 		}
 		util.Debugf("Created video part with type=%s, URL prefix=%s\n", part.Type, part.VideoURL.URL[:50])

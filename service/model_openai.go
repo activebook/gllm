@@ -2,9 +2,9 @@ package service
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/activebook/gllm/util"
@@ -73,10 +73,29 @@ func (ag *Agent) getOpenAIFilePart(file *FileData) (openai.ChatCompletionContent
 	// Handle based on file type
 	if IsImageMIMEType(format) {
 		// Create base64 image URL
-		base64Data := base64.StdEncoding.EncodeToString(file.Data())
-		imageURL := fmt.Sprintf("data:%s;base64,%s", file.Format(), base64Data)
+		imageURL := util.BuildDataURL(file.Format(), file.Data())
 		// Create and append image part
 		part = openai.ImageContentPart(openai.ChatCompletionContentPartImageImageURLParam{URL: imageURL})
+		return part, true
+	} else if IsAudioMIMEType(format) {
+		audioFmt := "mp3"
+		if strings.Contains(format, "wav") {
+			audioFmt = "wav"
+		}
+		part = openai.InputAudioContentPart(openai.ChatCompletionContentPartInputAudioInputAudioParam{
+			Data:   util.GetBase64String(file.Data()),
+			Format: audioFmt,
+		})
+		return part, true
+	} else if IsPDFMIMEType(format) {
+		filename := "document.pdf"
+		if file.Path() != "" {
+			filename = filepath.Base(file.Path())
+		}
+		part = openai.FileContentPart(openai.ChatCompletionContentPartFileFileParam{
+			FileData: openai.String(util.GetBase64String(file.Data())),
+			Filename: openai.String(filename),
+		})
 		return part, true
 	} else if IsTextMIMEType(format) {
 		// Create and append text part
@@ -84,7 +103,7 @@ func (ag *Agent) getOpenAIFilePart(file *FileData) (openai.ChatCompletionContent
 		return part, true
 	} else {
 		// Unknown file type, skip
-		// Don't deal with pdf, xls
+		// Don't deal with xls
 		// It needs upload to OpenAI's servers first, so we can't include them directly in a message.
 		return part, false
 	}
