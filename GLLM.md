@@ -1,34 +1,35 @@
-# gllm Copilot Agent Configuration
+## Purpose
+`gllm` is a Go-based CLI companion for LLMs featuring multi-provider support (OpenAI, Anthropic, Gemini), MCP integration, and complex agentic workflows with context compression.
 
-This `GLLM.md` defines a custom Copilot Chat agent for working on the **gllm** repository.
+## Key Constraints
+- **Idiomatic Go**: Adhere strictly to "Effective Go" and standard `gofmt` formatting.
+- **Error Handling**: Never ignore errors with `_`; use error wrapping (`fmt.Errorf` with `%w`) or sentinel errors.
+- **Encapsulation**: Use `internal/` packages to enforce boundaries; keep files under 500 lines.
+- **Thread Safety**: Ensure concurrent access to `SharedState` and `SessionManager` is protected.
+- **UI Decoupling**: Service layer logic must communicate with the TUI via the internal event bus (`internal/event/`).
 
-## Agent Identity & Persona
+## Workflow
+1. **Dependency Management**: Run `make deps` (or `go mod tidy`) after adding imports.
+2. **Development**: Implement logic in `service/` and CLI interface in `cmd/`.
+3. **Verification**: Run `make lint` and `make test` before proposing any changes.
+4. **Context References**: Use `@` syntax (handled by `service/atref.go`) when referencing local files in prompts.
+5. **Commits**: Use Conventional Commits (e.g., `feat:`, `fix:`, `refactor:`).
 
-- **Role:** Expert senior software engineer specializing in **Go**.
-- **Goal:** Help develop, test, document, and maintain the `gllm` codebase with high quality, strong test coverage, and idiomatic Go.
-- **Tone:** Professional, formal, and direct.
+## Agent Rules
+- **Non-Destructive**: Never modify user configuration in `gllm.yaml` without explicit permission.
+- **No Direct Main**: Propose changes via PR commands (`make create-pr`) rather than direct commits.
+- **Confirmation**: Always ask before executing shell commands or file deletions unless "Yolo Mode" is explicitly active.
 
-## When to Use This Agent
+## Commands
+- `make build`: Build binary to `dist/gllm`.
+- `make test`: Run all tests.
+- `make lint`: Run `golangci-lint` or `go vet`.
+- `go test ./service/ -v -run <TestName>`: Run specific service tests.
+- `make run`: Execute `main.go` directly.
 
-Use this agent when working on code, tests, documentation, or tooling for the `gllm` repository. It should be chosen instead of the default agent when you want responses and guidance tailored to Go development practices and this repo's conventions.
-
-## Tools & Workflows
-
-- Use terminal tooling (`run_in_terminal`) for:
-  - `go mod tidy`
-  - `go build .`
-  - `go test ./...`
-  - `gofmt` / `goimports` formatting checks
-- Use file tools (`read_file`, `replace_string_in_file`, `create_file`, etc.) for edits and reviews.
-- Use `grep_search` / `semantic_search` to locate code patterns and understand the codebase.
-
-## Standards & Guardrails
-
-- **Testing:** Always run `go test ./...` and ensure the suite passes before proposing changes.
-- **Formatting:** Always apply `gofmt` (and `goimports` when appropriate) to Go code.
-- **Branches:** Do not commit directly to `main`.
-- **Error handling:** If a command fails, stop, report the full error, and wait for guidance.
-- **Documentation:** Always update relevant documentation when making changes.
-- **Commit messages:** Write clear, concise commit messages.
-- **Code reviews:** Always request a review from another engineer before merging.
-- **Security:** Always ensure your code does not introduce any security vulnerabilities.
+## Architecture
+- **cmd/**: CLI definition using Cobra; `repl.go` manages the interactive TUI.
+- **service/**: Core engine including `provider.go` (LLM APIs), `session_manager.go` (history), and `mcptools.go` (MCP).
+- **data/**: Persistence layer for configuration, user memory, and the `SharedState` blackboard.
+- **internal/ui/**: TUI components built with Bubble Tea and Lip Gloss.
+- **internal/event/**: Central event bus for decoupled Service-to-UI communication.

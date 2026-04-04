@@ -20,6 +20,7 @@ import (
 
 var (
 	replCommandMap = map[string]string{
+		"/init":     "Initialize or update agent configuration and GLLM.md",
 		"/exit":     "Exit current session",
 		"/quit":     "Exit current session",
 		"/help":     "Show this help message",
@@ -174,6 +175,9 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 	// but mostly we just need command and "the rest"
 	// To minimize changes, we'll keep 'parts' generally available but also provide robust args parsing where needed.
 	switch command {
+	case "/init":
+		runCommand(initCmd, parts[1:])
+
 	case "/exit", "/quit":
 		ri.QuitFlag = true
 		fmt.Println("Session Ended")

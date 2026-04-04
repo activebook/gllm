@@ -2,12 +2,15 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/io"
 	"github.com/activebook/gllm/service"
+	"github.com/activebook/gllm/util"
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -15,9 +18,9 @@ import (
 // initCmd represents the init command
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "Initialize gllm configuration",
+	Short: "Initialize gllm configuration and instruction",
 	Long: `Interactive setup wizard to configure gllm with your preferred LLM provider.
-It will create or update the 'gllm.yaml' configuration file.`,
+It will create or update the 'gllm.yaml' configuration file and GLLM.md instruction file.`,
 	// Add completion support
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveNoFileComp
@@ -64,8 +67,41 @@ func RunInitWizard() error {
 	height := io.GetTermFitHeight(100) // algo would use term height/2
 
 	store := data.NewConfigStore()
+
+	// --- Dual-entry mode: if gllm.yaml already exists, offer a branching menu ---
 	if store.ConfigFileUsed() != "" {
 		fmt.Printf("Note: Updating existing configuration at %s\n\n", store.ConfigFileUsed())
+
+		var wizardMode string
+		err := huh.NewForm(
+			huh.NewGroup(
+				huh.NewSelect[string]().
+					Title("What would you like to do?").
+					Description("An existing configuration was detected.").
+					Options(
+						huh.NewOption("Reconfigure Agent", "agent"),
+						huh.NewOption("Generate / Update GLLM.md", "instruction"),
+						huh.NewOption("Both", "both"),
+					).
+					Value(&wizardMode),
+			).WithHeight(height),
+		).Run()
+		if err != nil {
+			return err
+		}
+
+		switch wizardMode {
+		case "instruction":
+			agent := store.GetActiveAgent()
+			if agent == nil {
+				return fmt.Errorf("no active agent found; run 'gllm init' to create one first")
+			}
+			return runInstructionWizard(agent)
+		case "both":
+			// fall through to run the full agent wizard, then append instruction wizard at the end
+		case "agent":
+			// fall through to run the full agent wizard only
+		}
 	}
 
 	// Group 1: Provider selection
@@ -384,5 +420,140 @@ func RunInitWizard() error {
 	fmt.Printf("✅ Configuration saved to %s\n", store.ConfigFileUsed())
 	fmt.Printf("🎉 You are ready to go! Try running: gllm \"Hello World\"\n")
 
+	// Offer GLLM.md generation after a successful agent save.
+	// We re-fetch the agent so the caller always gets the freshly persisted config.
+	newAgentConfig := store.GetAgent(agentName)
+	if newAgentConfig == nil {
+		return nil // shouldn't happen; fail gracefully without blocking the happy path
+	}
+
+	var wantInstruction bool
+	_ = huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Generate Instruction File (GLLM.md)?").
+				Description("GLLM.md is used to provide project-specific context and rules.").
+				Value(&wantInstruction),
+		),
+	).Run()
+
+	if wantInstruction {
+		if err := runInstructionWizard(newAgentConfig); err != nil {
+			fmt.Printf("⚠️  Instruction file generation skipped: %v\n", err)
+		}
+	}
+
 	return nil
+}
+
+// runInstructionWizard handles the GLLM.md sub-wizard:
+//  1. Prompt for storage location (local vs global), annotated with CREATE / UPDATE.
+//  2. Generate content via service.GenerateInstructionContent (sync LLM call).
+//  3. Show generated content for review.
+//  4. On confirmation, write the file using os.WriteFile.
+//
+// agentConfig must be the fully resolved active agent (used for provider dispatch).
+func runInstructionWizard(agentConfig *data.AgentConfig) error {
+	height := io.GetTermFitHeight(8)
+
+	var storageChoice string
+	localLabel := fmt.Sprintf("Local — ./GLLM.md %s", existsLabel(data.LocalInstructionFileExists()))
+	globalLabel := fmt.Sprintf("Global — %s %s", data.GetGlobalInstructionFilePath(), existsLabel(data.GlobalInstructionFileExists()))
+
+	err := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Where to store GLLM.md?").
+				Description("Local applies to this project only. Global applies to all projects.").
+				Options(
+					huh.NewOption(localLabel, "local"),
+					huh.NewOption(globalLabel, "global"),
+				).
+				Value(&storageChoice),
+		).WithHeight(height),
+	).Run()
+	if err != nil {
+		return err
+	}
+
+	var targetPath string
+	switch storageChoice {
+	case "global":
+		targetPath = data.GetGlobalInstructionFilePath()
+	default:
+		targetPath = data.GetLocalInstructionFilePath()
+	}
+
+	// Resolve to an absolute path for clear user-facing output.
+	if abs, err := filepath.Abs(targetPath); err == nil {
+		targetPath = abs
+	}
+
+	// fmt.Printf("\n🔍 Scanning project context...\n")
+
+	// Start spinner — ui.GetIndicator() is standalone; no event bus required.
+	indicator := ui.GetIndicator()
+	indicator.Start(ui.IndicatorGenInstruction)
+
+	content, genErr := service.GenerateInstructionContent(agentConfig)
+
+	indicator.Stop()
+
+	if genErr != nil {
+		return fmt.Errorf("generation failed: %w", genErr)
+	}
+
+	// Render the generated Markdown so the user can review it before committing to save.
+	fmt.Println()
+	fmt.Println(strings.Repeat("─", 60))
+	glamourStyle := data.MostSimilarGlamourStyle()
+	if tr, err := glamour.NewTermRenderer(glamour.WithStandardStyle(glamourStyle)); err == nil {
+		if rendered, err := tr.Render(content); err == nil {
+			fmt.Print(rendered)
+		} else {
+			fmt.Println(content) // graceful fallback
+		}
+	} else {
+		fmt.Println(content) // graceful fallback
+	}
+	fmt.Println(strings.Repeat("─", 60))
+	fmt.Println()
+
+	var saveConfirm bool
+	err = huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title(fmt.Sprintf("Save to %s?", targetPath)).
+				Affirmative("Save").
+				Negative("Discard").
+				Value(&saveConfirm),
+		),
+	).Run()
+	if err != nil {
+		return err
+	}
+
+	if !saveConfirm {
+		fmt.Println("Discarded — no file written.")
+		return nil
+	}
+
+	// WriteInstructionFile writes content to the given instruction file path,
+	// creating any missing parent directories along the way.
+	// This is the single authoritative write path for all GLLM.md I/O.
+	if err := util.WriteFileContent(targetPath, content); err != nil {
+		return err
+	}
+
+	fmt.Printf("✅ GLLM.md written to %s\n", targetPath)
+	return nil
+}
+
+// existsLabel returns a short annotation for the storage-location picker,
+// indicating whether the file will be created fresh or overwritten.
+func existsLabel(exists bool) string {
+	if exists {
+		return "(exists — will UPDATE)"
+	}
+	return "(will CREATE)"
 }

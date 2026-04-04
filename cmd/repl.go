@@ -121,7 +121,7 @@ func (ri *ReplInfo) printWelcome() {
 		BorderForeground(lipgloss.Color(data.BorderHex)).
 		Width(safeWidth).
 		Margin(0, 1).
-		Padding(1, 1)
+		Padding(0, 1)
 
 	innerWidth := safeWidth - borderStyle.GetHorizontalFrameSize()
 
@@ -138,7 +138,8 @@ func (ri *ReplInfo) printWelcome() {
 		Foreground(lipgloss.Color(data.KeyHex)).
 		Width(leftWidth).
 		Align(lipgloss.Center).
-		Padding(0, 1).
+		Padding(1, 1, 0, 1).
+		Margin(0, 0, 0, 0).
 		Render(welcomeText)
 
 	// --- Right panel: instructions ---

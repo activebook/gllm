@@ -67,6 +67,16 @@ func GetFileContent(filePath string) (string, error) {
 	return string(data), nil
 }
 
+func WriteFileContent(path, content string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
+		return fmt.Errorf("failed to create directory for file: %w", err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+	return nil
+}
+
 func GenerateTempFileName() string {
 	// Get the default session name from the config
 	// This is a placeholder function. Replace with actual logic to get the default name.
