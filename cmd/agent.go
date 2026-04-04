@@ -916,7 +916,8 @@ func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
 		fmt.Printf("%sSystem Prompt: \n\n", spaceholder)
 	}
 
-	fmt.Printf("%sThink: %v\n", spaceholder, agent.Think)
+	level := service.ParseThinkingLevel(agent.Think)
+	fmt.Printf("%sThinking Level: %s\n\n", spaceholder, level.Display())
 
 	fmt.Printf("%sTools:\n", spaceholder)
 	toolsList := GetAllTools(agent)

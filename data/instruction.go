@@ -49,3 +49,15 @@ func GetInstructionContent() string {
 
 	return strings.TrimSpace(content.String())
 }
+
+// LocalInstructionFileExists reports whether ./GLLM.md exists in the current working directory.
+func LocalInstructionFileExists() bool {
+	_, err := os.Stat(GetLocalInstructionFilePath())
+	return err == nil
+}
+
+// GlobalInstructionFileExists reports whether the global GLLM.md exists in the config directory.
+func GlobalInstructionFileExists() bool {
+	_, err := os.Stat(GetGlobalInstructionFilePath())
+	return err == nil
+}

@@ -36,6 +36,7 @@ const (
 	IndicatorRenamingSession    = "Renaming session..."
 	IndicatorCheckingUpdate     = "Checking for updates..."
 	IndicatorInstallingUpdate   = "Downloading and installing..."
+	IndicatorGenInstruction     = "Generating GLLM.md ..."
 )
 
 // WhimsicalProcessingWords is a collection of fun, playful processing indicators
