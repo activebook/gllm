@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/activebook/gllm/data"
-	anthopic "github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go"
 	openai "github.com/openai/openai-go/v3"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"github.com/volcengine/volcengine-go-sdk/volcengine"
@@ -90,12 +90,12 @@ func GenerateSessionName(modelConfig *data.AgentConfig, sessionData []byte) (str
 		raw, err = ag.GenerateOpenAISync(send, RenameSystemPrompt)
 
 	case ModelProviderAnthropic:
-		var messages []anthopic.MessageParam
+		var messages []anthropic.MessageParam
 		if err = parseJSONL(sessionData, &messages); err != nil {
 			return "", fmt.Errorf("failed to parse Anthropic session for rename: %w", err)
 		}
-		send := append(make([]anthopic.MessageParam, 0, len(messages)+1), messages...)
-		send = append(send, anthopic.NewUserMessage(anthopic.NewTextBlock(RenamePromptFormat)))
+		send := append(make([]anthropic.MessageParam, 0, len(messages)+1), messages...)
+		send = append(send, anthropic.NewUserMessage(anthropic.NewTextBlock(RenamePromptFormat)))
 		raw, err = ag.GenerateAnthropicSync(send, RenameSystemPrompt)
 
 	case ModelProviderGemini:

@@ -43,7 +43,7 @@ var (
 		"/attach":   "Attach file(s) or URL(s)",
 		"/detach":   "Detach file(s) or URL(s), or 'all'",
 		"/copy":     "Copy the last result or code snippet to clipboard",
-		"/about":    "Show current settings",
+		"/about":    "Show current session settings",
 		"/theme":    "Manage and switch themes",
 		"/verbose":  "Toggle verbose mode",
 		"/workflow": "Manage workflow commands",
@@ -347,7 +347,10 @@ func (ri *ReplInfo) showInfo() {
 		fmt.Printf("%s%s%s\n", data.SectionColor, fullTitle, data.ResetSeq)
 	}
 
-	printSection("CURRENT SETTINGS")
+	printSection("CURRENT SESSION")
+
+	// Session Name
+	fmt.Printf("Name: %s%s%s\n", data.KeyColor, sessionName, data.ResetSeq)
 
 	// Memory section (included in system prompt)
 	// printSection("Memory")
