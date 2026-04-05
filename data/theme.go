@@ -110,6 +110,7 @@ var (
 	PlanModeHex string
 	YoloModeHex string
 
+	WarnStatusHex       string
 	BackgroundStatusHex string
 
 	// Functional Helpers (for backwards compatibility or convenience)
@@ -260,6 +261,7 @@ func applyTheme(t goghthemes.Theme) {
 	PlanModeHex = t.BrightMagenta
 	YoloModeHex = t.BrightRed
 
+	StatusWarnColor = t.Yellow
 	BackgroundStatusHex = t.Foreground
 }
 

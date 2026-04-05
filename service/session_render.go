@@ -16,31 +16,69 @@ import (
 )
 
 // RenderSessionHistory loads and formats existing messages when resuming a REPL session.
-func RenderSessionHistory(agent *data.AgentConfig, name string) string {
+func RenderSessionHistory(agent *data.AgentConfig, name string) (content, notice string, err error) {
 	if name == "" {
-		return ""
+		return "", "", nil
 	}
 
 	sessionData, err := ReadSessionContent(name)
 	if err != nil || len(bytes.TrimSpace(sessionData)) == 0 {
-		return "" // brand-new session or unreadable file — start fresh silently
+		return "", "", nil // brand-new session or unreadable file — start fresh silently
 	}
 
-	_, provider, _ := CheckSessionFormat(agent, sessionData)
-	if provider == ModelProviderUnknown {
-		return ""
+	isCompatible, provider, modelProvider := CheckSessionFormat(agent, sessionData)
+	if !isCompatible {
+		notice = fmt.Sprintf("Session '%s' is a [%s] transcript - continuing via [%s] need to transform format.", name, provider, modelProvider)
 	}
 
 	switch provider {
 	case ModelProviderGemini:
-		return renderGeminiSessionHistory(sessionData)
+		content = renderGeminiSessionHistory(sessionData)
 	case ModelProviderAnthropic:
-		return renderAnthropicSessionHistory(sessionData)
+		content = renderAnthropicSessionHistory(sessionData)
 	case ModelProviderOpenAI, ModelProviderOpenAICompatible:
-		return renderOpenAISessionHistory(sessionData)
+		content = renderOpenAISessionHistory(sessionData)
 	default:
-		return ""
+		content = ""
+		err = fmt.Errorf("can't render session, unknown provider: '%s'", provider)
 	}
+	return content, notice, err
+}
+
+// RenderSessionForViewport reads, validates, and renders a session for the TUI viewport.
+// It consolidates all read/check/render logic so the caller only needs one call.
+// Returns the detected provider (for use as a viewport label), rendered content, and any error.
+func RenderSessionForViewport(agent *data.AgentConfig, name string) (provider, content, notice string, err error) {
+	if name == "" {
+		return "", "", "", fmt.Errorf("no available session yet")
+	}
+
+	sessionData, readErr := ReadSessionContent(name)
+	if readErr != nil {
+		return "", "", "", readErr
+	}
+	if len(bytes.TrimSpace(sessionData)) == 0 {
+		return "", "", "", fmt.Errorf("no available session yet")
+	}
+
+	isCompatible, detectedProvider, modelProvider := CheckSessionFormat(agent, sessionData)
+	if !isCompatible {
+		notice = fmt.Sprintf("Session '%s' is a [%s] transcript - continuing via [%s] need to transform format.", name, detectedProvider, modelProvider)
+	}
+
+	switch detectedProvider {
+	case ModelProviderGemini:
+		content = RenderGeminiSessionLog(sessionData)
+	case ModelProviderOpenAI, ModelProviderOpenAICompatible:
+		content = RenderOpenAISessionLog(sessionData)
+	case ModelProviderAnthropic:
+		content = RenderAnthropicSessionLog(sessionData)
+	default:
+		content = ""
+		err = fmt.Errorf("can't render session, unknown provider: '%s'", detectedProvider)
+	}
+
+	return detectedProvider, content, notice, err
 }
 
 // -------------------------------------------------------------------------
@@ -108,7 +146,7 @@ func renderThinkingBlock(content string) string {
 	var sb strings.Builder
 	sb.WriteString(data.ReasoningTagColor + "Thinking ↓" + data.ResetSeq + "\n")
 	for _, line := range strings.Split(strings.TrimSpace(content), "\n") {
-		sb.WriteString(data.ReasoningTextColor + "  " + line + data.ResetSeq + "\n")
+		sb.WriteString(data.ReasoningTextColor + line + data.ResetSeq + "\n")
 	}
 	sb.WriteString(data.ReasoningTagColor + "✓" + data.ResetSeq + "\n")
 	return sb.String()
@@ -177,7 +215,7 @@ func renderGeminiSessionHistory(input []byte) string {
 		}
 
 		switch msg.Role {
-		case "user":
+		case gemini.RoleUser:
 			var userText []string
 			for _, part := range msg.Parts {
 				if part.Text != "" {

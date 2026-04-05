@@ -212,12 +212,12 @@ func getModelUpdatedBanner(modelKey string, modelName string, contextLength int,
 	style := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(data.UpdateModelSuccessHex)).
 		Bold(true)
-	return style.Render(fmt.Sprintf("* Model %s updated: context_length=%d, max_completion_tokens=%d for %s", modelKey, contextLength, maxOutput, modelName))
+	return style.Render(fmt.Sprintf("✓ Model %s updated: context_length=%d, max_completion_tokens=%d for %s", modelKey, contextLength, maxOutput, modelName))
 }
 
 func getModelFailedBanner(modelKey string, err error) string {
 	style := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(data.UpdateModelFailedHex)).
 		Bold(true)
-	return style.Render(fmt.Sprintf("* Model %s update failed: %v", modelKey, err))
+	return style.Render(fmt.Sprintf("✗ Model %s update failed: %v", modelKey, err))
 }

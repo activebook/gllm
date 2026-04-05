@@ -13,6 +13,7 @@ import (
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/event"
 	"github.com/activebook/gllm/util"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -124,8 +125,7 @@ func (mc *MCPClient) PreloadAsync(servers map[string]*data.MCPServer, option MCP
 		event.SendStatus("Loading MCP servers...")
 		err := mc.Init(servers, option)
 		if err != nil {
-			status := fmt.Sprintf("MCP Error: %v", err)
-			event.SendStatus(status)
+			event.SendBanner(getMCPFialedBanner(err))
 		} else {
 			mc.mu.Lock()
 			count := len(mc.toolToSession)
@@ -133,6 +133,13 @@ func (mc *MCPClient) PreloadAsync(servers map[string]*data.MCPServer, option MCP
 			event.SendStatus(fmt.Sprintf("MCP Loaded: %d servers %d tools", len(mc.connected), count))
 		}
 	}()
+}
+
+func getMCPFialedBanner(err error) string {
+	style := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(data.WarnStatusHex)).
+		Bold(true)
+	return style.Render(fmt.Sprintf("▲ Warning: %v", err))
 }
 
 // three types of transports supported:

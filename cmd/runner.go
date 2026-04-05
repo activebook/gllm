@@ -42,7 +42,7 @@ func EnsureActiveAgent() (*data.AgentConfig, error) {
 }
 
 // RunAgent executes the agent with the given parameters, handling all setup and compatibility checks.
-func RunAgent(prompt string, files []*service.FileData, sessionName string, outputFile string, inputState *data.SharedState) error {
+func RunAgent(prompt string, guideline string, files []*service.FileData, sessionName string, outputFile string, inputState *data.SharedState) error {
 	// Start VSCode event bus if the plugin is enabled
 	service.StartVSCodeEventBus()
 
@@ -78,7 +78,7 @@ func RunAgent(prompt string, files []*service.FileData, sessionName string, outp
 		}
 
 		// Build Final Prompt (Input + @ Processing)
-		finalPrompt := buildFinalPrompt(prompt)
+		finalPrompt := buildFinalPrompt(prompt, guideline)
 
 		// Load MCP config
 		mcpStore := data.NewMCPStore()
@@ -148,7 +148,7 @@ func RunAgent(prompt string, files []*service.FileData, sessionName string, outp
 }
 
 // buildFinalPrompt combines user input, injects registered context providers, and processes @ references
-func buildFinalPrompt(input string) string {
+func buildFinalPrompt(input string, guideline string) string {
 	tb := TextBuilder{}
 	var contextBlobs []string
 
@@ -165,12 +165,17 @@ func buildFinalPrompt(input string) string {
 		util.Warnf("Skip processing @ references in prompt: %v\n", err)
 	}
 
-	// 3. Put all context into an inline hidden block
+	// 3. Optional: Add guideline as a special context blob if present
+	if guideline != "" {
+		contextBlobs = append(contextBlobs, guideline)
+	}
+
+	// 4. Put all context into an inline hidden block
 	if len(contextBlobs) > 0 {
 		tb.appendText(service.BuildInlineContextBlock(contextBlobs))
 	}
 
-	// 4. Finally append the unmodified user prompt
+	// 5. Finally append the unmodified user prompt
 	tb.appendText(input)
 
 	return tb.String()

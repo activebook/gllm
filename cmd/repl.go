@@ -105,7 +105,7 @@ type ReplInfo struct {
 	Files          []*service.FileData
 	QuitFlag       bool     // for cmd /quit or /exit
 	EditorInput    string   // for /e editor edit
-	Instruction    string   // for underlying system instructions (e.g. skill activation)
+	Guideline      string   // for underlying guideline (e.g. skill activation)
 	History        []string // for input history
 	outputFile     string
 	sharedState    *data.SharedState // Persistent SharedState for the session
@@ -142,27 +142,18 @@ func (ri *ReplInfo) printWelcome() {
 		Margin(0, 0, 0, 0).
 		Render(welcomeText)
 
-	// --- Right panel: instructions ---
-	// maxCmdLen := 0
-	// for cmd := range replSpecMap {
-	// 	if len(cmd) > maxCmdLen {
-	// 		maxCmdLen = len(cmd)
-	// 	}
-	// }
-	// format := fmt.Sprintf("• %%-%ds : %%s", maxCmdLen)
-
-	instructions := []string{}
+	specs := []string{}
 	for cmd, desc := range replSpecMap {
-		instructions = append(instructions, fmt.Sprintf("• %s: %s", cmd, desc))
+		specs = append(specs, fmt.Sprintf("• %s: %s", cmd, desc))
 	}
-	sort.Strings(instructions)
+	sort.Strings(specs)
 
 	rightContent := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(data.LabelHex)).
 		Width(rightWidth).
 		Align(lipgloss.Left).
 		Padding(0, 0, 0, 2).
-		Render(strings.Join(instructions, "\n"))
+		Render(strings.Join(specs, "\n"))
 
 	// --- Combine panels horizontally ---
 	inner := lipgloss.JoinHorizontal(
@@ -253,33 +244,6 @@ func (ri *ReplInfo) awaitInput() (string, error) {
 	ri.History = result.History
 
 	return result.Value, nil
-}
-
-// printSessionHistory loads and renders existing messages when resuming a session.
-// It is a no-op when the session is brand-new (no data on disk) or when
-// the session name is empty (anonymous single-turn mode).
-func (ri *ReplInfo) printSessionHistory() {
-	if sessionName == "" {
-		return
-	}
-	agent, err := EnsureActiveAgent()
-	if err != nil {
-		return
-	}
-
-	rendered := service.RenderSessionHistory(agent, sessionName)
-	if rendered == "" {
-		return
-	}
-
-	// Print a subtle divider so the user understands they are seeing history
-	dividerStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(data.LabelHex)).
-		Italic(true)
-	fmt.Println(dividerStyle.Render("── Resuming session: " + sessionName + " ──"))
-	fmt.Println()
-	fmt.Print(rendered)
-	fmt.Println()
 }
 
 // getChatInputHooks returns the hooks required for the chat input UI.
@@ -431,44 +395,57 @@ func (ri *ReplInfo) clearContext() {
 	fmt.Printf("Context cleared.\n")
 }
 
-// showHistory displays session history using TUI viewport
-func (ri *ReplInfo) showHistory() {
-	// Get active agent
+// printSessionHistory loads and renders existing messages when resuming a session.
+// It is a no-op when the session is brand-new (no data on disk) or when
+// the session name is empty (anonymous single-turn mode).
+func (ri *ReplInfo) printSessionHistory() {
+	if sessionName == "" {
+		return
+	}
+	agent, err := EnsureActiveAgent()
+	if err != nil {
+		return
+	}
+
+	rendered, notice, err := service.RenderSessionHistory(agent, sessionName)
+	if err != nil {
+		util.Errorf("%v\n", err)
+		return
+	}
+	if util.IsEmpty(rendered) {
+		return
+	}
+
+	// Print a subtle divider so the user understands they are seeing history
+	dividerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(data.LabelHex)).
+		Italic(true)
+	fmt.Println(dividerStyle.Render("── Resuming session: " + sessionName + " ──"))
+	fmt.Println()
+	fmt.Print(rendered)
+	fmt.Println()
+
+	// Print notice at the end if any
+	if !util.IsEmpty(notice) {
+		util.Warnf("%v\n", notice)
+	}
+}
+
+// viewSessionHistory displays session history using TUI viewport
+func (ri *ReplInfo) viewSessionHistory() {
 	agent, err := EnsureActiveAgent()
 	if err != nil {
 		util.Errorf("%v\n", err)
 		return
 	}
 
-	// Get session data
-	sessionData, err := service.ReadSessionContent(sessionName)
+	provider, content, notice, err := service.RenderSessionForViewport(agent, sessionName)
 	if err != nil {
-		if os.IsNotExist(err) {
-			fmt.Println("No available session yet.")
-			return
-		}
 		util.Errorf("%v\n", err)
 		return
 	}
-
-	// Detect provider based on message format
-	isCompatible, provider, modelProvider := service.CheckSessionFormat(agent, sessionData)
-	if !isCompatible {
-		// Warn about potential incompatibility if providers differ
-		util.Warnf("Session '%s' [%s] is not compatible with the current model provider [%s].\n", sessionName, provider, modelProvider)
-	}
-
-	// Render session log
-	var content string
-	switch provider {
-	case service.ModelProviderGemini:
-		content = service.RenderGeminiSessionLog(sessionData)
-	case service.ModelProviderOpenAI, service.ModelProviderOpenAICompatible:
-		content = service.RenderOpenAISessionLog(sessionData)
-	case service.ModelProviderAnthropic:
-		content = service.RenderAnthropicSessionLog(sessionData)
-	default:
-		fmt.Println("No available session yet.")
+	// If content is empty, return
+	if util.IsEmpty(content) {
 		return
 	}
 
@@ -482,6 +459,11 @@ func (ri *ReplInfo) showHistory() {
 	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
 		util.Errorf("Error running viewport: %v\n", err)
+	}
+
+	// Print notice after close the view if any
+	if !util.IsEmpty(notice) {
+		util.Warnf("%v\n", notice)
 	}
 }
 
@@ -623,13 +605,14 @@ func (ri *ReplInfo) copyLastMessage() {
 
 func (ri *ReplInfo) callAgent(input string) {
 	prompt := input
-	if ri.Instruction != "" {
-		prompt = fmt.Sprintf("<instruction>\n%s\n</instruction>\n\n<user-request>%s</user-request>", ri.Instruction, input)
-		ri.Instruction = "" // Clear it after use
+	guideline := ""
+	if ri.Guideline != "" {
+		guideline = fmt.Sprintf("<guideline>%s</guideline>", ri.Guideline)
+		ri.Guideline = "" // Clear it after use
 	}
 
 	// Call agent using the shared runner, passing persisted SharedState
-	err := RunAgent(prompt, ri.Files, sessionName, ri.outputFile, ri.sharedState)
+	err := RunAgent(prompt, guideline, ri.Files, sessionName, ri.outputFile, ri.sharedState)
 	if err != nil {
 		util.Errorf("%v\n", err)
 		return

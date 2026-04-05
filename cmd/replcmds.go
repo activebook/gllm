@@ -189,7 +189,7 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 	case "/history":
 		// Arguments (num, chars) are deprecated/ignored in viewport mode
 		// We could implement "--raw" here later
-		ri.showHistory()
+		ri.viewSessionHistory()
 
 	case "/clear":
 		ri.clearContext()
@@ -615,8 +615,8 @@ func (ri *ReplInfo) executeSkill(command string, parts []string) bool {
 		userArgs = strings.Join(parts[1:], " ")
 	}
 
-	// Construct the instruction to force skill activation
-	ri.Instruction = fmt.Sprintf("You need to activate the skill '%s' and follow its instructions to answer the user's request. Use tool 'activate_skill' with the skill name '%s'.", foundSkill.Name, foundSkill.Name)
+	// Construct the guideline to force skill activation
+	ri.Guideline = fmt.Sprintf("You need to activate the skill '%s' and follow its guidelines to answer the user's request. Use tool 'activate_skill' with the skill name '%s'.", foundSkill.Name, foundSkill.Name)
 
 	input := "/" + foundSkill.Name // Fallback to echo the command itself if no args
 	if userArgs != "" {
@@ -735,7 +735,7 @@ func switchSessionMode() {
 		ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModeNormal})
 	} else {
 		// back to normal
-		util.Warnln("Plan mode and yolo mode shouldn't be both turned on.")
+		util.Errorln("Plan mode and yolo mode shouldn't be both turned on.")
 		data.SetPlanModeInSession(false)
 		data.SetYoloModeInSession(false)
 		ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModeNormal})

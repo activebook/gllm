@@ -48,13 +48,13 @@ func StartBackgroundUpdateCheck() {
 		release, err := service.CheckLatest(version)
 		if err != nil {
 			ss.SetLastUpdateCheck(time.Now())
-			util.Warnf("Update check failed: %v\n", err)
+			UpdateWarn(err.Error())
 			return
 		}
 		// Always record the time so we don't hammer GitHub on every start.
 		_ = ss.SetLastUpdateCheck(time.Now())
 		if release.Newer {
-			ui.SendEvent(ui.BannerMsg{Text: getUpdateBanner(release.Version)})
+			UpdateVersion(release.Version)
 		}
 	}()
 }
@@ -107,12 +107,25 @@ func runUpdate(interactive bool) error {
 	return nil
 }
 
-// getUpdateBanner returns a non-intrusive update notification.
-func getUpdateBanner(latestVersion string) string {
+// updateVersion returns a non-intrusive update notification.
+func UpdateVersion(latestVersion string) {
 	style := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(data.UpdateAvailableHex)).
 		Bold(true)
-	return style.Render(fmt.Sprintf("⬆ Update available: %s → %s  (type /update to install)", version, latestVersion))
+	text := style.Render(fmt.Sprintf("⬆ Update available: %s → %s  (type /update to install)", version, latestVersion))
+	ui.SendEvent(ui.BannerMsg{Text: text})
+}
+
+// UpdateWarnBanner sends a warning banner to the UI
+// The chatinput must be there to receive the banner message
+// Otherwise the banner will be lost
+// Use for background goroutine warning
+func UpdateWarn(warn string) {
+	style := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(data.WarnStatusHex)).
+		Bold(true)
+	text := style.Render(fmt.Sprintf("▲ Warning: %s", warn))
+	ui.SendEvent(ui.BannerMsg{Text: text})
 }
 
 // printAlternativeUpdateInstructions shows the platform-specific package
