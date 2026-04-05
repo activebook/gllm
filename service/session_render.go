@@ -49,13 +49,55 @@ func RenderSessionHistory(agent *data.AgentConfig, name string) string {
 
 func renderUserBlock(text string) string {
 	tcol := io.GetTerminalWidth()
+	// Strip out any inline context meant only for the model
+	cleanText := stripInlineContext(text)
+
 	return lipgloss.NewStyle().
 		Background(lipgloss.Color(data.CurrentTheme.Background)).
 		Foreground(lipgloss.Color(data.CurrentTheme.Foreground)).
 		Width(tcol).
 		Padding(1, 2).
 		Margin(0, 0, 1, 0).
-		Render(text)
+		Render(cleanText)
+}
+
+const InlineContextStart = "\x02GLLM-INLINE-CTX\x02\n"
+const InlineContextEnd = "\n\x03GLLM-INLINE-CTX\x03\n"
+
+// BuildInlineContextBlock takes an array of context string blobs and safely
+// wraps them in invisible formatting bounds so they don't appear in UI history
+func BuildInlineContextBlock(blobs []string) string {
+	if len(blobs) == 0 {
+		return ""
+	}
+	var tb strings.Builder
+	tb.WriteString(InlineContextStart)
+	for i, blob := range blobs {
+		if i > 0 {
+			tb.WriteString("\n\n")
+		}
+		tb.WriteString(blob)
+	}
+	tb.WriteString(InlineContextEnd)
+	return tb.String()
+}
+
+func stripInlineContext(text string) string {
+	for {
+		start := strings.Index(text, InlineContextStart)
+		if start == -1 {
+			break
+		}
+		end := strings.Index(text, InlineContextEnd)
+		if end == -1 || end < start {
+			// Malformed, just remove the start tag at minimum
+			text = text[:start] + text[start+len(InlineContextStart):]
+			continue
+		}
+		// Strip the entire block including the tags
+		text = text[:start] + strings.TrimSpace(text[end+len(InlineContextEnd):])
+	}
+	return text
 }
 
 func renderMediaTag(tag string) string {
@@ -135,7 +177,7 @@ func renderGeminiSessionHistory(input []byte) string {
 		}
 
 		switch msg.Role {
-		case gemini.RoleUser:
+		case "user":
 			var userText []string
 			for _, part := range msg.Parts {
 				if part.Text != "" {
@@ -158,6 +200,7 @@ func renderGeminiSessionHistory(input []byte) string {
 					}
 				}
 			}
+
 			if len(userText) > 0 {
 				sb.WriteString(renderUserBlock(strings.Join(userText, "\n")))
 				sb.WriteString("\n")
@@ -222,6 +265,7 @@ func renderAnthropicSessionHistory(input []byte) string {
 					// silently skip user tool results
 				}
 			}
+
 			if len(userText) > 0 {
 				sb.WriteString(renderUserBlock(strings.Join(userText, "\n")))
 				sb.WriteString("\n")
@@ -298,6 +342,7 @@ func renderOpenAISessionHistory(input []byte) string {
 					}
 				}
 			}
+
 			if len(userText) > 0 {
 				sb.WriteString(renderUserBlock(strings.Join(userText, "\n")))
 				sb.WriteString("\n")

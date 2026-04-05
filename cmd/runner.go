@@ -150,25 +150,30 @@ func RunAgent(prompt string, files []*service.FileData, sessionName string, outp
 // buildFinalPrompt combines user input, injects registered context providers, and processes @ references
 func buildFinalPrompt(input string) string {
 	tb := TextBuilder{}
+	var contextBlobs []string
 
-	// Collect context from all registered providers (e.g. VSCode Companion, future plugins)
+	// 1. Collect context from all registered providers (e.g. VSCode Companion, future plugins)
 	if ctx := service.NewContextHooks().Collect(); ctx != "" {
-		tb.appendText(ctx)
-		tb.appendText("\n---\n\n")
+		contextBlobs = append(contextBlobs, ctx)
 	}
 
-	// Add user input
+	// 2. Collect @ reference context from the user input
+	atRefProcessor := service.NewAtRefProcessor()
+	if atCtx, err := atRefProcessor.ParseAndCollect(input); err == nil && atCtx != "" {
+		contextBlobs = append(contextBlobs, atCtx)
+	} else if err != nil {
+		util.Warnf("Skip processing @ references in prompt: %v\n", err)
+	}
+
+	// 3. Put all context into an inline hidden block
+	if len(contextBlobs) > 0 {
+		tb.appendText(service.BuildInlineContextBlock(contextBlobs))
+	}
+
+	// 4. Finally append the unmodified user prompt
 	tb.appendText(input)
 
-	// Inject @ references
-	rawPrompt := tb.String()
-	atRefProcessor := service.NewAtRefProcessor()
-	processedPrompt, err := atRefProcessor.ProcessText(rawPrompt)
-	if err != nil {
-		util.Warnf("Skip processing @ references in prompt: %v\n", err)
-		return rawPrompt
-	}
-	return processedPrompt
+	return tb.String()
 }
 
 // BatchAttachments processes multiple attachments concurrently and adds the resulting
