@@ -301,6 +301,7 @@ func renderAnthropicSessionHistory(input []byte) string {
 					userText = append(userText, renderMediaTag("Document"))
 				} else if block.OfToolResult != nil {
 					// silently skip user tool results
+					// Anthropic encapsulates tool results within a user role message.
 				}
 			}
 
@@ -355,7 +356,8 @@ func renderOpenAISessionHistory(input []byte) string {
 		}
 
 		if msg.Role == model.ChatMessageRoleSystem || msg.Role == model.ChatMessageRoleTool || msg.Role == "function" {
-			// silently skip
+			// silently skip system, tool(tool response), function(tool response)
+			// We don't need to show them
 			continue
 		}
 

@@ -19,7 +19,7 @@ type GeminiSession struct {
 
 // consolidateTextParts merges consecutive text parts to reduce fragmentation
 // from streaming responses while preserving non-text parts (function calls, etc.)
-// 
+//
 // The logic operates as follows:
 // 1. Gemini text can be split into multiple small parts during streaming, so we must combine them together.
 // 2. The complex part is that "thought" text (reasoning output) is also streamed as text parts with a Thought bool flag.
@@ -55,6 +55,8 @@ func (s *GeminiSession) consolidateTextParts(parts []*genai.Part) []*genai.Part 
 				})
 				textBuffer = ""
 			}
+			// For those function call/response, we don't need to do anything
+			// The text buffer should be empty at this point
 			consolidated = append(consolidated, part)
 		}
 	}
