@@ -28,7 +28,7 @@ func RenderSessionHistory(agent *data.AgentConfig, name string) (content, notice
 
 	isCompatible, provider, modelProvider := CheckSessionFormat(agent, sessionData)
 	if !isCompatible {
-		notice = fmt.Sprintf("Session '%s' is a [%s] transcript - continuing via [%s] need to transform format.", name, provider, modelProvider)
+		notice = fmt.Sprintf("Session '%s' is formatted by [%s] - continuing via [%s] need to transform format.", name, provider, modelProvider)
 	}
 
 	switch provider {
@@ -63,7 +63,7 @@ func RenderSessionForViewport(agent *data.AgentConfig, name string) (provider, c
 
 	isCompatible, detectedProvider, modelProvider := CheckSessionFormat(agent, sessionData)
 	if !isCompatible {
-		notice = fmt.Sprintf("Session '%s' is a [%s] transcript - continuing via [%s] need to transform format.", name, detectedProvider, modelProvider)
+		notice = fmt.Sprintf("Session '%s' is formatted by [%s] - continuing via [%s] need to transform format.", name, detectedProvider, modelProvider)
 	}
 
 	switch detectedProvider {

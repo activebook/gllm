@@ -58,9 +58,6 @@ func RunAgent(prompt string, guideline string, files []*service.FileData, sessio
 	}
 
 	for {
-		// Start indeterminate progress bar
-		ui.GetIndicator().Start("")
-
 		// Get YOLO mode
 		yolo := data.GetYoloModeInSession()
 
@@ -71,11 +68,20 @@ func RunAgent(prompt string, guideline string, files []*service.FileData, sessio
 		}
 
 		// Ensure session compatibility
-		if sessionName != "" {
-			if err := service.EnsureSessionCompatibility(agent, sessionName); err != nil {
-				return err
-			}
+		hook := service.SessionConvertHook{
+			OnStartConvert: func() {
+				ui.GetIndicator().Start(ui.IndicatorConvertingSession)
+			},
+			OnFinishedConvert: func() {
+				ui.GetIndicator().Stop()
+			},
 		}
+		if err := service.EnsureSessionCompatibility(agent, sessionName, hook); err != nil {
+			return err
+		}
+
+		// Start indeterminate progress bar
+		ui.GetIndicator().Start("")
 
 		// Build Final Prompt (Input + @ Processing)
 		finalPrompt := buildFinalPrompt(prompt, guideline)
