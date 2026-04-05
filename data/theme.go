@@ -44,13 +44,13 @@ var (
 	StatusDebugColor   string
 
 	// Reasoning
-	ReasoningActiveColor string
-	ReasoningDoneColor   string
-	ReasoningOffColor    string
-	ReasoningMinColor    string
-	ReasoningLowColor    string
-	ReasoningMedColor    string
-	ReasoningHighColor   string
+	ReasoningTagColor  string
+	ReasoningTextColor string
+	ReasoningOffColor  string
+	ReasoningMinColor  string
+	ReasoningLowColor  string
+	ReasoningMedColor  string
+	ReasoningHighColor string
 
 	// UI & Interactive
 	SwitchOnColor     string
@@ -190,8 +190,8 @@ func applyTheme(t goghthemes.Theme) {
 	StatusDebugColor = toAnsi(t.BrightBlack) // Gray
 
 	// 4. Reasoning
-	ReasoningActiveColor = toAnsi(t.Green)
-	ReasoningDoneColor = toAnsi(t.BrightBlack) // Dimmed out
+	ReasoningTagColor = toAnsi(t.Green)
+	ReasoningTextColor = toAnsi(t.BrightBlack) // Dimmed out
 
 	// Reasoning Levels (Heatmap style)
 	ReasoningOffColor = toAnsi(t.BrightBlack)

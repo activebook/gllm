@@ -255,6 +255,33 @@ func (ri *ReplInfo) awaitInput() (string, error) {
 	return result.Value, nil
 }
 
+// printSessionHistory loads and renders existing messages when resuming a session.
+// It is a no-op when the session is brand-new (no data on disk) or when
+// the session name is empty (anonymous single-turn mode).
+func (ri *ReplInfo) printSessionHistory() {
+	if sessionName == "" {
+		return
+	}
+	agent, err := EnsureActiveAgent()
+	if err != nil {
+		return
+	}
+
+	rendered := service.RenderSessionHistory(agent, sessionName)
+	if rendered == "" {
+		return
+	}
+
+	// Print a subtle divider so the user understands they are seeing history
+	dividerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(data.LabelHex)).
+		Italic(true)
+	fmt.Println(dividerStyle.Render("── Resuming session: " + sessionName + " ──"))
+	fmt.Println()
+	fmt.Print(rendered)
+	fmt.Println()
+}
+
 // getChatInputHooks returns the hooks required for the chat input UI.
 func (ri *ReplInfo) getChatInputHooks(agent *data.AgentConfig) ui.ChatInputHooks {
 	return ui.ChatInputHooks{
@@ -300,6 +327,9 @@ func (ri *ReplInfo) startREPL() {
 
 	// Start the REPL
 	ri.printWelcome()
+
+	// Print session history if available
+	ri.printSessionHistory()
 
 	// Launch background update check (non-blocking).
 	// Only check once repl started
