@@ -61,35 +61,30 @@ func (p *AtRefProcessor) ParseAtReferences(text string) []AtReference {
 	return references
 }
 
-// ProcessReferences processes all @ references and returns augmented text
-func (p *AtRefProcessor) ProcessReferences(text string, references []AtReference) (string, error) {
+// CollectContext resolves all @ references and returns only the injected context
+// content — the resolved file/directory blobs. The caller is responsible for
+// assembling these into the final prompt alongside any other context sources.
+func (p *AtRefProcessor) CollectContext(references []AtReference) (string, error) {
 	if len(references) == 0 {
-		return text, nil
+		return "", nil
 	}
 
-	var result strings.Builder
-	result.WriteString(text)
-	result.WriteString("\n\n")
-
-	// Process each reference
+	var ctx strings.Builder
 	for i, ref := range references {
 		if i > 0 {
-			result.WriteString("\n")
+			ctx.WriteString("\n")
 		}
-
 		content, err := p.resolveReference(ref)
 		if err != nil {
-			// Include error information but continue processing
-			result.WriteString(fmt.Sprintf("=== Error processing %s ===\n", ref.Original))
-			result.WriteString(fmt.Sprintf("Error: %v\n\n", err))
+			ctx.WriteString(fmt.Sprintf("=== Error processing %s ===\n", ref.Original))
+			ctx.WriteString(fmt.Sprintf("Error: %v\n\n", err))
 			continue
 		}
-
-		result.WriteString(content)
+		ctx.WriteString(content)
 	}
-
-	return result.String(), nil
+	return ctx.String(), nil
 }
+
 
 // resolveReference resolves a single @ reference to its content
 func (p *AtRefProcessor) resolveReference(ref AtReference) (string, error) {
@@ -278,10 +273,12 @@ func (p *AtRefProcessor) shouldExclude(name string) bool {
 	return false
 }
 
-// ProcessText processes text containing @ references and returns augmented text
-func (p *AtRefProcessor) ProcessText(text string) (string, error) {
-	references := p.ParseAtReferences(text)
-	return p.ProcessReferences(text, references)
+// ParseAndCollect is a convenience method that parses @ references from text
+// and resolves them into an injectable context string.
+// Returns an empty string when no references are found.
+func (p *AtRefProcessor) ParseAndCollect(text string) (string, error) {
+	refs := p.ParseAtReferences(text)
+	return p.CollectContext(refs)
 }
 
 // SetMaxFileSize sets the maximum file size to include

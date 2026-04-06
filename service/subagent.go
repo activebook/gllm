@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -247,18 +248,21 @@ func (e *SubAgentExecutor) executeTask(agent *ActiveAgent, task *SubAgentTask) *
 	// Load MCP config
 	mcpConfig, _ := e.mcpStore.Load()
 
-	// Prepare input context from SharedState
+	// Prepare input context from SharedState: inject as a hidden inline block
+	// so it is preserved for the LLM but stripped from the session history UI.
 	finalInstruction := task.Instruction
 	if len(task.InputKeys) > 0 && e.state != nil {
-		finalInstruction += "\n\n# Context from previous tasks:\n"
+		var ctxBlob strings.Builder
+		ctxBlob.WriteString("# Context from previous tasks:\n")
 		for _, key := range task.InputKeys {
 			if val, ok := e.state.Get(key); ok {
 				contentStr := fmt.Sprintf("%v", val)
-				finalInstruction += fmt.Sprintf("\n## Output from '%s':\n%s\n", util.GetSanitizeTitle(key), contentStr)
+				ctxBlob.WriteString(fmt.Sprintf("\n## Output from '%s':\n%s\n", util.GetSanitizeTitle(key), contentStr))
 			} else {
 				util.Warnf("Sub-agent input key '%s' not found in SharedState, skipping.\n", key)
 			}
 		}
+		finalInstruction = BuildInlineContextBlock([]string{ctxBlob.String()}) + task.Instruction
 	}
 
 	// Prepare agent options

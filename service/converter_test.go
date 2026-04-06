@@ -121,11 +121,10 @@ func TestConvertMessages_SameProvider(t *testing.T) {
 	}
 }
 
-func TestConvertMessages_InlinesToolResults(t *testing.T) {
+func TestConvertMessages_PreservesToolCalls(t *testing.T) {
 	// OpenAI conversation with tool calls (JSONL format)
-	// The tool response content should be preserved, but the call itself ignored.
 	input := `{"role": "user", "content": "Search for cats"}
-{"role": "assistant", "tool_calls": [{"id": "1", "type": "function", "function": {"name": "search", "arguments": "{}"}}]}
+{"role": "assistant", "tool_calls": [{"id": "1", "type": "function", "function": {"name": "search", "arguments": "{\"q\":\"cat\"}"}}]}
 {"role": "tool", "tool_call_id": "1", "content": "Search results"}
 {"role": "assistant", "content": "Here are the results."}`
 
@@ -140,12 +139,37 @@ func TestConvertMessages_InlinesToolResults(t *testing.T) {
 		t.Fatalf("Result is not valid JSONL: %v", err)
 	}
 
-	// Should have 3 messages:
+	// Should have 4 messages:
 	// 1. user ("Search for cats")
-	// 2. user ("[Tool Result]:\nSearch results")
-	// 3. model ("Here are the results.")
-	if len(geminiMessages) != 3 {
-		t.Errorf("Expected 3 messages after conversion, got %d", len(geminiMessages))
+	// 2. model (FunctionCall search)
+	// 3. user (FunctionResponse search)
+	// 4. model ("Here are the results.")
+	if len(geminiMessages) != 4 {
+		t.Fatalf("Expected 4 messages after conversion, got %d", len(geminiMessages))
+	}
+
+	// Verify Message 2 (FunctionCall)
+	if geminiMessages[1]["role"] != "model" {
+		t.Errorf("Expected msg 2 role 'model', got '%v'", geminiMessages[1]["role"])
+	}
+	parts2 := geminiMessages[1]["parts"].([]interface{})
+	part2 := parts2[0].(map[string]interface{})
+	if _, hasFunc := part2["functionCall"]; !hasFunc {
+		t.Errorf("Expected functionCall in msg 2")
+	}
+
+	// Verify Message 3 (FunctionResponse)
+	if geminiMessages[2]["role"] != "user" {
+		t.Errorf("Expected msg 3 role 'user', got '%v'", geminiMessages[2]["role"])
+	}
+	parts3 := geminiMessages[2]["parts"].([]interface{})
+	part3 := parts3[0].(map[string]interface{})
+	funcResp, hasResp := part3["functionResponse"].(map[string]interface{})
+	if !hasResp {
+		t.Fatalf("Expected functionResponse in msg 3")
+	}
+	if funcResp["name"] != "search" {
+		t.Errorf("Expected functionResponse name 'search' (correlated), got '%v'", funcResp["name"])
 	}
 }
 

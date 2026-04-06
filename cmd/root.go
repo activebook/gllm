@@ -168,7 +168,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 
 			// Call your LLM service here
 			// Call agent using the shared runner, passing nil for SharedState (single turn)
-			err := RunAgent(prompt, files, sessionName, "", nil)
+			err := RunAgent(prompt, "", files, sessionName, "", nil)
 			if err != nil {
 				util.Errorf("%v\n", err)
 				return

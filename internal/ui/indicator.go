@@ -34,6 +34,7 @@ const (
 	IndicatorLoadingMCP         = "Loading MCP servers..."
 	IndicatorCompressingContext = "Compressing context..."
 	IndicatorRenamingSession    = "Renaming session..."
+	IndicatorConvertingSession  = "Converting session..."
 	IndicatorCheckingUpdate     = "Checking for updates..."
 	IndicatorInstallingUpdate   = "Downloading and installing..."
 	IndicatorGenInstruction     = "Generating GLLM.md ..."

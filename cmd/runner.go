@@ -42,7 +42,7 @@ func EnsureActiveAgent() (*data.AgentConfig, error) {
 }
 
 // RunAgent executes the agent with the given parameters, handling all setup and compatibility checks.
-func RunAgent(prompt string, files []*service.FileData, sessionName string, outputFile string, inputState *data.SharedState) error {
+func RunAgent(prompt string, guideline string, files []*service.FileData, sessionName string, outputFile string, inputState *data.SharedState) error {
 	// Start VSCode event bus if the plugin is enabled
 	service.StartVSCodeEventBus()
 
@@ -58,9 +58,6 @@ func RunAgent(prompt string, files []*service.FileData, sessionName string, outp
 	}
 
 	for {
-		// Start indeterminate progress bar
-		ui.GetIndicator().Start("")
-
 		// Get YOLO mode
 		yolo := data.GetYoloModeInSession()
 
@@ -71,14 +68,23 @@ func RunAgent(prompt string, files []*service.FileData, sessionName string, outp
 		}
 
 		// Ensure session compatibility
-		if sessionName != "" {
-			if err := service.EnsureSessionCompatibility(agent, sessionName); err != nil {
-				return err
-			}
+		hook := service.SessionConvertHook{
+			OnStartConvert: func() {
+				ui.GetIndicator().Start(ui.IndicatorConvertingSession)
+			},
+			OnFinishedConvert: func() {
+				ui.GetIndicator().Stop()
+			},
+		}
+		if err := service.EnsureSessionCompatibility(agent, sessionName, hook); err != nil {
+			return err
 		}
 
+		// Start indeterminate progress bar
+		ui.GetIndicator().Start("")
+
 		// Build Final Prompt (Input + @ Processing)
-		finalPrompt := buildFinalPrompt(prompt)
+		finalPrompt := buildFinalPrompt(prompt, guideline)
 
 		// Load MCP config
 		mcpStore := data.NewMCPStore()
@@ -148,27 +154,37 @@ func RunAgent(prompt string, files []*service.FileData, sessionName string, outp
 }
 
 // buildFinalPrompt combines user input, injects registered context providers, and processes @ references
-func buildFinalPrompt(input string) string {
+func buildFinalPrompt(input string, guideline string) string {
 	tb := TextBuilder{}
+	var contextBlobs []string
 
-	// Collect context from all registered providers (e.g. VSCode Companion, future plugins)
+	// 1. Collect context from all registered providers (e.g. VSCode Companion, future plugins)
 	if ctx := service.NewContextHooks().Collect(); ctx != "" {
-		tb.appendText(ctx)
-		tb.appendText("\n---\n\n")
+		contextBlobs = append(contextBlobs, ctx)
 	}
 
-	// Add user input
+	// 2. Collect @ reference context from the user input
+	atRefProcessor := service.NewAtRefProcessor()
+	if atCtx, err := atRefProcessor.ParseAndCollect(input); err == nil && atCtx != "" {
+		contextBlobs = append(contextBlobs, atCtx)
+	} else if err != nil {
+		util.Warnf("Skip processing @ references in prompt: %v\n", err)
+	}
+
+	// 3. Optional: Add guideline as a special context blob if present
+	if guideline != "" {
+		contextBlobs = append(contextBlobs, guideline)
+	}
+
+	// 4. Put all context into an inline hidden block
+	if len(contextBlobs) > 0 {
+		tb.appendText(service.BuildInlineContextBlock(contextBlobs))
+	}
+
+	// 5. Finally append the unmodified user prompt
 	tb.appendText(input)
 
-	// Inject @ references
-	rawPrompt := tb.String()
-	atRefProcessor := service.NewAtRefProcessor()
-	processedPrompt, err := atRefProcessor.ProcessText(rawPrompt)
-	if err != nil {
-		util.Warnf("Skip processing @ references in prompt: %v\n", err)
-		return rawPrompt
-	}
-	return processedPrompt
+	return tb.String()
 }
 
 // BatchAttachments processes multiple attachments concurrently and adds the resulting

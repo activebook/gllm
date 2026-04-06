@@ -51,8 +51,8 @@ var colorCmd = &cobra.Command{
 		printColor("StatusDebugColor", data.StatusDebugColor)
 
 		fmt.Println("\n-- Reasoning --")
-		printColor("ReasoningActiveColor", data.ReasoningActiveColor)
-		printColor("ReasoningDoneColor", data.ReasoningDoneColor)
+		printColor("ReasoningTagColor", data.ReasoningTagColor)
+		printColor("ReasoningTextColor", data.ReasoningTextColor)
 
 		printColor("ReasoningOffColor", data.ReasoningOffColor)
 		printColor("ReasoningLowColor", data.ReasoningLowColor)
