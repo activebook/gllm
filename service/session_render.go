@@ -8,6 +8,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/io"
+	"github.com/activebook/gllm/util"
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
@@ -337,7 +338,7 @@ func renderAnthropicSessionHistory(input []byte) string {
 }
 
 // -------------------------------------------------------------------------
-// OpenAI / OpenChat Renderer
+// OpenAI / OpenChat Renderer (They are compatible, we use openchat for convenient)
 // -------------------------------------------------------------------------
 
 func renderOpenAISessionHistory(input []byte) string {
@@ -388,21 +389,9 @@ func renderOpenAISessionHistory(input []byte) string {
 				sb.WriteString("\n")
 			}
 		case model.ChatMessageRoleAssistant:
+			var thinkingContent string
 			if msg.ReasoningContent != nil && *msg.ReasoningContent != "" {
-				sb.WriteString(renderThinkingBlock(*msg.ReasoningContent))
-				// sb.WriteString("\n")
-			}
-
-			if len(msg.ToolCalls) > 0 {
-				for _, tool := range msg.ToolCalls {
-					var rawArgs interface{}
-					// Try to unmarshal args if it's JSON text, otherwise pass as string
-					if err := json.Unmarshal([]byte(tool.Function.Arguments), &rawArgs); err != nil {
-						rawArgs = tool.Function.Arguments
-					}
-					sb.WriteString(renderToolCallBox(tool.Function.Name, rawArgs))
-					sb.WriteString("\n")
-				}
+				thinkingContent = *msg.ReasoningContent
 			}
 
 			var markdownBuf strings.Builder
@@ -418,8 +407,33 @@ func renderOpenAISessionHistory(input []byte) string {
 				}
 			}
 
-			if markdownBuf.Len() > 0 {
-				sb.WriteString(renderMarkdown(markdownBuf.String()))
+			mainText := markdownBuf.String()
+
+			if thinkingContent == "" && mainText != "" {
+				if extractedThink, cleanedText := util.ExtractThinkTags(mainText); extractedThink != "" {
+					thinkingContent = extractedThink
+					mainText = string(cleanedText)
+				}
+			}
+
+			if thinkingContent != "" {
+				sb.WriteString(renderThinkingBlock(thinkingContent))
+			}
+
+			if len(msg.ToolCalls) > 0 {
+				for _, tool := range msg.ToolCalls {
+					var rawArgs interface{}
+					// Try to unmarshal args if it's JSON text, otherwise pass as string
+					if err := json.Unmarshal([]byte(tool.Function.Arguments), &rawArgs); err != nil {
+						rawArgs = tool.Function.Arguments
+					}
+					sb.WriteString(renderToolCallBox(tool.Function.Name, rawArgs))
+					sb.WriteString("\n")
+				}
+			}
+
+			if mainText != "" {
+				sb.WriteString(renderMarkdown(mainText))
 			}
 		}
 	}
