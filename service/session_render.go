@@ -1,0 +1,442 @@
+package service
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/io"
+	"github.com/activebook/gllm/util"
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/lipgloss"
+	model "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
+	gemini "google.golang.org/genai"
+)
+
+// RenderSessionHistory loads and formats existing messages when resuming a REPL session.
+func RenderSessionHistory(agent *data.AgentConfig, name string) (content, notice string, err error) {
+	if name == "" {
+		return "", "", nil
+	}
+
+	sessionData, err := ReadSessionContent(name)
+	if err != nil || len(bytes.TrimSpace(sessionData)) == 0 {
+		return "", "", nil // brand-new session or unreadable file — start fresh silently
+	}
+
+	isCompatible, provider, modelProvider := CheckSessionFormat(agent, sessionData)
+	if !isCompatible {
+		notice = fmt.Sprintf("Session '%s' is formatted by [%s] - continuing via [%s] need to transform format.", name, provider, modelProvider)
+	}
+
+	switch provider {
+	case ModelProviderGemini:
+		content = renderGeminiSessionHistory(sessionData)
+	case ModelProviderAnthropic:
+		content = renderAnthropicSessionHistory(sessionData)
+	case ModelProviderOpenAI, ModelProviderOpenAICompatible:
+		content = renderOpenAISessionHistory(sessionData)
+	default:
+		content = ""
+		err = fmt.Errorf("can't render session, unknown provider: '%s'", provider)
+	}
+	return content, notice, err
+}
+
+// RenderSessionForViewport reads, validates, and renders a session for the TUI viewport.
+// It consolidates all read/check/render logic so the caller only needs one call.
+// Returns the detected provider (for use as a viewport label), rendered content, and any error.
+func RenderSessionForViewport(agent *data.AgentConfig, name string) (provider, content, notice string, err error) {
+	if name == "" {
+		return "", "", "", fmt.Errorf("no available session yet")
+	}
+
+	sessionData, readErr := ReadSessionContent(name)
+	if readErr != nil {
+		return "", "", "", readErr
+	}
+	if len(bytes.TrimSpace(sessionData)) == 0 {
+		return "", "", "", fmt.Errorf("no available session yet")
+	}
+
+	isCompatible, detectedProvider, modelProvider := CheckSessionFormat(agent, sessionData)
+	if !isCompatible {
+		notice = fmt.Sprintf("Session '%s' is formatted by [%s] - continuing via [%s] need to transform format.", name, detectedProvider, modelProvider)
+	}
+
+	switch detectedProvider {
+	case ModelProviderGemini:
+		content = RenderGeminiSessionLog(sessionData)
+	case ModelProviderOpenAI, ModelProviderOpenAICompatible:
+		content = RenderOpenAISessionLog(sessionData)
+	case ModelProviderAnthropic:
+		content = RenderAnthropicSessionLog(sessionData)
+	default:
+		content = ""
+		err = fmt.Errorf("can't render session, unknown provider: '%s'", detectedProvider)
+	}
+
+	return detectedProvider, content, notice, err
+}
+
+// -------------------------------------------------------------------------
+// Common Rendering Helpers
+// -------------------------------------------------------------------------
+
+func renderUserBlock(text string) string {
+	tcol := io.GetTerminalWidth()
+	// Strip out any inline context meant only for the model
+	cleanText := stripInlineContext(text)
+
+	return lipgloss.NewStyle().
+		Background(lipgloss.Color(data.CurrentTheme.Background)).
+		Foreground(lipgloss.Color(data.CurrentTheme.Foreground)).
+		Width(tcol).
+		Padding(1, 2).
+		Margin(0, 0, 1, 0).
+		Render(cleanText)
+}
+
+const InlineContextStart = "\x02GLLM-INLINE-CTX\x02\n"
+const InlineContextEnd = "\n\x03GLLM-INLINE-CTX\x03\n"
+
+// BuildInlineContextBlock takes an array of context string blobs and safely
+// wraps them in invisible formatting bounds so they don't appear in UI history
+func BuildInlineContextBlock(blobs []string) string {
+	if len(blobs) == 0 {
+		return ""
+	}
+	var tb strings.Builder
+	tb.WriteString(InlineContextStart)
+	for i, blob := range blobs {
+		if i > 0 {
+			tb.WriteString("\n\n")
+		}
+		tb.WriteString(blob)
+	}
+	tb.WriteString(InlineContextEnd)
+	return tb.String()
+}
+
+func stripInlineContext(text string) string {
+	for {
+		start := strings.Index(text, InlineContextStart)
+		if start == -1 {
+			break
+		}
+		end := strings.Index(text, InlineContextEnd)
+		if end == -1 || end < start {
+			// Malformed, just remove the start tag at minimum
+			text = text[:start] + text[start+len(InlineContextStart):]
+			continue
+		}
+		// Strip the entire block including the tags
+		text = text[:start] + strings.TrimSpace(text[end+len(InlineContextEnd):])
+	}
+	return text
+}
+
+func renderMediaTag(tag string) string {
+	return data.MediaColor + "[" + tag + "]" + data.ResetSeq
+}
+
+func renderThinkingBlock(content string) string {
+	var sb strings.Builder
+	sb.WriteString(data.ReasoningTagColor + "Thinking ↓" + data.ResetSeq + "\n")
+	for _, line := range strings.Split(strings.TrimSpace(content), "\n") {
+		sb.WriteString(data.ReasoningTextColor + line + data.ResetSeq + "\n")
+	}
+	sb.WriteString(data.ReasoningTagColor + "✓" + data.ResetSeq + "\n")
+	return sb.String()
+}
+
+func renderToolCallBox(name string, args interface{}) string {
+	tcol := io.GetTerminalWidth() - 8
+	style := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(data.BorderHex)).
+		Padding(0, 1)
+
+	titleStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(data.SectionHex)).Bold(true)
+
+	argsStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(data.DetailHex)).Width(tcol)
+
+	// extractFirstArg is a helper in agent_output.go that handles both maps and strings
+	detail := extractFirstArg(args)
+
+	var content string
+	if detail == "" {
+		content = titleStyle.Render(name)
+	} else {
+		content = fmt.Sprintf("%s\n%s", titleStyle.Render(name), argsStyle.Render(detail))
+	}
+
+	return style.Render(content)
+}
+
+func renderMarkdown(text string) string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return ""
+	}
+
+	tr, err := glamour.NewTermRenderer(glamour.WithStandardStyle(data.MostSimilarGlamourStyle()))
+	if err != nil {
+		tr, _ = glamour.NewTermRenderer(glamour.WithAutoStyle())
+	}
+	out, err := tr.Render(text)
+	if err != nil {
+		return text // fallback to raw
+	}
+	return out
+}
+
+// -------------------------------------------------------------------------
+// Gemini Renderer
+// -------------------------------------------------------------------------
+
+func renderGeminiSessionHistory(input []byte) string {
+	var sb strings.Builder
+	lines := bytes.Split(input, []byte("\n"))
+
+	for _, line := range lines {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+
+		var msg gemini.Content
+		if err := json.Unmarshal(line, &msg); err != nil {
+			continue
+		}
+
+		switch msg.Role {
+		case gemini.RoleUser:
+			var userText []string
+			for _, part := range msg.Parts {
+				if part.Text != "" {
+					userText = append(userText, part.Text)
+				} else if part.InlineData != nil {
+					if strings.HasPrefix(part.InlineData.MIMEType, "image/") {
+						userText = append(userText, renderMediaTag("Image"))
+					} else if strings.HasPrefix(part.InlineData.MIMEType, "audio/") {
+						userText = append(userText, renderMediaTag("Audio"))
+					} else {
+						userText = append(userText, renderMediaTag("Document"))
+					}
+				} else if part.FileData != nil {
+					if strings.HasPrefix(part.FileData.MIMEType, "image/") {
+						userText = append(userText, renderMediaTag("Image"))
+					} else if strings.HasPrefix(part.FileData.MIMEType, "audio/") {
+						userText = append(userText, renderMediaTag("Audio"))
+					} else {
+						userText = append(userText, renderMediaTag("Document"))
+					}
+				}
+			}
+
+			if len(userText) > 0 {
+				sb.WriteString(renderUserBlock(strings.Join(userText, "\n")))
+				sb.WriteString("\n")
+			}
+		case gemini.RoleModel:
+			var markdownBuf strings.Builder
+
+			for _, part := range msg.Parts {
+				if part.Thought {
+					sb.WriteString(renderThinkingBlock(part.Text))
+					// sb.WriteString("\n")
+				} else if part.FunctionCall != nil {
+					sb.WriteString(renderToolCallBox(part.FunctionCall.Name, part.FunctionCall.Args))
+					sb.WriteString("\n")
+				} else if part.FunctionResponse != nil {
+					// silently skip function response
+				} else if part.Text != "" {
+					markdownBuf.WriteString(part.Text)
+				}
+			}
+
+			// flush markdown
+			if markdownBuf.Len() > 0 {
+				sb.WriteString(renderMarkdown(markdownBuf.String()))
+			}
+		}
+	}
+
+	return sb.String()
+}
+
+// -------------------------------------------------------------------------
+// Anthropic Renderer
+// -------------------------------------------------------------------------
+
+func renderAnthropicSessionHistory(input []byte) string {
+	var sb strings.Builder
+	lines := bytes.Split(input, []byte("\n"))
+
+	for _, line := range lines {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+
+		var msg anthropic.MessageParam
+		if err := json.Unmarshal(line, &msg); err != nil {
+			continue
+		}
+
+		switch msg.Role {
+		case anthropic.MessageParamRoleUser:
+			var userText []string
+			for _, block := range msg.Content {
+				if v := block.OfText; v != nil {
+					userText = append(userText, v.Text)
+				} else if block.OfImage != nil {
+					userText = append(userText, renderMediaTag("Image"))
+				} else if block.OfDocument != nil {
+					userText = append(userText, renderMediaTag("Document"))
+				} else if block.OfToolResult != nil {
+					// silently skip user tool results
+					// Anthropic encapsulates tool results within a user role message.
+				}
+			}
+
+			if len(userText) > 0 {
+				sb.WriteString(renderUserBlock(strings.Join(userText, "\n")))
+				sb.WriteString("\n")
+			}
+		case anthropic.MessageParamRoleAssistant:
+			var markdownBuf strings.Builder
+
+			for _, block := range msg.Content {
+				if v := block.OfThinking; v != nil {
+					sb.WriteString(renderThinkingBlock(v.Thinking))
+					// sb.WriteString("\n")
+				} else if v := block.OfRedactedThinking; v != nil {
+					sb.WriteString(renderThinkingBlock(v.Data))
+					// sb.WriteString("\n")
+				} else if v := block.OfToolUse; v != nil {
+					sb.WriteString(renderToolCallBox(v.Name, v.Input))
+					sb.WriteString("\n")
+				} else if v := block.OfText; v != nil {
+					markdownBuf.WriteString(v.Text)
+				}
+			}
+
+			if markdownBuf.Len() > 0 {
+				sb.WriteString(renderMarkdown(markdownBuf.String()))
+			}
+		}
+	}
+
+	return sb.String()
+}
+
+// -------------------------------------------------------------------------
+// OpenAI / OpenChat Renderer (They are compatible, we use openchat for convenient)
+// -------------------------------------------------------------------------
+
+func renderOpenAISessionHistory(input []byte) string {
+	var sb strings.Builder
+	lines := bytes.Split(input, []byte("\n"))
+
+	for _, line := range lines {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+
+		var msg model.ChatCompletionMessage
+		if err := json.Unmarshal(line, &msg); err != nil {
+			continue
+		}
+
+		if msg.Role == model.ChatMessageRoleSystem || msg.Role == model.ChatMessageRoleTool || msg.Role == "function" {
+			// silently skip system, tool(tool response), function(tool response)
+			// We don't need to show them
+			continue
+		}
+
+		switch msg.Role {
+		case model.ChatMessageRoleUser:
+			var userText []string
+			if msg.Content != nil {
+				if msg.Content.StringValue != nil && *msg.Content.StringValue != "" {
+					userText = append(userText, *msg.Content.StringValue)
+				} else if len(msg.Content.ListValue) > 0 {
+					for _, part := range msg.Content.ListValue {
+						switch part.Type {
+						case model.ChatCompletionMessageContentPartTypeText:
+							userText = append(userText, part.Text)
+						case model.ChatCompletionMessageContentPartTypeImageURL:
+							userText = append(userText, renderMediaTag("Image"))
+						case "input_audio":
+							userText = append(userText, renderMediaTag("Audio"))
+						case "file":
+							userText = append(userText, renderMediaTag("Document"))
+						}
+					}
+				}
+			}
+
+			if len(userText) > 0 {
+				sb.WriteString(renderUserBlock(strings.Join(userText, "\n")))
+				sb.WriteString("\n")
+			}
+		case model.ChatMessageRoleAssistant:
+			var thinkingContent string
+			if msg.ReasoningContent != nil && *msg.ReasoningContent != "" {
+				thinkingContent = *msg.ReasoningContent
+			}
+
+			var markdownBuf strings.Builder
+			if msg.Content != nil {
+				if msg.Content.StringValue != nil && *msg.Content.StringValue != "" {
+					markdownBuf.WriteString(*msg.Content.StringValue)
+				} else if len(msg.Content.ListValue) > 0 {
+					for _, part := range msg.Content.ListValue {
+						if part.Type == model.ChatCompletionMessageContentPartTypeText {
+							markdownBuf.WriteString(part.Text)
+						}
+					}
+				}
+			}
+
+			mainText := markdownBuf.String()
+
+			if thinkingContent == "" && mainText != "" {
+				if extractedThink, cleanedText := util.ExtractThinkTags(mainText); extractedThink != "" {
+					thinkingContent = extractedThink
+					mainText = string(cleanedText)
+				}
+			}
+
+			if thinkingContent != "" {
+				sb.WriteString(renderThinkingBlock(thinkingContent))
+			}
+
+			if len(msg.ToolCalls) > 0 {
+				for _, tool := range msg.ToolCalls {
+					var rawArgs interface{}
+					// Try to unmarshal args if it's JSON text, otherwise pass as string
+					if err := json.Unmarshal([]byte(tool.Function.Arguments), &rawArgs); err != nil {
+						rawArgs = tool.Function.Arguments
+					}
+					sb.WriteString(renderToolCallBox(tool.Function.Name, rawArgs))
+					sb.WriteString("\n")
+				}
+			}
+
+			if mainText != "" {
+				sb.WriteString(renderMarkdown(mainText))
+			}
+		}
+	}
+
+	return sb.String()
+}

@@ -81,8 +81,8 @@ var themeCmd = &cobra.Command{
 			data.StatusDebugColor, data.ResetSeq,
 			data.StatusErrorColor, data.ResetSeq))
 		leftParts = append(leftParts, fmt.Sprintf("%-14s: %sToken Count%s\n", "Labels", data.LabelColor, data.ResetSeq))
-		leftParts = append(leftParts, fmt.Sprintf("%-14s: %sThinking ↓%s", "Thinking State", data.ReasoningActiveColor, data.ResetSeq))
-		leftParts = append(leftParts, fmt.Sprintf("%-14s: %sInner Thinking...%s", "Thinking Msg", data.ReasoningDoneColor, data.ResetSeq))
+		leftParts = append(leftParts, fmt.Sprintf("%-14s: %sThinking ↓%s", "Thinking State", data.ReasoningTagColor, data.ResetSeq))
+		leftParts = append(leftParts, fmt.Sprintf("%-14s: %sInner Thinking...%s", "Thinking Msg", data.ReasoningTextColor, data.ResetSeq))
 		leftParts = append(leftParts, fmt.Sprintf("%-14s: %sHigh%s | %sMed%s | %sLow%s | %sMin%s | %sOff%s\n",
 			"Thinking Effort",
 			data.ReasoningHighColor, data.ResetSeq,

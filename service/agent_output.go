@@ -41,7 +41,7 @@ It writes a status message to both Std and OutputFile if they are available.
 func (ag *Agent) StartReasoning() {
 	if ag.StdOutput != nil {
 		if ag.Verbose {
-			ag.StdOutput.Writeln(data.ReasoningActiveColor + StartThinking)
+			ag.StdOutput.Writeln(data.ReasoningTagColor + StartThinking)
 		} else {
 			// Only output thinking indicator under non-verbose mode
 			// ag.Std.Writeln(data.ReasoningActiveColor + "Thinking..." + data.ResetSeq)
@@ -59,7 +59,7 @@ func (ag *Agent) StartReasoning() {
 func (ag *Agent) CompleteReasoning() {
 	if ag.StdOutput != nil {
 		if ag.Verbose {
-			ag.StdOutput.Writeln(data.ResetSeq + data.ReasoningActiveColor + EndThinking + data.ResetSeq)
+			ag.StdOutput.Writeln(data.ResetSeq + data.ReasoningTagColor + EndThinking + data.ResetSeq)
 		} else {
 			// bugfix: some models such as gemini, would do tool calls before reasoning end
 			event.StopIndicator()
@@ -78,7 +78,7 @@ func (ag *Agent) WriteReasoning(text string) {
 	if ag.StdOutput != nil {
 		// Only output reasoning content under verbose
 		if ag.Verbose {
-			ag.StdOutput.Writef("%s%s", data.ReasoningDoneColor, text)
+			ag.StdOutput.Writef("%s%s", data.ReasoningTextColor, text)
 			ag.LastWrittenData = text
 		} else {
 			// bugfix: reasoning maybe continue after tool calls

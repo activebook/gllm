@@ -19,6 +19,11 @@ type GeminiSession struct {
 
 // consolidateTextParts merges consecutive text parts to reduce fragmentation
 // from streaming responses while preserving non-text parts (function calls, etc.)
+//
+// The logic operates as follows:
+// 1. Gemini text can be split into multiple small parts during streaming, so we must combine them together.
+// 2. The complex part is that "thought" text (reasoning output) is also streamed as text parts with a Thought bool flag.
+// 3. We must combine thought text together, and combine pure text together. When we encounter a switch between thought/non-thought text, we flush the accumulated buffer.
 func (s *GeminiSession) consolidateTextParts(parts []*genai.Part) []*genai.Part {
 	if len(parts) == 0 {
 		return parts
@@ -26,24 +31,41 @@ func (s *GeminiSession) consolidateTextParts(parts []*genai.Part) []*genai.Part 
 
 	consolidated := make([]*genai.Part, 0, len(parts))
 	var textBuffer string
+	var isThoughtBuffer bool
 
 	for _, part := range parts {
 		if part.Text != "" {
-			// Accumulate consecutive text parts
-			textBuffer += part.Text
-		} else {
-			// Non-text part encountered: flush accumulated text, then add the part
-			if textBuffer != "" {
-				consolidated = append(consolidated, &genai.Part{Text: textBuffer})
+			// If we are already buffering text, but the nature of the text has changed
+			// (e.g. going from thought text to pure text, or vice versa), we must flush the buffer.
+			if textBuffer != "" && isThoughtBuffer != part.Thought {
+				consolidated = append(consolidated, &genai.Part{
+					Text:    textBuffer,
+					Thought: isThoughtBuffer,
+				})
 				textBuffer = ""
 			}
+			textBuffer += part.Text
+			isThoughtBuffer = part.Thought
+		} else {
+			// Non-text part encountered (e.g. function call): flush any accumulated text
+			if textBuffer != "" {
+				consolidated = append(consolidated, &genai.Part{
+					Text:    textBuffer,
+					Thought: isThoughtBuffer,
+				})
+				textBuffer = ""
+			}
+			// For those function call/response, we don't need to do anything
+			// The text buffer should be empty at this point
 			consolidated = append(consolidated, part)
 		}
 	}
 
-	// Flush any remaining text
 	if textBuffer != "" {
-		consolidated = append(consolidated, &genai.Part{Text: textBuffer})
+		consolidated = append(consolidated, &genai.Part{
+			Text:    textBuffer,
+			Thought: isThoughtBuffer,
+		})
 	}
 
 	return consolidated

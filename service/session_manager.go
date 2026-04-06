@@ -146,9 +146,18 @@ func WriteSessionContent(name string, data []byte) error {
 	return os.WriteFile(filePath, data, 0644)
 }
 
+type SessionConvertHook struct {
+	OnStartConvert    func()
+	OnFinishedConvert func()
+}
+
 // EnsureSessionCompatibility checks if the existing session is compatible with the current agent's provider.
 // If not, it attempts to convert the session history.
-func EnsureSessionCompatibility(agent *data.AgentConfig, sessionName string) error {
+func EnsureSessionCompatibility(agent *data.AgentConfig, sessionName string, hook SessionConvertHook) error {
+	if sessionName == "" {
+		return nil
+	}
+
 	// 1. Get session Data
 	sessionData, err := ReadSessionContent(sessionName)
 	if err != nil {
@@ -162,10 +171,12 @@ func EnsureSessionCompatibility(agent *data.AgentConfig, sessionName string) err
 	// 2. Check Compatibility
 	isCompatible, provider, modelProvider := CheckSessionFormat(agent, sessionData)
 	if !isCompatible {
-		util.Debugf("session '%s' [%s] is not compatible with the current model provider [%s].\n", sessionName, provider, modelProvider)
+		util.Warnf("session '%s' [%s] is not compatible with the current model provider [%s].\n", sessionName, provider, modelProvider)
 
 		// 3. Convert Data
+		hook.OnStartConvert()
 		convertData, err := ConvertMessages(sessionData, provider, modelProvider)
+		hook.OnFinishedConvert()
 		if err != nil {
 			return fmt.Errorf("error converting session: %v", err)
 		}
@@ -174,7 +185,7 @@ func EnsureSessionCompatibility(agent *data.AgentConfig, sessionName string) err
 		if err := WriteSessionContent(sessionName, convertData); err != nil {
 			return err
 		}
-		util.Debugf("session '%s' converted to compatible format [%s].\n", sessionName, modelProvider)
+		util.Infof("session '%s' has been converted to compatible format [%s].\n", sessionName, modelProvider)
 	}
 
 	return nil

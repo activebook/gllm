@@ -40,8 +40,8 @@ func init() {
 		"function_response": data.ToolResponseColor,
 		"image":             data.MediaColor,
 		"file_data":         data.MediaColor,
-		"reasoning":         data.ReasoningActiveColor,
-		"reasoning_content": data.ReasoningDoneColor,
+		"reasoning":         data.ReasoningTagColor,
+		"reasoning_content": data.ReasoningTextColor,
 		"reset":             data.ResetSeq,
 	}
 }
