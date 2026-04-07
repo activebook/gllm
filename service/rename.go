@@ -18,22 +18,23 @@ Analyze the conversation and produce a concise, descriptive title.
 
 Rules:
 1. Output ONLY the title — no punctuation, no quotes, no explanation
-2. Use 4–8 words, each capitalized, joined by hyphens
+2. Use 4–8 words, all lowercase, joined by hyphens
 3. Name the specific artifact, concept, or mechanism at the center of the session
-4. Include proper nouns — tool names, file names, API names, commands — when they are central
-5. Prefer noun phrases that describe the *thing* over verb phrases that describe the *action*
+4. Include proper nouns — tool names, file names, API names, commands — when central
+5. Titles should be scannable and self-explanatory when read in a list days later
 
-Examples of good titles:
-- Gemini-Context-Window-Injection-Strategy
-- Uncached-Token-Cost-Fields-Breakdown
-- Vscodeignore-Packaging-And-Marketplace-Copy
-- Unix-Socket-IPC-Daemon-Architecture
-- Ask-User-Tool-Four-Mode-Schema
+Good titles (specific, scannable, topic-focused):
+- gemini-context-window-injection-strategy
+- uncached-token-cost-fields-breakdown
+- vscodeignore-packaging-and-marketplace-copy
+- unix-socket-ipc-daemon-architecture
+- ask-user-tool-four-mode-schema
 
-Examples of bad titles (too generic):
-- Add-Uncached-Token-Usage-Breakdown
-- Implement-Global-Instruction-File-Support
-- Merge-Instruction-And-Usage-Updates`
+Bad titles — too vague to identify the topic later:
+- add-feature-to-system        (no specifics, could be anything)
+- implement-support-for-files  (which files? what system?)
+- fix-prompt-formatting-bug    (what prompt? what bug?)
+- update-existing-configuration (tells you nothing)`
 
 const RenamePromptFormat = `Generate a title for this conversation following your system instructions.
 Output ONLY the hyphenated title, nothing else.`
@@ -48,7 +49,7 @@ func sanitizeGeneratedName(raw string) string {
 	name := strings.TrimSpace(raw)
 	// Strip wrapping quotes the model occasionally emits
 	name = strings.Trim(name, `"'`+"`")
-	// name = strings.ToLower(name)
+	name = strings.ToLower(name)
 	// Replace spaces and underscores with hyphens before stripping other chars
 	name = strings.ReplaceAll(name, " ", "-")
 	name = strings.ReplaceAll(name, "_", "-")

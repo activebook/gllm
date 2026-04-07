@@ -147,6 +147,16 @@ func (c *ConfigStore) ConfigFileUsed() string {
 	return c.v.ConfigFileUsed()
 }
 
+// ConfigExists returns true if the configuration file actually exists on disk.
+func (c *ConfigStore) ConfigExists() bool {
+	path := c.v.ConfigFileUsed()
+	if path == "" {
+		return false
+	}
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 // GetAgent returns a specific agent configuration by name.
 // Returns nil if agent doesn't exist.
 func (c *ConfigStore) GetAgent(name string) *AgentConfig {

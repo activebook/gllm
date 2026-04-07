@@ -69,7 +69,7 @@ func RunInitWizard() error {
 	store := data.NewConfigStore()
 
 	// --- Dual-entry mode: if gllm.yaml already exists, offer a branching menu ---
-	if store.ConfigFileUsed() != "" {
+	if store.ConfigExists() {
 		fmt.Printf("Note: Updating existing configuration at %s\n\n", store.ConfigFileUsed())
 
 		var wizardMode string

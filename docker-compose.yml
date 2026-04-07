@@ -1,0 +1,19 @@
+services:
+  gllm:
+    # Build using the Dockerfile in the current directory
+    build: .
+    
+    image: gllm:latest
+
+    # Mount the current folder to /home/gllmuser inside the container
+    volumes:
+      - .:/home/gllmuser
+    
+    # Enable modern color support
+    environment:
+      - TERM=xterm-256color
+      - COLORTERM=truecolor
+    
+    # Keep the terminal open for interactive commands
+    stdin_open: true
+    tty: true
