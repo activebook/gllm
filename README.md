@@ -32,7 +32,7 @@
 - **Workflow & Skills Commands**: Define and execute workflows and skills as commands for streamlined operations.
 - **Colorful Themes**: Supports hundreds of popular themes, compatible with light and dark modes, ANSI-color, and full true-color.
 - **API local Proxy**: Supports Multi-Protocol (OpenAI, Anthropic, Google Gemini) local API reverse proxy, ensures seamless compatibility with a wide range of applications.
-- **Cross-platform Support**: gllm is available for macOS, Windows, and Linux, and easy to install and update.
+- **Cross-platform Support**: gllm is available for macOS, Windows, Linux, and Docker image on GitHub Container Registry (`ghcr.io/activebook/gllm`).
 - **VS Code Extension**: `gllm Companion` bridges the CLI tool with your IDE, enabling native inline diffs and direct workspace access.
 
 ---
@@ -64,6 +64,36 @@ scoop install gllm
 curl -fsSL https://raw.githubusercontent.com/activebook/gllm/main/build/install.sh | sh
 ```
 
+### Docker (Image)
+
+**Pull the latest image:**
+
+```sh
+docker pull ghcr.io/activebook/gllm:latest
+```
+
+**Run interactively (one-off):**
+
+Per-project config — each folder has its own gllm.yaml, sessions, skills:
+```sh
+docker run -it --rm -v "$(pwd):/home/gllmuser" ghcr.io/activebook/gllm:latest
+```
+
+Global config — all sessions, configs, and skills in one place:
+```sh
+docker run -it --rm -v "$HOME/.config/gllm:/home/gllmuser/.config/gllm" ghcr.io/activebook/gllm:latest
+```
+
+**Run with Docker Compose:**
+
+Clone the repo (or just download `docker-compose.yml`) and start a session:
+
+```sh
+docker compose run --rm gllm
+```
+
+---
+
 ### Multi-Platform Self-Update
 
 `gllm` includes a built-in self-update mechanism that automatically checks for new versions in the background. You can also manually trigger an update or check the current status.
@@ -75,6 +105,7 @@ curl -fsSL https://raw.githubusercontent.com/activebook/gllm/main/build/install.
 ---
 
 ### Build from Source
+
 
 ```sh
 git clone https://github.com/activebook/gllm.git

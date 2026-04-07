@@ -1,0 +1,19 @@
+# Stage 1: Final Image wrapping pre-built Goreleaser binary
+FROM alpine:3.21
+
+# Install runtime dependencies (CA certificates for API calls)
+RUN apk add --no-cache ca-certificates tzdata
+
+# Create a non-root user for security
+RUN adduser -D -g '' gllmuser
+
+WORKDIR /home/gllmuser
+
+# Goreleaser automatically copies the compiled binary to the working context
+COPY gllm /usr/local/bin/gllm
+
+# Set the user
+USER gllmuser
+
+# Define the entrypoint
+ENTRYPOINT ["gllm"]

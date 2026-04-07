@@ -1,13 +1,20 @@
 services:
   gllm:
-    # Build using the Dockerfile in the current directory
-    build: .
+    # Build using the Dockerfile in the current directory(for local)
+    # build: .
     
-    image: gllm:latest
+    # Local image
+    #image: gllm:latest
+
+    # Downloaded remote package
+    image: ghcr.io/activebook/gllm:latest
 
     # Mount the current folder to /home/gllmuser inside the container
     volumes:
+      # Per-project config — each folder has its own gllm.yaml, sessions, skills:
       - .:/home/gllmuser
+      # Global config — all sessions, configs, and skills in one place:
+      # - ~/.config/gllm:/home/gllmuser/.config/gllm
     
     # Enable modern color support
     environment:

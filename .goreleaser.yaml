@@ -80,3 +80,26 @@ scoops:
 
 # ---- Linux INTEGRATION ----
 # Linux users can install via install.sh script.
+
+# ---- DOCKER INTEGRATION ----
+# Goreleaser builds the Docker image from the pre-compiled linux/amd64 binary.
+# This ensures the image always wraps the exact same, properly-versioned artifact
+# as the GitHub Release — eliminating version drift and the race condition
+# caused by running a parallel docker.yml workflow on push to main.
+dockers:
+  - image_templates:
+      - "ghcr.io/activebook/gllm:{{ .Tag }}"
+      - "ghcr.io/activebook/gllm:v{{ .Major }}"
+      - "ghcr.io/activebook/gllm:latest"
+    dockerfile: Dockerfile.release
+    # Goreleaser copies the linux/amd64 binary into the build context as `gllm`
+    goos: linux
+    goarch: amd64
+    # OCI-compliant labels for traceability
+    build_flag_templates:
+      - "--label=org.opencontainers.image.title={{ .ProjectName }}"
+      - "--label=org.opencontainers.image.description=A powerful CLI tool for interacting with Large Language Models"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      - "--label=org.opencontainers.image.source=https://github.com/activebook/gllm"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.licenses=Apache-2.0"
