@@ -44,7 +44,12 @@ var illegalNameChars = regexp.MustCompile(`[^a-zA-Z0-9\-_]`)
 
 // sanitizeGeneratedName cleans up a model-produced name:
 // strips surrounding whitespace/quotes, collapses runs of
-// illegal characters or hyphens into a single hyphen, and trims leading/trailing hyphens.
+// sanitizeGeneratedName normalizes a model-produced title into a filesystem-safe,
+// lowercase hyphenated slug suitable for use as a directory name.
+// It trims surrounding whitespace and wrapping quotes, converts to lowercase,
+// replaces spaces and underscores with hyphens, removes characters outside
+// [a-z0-9-_], collapses consecutive hyphens into one, and trims leading/trailing
+// hyphens. The resulting string may be empty.
 func sanitizeGeneratedName(raw string) string {
 	name := strings.TrimSpace(raw)
 	// Strip wrapping quotes the model occasionally emits

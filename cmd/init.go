@@ -49,7 +49,17 @@ func buildToolsOptions() []huh.Option[string] {
 }
 
 // RunInitWizard runs the interactive setup
-// Exported so it can be called from root.go
+// RunInitWizard runs the interactive setup wizard that creates or updates the gllm.yaml configuration,
+// configures an agent (name, description, provider, endpoint, API key, model, tools, thinking level,
+// and capabilities), and optionally generates or updates the project instruction file (GLLM.md).
+//
+// The function detects an existing configuration and offers a branching menu to reconfigure the agent,
+// generate/update the instruction file, or do both. It validates user input, persists the model and agent
+// configuration, sets the active agent, and may invoke the instruction-file wizard which previews and
+// writes GLLM.md to the chosen location.
+//
+// It returns an error if any interactive form fails, if a requested instruction-generation step cannot
+// find an active agent, or if persistence, generation, or file-write operations fail.
 func RunInitWizard() error {
 	var (
 		agentName             string
