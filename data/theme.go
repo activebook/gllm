@@ -261,7 +261,7 @@ func applyTheme(t goghthemes.Theme) {
 	PlanModeHex = t.BrightMagenta
 	YoloModeHex = t.BrightRed
 
-	StatusWarnColor = t.Yellow
+	WarnStatusHex = t.Yellow
 	BackgroundStatusHex = t.Foreground
 }
 

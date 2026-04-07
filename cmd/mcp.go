@@ -102,7 +102,7 @@ var mcpLoadCmd = &cobra.Command{
 			fmt.Printf("\n%s %sServer: %s%s %s\n", enableIndicator, data.SwitchOnColor, server.Name, data.ResetSeq, statusSuffix)
 			if server.Tools != nil {
 				for _, tool := range *server.Tools {
-					fmt.Printf("  • %s%s%s\n", data.StatusWarnColor, tool.Name, data.ResetSeq)
+					fmt.Printf("  • %s%s%s\n", data.ToolCallColor, tool.Name, data.ResetSeq)
 					if tool.Description != "" {
 						fmt.Printf("    Description: %s\n", tool.Description)
 					}
@@ -118,7 +118,7 @@ var mcpLoadCmd = &cobra.Command{
 			if server.Resources != nil && len(*server.Resources) > 0 {
 				fmt.Println("  Resources:")
 				for _, resource := range *server.Resources {
-					fmt.Printf("    • %s%s%s\n", data.StatusWarnColor, resource.Name, data.ResetSeq)
+					fmt.Printf("    • %s%s%s\n", data.ToolCallColor, resource.Name, data.ResetSeq)
 					if resource.Description != "" {
 						fmt.Printf("      Description: %s\n", resource.Description)
 					}
@@ -134,7 +134,7 @@ var mcpLoadCmd = &cobra.Command{
 			if server.Prompts != nil && len(*server.Prompts) > 0 {
 				fmt.Println("  Prompts:")
 				for _, prompt := range *server.Prompts {
-					fmt.Printf("    • %s%s%s\n", data.StatusWarnColor, prompt.Name, data.ResetSeq)
+					fmt.Printf("    • %s%s%s\n", data.ToolCallColor, prompt.Name, data.ResetSeq)
 					if prompt.Description != "" {
 						fmt.Printf("      Description: %s\n", prompt.Description)
 					}
