@@ -62,7 +62,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 
 			// Check if config file is loaded
 			store := data.NewConfigStore()
-			if store.ConfigFileUsed() == "" {
+			if !store.ConfigExists() {
 				// Config missing!
 				// Ask user if they want to setup
 				fmt.Println("Configuration file not found.")
