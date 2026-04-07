@@ -13,17 +13,17 @@ func TestSanitizeGeneratedName(t *testing.T) {
 		{
 			name:     "basic case with quotes and newlines",
 			input:    "\"This is a test session\"\n",
-			expected: "This-is-a-test-session",
+			expected: "this-is-a-test-session",
 		},
 		{
 			name:     "already hyphens but weird casing",
 			input:    "SOME-random-TALK",
-			expected: "SOME-random-TALK",
+			expected: "some-random-talk",
 		},
 		{
 			name:     "illegal characters and extra spaces",
 			input:    "  `Hello! World? How are you?`  ",
-			expected: "Hello-World-How-are-you",
+			expected: "hello-world-how-are-you",
 		},
 		{
 			name:     "multiple dash replacement",
@@ -38,7 +38,12 @@ func TestSanitizeGeneratedName(t *testing.T) {
 		{
 			name:     "mixed symbols",
 			input:    "\"We're fixing bug #123 (critical)!\"",
-			expected: "Were-fixing-bug-123-critical",
+			expected: "were-fixing-bug-123-critical",
+		},
+		{
+			name:     "mixed-case to lowercase conversion",
+			input:    "Mixed-Case_To LowerCase",
+			expected: "mixed-case-to-lowercase",
 		},
 	}
 
