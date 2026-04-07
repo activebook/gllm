@@ -1,0 +1,14 @@
+services:
+  gllm:
+    # Build using the Dockerfile in the current directory
+    build: .
+    
+    image: gllm:latest
+
+    # Mount the current folder to /home/gllmuser inside the container
+    volumes:
+      - .:/home/gllmuser
+    
+    # Keep the terminal open for interactive commands
+    stdin_open: true
+    tty: true
