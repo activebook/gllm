@@ -9,6 +9,11 @@ services:
     volumes:
       - .:/home/gllmuser
     
+    # Enable modern color support
+    environment:
+      - TERM=xterm-256color
+      - COLORTERM=truecolor
+    
     # Keep the terminal open for interactive commands
     stdin_open: true
     tty: true
