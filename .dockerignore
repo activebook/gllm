@@ -1,0 +1,47 @@
+# Version control
+.git
+.github
+
+# IDE and system
+.DS_Store
+.vscode
+.gitignore
+
+# AI tool directories
+.kilo
+.kilocode
+.cline
+.codebuddy
+.qodo
+.roo
+.agent
+.worktrees
+.config
+
+# Environment and secrets
+.env
+
+# Documentation
+docs
+README.md
+CLAUDE.md
+GLLM.md
+design.md
+agents.md
+LICENSE
+
+# Pre-built artifacts (built inside container)
+gllm
+dist
+bin
+
+# Test directories
+test
+test2
+
+# Other
+screenshots
+plans
+mcp.json
+*.log
+*.tmp
