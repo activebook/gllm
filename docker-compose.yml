@@ -11,7 +11,10 @@ services:
 
     # Mount the current folder to /home/gllmuser inside the container
     volumes:
+      # Per-project config — each folder has its own gllm.yaml, sessions, skills:
       - .:/home/gllmuser
+      # Global config — all sessions, configs, and skills in one place:
+      # - ~/.config/gllm:/home/gllmuser/.config/gllm
     
     # Enable modern color support
     environment:
