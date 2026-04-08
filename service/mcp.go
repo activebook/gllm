@@ -9,6 +9,7 @@ import (
 	"os/exec" // Retained as it's used by AddStdServer
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/event"
@@ -70,6 +71,7 @@ type MCPSession struct {
 type MCPClient struct {
 	mu            sync.Mutex
 	ctx           context.Context
+	cancel        context.CancelFunc
 	client        *mcp.Client
 	sessions      []*MCPSession
 	servers       []*MCPServer
@@ -163,12 +165,15 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 	defer mc.mu.Unlock()
 
 	if mc.client == nil {
-		mc.ctx = context.Background()
+		mc.ctx, mc.cancel = context.WithCancel(context.Background())
 		mc.toolToSession = make(map[string]*MCPSession)
 		mc.connected = make(map[string]bool)
 		// Create a new client, with no features.
 		mc.client = mcp.NewClient(&mcp.Implementation{Name: "mcp-client", Version: "v1.0.0"}, nil)
 	}
+
+	initCtx, cancelInit := context.WithTimeout(mc.ctx, 30*time.Second)
+	defer cancelInit()
 
 	// Connect to each server based on its type
 	for serverName, server := range servers {
@@ -185,17 +190,17 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 		var err error
 		if server.Type == "sse" || server.URL != "" || server.BaseURL != "" {
 			// Add SSE server
-			err = mc.AddSseServer(serverName, server.BaseURL, server.Headers)
+			err = mc.AddSseServer(initCtx, serverName, server.BaseURL, server.Headers)
 		} else if server.Type == "stdio" || server.Type == "std" || server.Type == "local" || server.Command != "" {
 			// Add stdio server
 			dir := server.WorkDir
 			if dir == "" {
 				dir = server.Cwd
 			}
-			err = mc.AddStdServer(serverName, server.Command, server.Env, dir, server.Args...)
+			err = mc.AddStdServer(initCtx, serverName, server.Command, server.Env, dir, server.Args...)
 		} else if server.Type == "http" || server.HTTPUrl != "" {
 			// Add HTTP server
-			err = mc.AddHttpServer(serverName, server.HTTPUrl, server.Headers)
+			err = mc.AddHttpServer(initCtx, serverName, server.HTTPUrl, server.Headers)
 		}
 
 		if err != nil {
@@ -205,7 +210,7 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 
 		// Get the latest added session
 		session := mc.sessions[len(mc.sessions)-1]
-		tools, err := mc.GetTools(session)
+		tools, err := mc.GetTools(initCtx, session)
 		if err != nil {
 			return fmt.Errorf("error loading mcp server %s: %v", serverName, err)
 		}
@@ -220,10 +225,10 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 		var resources *[]MCPResource
 		var prompts *[]MCPPrompt
 		if option.LoadResources {
-			resources, _ = mc.GetResources(session)
+			resources, _ = mc.GetResources(initCtx, session)
 		}
 		if option.LoadPrompts {
-			prompts, _ = mc.GetPrompts(session)
+			prompts, _ = mc.GetPrompts(initCtx, session)
 		}
 
 		// Add server to servers
@@ -242,6 +247,10 @@ func (mc *MCPClient) Close() {
 	for _, session := range mc.sessions {
 		session.cs.Close()
 	}
+	if mc.cancel != nil {
+		mc.cancel()
+		mc.cancel = nil
+	}
 	mc.sessions = []*MCPSession{}
 	mc.servers = []*MCPServer{}
 	mc.toolToSession = nil
@@ -250,7 +259,7 @@ func (mc *MCPClient) Close() {
 	mc.ctx = nil
 }
 
-func (mc *MCPClient) AddSseServer(name string, url string, headers map[string]string) error {
+func (mc *MCPClient) AddSseServer(ctx context.Context, name string, url string, headers map[string]string) error {
 	// Create HTTP client with custom headers
 	httpClient := &http.Client{
 		Transport: &headerTransport{
@@ -265,7 +274,7 @@ func (mc *MCPClient) AddSseServer(name string, url string, headers map[string]st
 	}
 
 	// Connect to the server
-	session, err := mc.client.Connect(mc.ctx, transport, nil)
+	session, err := mc.client.Connect(ctx, transport, nil)
 	if err != nil {
 		return err
 	}
@@ -274,7 +283,7 @@ func (mc *MCPClient) AddSseServer(name string, url string, headers map[string]st
 	return nil
 }
 
-func (mc *MCPClient) AddHttpServer(name string, url string, headers map[string]string) error {
+func (mc *MCPClient) AddHttpServer(ctx context.Context, name string, url string, headers map[string]string) error {
 	// Create HTTP client with custom headers
 	httpClient := &http.Client{
 		Transport: &headerTransport{
@@ -289,7 +298,7 @@ func (mc *MCPClient) AddHttpServer(name string, url string, headers map[string]s
 	}
 
 	// Connect to the server
-	session, err := mc.client.Connect(mc.ctx, transport, nil)
+	session, err := mc.client.Connect(ctx, transport, nil)
 	if err != nil {
 		return err
 	}
@@ -298,7 +307,7 @@ func (mc *MCPClient) AddHttpServer(name string, url string, headers map[string]s
 	return nil
 }
 
-func (mc *MCPClient) AddStdServer(name string, cmd string, env map[string]string, cwd string, args ...string) error {
+func (mc *MCPClient) AddStdServer(ctx context.Context, name string, cmd string, env map[string]string, cwd string, args ...string) error {
 	// IMPORTANT: WE WRAP THE COMMAND TO FILTER NOISY STDOUT (NON-JSON OUTPUT)
 	// Run: gllm _mcp-filter -- cmd args...
 	// "--" is a common convention in Unix-like systems to prevent arguments starting with - from being misinterpreted as flags or options.
@@ -323,7 +332,7 @@ func (mc *MCPClient) AddStdServer(name string, cmd string, env map[string]string
 	transport.Command.Dir = cwd
 
 	// Connect to the server
-	session, err := mc.client.Connect(mc.ctx, transport, nil)
+	session, err := mc.client.Connect(ctx, transport, nil)
 	if err != nil {
 		return err
 	}
@@ -400,8 +409,8 @@ func (mc *MCPClient) GetAllServers() []*MCPServer {
 	return mc.servers
 }
 
-func (mc *MCPClient) GetTools(session *MCPSession) (*[]MCPTool, error) {
-	tools, err := session.cs.ListTools(mc.ctx, nil)
+func (mc *MCPClient) GetTools(ctx context.Context, session *MCPSession) (*[]MCPTool, error) {
+	tools, err := session.cs.ListTools(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -461,8 +470,8 @@ func (mc *MCPClient) GetTools(session *MCPSession) (*[]MCPTool, error) {
 	return &mcpTools, nil
 }
 
-func (mc *MCPClient) GetResources(session *MCPSession) (*[]MCPResource, error) {
-	res, err := session.cs.ListResources(mc.ctx, nil)
+func (mc *MCPClient) GetResources(ctx context.Context, session *MCPSession) (*[]MCPResource, error) {
+	res, err := session.cs.ListResources(ctx, nil)
 	if err != nil {
 		// "resources/list": Method not found
 		return nil, err
@@ -480,8 +489,8 @@ func (mc *MCPClient) GetResources(session *MCPSession) (*[]MCPResource, error) {
 	return &mcpResources, nil
 }
 
-func (mc *MCPClient) GetPrompts(session *MCPSession) (*[]MCPPrompt, error) {
-	prompts, err := session.cs.ListPrompts(mc.ctx, nil)
+func (mc *MCPClient) GetPrompts(ctx context.Context, session *MCPSession) (*[]MCPPrompt, error) {
+	prompts, err := session.cs.ListPrompts(ctx, nil)
 	if err != nil {
 		// "prompts/list": Method not found
 		return nil, err
