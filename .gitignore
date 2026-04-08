@@ -63,3 +63,13 @@ plans/
 
 # Docker files
 .ash_history
+.python_history
+.node_history
+.node_repl_history
+.npm_history
+.npmrc
+.pnpm-debug.log
+.yarnrc
+.yarn-error.log
+.yarn
+.yarnrc.yml

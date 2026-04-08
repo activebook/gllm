@@ -26,6 +26,8 @@ RUN apk add --no-cache \
     tzdata \
     nodejs \
     npm \
+    python3 \
+    py3-pip \
     ttyd
 
 # Create a non-root user for security
