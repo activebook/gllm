@@ -20,8 +20,12 @@ RUN CGO_ENABLED=0 make build
 # Stage 2: Final Image
 FROM alpine:3.21
 
-# Install runtime dependencies (CA certificates for API calls)
-RUN apk add --no-cache ca-certificates tzdata
+# Install runtime dependencies (CA certificates for API calls, Node.js for MCP servers)
+RUN apk add --no-cache \
+    ca-certificates \
+    tzdata \
+    nodejs \
+    npm
 
 # Create a non-root user for security
 RUN adduser -D -g '' gllmuser
