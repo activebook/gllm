@@ -1,4 +1,5 @@
 services:
+  # Run the gllm service using the local Dockerfile or a pre-built image
   gllm:
     # Build using the Dockerfile in the current directory(for local)
     # build: .
@@ -34,3 +35,27 @@ services:
     # Keep the terminal open for interactive commands
     stdin_open: true
     tty: true
+  
+  # Run a ttyd service to access the gllm terminal interface via a web browser
+  # local image for ttyd, for debugging and development
+  gllmd:
+    image: gllm:latest
+    volumes:
+      - .:/home/gllmuser
+    # Enable modern color support
+    environment:
+      - TERM=xterm-256color
+      - COLORTERM=truecolor
+    ports:
+      #- "8080:8080"  # Map your computer's 8080 to the container's 8080
+      - "9000:9000"  # For gllm's web UI if it uses port 9000
+    # Optional: ensure it runs the command correctly
+    entrypoint: ["/usr/bin/ttyd"]  # Override the gllm entrypoint    
+    #command: ["-W", "-p", "9000", "gllm"]
+    command: ["-W", "-p", "9000", "sh"]
+
+    # How to run ttyd:
+    # 1. Start the ttyd service: `docker compose run --rm --service-ports gllmd`
+    # 2. Open your browser and navigate to http://localhost:9000 to access the terminal interface.
+    # Note: If you want to run ttyd in the foreground for debugging 
+    # you must explicitly tell Docker to enable the port mappings

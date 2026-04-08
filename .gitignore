@@ -1,6 +1,7 @@
 # Specific
 design.md
 .qodo
+.npm/
 *.yaml
 *.json
 **test*/*
@@ -59,3 +60,6 @@ build/.env
 # Documents
 docs/
 plans/
+
+# Docker files
+.ash_history

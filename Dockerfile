@@ -25,7 +25,8 @@ RUN apk add --no-cache \
     ca-certificates \
     tzdata \
     nodejs \
-    npm
+    npm \
+    ttyd
 
 # Create a non-root user for security
 RUN adduser -D -g '' gllmuser
