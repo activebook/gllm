@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http" // Retained as it's used by headerTransport
 	"os"
@@ -77,6 +78,7 @@ type MCPClient struct {
 	servers       []*MCPServer
 	connected     map[string]bool
 	toolToSession map[string]*MCPSession
+	loaded        bool // Whether MCP is loaded already
 }
 type MCPLoadOption struct {
 	LoadAll       bool // load all tools(allowed|blocked)
@@ -105,17 +107,12 @@ func GetMCPClient() *MCPClient {
 // IsReady returns true if the client is initialized and has at least one tool loaded.
 // It is safe to call without locking.
 func (mc *MCPClient) IsReady() bool {
-	// mc.client is set under lock, but checking for nil is atomic enough locally
-	// In strict Go, reading it outside a lock while it might be written could be a race,
-	// but mc.client is only written once in Init() and then never touched until Close().
-	if mc.client == nil {
-		return false
-	}
-
 	// mc.mu.Lock()
 	// defer mc.mu.Unlock()
 	// return len(mc.toolToSession) > 0
-	return true
+
+	// when loaded is true, it means the MCP client is loaded once
+	return mc.client != nil && mc.ctx != nil && mc.cancel != nil && mc.loaded
 }
 
 func (mc *MCPClient) setMCPStatus() {
@@ -129,6 +126,13 @@ func (mc *MCPClient) setMCPStatus() {
 // PreloadAsync initializes the MCP client in the background.
 func (mc *MCPClient) PreloadAsync(servers map[string]*data.MCPServer, option MCPLoadOption) {
 	go func() {
+		if mc.IsReady() {
+			// Refresh status for the UI even if already ready
+			// fmt.Println("MCP is already ready")
+			mc.setMCPStatus()
+			return
+		}
+
 		// Only show loading status if there are actually servers to load
 		if len(servers) > 0 {
 			event.SendStatus("Loading MCP servers...")
@@ -136,6 +140,10 @@ func (mc *MCPClient) PreloadAsync(servers map[string]*data.MCPServer, option MCP
 
 		err := mc.Init(servers, option)
 		if err != nil {
+			if errors.Is(err, context.Canceled) || strings.Contains(err.Error(), "context canceled") {
+				// fmt.Println("MCP initialization aborted by /mcp switch")
+				return // Aborted by /mcp switch, yield to new initialization stream
+			}
 			event.SendBanner(getMCPFialedBanner(err))
 		}
 		mc.setMCPStatus() // Show status regardless of error
@@ -168,6 +176,7 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 	mc.mu.Unlock()
 	defer cancelInit()
 
+	var err error
 	// Connect to each server based on its type
 	for serverName, server := range servers {
 		// Skip if not in allowed list (if allow list is not empty)
@@ -203,12 +212,14 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 
 		if err != nil {
 			// don't continue with other servers
-			return fmt.Errorf("error loading mcp server %s: %v", serverName, err)
+			err = fmt.Errorf("error loading mcp server %s: %w", serverName, err)
+			break
 		}
 
 		tools, err := mc.GetTools(initCtx, session)
 		if err != nil {
-			return fmt.Errorf("error loading mcp server %s: %v", serverName, err)
+			err = fmt.Errorf("error loading mcp server %s: %w", serverName, err)
+			break
 		}
 		var resources *[]MCPResource
 		var prompts *[]MCPPrompt
@@ -235,7 +246,10 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 		mc.connected[serverName] = true
 		mc.mu.Unlock()
 	}
-	return nil
+	mc.mu.Lock()
+	mc.loaded = true
+	mc.mu.Unlock()
+	return err
 }
 
 func (mc *MCPClient) Close() {
@@ -254,6 +268,7 @@ func (mc *MCPClient) Close() {
 	mc.connected = nil
 	mc.client = nil
 	mc.ctx = nil
+	mc.loaded = false
 }
 
 func (mc *MCPClient) AddSseServer(ctx context.Context, name string, url string, headers map[string]string) (*MCPSession, error) {
