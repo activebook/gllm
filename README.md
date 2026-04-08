@@ -92,6 +92,11 @@ Clone the repo (or just download `docker-compose.yml`) and start a session:
 docker compose run --rm gllm
 ```
 
+Using web to access [http://localhost:9000](http://localhost:9000):
+```sh
+docker compose run --rm --service-ports gllm-web
+```
+
 ---
 
 ### Multi-Platform Self-Update
