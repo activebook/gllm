@@ -20,7 +20,17 @@ services:
     environment:
       - TERM=xterm-256color
       - COLORTERM=truecolor
+      # Proxy settings (if needed, adjust the proxy URL and port accordingly)
+      #- HTTP_PROXY=http://host.docker.internal:7890
+      #- HTTPS_PROXY=http://host.docker.internal:7890
+      #- http_proxy=http://host.docker.internal:7890
+      #- https_proxy=http://host.docker.internal:7890
     
+    # For linux
+    #network_mode: host
+    #extra_hosts:
+    #  - "host.docker.internal:host-gateway"
+
     # Keep the terminal open for interactive commands
     stdin_open: true
     tty: true

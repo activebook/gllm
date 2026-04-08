@@ -88,15 +88,23 @@ func SendEvent(msg tea.Msg) {
 		// We must here set the background status,
 		// otherwise it will not be displayed if activeProgram == nil
 		// and the status will be lost when the program is reloaded.
+		// We don't need to proceed to send the message to the active program
 		backgroundStatusMu.Lock()
 		backgroundStatus = status.Text
 		backgroundStatusMu.Unlock()
+		return
 	}
 
 	if activeProgram != nil {
-		go func() {
-			activeProgram.Send(msg)
-		}()
+		// tea.Program.Send is a blocking call. It must be called from a goroutine
+		// to avoid deadlocking when SendEvent is invoked from within a Bubble Tea
+		// Update handler (e.g. the ToggleSessionMode hook on KeyShiftTab).
+		//
+		// Message ordering for MCP status ("Loading..." → "Loaded...") is guaranteed
+		// by PreloadAsync, which sends both messages sequentially within a single
+		// background goroutine — so the goroutine-per-send approach here does not
+		// re-introduce the original race.
+		go activeProgram.Send(msg)
 	}
 }
 

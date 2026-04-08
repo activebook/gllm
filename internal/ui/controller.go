@@ -12,6 +12,7 @@ func StartUIEventListener() {
 		for {
 			select {
 			case ev := <-bus.Status:
+				// SendEvent will update the background status
 				SendEvent(StatusMsg{Text: ev.Text})
 			case ev := <-bus.Banner:
 				SendEvent(BannerMsg{Text: ev.Text})

@@ -116,22 +116,33 @@ func (mc *MCPClient) IsReady() bool {
 	return true
 }
 
+func (mc *MCPClient) setMCPStatus() {
+	mc.mu.Lock()
+	nServers := len(mc.connected)
+	nTools := len(mc.toolToSession)
+	mc.mu.Unlock()
+	event.SendStatus(fmt.Sprintf("MCP Loaded: %d servers %d tools", nServers, nTools))
+}
+
 // PreloadAsync initializes the MCP client in the background.
 func (mc *MCPClient) PreloadAsync(servers map[string]*data.MCPServer, option MCPLoadOption) {
 	go func() {
 		if mc.IsReady() {
+			// Refresh status for the UI even if already ready
+			mc.setMCPStatus()
 			return
 		}
-		event.SendStatus("Loading MCP servers...")
+
+		// Only show loading status if there are actually servers to load
+		if len(servers) > 0 {
+			event.SendStatus("Loading MCP servers...")
+		}
+
 		err := mc.Init(servers, option)
 		if err != nil {
 			event.SendBanner(getMCPFialedBanner(err))
-		} else {
-			mc.mu.Lock()
-			count := len(mc.toolToSession)
-			mc.mu.Unlock()
-			event.SendStatus(fmt.Sprintf("MCP Loaded: %d servers %d tools", len(mc.connected), count))
 		}
+		mc.setMCPStatus() // Show status regardless of error
 	}()
 }
 
