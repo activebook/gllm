@@ -333,10 +333,35 @@ var mcpSwitchCmd = &cobra.Command{
 			return // User cancelled
 		}
 
-		// Save updated allowed list to settings
-		if err := settingsStore.SetAllowedMCPServers(selected); err != nil {
-			fmt.Printf("Error saving MCP settings: %v\n", err)
-			return
+		// Check if the selection actually changed
+		oldAllowed := settingsStore.GetAllowedMCPServers()
+		changed := len(selected) != len(oldAllowed)
+		if !changed {
+			oldMap := make(map[string]bool)
+			for _, s := range oldAllowed {
+				oldMap[s] = true
+			}
+			for _, s := range selected {
+				if !oldMap[s] {
+					changed = true
+					break
+				}
+			}
+		}
+
+		if changed {
+			// Save updated allowed list to settings
+			if err := settingsStore.SetAllowedMCPServers(selected); err != nil {
+				fmt.Printf("Error saving MCP settings: %v\n", err)
+				return
+			}
+
+			// Reload MCP servers
+			mc := service.GetMCPClient()
+			mc.Close() // Must first close the old client
+			dataStore := data.NewConfigStore()
+			agent := dataStore.GetActiveAgent()
+			StartLoadMCPServer(agent)
 		}
 
 		// Run mcp list to show updated list

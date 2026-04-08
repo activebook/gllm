@@ -81,22 +81,32 @@ type PasteResultMsg struct {
 	PastedText        string // non-empty: insert into the textarea (text fallback)
 }
 
-// SendEvent dispatches a message to the active chat input program.
-// Goroutine-safe; saves status globally even if no program is running.
-func SendEvent(msg tea.Msg) {
+// SendSyncEvent dispatches a message to the active chat input program synchronously.
+// This is used for messages that need to be processed immediately.
+func SendSyncEvent(msg tea.Msg) {
 	if status, ok := msg.(StatusMsg); ok {
 		// We must here set the background status,
 		// otherwise it will not be displayed if activeProgram == nil
 		// and the status will be lost when the program is reloaded.
+		// We don't need to proceed to send the message to the active program
 		backgroundStatusMu.Lock()
 		backgroundStatus = status.Text
 		backgroundStatusMu.Unlock()
 	}
 
+	if prog := activeProgram; prog != nil {
+		// Send here to force ui to update
+		prog.Send(msg)
+	}
+}
+
+// SendEvent dispatches a message to the active chat input program.
+// Goroutine-safe; saves status globally even if no program is running.
+func SendEvent(msg tea.Msg) {
 	if activeProgram != nil {
-		go func() {
-			activeProgram.Send(msg)
-		}()
+		// tea.Program.Send is a blocking call. It must be called from a goroutine
+		// to avoid deadlocking when SendEvent is invoked from within a Bubble Tea
+		go activeProgram.Send(msg)
 	}
 }
 
