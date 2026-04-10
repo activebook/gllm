@@ -321,7 +321,7 @@ func (ri *ReplInfo) startREPL() {
 				fmt.Println("\nSession ended.")
 				break
 			}
-			util.Errorf("%v\n", err)
+			util.LogErrorf("%v\n", err)
 			break
 		}
 		if input == "" {
@@ -375,19 +375,19 @@ func (ri *ReplInfo) startWithLocalCommand(line string) bool {
 func (ri *ReplInfo) clearContext() {
 	agent, err := EnsureActiveAgent()
 	if err != nil {
-		util.Errorf("%v\n", err)
+		util.LogErrorf("%v\n", err)
 		return
 	}
 	// Construct session manager
 	session, err := service.ConstructSession(sessionName, agent.Model.Provider)
 	if err != nil {
-		util.Errorf("Error constructing session manager: %v\n", err)
+		util.LogErrorf("Error constructing session manager: %v\n", err)
 		return
 	}
 	// Clear session history
 	err = session.Clear()
 	if err != nil {
-		util.Errorf("Error clearing context: %v\n", err)
+		util.LogErrorf("Error clearing context: %v\n", err)
 		return
 	}
 	// Empty attachments
@@ -409,7 +409,7 @@ func (ri *ReplInfo) printSessionHistory() {
 
 	rendered, notice, err := service.RenderSessionHistory(agent, sessionName)
 	if err != nil {
-		util.Errorf("%v\n", err)
+		util.LogErrorf("%v\n", err)
 		return
 	}
 	if util.IsEmpty(rendered) {
@@ -427,7 +427,7 @@ func (ri *ReplInfo) printSessionHistory() {
 
 	// Print notice at the end if any
 	if !util.IsEmpty(notice) {
-		util.Warnf("%v\n", notice)
+		util.LogWarnf("%v\n", notice)
 	}
 }
 
@@ -435,13 +435,13 @@ func (ri *ReplInfo) printSessionHistory() {
 func (ri *ReplInfo) viewSessionHistory() {
 	agent, err := EnsureActiveAgent()
 	if err != nil {
-		util.Errorf("%v\n", err)
+		util.LogErrorf("%v\n", err)
 		return
 	}
 
 	provider, content, notice, err := service.RenderSessionForViewport(agent, sessionName)
 	if err != nil {
-		util.Errorf("%v\n", err)
+		util.LogErrorf("%v\n", err)
 		return
 	}
 	// If content is empty, return
@@ -458,12 +458,12 @@ func (ri *ReplInfo) viewSessionHistory() {
 	// p := tea.NewProgram(m, tea.WithAltScreen())
 	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
-		util.Errorf("Error running viewport: %v\n", err)
+		util.LogErrorf("Error running viewport: %v\n", err)
 	}
 
 	// Print notice after close the view if any
 	if !util.IsEmpty(notice) {
-		util.Warnf("%v\n", notice)
+		util.LogWarnf("%v\n", notice)
 	}
 }
 
@@ -472,7 +472,7 @@ func (ri *ReplInfo) compressContext() {
 	// Get active agent
 	agent, err := EnsureActiveAgent()
 	if err != nil {
-		util.Errorf("%v\n", err)
+		util.LogErrorf("%v\n", err)
 		return
 	}
 
@@ -483,7 +483,7 @@ func (ri *ReplInfo) compressContext() {
 			fmt.Println("No available session yet.")
 			return
 		}
-		util.Errorf("%v\n", err)
+		util.LogErrorf("%v\n", err)
 		return
 	}
 
@@ -493,25 +493,25 @@ func (ri *ReplInfo) compressContext() {
 	ui.GetIndicator().Stop()
 
 	if err != nil {
-		util.Errorf("Failed to compress session: %v\n", err)
+		util.LogErrorf("Failed to compress session: %v\n", err)
 		return
 	}
 
 	// Build the new compressed session
 	newData, err := service.BuildCompressedSession(summary, agent.Model.Provider)
 	if err != nil {
-		util.Errorf("Failed to build compressed session: %v\n", err)
+		util.LogErrorf("Failed to build compressed session: %v\n", err)
 		return
 	}
 
 	// Save back to the file format
 	err = service.WriteSessionContent(sessionName, newData)
 	if err != nil {
-		util.Errorf("Failed to save compressed session: %v\n", err)
+		util.LogErrorf("Failed to save compressed session: %v\n", err)
 		return
 	}
 
-	util.Successln("Compressed successfully!\nUse /history to view the compressed session.")
+	util.LogSuccessln("Compressed successfully!\nUse /history to view the compressed session.")
 }
 
 // renameSession uses the model synchronously to infer a meaningful name for
@@ -521,7 +521,7 @@ func (ri *ReplInfo) compressContext() {
 func (ri *ReplInfo) renameSession() {
 	agent, err := EnsureActiveAgent()
 	if err != nil {
-		util.Errorf("%v\n", err)
+		util.LogErrorf("%v\n", err)
 		return
 	}
 
@@ -531,7 +531,7 @@ func (ri *ReplInfo) renameSession() {
 			fmt.Println("No session history yet — nothing to rename.")
 			return
 		}
-		util.Errorf("%v\n", err)
+		util.LogErrorf("%v\n", err)
 		return
 	}
 	if len(sessionData) == 0 {
@@ -544,22 +544,22 @@ func (ri *ReplInfo) renameSession() {
 	ui.GetIndicator().Stop()
 
 	if err != nil {
-		util.Errorf("Failed to generate session name: %v\n", err)
+		util.LogErrorf("Failed to generate session name: %v\n", err)
 		return
 	}
 	if newName == sessionName {
-		util.Successln("Session name is already optimal: " + sessionName)
+		util.LogSuccessln("Session name is already optimal: " + sessionName)
 		return
 	}
 
 	if err := service.RenameSession(sessionName, newName); err != nil {
-		util.Errorf("Failed to rename session: %v\n", err)
+		util.LogErrorf("Failed to rename session: %v\n", err)
 		return
 	}
 
 	oldName := sessionName
 	sessionName = newName
-	util.Successln(fmt.Sprintf("Session renamed: %s → %s", oldName, newName))
+	util.LogSuccessln(fmt.Sprintf("Session renamed: %s → %s", oldName, newName))
 }
 
 func (ri *ReplInfo) autoRenameSessionOnce() {
@@ -572,7 +572,7 @@ func (ri *ReplInfo) autoRenameSessionOnce() {
 		}
 		agent, err := EnsureActiveAgent()
 		if err != nil {
-			util.Errorf("%v\n", err)
+			util.LogErrorf("%v\n", err)
 			return
 		}
 		if !service.IsAutoRenameEnabled(agent.Capabilities) {
@@ -598,9 +598,9 @@ func (ri *ReplInfo) copyLastMessage() {
 	// Actually copy to clipboard using atotto/clipboard
 	err := data.WriteClipboardText(lastAssistantMessage)
 	if err != nil {
-		util.Errorf("Failed to copy to clipboard: %v\n", err)
+		util.LogErrorf("Failed to copy to clipboard: %v\n", err)
 	}
-	util.Successln("Copied the last response to clipboard.")
+	util.LogSuccessln("Copied the last response to clipboard.")
 }
 
 func (ri *ReplInfo) callAgent(input string) {
@@ -614,7 +614,7 @@ func (ri *ReplInfo) callAgent(input string) {
 	// Call agent using the shared runner, passing persisted SharedState
 	err := RunAgent(prompt, guideline, ri.Files, sessionName, ri.outputFile, ri.sharedState)
 	if err != nil {
-		util.Errorf("%v\n", err)
+		util.LogErrorf("%v\n", err)
 		return
 	}
 
@@ -646,9 +646,9 @@ func (ri *ReplInfo) executeShellCommand(command string) {
 	// Display error if command failed
 	if err != nil {
 		if exitError, ok := err.(*exec.ExitError); ok {
-			util.Errorf("Command failed with exit code %d\n", exitError.ExitCode())
+			util.LogErrorf("Command failed with exit code %d\n", exitError.ExitCode())
 		} else {
-			util.Errorf("Command failed: %v\n", err)
+			util.LogErrorf("Command failed: %v\n", err)
 		}
 	}
 

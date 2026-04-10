@@ -4,6 +4,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/activebook/gllm/util"
+
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
@@ -39,7 +41,7 @@ Use 'gllm plugin switch' to toggle plugins on or off.`,
 		store := data.GetSettingsStore()
 		enabled := store.GetEnabledPlugins()
 		printPluginSummary(enabled)
-		fmt.Println("Use 'gllm plugin switch' to change.")
+		util.Println(cmd, "Use 'gllm plugin switch' to change.")
 	},
 }
 
@@ -93,17 +95,17 @@ var pluginSwitchCmd = &cobra.Command{
 			huh.NewGroup(msPlugins, pluginNote),
 		).Run()
 		if err != nil {
-			fmt.Println("Operation cancelled.")
+			util.Println(cmd, "Operation cancelled.")
 			return
 		}
 
 		if err := store.SetEnabledPlugins(selected); err != nil {
-			fmt.Printf("Error saving plugin settings: %v\n", err)
+			util.Printf(cmd, "Error saving plugin settings: %v\n", err)
 			return
 		}
 
-		fmt.Printf("Plugin settings updated. %d enabled.\n", len(selected))
-		fmt.Println()
+		util.Printf(cmd, "Plugin settings updated. %d enabled.\n", len(selected))
+		util.Println(cmd)
 		printPluginSummary(selected)
 	},
 }

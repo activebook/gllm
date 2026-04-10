@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/activebook/gllm/util"
+
 	"github.com/spf13/cobra"
 )
 
@@ -70,7 +72,7 @@ var mcpFilterCmd = &cobra.Command{
 					// If line is not empty, it's the last line.
 					if strings.TrimSpace(line) != "" {
 						if strings.HasPrefix(strings.TrimSpace(line), "{") {
-							fmt.Print(line)
+							util.Print(cmd, line)
 						}
 					}
 					break
@@ -81,7 +83,7 @@ var mcpFilterCmd = &cobra.Command{
 			trimmed := strings.TrimSpace(line)
 			if strings.HasPrefix(trimmed, "{") {
 				foundJSON = true
-				fmt.Print(line)
+				util.Print(cmd, line)
 			} else {
 				// Log filtered lines to stderr for debugging?
 				// fmt.Fprintf(os.Stderr, "[MCP-FILTER-DROPPED]: %s", line)

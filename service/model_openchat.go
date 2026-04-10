@@ -40,7 +40,7 @@ func (ag *Agent) getOpenChatFilePart(file *FileData) *model.ChatCompletionMessag
 				URL: videoURL,
 			},
 		}
-		util.Debugf("Created video part with type=%s, URL prefix=%s\n", part.Type, part.VideoURL.URL[:50])
+		util.LogDebugf("Created video part with type=%s, URL prefix=%s\n", part.Type, part.VideoURL.URL[:50])
 	} else if IsTextMIMEType(format) {
 		// Create and append text part
 		part = &model.ChatCompletionMessageContentPart{
@@ -277,7 +277,7 @@ func (c *OpenChat) process(ag *Agent) error {
 		messages, _ := ag.Session.GetMessages().([]*model.ChatCompletionMessage)
 
 		// Apply context window management.
-		util.Debugf("Context messages: [%d]\n", len(messages))
+		util.LogDebugf("Context messages: [%d]\n", len(messages))
 		pruned, truncated, err := ag.Context.PruneMessages(messages, ag.SystemPrompt, c.tools)
 		if err != nil {
 			return fmt.Errorf("failed to prune context: %w", err)
@@ -285,8 +285,8 @@ func (c *OpenChat) process(ag *Agent) error {
 		messages = pruned.([]*model.ChatCompletionMessage)
 
 		if truncated {
-			util.Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.\n", ag.Context.GetStrategy())
-			util.Debugf("Context messages after truncation: [%d]\n", len(messages))
+			util.LogWarnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.\n", ag.Context.GetStrategy())
+			util.LogDebugf("Context messages after truncation: [%d]\n", len(messages))
 			// Session write-back is clean: system message not yet prepended at this point.
 			ag.Session.SetMessages(messages)
 			if err := ag.Session.Save(); err != nil {
@@ -492,7 +492,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 					// Skip if not our expected function
 					// Because some model made up function name
 					if functionName != "" && !IsAvailableOpenTool(functionName) && !IsAvailableMCPTool(functionName, c.op.mcpClient) {
-						util.Warnf("Skipping tool call with unknown function name: %s\n", functionName)
+						util.LogWarnf("Skipping tool call with unknown function name: %s\n", functionName)
 						continue
 					}
 
@@ -567,7 +567,7 @@ func (c *OpenChat) processStream(stream *utils.ChatCompletionStreamReader) (*mod
 			// Sanitize arguments to handle cases like "}{" or trailing garbage
 			cleanedArgs := sanitizeToolArgs(tc.Function.Arguments)
 			if cleanedArgs != tc.Function.Arguments {
-				util.Debugf("Sanitized tool arguments for %s: %s -> %s\n", tc.Function.Name, tc.Function.Arguments, cleanedArgs)
+				util.LogDebugf("Sanitized tool arguments for %s: %s -> %s\n", tc.Function.Name, tc.Function.Arguments, cleanedArgs)
 				tc.Function.Arguments = cleanedArgs
 				// Update the map as well so local execution uses the clean version
 				toolCalls[id] = tc
@@ -591,7 +591,7 @@ func (c *OpenChat) processToolCall(toolCall model.ToolCall) (*model.ChatCompleti
 
 	if err := json.Unmarshal([]byte(argsStr), &argsMap); err != nil {
 		// Log the malformed JSON for debugging
-		util.Debugf("Failed to parse tool call arguments. Function: %s, Raw arguments: %s\n", toolCall.Function.Name, toolCall.Function.Arguments)
+		util.LogDebugf("Failed to parse tool call arguments. Function: %s, Raw arguments: %s\n", toolCall.Function.Name, toolCall.Function.Arguments)
 		return nil, fmt.Errorf("error parsing arguments: %v (raw: %s)", err, toolCall.Function.Arguments)
 	}
 

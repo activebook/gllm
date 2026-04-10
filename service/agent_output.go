@@ -32,6 +32,9 @@ func (ag *Agent) WriteText(text string) {
 	if ag.FileOutput != nil {
 		ag.FileOutput.Writef("%s", text)
 	}
+	if ag.SSEOutput != nil {
+		ag.SSEOutput.Writef("%s", text)
+	}
 }
 
 /*
@@ -39,6 +42,10 @@ StartReasoning notifies the user and logs to file that the agent has started thi
 It writes a status message to both Std and OutputFile if they are available.
 */
 func (ag *Agent) StartReasoning() {
+	if ag.SSEOutput != nil {
+		ag.SSEOutput.WriteSSEEvent("status", "start_reasoning")
+	}
+
 	if ag.StdOutput != nil {
 		if ag.Verbose {
 			ag.StdOutput.Writeln(data.ReasoningTagColor + StartThinking)
@@ -57,6 +64,10 @@ func (ag *Agent) StartReasoning() {
 }
 
 func (ag *Agent) CompleteReasoning() {
+	if ag.SSEOutput != nil {
+		ag.SSEOutput.WriteSSEEvent("status", "end_reasoning")
+	}
+
 	if ag.StdOutput != nil {
 		if ag.Verbose {
 			ag.StdOutput.Writeln(data.ResetSeq + data.ReasoningTagColor + EndThinking + data.ResetSeq)
@@ -93,6 +104,11 @@ func (ag *Agent) WriteReasoning(text string) {
 	// if ag.FileOutput != nil {
 	// 	ag.FileOutput.Writef("%s", text)
 	// }
+
+	// Write reasoning stream event payload
+	if ag.SSEOutput != nil {
+		ag.SSEOutput.WriteReasoningPayload(text)
+	}
 }
 
 func (ag *Agent) WriteMarkdown() {
@@ -121,19 +137,28 @@ func (ag *Agent) WriteDiffConfirm(text string) {
 }
 
 func (ag *Agent) WriteFunctionCall(text string) {
-	if ag.StdOutput != nil {
-		// Attempt to parse text as JSON
-		// The text is expected to be in format "function_name(arguments)" or just raw text
-		// But in our new implementation, we will pass a JSON string: {"function": name, "args": args}
+	// Attempt to parse text as JSON
+	// The text is expected to be in format "function_name(arguments)" or just raw text
+	// But in our new implementation, we will pass a JSON string: {"function": name, "args": args}
 
-		type ToolCallData struct {
-			Function string      `json:"function"`
-			Args     interface{} `json:"args"`
+	type ToolCallData struct {
+		Function string      `json:"function"`
+		Args     interface{} `json:"args"`
+	}
+
+	var output string
+	var toolData ToolCallData
+	err := json.Unmarshal([]byte(text), &toolData)
+
+	if ag.SSEOutput != nil {
+		if err == nil {
+			ag.SSEOutput.WriteSSEEvent("tool_call", toolData)
+		} else {
+			ag.SSEOutput.WriteSSEEvent("tool_call", text)
 		}
+	}
 
-		var output string
-		var toolData ToolCallData
-		err := json.Unmarshal([]byte(text), &toolData)
+	if ag.StdOutput != nil {
 		if err != nil {
 			// Fallback to original text if not JSON
 			output = data.ToolCallColor + text + data.ResetSeq
@@ -241,6 +266,10 @@ func (ag *Agent) WriteFunctionCallOver() {
 }
 
 func (ag *Agent) WriteEnd() {
+	if ag.SSEOutput != nil {
+		ag.SSEOutput.WriteSSEEvent("status", "agent_finished")
+	}
+
 	// Ensure output ends with a newline to prevent shell from displaying %
 	// the % character in shells like zsh when output doesn't end with newline
 	//if ag.Std != nil && ag.Markdown == nil && ag.TokenUsage == nil {
@@ -277,7 +306,7 @@ func (ag *Agent) Error(text string) {
 
 func (ag *Agent) Warn(text string) {
 	if ag.StdOutput != nil {
-		util.Warnf("%s\n", text)
+		util.LogWarnf("%s\n", text)
 	}
 	if ag.FileOutput != nil {
 		ag.FileOutput.Writef("\nWarning:\n%s\n", text)

@@ -343,7 +343,7 @@ type FetchResult struct {
 func fetchWorker(ctx context.Context, url string) (string, error) {
 	content, err := ExtractTextFromURL(ctx, url, nil)
 	if err != nil {
-		util.Debugf("Error fetching URL [%s]: %v\n", url, err)
+		util.LogDebugf("Error fetching URL [%s]: %v\n", url, err)
 		return "", err
 	}
 	return strings.Join(content, "\n"), nil
@@ -357,18 +357,18 @@ func FetchProcess(ctx context.Context, urls []string) []FetchResult {
 		Result FetchResult
 	}, len(urls))
 
-	util.Debugf("Fetching %d URLs...\n", len(urls))
+	util.LogDebugf("Fetching %d URLs...\n", len(urls))
 
 	for i, url := range urls {
 		wg.Add(1)
-		util.Debugf("Fetching URL [%s]...\n", url)
+		util.LogDebugf("Fetching URL [%s]...\n", url)
 		go func(idx int, u string) {
 			defer wg.Done()
 
 			// Recover from panics in goroutines to prevent crashes
 			defer func() {
 				if r := recover(); r != nil {
-					util.Debugf("Panic in fetch goroutine for URL [%s]: %v\n", u, r)
+					util.LogDebugf("Panic in fetch goroutine for URL [%s]: %v\n", u, r)
 					resultCh <- struct {
 						Index  int
 						Result FetchResult

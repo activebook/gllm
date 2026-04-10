@@ -117,7 +117,7 @@ func (mr *Markdown) Render(r io.Output) {
 
 	out, err2 := tr.Render(output)
 	if err2 != nil {
-		util.Warnf("Cannot render Markdown correctly: %v\n", err2)
+		util.LogWarnf("Cannot render Markdown correctly: %v\n", err2)
 		return
 	}
 

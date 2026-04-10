@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/activebook/gllm/util"
+
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -43,6 +45,6 @@ The command will display lines that are different between the two files:
 		}
 
 		diff := ui.Diff(string(content1), string(content2), file1, file2, contextLines)
-		fmt.Println(diff)
+		util.Println(cmd, diff)
 	},
 }

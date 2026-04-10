@@ -80,7 +80,7 @@ func NewContextManager(ag *Agent, strategy TruncationStrategy) ContextManager {
 		maxOutputTokens = limits.MaxOutputTokens
 	}
 
-	util.Debugf("Context Quota: modelName=%s, inputTokens=%d, outputTokens=%d, strategy=%s\n", ag.Model.Model, maxInputTokens, maxOutputTokens, strategy)
+	util.LogDebugf("Context Quota: modelName=%s, inputTokens=%d, outputTokens=%d, strategy=%s\n", ag.Model.Model, maxInputTokens, maxOutputTokens, strategy)
 	base := commonContext{
 		agent:           ag,
 		maxInputTokens:  maxInputTokens,

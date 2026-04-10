@@ -296,7 +296,7 @@ func (ga *Gemini) process(ag *Agent, config *genai.GenerateContentConfig) error 
 
 		// Context Management
 		// Directly truncate on the messages
-		util.Debugf("Context messages: [%d]\n", len(messages))
+		util.LogDebugf("Context messages: [%d]\n", len(messages))
 		// check context limit and prune if needed
 		pruned, truncated, err := ag.Context.PruneMessages(messages, ag.SystemPrompt, config.Tools)
 		if err != nil {
@@ -305,8 +305,8 @@ func (ga *Gemini) process(ag *Agent, config *genai.GenerateContentConfig) error 
 		messages = pruned.([]*genai.Content)
 
 		if truncated {
-			util.Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.\n", ag.Context.GetStrategy())
-			util.Debugf("Context messages after truncation: [%d]\n", len(messages))
+			util.LogWarnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.\n", ag.Context.GetStrategy())
+			util.LogDebugf("Context messages after truncation: [%d]\n", len(messages))
 			ag.Session.SetMessages(messages)
 			if err := ag.Session.Save(); err != nil {
 				return fmt.Errorf("failed to save truncated session: %w", err)
@@ -439,7 +439,7 @@ func (ga *Gemini) processStream(stream iter.Seq2[*genai.GenerateContentResponse,
 						funcName := part.FunctionCall.Name
 						if funcName != "" && !IsAvailableOpenTool(funcName) && !IsAvailableMCPTool(funcName, ga.op.mcpClient) {
 							// Skip unknown tools so they don't pollute history and cause 400 errors (Missing function response)
-							util.Warnf("Skipping tool call with unknown function name: %s\n", funcName)
+							util.LogWarnf("Skipping tool call with unknown function name: %s\n", funcName)
 							continue
 						}
 					}

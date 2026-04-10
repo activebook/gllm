@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/activebook/gllm/util"
+
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
@@ -27,13 +29,13 @@ Use 'gllm features switch' to toggle capabilities on or off.`,
 		store := data.NewConfigStore()
 		agent := store.GetActiveAgent()
 		if agent == nil {
-			fmt.Println("No active agent.")
+			util.Println(cmd, "No active agent.")
 			return
 		}
 
 		printCapSummary(agent.Capabilities)
 
-		fmt.Println("Use 'gllm features switch' to change.")
+		util.Println(cmd, "Use 'gllm features switch' to change.")
 	},
 }
 
@@ -46,7 +48,7 @@ var capsSwitchCmd = &cobra.Command{
 		store := data.NewConfigStore()
 		agent := store.GetActiveAgent()
 		if agent == nil {
-			fmt.Println("No active agent to configure.")
+			util.Println(cmd, "No active agent to configure.")
 			return
 		}
 
@@ -148,7 +150,7 @@ var capsSwitchCmd = &cobra.Command{
 			huh.NewGroup(msfeatures, featureNote),
 		).Run()
 		if err != nil {
-			fmt.Println("Operation cancelled.")
+			util.Println(cmd, "Operation cancelled.")
 			return
 		}
 
@@ -181,12 +183,12 @@ var capsSwitchCmd = &cobra.Command{
 		agent.Capabilities = newCaps
 
 		if err := store.SetAgent(agent.Name, agent); err != nil {
-			fmt.Printf("Error saving agent config: %v\n", err)
+			util.Printf(cmd, "Error saving agent config: %v\n", err)
 			return
 		}
 
-		fmt.Printf("Capabilities updated. %d enabled.\n", len(newCaps))
-		fmt.Println()
+		util.Printf(cmd, "Capabilities updated. %d enabled.\n", len(newCaps))
+		util.Println(cmd)
 		printCapSummary(agent.Capabilities)
 	},
 }

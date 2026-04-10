@@ -123,10 +123,10 @@ func RunAgent(prompt string, guideline string, files []*service.FileData, sessio
 			// Switch agent signal
 			if service.IsSwitchAgentError(err) {
 				switchErr, _ := service.AsSwitchAgentError(err)
-				util.Infof("Already switched to agent [%s].\n", switchErr.TargetAgent)
+				util.LogInfof("Already switched to agent [%s].\n", switchErr.TargetAgent)
 				// Set instruction, shouldn't use the old prompt
 				prompt = switchErr.Instruction
-				util.Debugf("Switch agent instruction: %s\n", prompt)
+				util.LogDebugf("Switch agent instruction: %s\n", prompt)
 				// Clearup files
 				files = nil
 				if prompt == "" {
@@ -139,7 +139,7 @@ func RunAgent(prompt string, guideline string, files []*service.FileData, sessio
 			} else if service.IsUserCancelError(err) {
 				// User cancelled operation
 				userCancelErr, _ := service.AsUserCancelError(err)
-				util.Infof("%v\n", userCancelErr)
+				util.LogInfof("%v\n", userCancelErr)
 				break
 			} else {
 				// Other error, return
@@ -168,7 +168,7 @@ func buildFinalPrompt(input string, guideline string) string {
 	if atCtx, err := atRefProcessor.ParseAndCollect(input); err == nil && atCtx != "" {
 		contextBlobs = append(contextBlobs, atCtx)
 	} else if err != nil {
-		util.Warnf("Skip processing @ references in prompt: %v\n", err)
+		util.LogWarnf("Skip processing @ references in prompt: %v\n", err)
 	}
 
 	// 3. Optional: Add guideline as a special context blob if present

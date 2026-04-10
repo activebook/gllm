@@ -314,7 +314,7 @@ func (oa *OpenAI) process(ag *Agent) error {
 		messages, _ := ag.Session.GetMessages().([]openai.ChatCompletionMessageParamUnion)
 
 		// Apply context window management.
-		util.Debugf("Context messages: [%d]\n", len(messages))
+		util.LogDebugf("Context messages: [%d]\n", len(messages))
 		pruned, truncated, err := ag.Context.PruneMessages(messages, ag.SystemPrompt, oa.tools)
 		if err != nil {
 			return fmt.Errorf("failed to prune context: %w", err)
@@ -322,8 +322,8 @@ func (oa *OpenAI) process(ag *Agent) error {
 		messages = pruned.([]openai.ChatCompletionMessageParamUnion)
 
 		if truncated {
-			util.Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.\n", ag.Context.GetStrategy())
-			util.Debugf("Context messages after truncation: [%d]\n", len(messages))
+			util.LogWarnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.\n", ag.Context.GetStrategy())
+			util.LogDebugf("Context messages after truncation: [%d]\n", len(messages))
 			// Save back only non-system messages to keep the session clean.
 			ag.Session.SetMessages(messages)
 			if err := ag.Session.Save(); err != nil {
@@ -511,7 +511,7 @@ func (oa *OpenAI) processStream(stream *ssestream.Stream[openai.ChatCompletionCh
 					// Skip if not our expected function
 					// Because some model made up function name
 					if functionName != "" && !IsAvailableOpenTool(functionName) && !IsAvailableMCPTool(functionName, oa.op.mcpClient) {
-						util.Warnf("Skipping tool call with unknown function name: %s\n", functionName)
+						util.LogWarnf("Skipping tool call with unknown function name: %s\n", functionName)
 						continue
 					}
 

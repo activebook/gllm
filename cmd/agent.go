@@ -48,13 +48,13 @@ different AI assistant setups with different models, tools, and settings.`,
 		store := data.NewConfigStore()
 		activeAgent := store.GetActiveAgent()
 		if activeAgent == nil {
-			fmt.Println("No current agent configuration found.")
-			fmt.Println()
+			util.Println(cmd, "No current agent configuration found.")
+			util.Println(cmd)
 			return
 		}
-		fmt.Println("Current agent configuration:")
+		util.Println(cmd, "Current agent configuration:")
 		printAgentConfigDetails(activeAgent, "")
-		fmt.Println()
+		util.Println(cmd)
 
 		// Then show the list of available agents
 		agentListCmd.Run(agentListCmd, args)
@@ -72,11 +72,11 @@ var agentListCmd = &cobra.Command{
 		store := data.NewConfigStore()
 		agents := store.GetAllAgents()
 		if len(agents) == 0 {
-			fmt.Printf("No agents configured yet. Use 'gllm agent add' to create one.\n")
+			util.Printf(cmd, "No agents configured yet. Use 'gllm agent add' to create one.\n")
 			return
 		}
 
-		fmt.Println("Available agents:")
+		util.Println(cmd, "Available agents:")
 
 		// Get agent names and sort them
 		names := make([]string, 0, len(agents))
@@ -94,14 +94,14 @@ var agentListCmd = &cobra.Command{
 			if active {
 				displayName = data.SwitchOnColor + name + data.ResetSeq
 			}
-			fmt.Printf("%s %s\n", indicator, displayName)
+			util.Printf(cmd, "%s %s\n", indicator, displayName)
 		}
 
 		if activeAgentName != "" {
-			fmt.Printf("\n%s = Current agent\n", ui.FormatEnabledIndicator(true))
+			util.Printf(cmd, "\n%s = Current agent\n", ui.FormatEnabledIndicator(true))
 		} else {
-			fmt.Println("\nNo agent selected. Use 'gllm agent switch <name>' to select one.")
-			fmt.Println("The first available agent will be used if needed.")
+			util.Println(cmd, "\nNo agent selected. Use 'gllm agent switch <name>' to select one.")
+			util.Println(cmd, "The first available agent will be used if needed.")
 		}
 	},
 }
@@ -177,7 +177,7 @@ var agentAddCmd = &cobra.Command{
 			).WithHeight(height),
 		).Run()
 		if err != nil {
-			fmt.Println("Aborted.")
+			util.Println(cmd, "Aborted.")
 			return
 		}
 
@@ -291,7 +291,7 @@ var agentAddCmd = &cobra.Command{
 			).WithHeight(height),
 		).Run()
 		if err != nil {
-			fmt.Println("Aborted.")
+			util.Println(cmd, "Aborted.")
 			return
 		}
 
@@ -308,11 +308,11 @@ var agentAddCmd = &cobra.Command{
 
 		err = store.SetAgent(name, agentConfig)
 		if err != nil {
-			fmt.Printf("Error adding agent: %v\n", err)
+			util.Printf(cmd, "Error adding agent: %v\n", err)
 			return
 		}
 
-		fmt.Printf("Agent '%s' added successfully.\n", name)
+		util.Printf(cmd, "Agent '%s' added successfully.\n", name)
 	},
 }
 
@@ -332,7 +332,7 @@ var agentSetCmd = &cobra.Command{
 			// Select agent
 			agents := store.GetAllAgents()
 			if len(agents) == 0 {
-				fmt.Println("No agents found.")
+				util.Println(cmd, "No agents found.")
 				return
 			}
 
@@ -365,7 +365,7 @@ var agentSetCmd = &cobra.Command{
 				huh.NewGroup(sel, note),
 			).Run()
 			if err != nil {
-				fmt.Println("Aborted.")
+				util.Println(cmd, "Aborted.")
 				return
 			}
 		}
@@ -373,7 +373,7 @@ var agentSetCmd = &cobra.Command{
 		// Get existing agent configuration
 		agent := store.GetAgent(name)
 		if agent == nil {
-			fmt.Printf("Agent '%s' not found.\n", name)
+			util.Printf(cmd, "Agent '%s' not found.\n", name)
 			return
 		}
 
@@ -462,7 +462,7 @@ var agentSetCmd = &cobra.Command{
 			),
 		).Run()
 		if err != nil {
-			fmt.Println("Aborted.")
+			util.Println(cmd, "Aborted.")
 			return
 		}
 
@@ -546,7 +546,7 @@ var agentSetCmd = &cobra.Command{
 		).Run()
 
 		if err != nil {
-			fmt.Println("Aborted.")
+			util.Println(cmd, "Aborted.")
 			return
 		}
 
@@ -570,11 +570,11 @@ var agentSetCmd = &cobra.Command{
 
 		err = store.SetAgent(name, agentConfig)
 		if err != nil {
-			fmt.Printf("Error updating agent: %v\n", err)
+			util.Printf(cmd, "Error updating agent: %v\n", err)
 			return
 		}
 
-		fmt.Printf("Agent '%s' updated successfully.\n", name)
+		util.Printf(cmd, "Agent '%s' updated successfully.\n", name)
 	},
 }
 
@@ -594,7 +594,7 @@ var agentRemoveCmd = &cobra.Command{
 			// Select agent to remove
 			agents := store.GetAllAgents()
 			if len(agents) == 0 {
-				fmt.Println("No agents found.")
+				util.Println(cmd, "No agents found.")
 				return
 			}
 
@@ -625,7 +625,7 @@ var agentRemoveCmd = &cobra.Command{
 				huh.NewGroup(sel, note),
 			).Run()
 			if err != nil {
-				fmt.Println("Aborted.")
+				util.Println(cmd, "Aborted.")
 				return
 			}
 		}
@@ -640,22 +640,22 @@ var agentRemoveCmd = &cobra.Command{
 			Run()
 
 		if err != nil {
-			fmt.Println("Aborted.")
+			util.Println(cmd, "Aborted.")
 			return
 		}
 
 		if !confirm {
-			fmt.Println("Operation cancelled.")
+			util.Println(cmd, "Operation cancelled.")
 			return
 		}
 
 		err = store.DeleteAgent(name)
 		if err != nil {
-			fmt.Printf("Error removing agent: %v\n", err)
+			util.Printf(cmd, "Error removing agent: %v\n", err)
 			return
 		}
 
-		fmt.Printf("Agent '%s' removed successfully.\n", name)
+		util.Printf(cmd, "Agent '%s' removed successfully.\n", name)
 	},
 }
 
@@ -677,7 +677,7 @@ tools, search settings, and other preferences to match the selected agent.`,
 			// Interactive select
 			agents := store.GetAllAgents()
 			if len(agents) == 0 {
-				fmt.Println("No agents found.")
+				util.Println(cmd, "No agents found.")
 				return
 			}
 
@@ -711,18 +711,18 @@ tools, search settings, and other preferences to match the selected agent.`,
 			).Run()
 
 			if err != nil {
-				fmt.Println("Aborted.")
+				util.Println(cmd, "Aborted.")
 				return
 			}
 		}
 
 		err := store.SetActiveAgent(name)
 		if err != nil {
-			fmt.Printf("Error switching to agent: %v\n", err)
+			util.Printf(cmd, "Error switching to agent: %v\n", err)
 			return
 		}
 
-		fmt.Printf("Switched to agent '%s'.\n", name)
+		util.Printf(cmd, "Switched to agent '%s'.\n", name)
 	},
 }
 
@@ -781,7 +781,7 @@ var agentInfoCmd = &cobra.Command{
 			return fmt.Errorf("agent '%s' not found", name)
 		}
 
-		fmt.Printf("Agent '%s' configuration:\n", name)
+		util.Printf(cmd, "Agent '%s' configuration:\n", name)
 		// Display configuration using the same formatting as add/set commands
 		printAgentConfigDetails(agentConfig, "")
 		return nil
@@ -809,7 +809,7 @@ var agentRenameCmd = &cobra.Command{
 		if oldName == "" {
 			agents := store.GetAllAgents()
 			if len(agents) == 0 {
-				fmt.Println("No agents found.")
+				util.Println(cmd, "No agents found.")
 				return
 			}
 			var options []huh.Option[string]
@@ -827,14 +827,14 @@ var agentRenameCmd = &cobra.Command{
 				Value(&oldName).
 				Run()
 			if err != nil {
-				fmt.Println("Aborted.")
+				util.Println(cmd, "Aborted.")
 				return
 			}
 		}
 
 		// Check if old agent exists
 		if store.GetAgent(oldName) == nil {
-			fmt.Printf("Agent '%s' not found.\n", oldName)
+			util.Printf(cmd, "Agent '%s' not found.\n", oldName)
 			return
 		}
 
@@ -859,18 +859,18 @@ var agentRenameCmd = &cobra.Command{
 				}).
 				Run()
 			if err != nil {
-				fmt.Println("Aborted.")
+				util.Println(cmd, "Aborted.")
 				return
 			}
 		}
 
 		// Perform rename
 		if err := store.RenameAgent(oldName, newName); err != nil {
-			util.Errorf("Failed to rename agent: %v\n", err)
+			util.Errorf(cmd, "Failed to rename agent: %v\n", err)
 			return
 		}
 
-		fmt.Printf("Agent '%s' successfully renamed to '%s'.\n", oldName, newName)
+		util.Printf(cmd, "Agent '%s' successfully renamed to '%s'.\n", oldName, newName)
 	},
 }
 
@@ -1066,7 +1066,7 @@ If [FILE] is a directory the file is placed inside that directory as <name>.md.`
 		if err := data.ExportAgent(name, destPath); err != nil {
 			return fmt.Errorf("failed to export agent: %w", err)
 		}
-		fmt.Printf("Agent '%s' exported to: %s\n", name, destPath)
+		util.Printf(cmd, "Agent '%s' exported to: %s\n", name, destPath)
 		return nil
 	},
 }
@@ -1085,7 +1085,7 @@ already exists you will be prompted to confirm overwrite.`,
 		srcPath := args[0]
 
 		if _, err := os.Stat(srcPath); os.IsNotExist(err) {
-			util.Errorf("File not found: %s\n", srcPath)
+			util.Errorf(cmd, "File not found: %s\n", srcPath)
 			return
 		}
 
@@ -1094,15 +1094,15 @@ already exists you will be prompted to confirm overwrite.`,
 		// Parse and validate frontmatter before touching the config dir.
 		agent, err := data.ParseAgentFile(srcPath)
 		if err != nil {
-			util.Errorf("Invalid agent file: %v\n", err)
+			util.Errorf(cmd, "Invalid agent file: %v\n", err)
 			return
 		}
 		if agent.Name == "" {
-			util.Errorf("Agent file is missing a 'name' field in its frontmatter.\n")
+			util.Errorf(cmd, "Agent file is missing a 'name' field in its frontmatter.\n")
 			return
 		}
 		if err := util.ValidateResourceName("agent", agent.Name); err != nil {
-			util.Errorf("Agent name is invalid: %v\n", err)
+			util.Errorf(cmd, "Agent name is invalid: %v\n", err)
 			return
 		}
 
@@ -1117,15 +1117,15 @@ already exists you will be prompted to confirm overwrite.`,
 				),
 			).Run()
 			if !overwrite {
-				fmt.Println("Import cancelled.")
+				util.Println(cmd, "Import cancelled.")
 				return
 			}
 		}
 
 		if err := data.ImportAgent(srcPath); err != nil {
-			util.Errorf("Failed to import agent: %v\n", err)
+			util.Errorf(cmd, "Failed to import agent: %v\n", err)
 			return
 		}
-		fmt.Printf("Agent '%s' imported successfully.\n", agent.Name)
+		util.Printf(cmd, "Agent '%s' imported successfully.\n", agent.Name)
 	},
 }

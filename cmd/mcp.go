@@ -11,11 +11,12 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/activebook/gllm/util"
+
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/io"
 	"github.com/activebook/gllm/service"
-	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -36,8 +37,8 @@ Use 'gllm mcp switch' to switch MCP servers on or off.`,
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(cmd.Long)
-		fmt.Println()
+		util.Println(cmd, cmd.Long)
+		util.Println(cmd)
 		mcpListCmd.Run(mcpListCmd, args)
 	},
 }
@@ -55,7 +56,7 @@ var mcpLoadCmd = &cobra.Command{
 		store := data.NewMCPStore()
 		mcpConfig, err := store.Load()
 		if err != nil {
-			fmt.Printf("Error loading MCP config: %v\n", err)
+			util.Printf(cmd, "Error loading MCP config: %v\n", err)
 			return
 		}
 
@@ -79,17 +80,17 @@ var mcpLoadCmd = &cobra.Command{
 		}) // Load all servers if detail is true, else false
 		ui.GetIndicator().Stop()
 		if err != nil {
-			fmt.Printf("Error initializing MCP client: %v\n", err)
+			util.Printf(cmd, "Error initializing MCP client: %v\n", err)
 			return
 		}
 
 		servers := client.GetAllServers()
 		if len(servers) == 0 {
-			fmt.Println("No MCP servers available.")
+			util.Println(cmd, "No MCP servers available.")
 			return
 		}
 
-		fmt.Println("Available MCP Servers:")
+		util.Println(cmd, "Available MCP Servers:")
 
 		for _, server := range servers {
 			enableIndicator := ui.FormatEnabledIndicator(server.Allowed)
@@ -99,52 +100,52 @@ var mcpLoadCmd = &cobra.Command{
 			} else {
 				statusSuffix = data.SwitchOffColor + "(blocked)" + data.ResetSeq
 			}
-			fmt.Printf("\n%s %sServer: %s%s %s\n", enableIndicator, data.SwitchOnColor, server.Name, data.ResetSeq, statusSuffix)
+			util.Printf(cmd, "\n%s %sServer: %s%s %s\n", enableIndicator, data.SwitchOnColor, server.Name, data.ResetSeq, statusSuffix)
 			if server.Tools != nil {
 				for _, tool := range *server.Tools {
-					fmt.Printf("  • %s%s%s\n", data.ToolCallColor, tool.Name, data.ResetSeq)
+					util.Printf(cmd, "  • %s%s%s\n", data.ToolCallColor, tool.Name, data.ResetSeq)
 					if tool.Description != "" {
-						fmt.Printf("    Description: %s\n", tool.Description)
+						util.Printf(cmd, "    Description: %s\n", tool.Description)
 					}
 					if len(tool.Parameters) > 0 {
-						fmt.Printf("    Parameters:\n")
+						util.Printf(cmd, "    Parameters:\n")
 						for param, desc := range tool.Parameters {
-							fmt.Printf("      - %s: %s\n", param, desc)
+							util.Printf(cmd, "      - %s: %s\n", param, desc)
 						}
 					}
-					fmt.Println()
+					util.Println(cmd)
 				}
 			}
 			if server.Resources != nil && len(*server.Resources) > 0 {
-				fmt.Println("  Resources:")
+				util.Println(cmd, "  Resources:")
 				for _, resource := range *server.Resources {
-					fmt.Printf("    • %s%s%s\n", data.ToolCallColor, resource.Name, data.ResetSeq)
+					util.Printf(cmd, "    • %s%s%s\n", data.ToolCallColor, resource.Name, data.ResetSeq)
 					if resource.Description != "" {
-						fmt.Printf("      Description: %s\n", resource.Description)
+						util.Printf(cmd, "      Description: %s\n", resource.Description)
 					}
 					if resource.URI != "" {
-						fmt.Printf("      URI: %s\n", resource.URI)
+						util.Printf(cmd, "      URI: %s\n", resource.URI)
 					}
 					if resource.MIMEType != "" {
-						fmt.Printf("      MIME Type: %s\n", resource.MIMEType)
+						util.Printf(cmd, "      MIME Type: %s\n", resource.MIMEType)
 					}
-					fmt.Println()
+					util.Println(cmd)
 				}
 			}
 			if server.Prompts != nil && len(*server.Prompts) > 0 {
-				fmt.Println("  Prompts:")
+				util.Println(cmd, "  Prompts:")
 				for _, prompt := range *server.Prompts {
-					fmt.Printf("    • %s%s%s\n", data.ToolCallColor, prompt.Name, data.ResetSeq)
+					util.Printf(cmd, "    • %s%s%s\n", data.ToolCallColor, prompt.Name, data.ResetSeq)
 					if prompt.Description != "" {
-						fmt.Printf("      Description: %s\n", prompt.Description)
+						util.Printf(cmd, "      Description: %s\n", prompt.Description)
 					}
 					if len(prompt.Parameters) > 0 {
-						fmt.Printf("      Parameters:\n")
+						util.Printf(cmd, "      Parameters:\n")
 						for param, desc := range prompt.Parameters {
-							fmt.Printf("        - %s: %s\n", param, desc)
+							util.Printf(cmd, "        - %s: %s\n", param, desc)
 						}
 					}
-					fmt.Println()
+					util.Println(cmd)
 				}
 			}
 		}
@@ -160,17 +161,17 @@ var mcpListCmd = &cobra.Command{
 		store := data.NewMCPStore()
 		servers, err := store.Load()
 		if err != nil {
-			fmt.Printf("Error loading MCP config: %v\n", err)
+			util.Printf(cmd, "Error loading MCP config: %v\n", err)
 			return
 		}
 
 		if len(servers) == 0 {
-			fmt.Println("No MCP servers defined.")
+			util.Println(cmd, "No MCP servers defined.")
 			return
 		}
 
-		fmt.Println("Available MCP servers:")
-		fmt.Println()
+		util.Println(cmd, "Available MCP servers:")
+		util.Println(cmd)
 
 		// Sort keys for consistent output
 		names := make([]string, 0, len(servers))
@@ -192,10 +193,10 @@ var mcpListCmd = &cobra.Command{
 				statusSuffix = data.SwitchOffColor + "(blocked)" + data.ResetSeq
 			}
 
-			fmt.Printf("%s %-18s %-7s %s\n", enableIndicator, name, server.Type, statusSuffix)
+			util.Printf(cmd, "%s %-18s %-7s %s\n", enableIndicator, name, server.Type, statusSuffix)
 		}
 
-		fmt.Printf("\n%s = Allowed MCP server\n", ui.FormatEnabledIndicator(true))
+		util.Printf(cmd, "\n%s = Allowed MCP server\n", ui.FormatEnabledIndicator(true))
 	},
 }
 
@@ -226,11 +227,11 @@ in the current directory.`,
 		store := data.NewMCPStore()
 		err := store.Export(exportPath)
 		if err != nil {
-			fmt.Printf("Error exporting MCP configuration: %v\n", err)
+			util.Printf(cmd, "Error exporting MCP configuration: %v\n", err)
 			return
 		}
 
-		fmt.Printf("MCP configuration exported successfully to: %s\n", exportPath)
+		util.Printf(cmd, "MCP configuration exported successfully to: %s\n", exportPath)
 	},
 }
 
@@ -247,11 +248,11 @@ This will replace the current MCP configuration with the imported one.`,
 		store := data.NewMCPStore()
 		err := store.Import(importFile)
 		if err != nil {
-			fmt.Printf("Error importing MCP configuration: %v\n", err)
+			util.Printf(cmd, "Error importing MCP configuration: %v\n", err)
 			return
 		}
 
-		fmt.Printf("MCP configuration imported successfully from: %s\n", importFile)
+		util.Printf(cmd, "MCP configuration imported successfully from: %s\n", importFile)
 	},
 }
 
@@ -269,12 +270,12 @@ var mcpPathCmd = &cobra.Command{
 			// File doesn't exist, initialize with template
 			err := store.CreateTemplate()
 			if err != nil {
-				fmt.Printf("Error initializing MCP configuration file: %v\n", err)
+				util.Printf(cmd, "Error initializing MCP configuration file: %v\n", err)
 				return
 			}
-			fmt.Printf("MCP configuration file initialized at: %s\n", configPath)
+			util.Printf(cmd, "MCP configuration file initialized at: %s\n", configPath)
 		} else {
-			fmt.Printf("MCP configuration file location: %s\n", configPath)
+			util.Printf(cmd, "MCP configuration file location: %s\n", configPath)
 		}
 	},
 }
@@ -289,12 +290,12 @@ var mcpSwitchCmd = &cobra.Command{
 		store := data.NewMCPStore()
 		servers, err := store.Load()
 		if err != nil {
-			fmt.Printf("Error loading MCP config: %v\n", err)
+			util.Printf(cmd, "Error loading MCP config: %v\n", err)
 			return
 		}
 
 		if len(servers) == 0 {
-			fmt.Println("No MCP servers defined.")
+			util.Println(cmd, "No MCP servers defined.")
 			return
 		}
 
@@ -352,7 +353,7 @@ var mcpSwitchCmd = &cobra.Command{
 		if changed {
 			// Save updated allowed list to settings
 			if err := settingsStore.SetAllowedMCPServers(selected); err != nil {
-				fmt.Printf("Error saving MCP settings: %v\n", err)
+				util.Printf(cmd, "Error saving MCP settings: %v\n", err)
 				return
 			}
 
@@ -365,8 +366,8 @@ var mcpSwitchCmd = &cobra.Command{
 		}
 
 		// Run mcp list to show updated list
-		fmt.Printf("%d MCP Server(s) enabled.\n", len(selected))
-		fmt.Println()
+		util.Printf(cmd, "%d MCP Server(s) enabled.\n", len(selected))
+		util.Println(cmd)
 		mcpListCmd.Run(mcpListCmd, args)
 	},
 }
@@ -382,7 +383,7 @@ var mcpSetCmd = &cobra.Command{
 		// Ensure file exists
 		if _, err := os.Stat(configPath); os.IsNotExist(err) {
 			if err := store.CreateTemplate(); err != nil {
-				util.Errorf("Error creating MCP configuration file: %v\n", err)
+				util.Errorf(cmd, "Error creating MCP configuration file: %v\n", err)
 				return
 			}
 		}
@@ -390,7 +391,7 @@ var mcpSetCmd = &cobra.Command{
 		// Read content
 		contentBytes, err := os.ReadFile(configPath)
 		if err != nil {
-			util.Errorf("Error reading config file: %v\n", err)
+			util.Errorf(cmd, "Error reading config file: %v\n", err)
 			return
 		}
 		content := string(contentBytes)
@@ -416,9 +417,9 @@ var mcpSetCmd = &cobra.Command{
 			cmdE.Stdout = os.Stdout
 			cmdE.Stderr = os.Stderr
 
-			fmt.Printf("Opening in %s...\n", editor)
+			util.Printf(cmd, "Opening in %s...\n", editor)
 			if err := cmdE.Run(); err != nil {
-				util.Errorf("Editor failed: %v\n", err)
+				util.Errorf(cmd, "Editor failed: %v\n", err)
 				return
 			}
 			// Reload content
@@ -449,7 +450,7 @@ var mcpSetCmd = &cobra.Command{
 			).WithKeyMap(ui.GetHuhKeyMap())
 			err = form.Run()
 			if err != nil {
-				fmt.Println("Edit cancelled.")
+				util.Println(cmd, "Edit cancelled.")
 				return
 			}
 		}
@@ -457,7 +458,7 @@ var mcpSetCmd = &cobra.Command{
 		// Validate JSON
 		var js map[string]interface{}
 		if err := json.Unmarshal([]byte(content), &js); err != nil {
-			util.Errorf("Invalid JSON content - %v\n", err)
+			util.Errorf(cmd, "Invalid JSON content - %v\n", err)
 			return
 		}
 
@@ -468,11 +469,11 @@ var mcpSetCmd = &cobra.Command{
 
 		// Save content
 		if err := os.WriteFile(configPath, prettyJSON.Bytes(), 0644); err != nil {
-			util.Errorf("Error saving config file: %v\n", err)
+			util.Errorf(cmd, "Error saving config file: %v\n", err)
 			return
 		}
 
-		fmt.Println("MCP configuration updated successfully.")
+		util.Println(cmd, "MCP configuration updated successfully.")
 
 		// Reload MCPs
 		mcpListCmd.Run(cmd, args)

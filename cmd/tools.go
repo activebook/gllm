@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/activebook/gllm/util"
+
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/io"
@@ -43,8 +45,8 @@ Use 'gllm tools sw' to select which tools to enable for the current agent.`,
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(cmd.Long)
-		fmt.Println()
+		util.Println(cmd, cmd.Long)
+		util.Println(cmd)
 		ListAllTools()
 	},
 }
@@ -58,7 +60,7 @@ var toolsSwCmd = &cobra.Command{
 		store := data.NewConfigStore()
 		agent := store.GetActiveAgent()
 		if agent == nil {
-			fmt.Println("No active agent found")
+			util.Println(cmd, "No active agent found")
 			return
 		}
 
@@ -100,7 +102,7 @@ var toolsSwCmd = &cobra.Command{
 		).Run()
 
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
+			util.Printf(cmd, "Error: %v\n", err)
 			return
 		}
 
@@ -108,7 +110,7 @@ var toolsSwCmd = &cobra.Command{
 		agent.Tools = selectedTools
 		err = store.SetAgent(agent.Name, agent)
 		if err != nil {
-			fmt.Printf("Error saving tools config: %v\n", err)
+			util.Printf(cmd, "Error saving tools config: %v\n", err)
 			return
 		}
 

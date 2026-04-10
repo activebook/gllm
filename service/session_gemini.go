@@ -129,7 +129,7 @@ func (s *GeminiSession) MarshalMessages(messages []*genai.Content, dropToolConte
 		// Marshal to JSON (compact, no indent for JSONL)
 		line, err := json.Marshal(formatted)
 		if err != nil {
-			util.Warnf("failed to serialize message: %v\n", err)
+			util.LogWarnf("failed to serialize message: %v\n", err)
 			continue
 		}
 

@@ -259,7 +259,7 @@ func (e *SubAgentExecutor) executeTask(agent *ActiveAgent, task *SubAgentTask) *
 				contentStr := fmt.Sprintf("%v", val)
 				ctxBlob.WriteString(fmt.Sprintf("\n## Output from '%s':\n%s\n", util.GetSanitizeTitle(key), contentStr))
 			} else {
-				util.Warnf("Sub-agent input key '%s' not found in SharedState, skipping.\n", key)
+				util.LogWarnf("Sub-agent input key '%s' not found in SharedState, skipping.\n", key)
 			}
 		}
 		finalInstruction = BuildInlineContextBlock([]string{ctxBlob.String()}) + task.Instruction

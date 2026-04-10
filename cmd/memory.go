@@ -5,9 +5,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/activebook/gllm/util"
+
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
-	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -30,8 +31,8 @@ or use 'memory path' to see where the memory file is located.`,
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		// Show current memory status
-		fmt.Println(cmd.Long)
-		fmt.Println()
+		util.Println(cmd, cmd.Long)
+		util.Println(cmd)
 		memoryListCmd.Run(cmd, args)
 	},
 }
@@ -49,24 +50,24 @@ Example:
 		store := data.NewMemoryStore()
 		memories, err := store.Load()
 		if err != nil {
-			util.Errorf("Error loading memories: %v\n", err)
+			util.Errorf(cmd, "Error loading memories: %v\n", err)
 			return
 		}
 
 		if len(memories) == 0 {
-			fmt.Println("No memories saved yet.")
-			fmt.Println("Use 'gllm memory add \"your memory\"' to add one.")
+			util.Println(cmd, "No memories saved yet.")
+			util.Println(cmd, "Use 'gllm memory add \"your memory\"' to add one.")
 			return
 		}
 
 		verbose, _ := cmd.Flags().GetBool("verbose")
 
-		fmt.Printf("%s%s%s (%d)\n", data.SectionColor, "Saved Memories", data.ResetSeq, len(memories))
-		fmt.Println()
+		util.Printf(cmd, "%s%s%s (%d)\n", data.SectionColor, "Saved Memories", data.ResetSeq, len(memories))
+		util.Println(cmd)
 
 		for i, memory := range memories {
 			if verbose {
-				fmt.Printf("%d. %s%s%s\n", i+1, data.LabelColor, memory, data.ResetSeq)
+				util.Printf(cmd, "%d. %s%s%s\n", i+1, data.LabelColor, memory, data.ResetSeq)
 			} else {
 				// Truncate long memories for display
 				displayMemory := memory
@@ -75,7 +76,7 @@ Example:
 				} else {
 					displayMemory = memory
 				}
-				fmt.Printf("%d. %s%s%s\n", i+1, data.LabelColor, displayMemory, data.ResetSeq)
+				util.Printf(cmd, "%d. %s%s%s\n", i+1, data.LabelColor, displayMemory, data.ResetSeq)
 			}
 		}
 	},
@@ -118,18 +119,18 @@ Examples:
 		}
 
 		if strings.TrimSpace(memory) == "" {
-			util.Errorf("Memory content cannot be empty\n")
+			util.Errorf(cmd, "Memory content cannot be empty\n")
 			return
 		}
 
 		store := data.NewMemoryStore()
 		err := store.Add(memory)
 		if err != nil {
-			util.Errorf("Error adding memory: %v\n", err)
+			util.Errorf(cmd, "Error adding memory: %v\n", err)
 			return
 		}
 
-		fmt.Printf("✓ Memory added: %s%s%s\n", data.SwitchOnColor, memory, data.ResetSeq)
+		util.Printf(cmd, "✓ Memory added: %s%s%s\n", data.SwitchOnColor, memory, data.ResetSeq)
 	},
 }
 
@@ -149,16 +150,16 @@ Example:
 			store := data.NewMemoryStore()
 			memories, err := store.Load()
 			if err != nil {
-				util.Errorf("Error loading memories: %v\n", err)
+				util.Errorf(cmd, "Error loading memories: %v\n", err)
 				return
 			}
 
 			if len(memories) == 0 {
-				fmt.Println("No memories to clear.")
+				util.Println(cmd, "No memories to clear.")
 				return
 			}
 
-			fmt.Printf("This will delete %d memories. This cannot be undone.\n", len(memories))
+			util.Printf(cmd, "This will delete %d memories. This cannot be undone.\n", len(memories))
 
 			var confirm bool
 			err = huh.NewConfirm().
@@ -170,7 +171,7 @@ Example:
 				return
 			}
 			if !confirm {
-				fmt.Println("Operation cancelled.")
+				util.Println(cmd, "Operation cancelled.")
 				return
 			}
 		}
@@ -178,11 +179,11 @@ Example:
 		store := data.NewMemoryStore()
 		err := store.Clear()
 		if err != nil {
-			util.Errorf("Error clearing memories: %v\n", err)
+			util.Errorf(cmd, "Error clearing memories: %v\n", err)
 			return
 		}
 
-		fmt.Println("✓ All memories have been cleared.")
+		util.Println(cmd, "✓ All memories have been cleared.")
 	},
 }
 
@@ -199,12 +200,12 @@ var memoryPathCmd = &cobra.Command{
 			// Create the file if it doesn't exist
 			err := store.Save([]string{})
 			if err != nil {
-				util.Errorf("Error initializing memory file: %v\n", err)
+				util.Errorf(cmd, "Error initializing memory file: %v\n", err)
 				return
 			}
-			fmt.Printf("Memory file initialized at: %s\n", memoryPath)
+			util.Printf(cmd, "Memory file initialized at: %s\n", memoryPath)
 		} else {
-			fmt.Printf("Memory file location: %s\n", memoryPath)
+			util.Printf(cmd, "Memory file location: %s\n", memoryPath)
 		}
 	},
 }

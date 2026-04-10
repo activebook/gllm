@@ -109,7 +109,7 @@ func (op *OpenProcessor) openChatMCPToolCall(toolCall *model.ToolCall, argsMap *
 		},
 	}
 
-	util.Debugf("OpenChatMCPToolCall Response: %s\n", *toolMessage.Content.StringValue)
+	util.LogDebugf("OpenChatMCPToolCall Response: %s\n", *toolMessage.Content.StringValue)
 	return &toolMessage, nil
 }
 

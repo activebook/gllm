@@ -44,7 +44,7 @@ func (c *anthropicContext) pruneAnthropicMessages(messages []anthropic.MessagePa
 	totalOverhead := sysTokens + toolTokens
 
 	currentTokens := c.estimateTokens(messages) + totalOverhead
-	util.Debugf("Token count: %d MaxInputTokens[80%%]: %d\n", currentTokens, c.maxInputTokens)
+	util.LogDebugf("Token count: %d MaxInputTokens[80%%]: %d\n", currentTokens, c.maxInputTokens)
 	if currentTokens <= c.maxInputTokens {
 		return messages, false, nil
 	}

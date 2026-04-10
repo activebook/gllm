@@ -43,15 +43,15 @@ var sessionListCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sessions, err := service.ListSortedSessions(true, true)
 		if err != nil {
-			fmt.Println(err)
+			util.Println(cmd, err)
 			return nil
 		}
 		if len(sessions) == 0 {
-			fmt.Println("No sessions found.")
+			util.Println(cmd, "No sessions found.")
 			return nil
 		}
 
-		fmt.Println("Available sessions:")
+		util.Println(cmd, "Available sessions:")
 		width := len(fmt.Sprintf("%d", len(sessions)))
 		for index, session := range sessions {
 			// Visually indent sub-sessions
@@ -62,9 +62,9 @@ var sessionListCmd = &cobra.Command{
 
 			// Display with title if available
 			if session.Provider != "" {
-				fmt.Printf("[%*d] %s%s [%s]\n", width, index+1, prefix, session.Name, session.Provider)
+				util.Printf(cmd, "[%*d] %s%s [%s]\n", width, index+1, prefix, session.Name, session.Provider)
 			} else {
-				fmt.Printf("[%*d] %s%s\n", width, index+1, prefix, session.Name)
+				util.Printf(cmd, "[%*d] %s%s\n", width, index+1, prefix, session.Name)
 			}
 		}
 		return nil
@@ -94,7 +94,7 @@ gllm session remove "2 - 5" --force`,
 		} else {
 			sessions, err := service.ListSortedSessions(true, true)
 			if err != nil || len(sessions) == 0 {
-				fmt.Println("No sessions found.")
+				util.Println(cmd, "No sessions found.")
 				return nil
 			}
 
@@ -139,11 +139,11 @@ gllm session remove "2 - 5" --force`,
 				if err1 == nil && err2 == nil {
 					sessions, err := service.ListSortedSessions(false, true)
 					if err != nil {
-						fmt.Println(err)
+						util.Println(cmd, err)
 						return nil
 					}
 					if len(sessions) == 0 {
-						fmt.Println("No sessions found.")
+						util.Println(cmd, "No sessions found.")
 						return nil
 					}
 
@@ -164,7 +164,7 @@ gllm session remove "2 - 5" --force`,
 					var err error
 					names, err = service.FindSessionsByPattern(pattern)
 					if err != nil {
-						fmt.Printf("Error finding sessions: %v\n", err)
+						util.Printf(cmd, "Error finding sessions: %v\n", err)
 						return nil
 					}
 				}
@@ -173,7 +173,7 @@ gllm session remove "2 - 5" --force`,
 				var err error
 				names, err = service.FindSessionsByPattern(pattern)
 				if err != nil {
-					fmt.Printf("Error finding sessions: %v\n", err)
+					util.Printf(cmd, "Error finding sessions: %v\n", err)
 					return nil
 				}
 			}
@@ -181,7 +181,7 @@ gllm session remove "2 - 5" --force`,
 
 		if len(names) == 0 {
 			if pattern != "" {
-				fmt.Printf("No sessions found matching '%s'.\n", pattern)
+				util.Printf(cmd, "No sessions found matching '%s'.\n", pattern)
 			}
 			return nil
 		}
@@ -189,9 +189,9 @@ gllm session remove "2 - 5" --force`,
 		// Ask for confirmation if not forced
 		force, _ := cmd.Flags().GetBool("force")
 		if !force {
-			fmt.Printf("The following sessions will be removed:\n")
+			util.Printf(cmd, "The following sessions will be removed:\n")
 			for _, name := range names {
-				fmt.Printf("  - %s\n", name)
+				util.Printf(cmd, "  - %s\n", name)
 			}
 
 			var confirm bool
@@ -200,7 +200,7 @@ gllm session remove "2 - 5" --force`,
 				Value(&confirm).
 				Run()
 			if err != nil || !confirm {
-				fmt.Println("Operation cancelled.")
+				util.Println(cmd, "Operation cancelled.")
 				return nil
 			}
 		}
@@ -208,9 +208,9 @@ gllm session remove "2 - 5" --force`,
 		// Remove the matching sessions
 		for _, name := range names {
 			if err := service.RemoveSession(name); err != nil {
-				fmt.Printf("Failed to remove '%s': %v\n", name, err)
+				util.Printf(cmd, "Failed to remove '%s': %v\n", name, err)
 			} else {
-				fmt.Printf("Session '%s' removed successfully.\n", name)
+				util.Printf(cmd, "Session '%s' removed successfully.\n", name)
 			}
 		}
 
@@ -230,7 +230,7 @@ gllm session clear --force`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sessions, err := service.ListSortedSessions(false, false)
 		if err != nil || len(sessions) == 0 {
-			fmt.Println("No sessions found.")
+			util.Println(cmd, "No sessions found.")
 			return nil
 		}
 
@@ -244,7 +244,7 @@ gllm session clear --force`,
 				Value(&confirm).
 				Run()
 			if err != nil || !confirm {
-				fmt.Println("Operation cancelled.")
+				util.Println(cmd, "Operation cancelled.")
 				return nil
 			}
 		}
@@ -252,13 +252,13 @@ gllm session clear --force`,
 		for _, session := range sessions {
 			name := session.Name
 			if err := service.RemoveSession(name); err != nil {
-				fmt.Printf("failed to remove session directory %s: %v\n", name, err)
+				util.Printf(cmd, "failed to remove session directory %s: %v\n", name, err)
 			} else {
-				fmt.Printf("  - '%s' removed.\n", name)
+				util.Printf(cmd, "  - '%s' removed.\n", name)
 			}
 		}
 
-		fmt.Println("All sessions have been cleared.")
+		util.Println(cmd, "All sessions have been cleared.")
 		return nil
 	},
 }
@@ -278,7 +278,7 @@ var sessionInfoCmd = &cobra.Command{
 			// Select session
 			sessions, err := service.ListSortedSessions(true, true)
 			if err != nil || len(sessions) == 0 {
-				fmt.Println("No sessions found.")
+				util.Println(cmd, "No sessions found.")
 				return nil
 			}
 
@@ -321,7 +321,7 @@ var sessionInfoCmd = &cobra.Command{
 
 		// Check if session exists
 		if !service.SessionExists(sessionName, true) {
-			fmt.Printf("Session '%s' not found.\n", sessionName)
+			util.Printf(cmd, "Session '%s' not found.\n", sessionName)
 			return nil
 		}
 
@@ -332,7 +332,7 @@ var sessionInfoCmd = &cobra.Command{
 		}
 
 		// Display session details
-		fmt.Printf("Name: %s\n", sessionName)
+		util.Printf(cmd, "Name: %s\n", sessionName)
 
 		// Detect provider based on message format
 		provider := service.DetectMessageProviderByContent(data)
@@ -347,7 +347,7 @@ var sessionInfoCmd = &cobra.Command{
 		case service.ModelProviderAnthropic:
 			content = service.RenderAnthropicSessionLog(data)
 		default:
-			fmt.Println("Unknown session format.")
+			util.Println(cmd, "Unknown session format.")
 			return nil
 		}
 
@@ -378,13 +378,13 @@ var sessionRenameCmd = &cobra.Command{
 			oldName = args[0]
 			newName = args[1]
 			if err := util.ValidateResourceName("session", newName); err != nil {
-				util.Errorf("%v\n", err)
+				util.Errorf(cmd, "%v\n", err)
 				return err
 			}
 		} else {
 			sessions, err := service.ListSortedSessions(true, true)
 			if err != nil || len(sessions) == 0 {
-				fmt.Println("No sessions found.")
+				util.Println(cmd, "No sessions found.")
 				return nil
 			}
 
@@ -460,7 +460,7 @@ var sessionRenameCmd = &cobra.Command{
 		oldName = resolvedName
 
 		if strings.EqualFold(oldName, newName) {
-			fmt.Println("No changes made.")
+			util.Println(cmd, "No changes made.")
 			return nil
 		}
 
@@ -473,7 +473,7 @@ var sessionRenameCmd = &cobra.Command{
 				Value(&confirm).
 				Run()
 			if err != nil || !confirm {
-				fmt.Println("Operation cancelled.")
+				util.Println(cmd, "Operation cancelled.")
 				return nil
 			}
 		}
@@ -483,7 +483,7 @@ var sessionRenameCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Session renamed from '%s' to '%s' successfully.\n", oldName, newName)
+		util.Printf(cmd, "Session renamed from '%s' to '%s' successfully.\n", oldName, newName)
 		return nil
 	},
 }
@@ -516,7 +516,7 @@ var sessionShareCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Session '%s' exported successfully\n", sessionName)
+		util.Printf(cmd, "Session '%s' exported successfully\n", sessionName)
 		return nil
 	},
 }

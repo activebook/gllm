@@ -171,7 +171,7 @@ func EnsureSessionCompatibility(agent *data.AgentConfig, sessionName string, hoo
 	// 2. Check Compatibility
 	isCompatible, provider, modelProvider := CheckSessionFormat(agent, sessionData)
 	if !isCompatible {
-		util.Warnf("session '%s' [%s] is not compatible with the current model provider [%s].\n", sessionName, provider, modelProvider)
+		util.LogWarnf("session '%s' [%s] is not compatible with the current model provider [%s].\n", sessionName, provider, modelProvider)
 
 		// 3. Convert Data
 		hook.OnStartConvert()
@@ -185,7 +185,7 @@ func EnsureSessionCompatibility(agent *data.AgentConfig, sessionName string, hoo
 		if err := WriteSessionContent(sessionName, convertData); err != nil {
 			return err
 		}
-		util.Infof("session '%s' has been converted to compatible format [%s].\n", sessionName, modelProvider)
+		util.LogInfof("session '%s' has been converted to compatible format [%s].\n", sessionName, modelProvider)
 	}
 
 	return nil
