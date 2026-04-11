@@ -7,29 +7,29 @@ import (
 )
 
 // sseWriter adapts SSEOutput to the stdio.Writer contract.
-// It strips ANSI escape codes before emitting a command_output SSE event.
+// It strips ANSI escape codes before emitting a command SSE event.
 type sseWriter struct {
 	sse     *SSEOutput
-	errMode bool // true → emit "command_error" event instead of "command_output"
+	errMode bool // true → emit command with error field instead of content
 }
 
-// NewSSEWriter creates an stdio.Writer that emits "command_output" SSE events.
+// NewSSEWriter creates an stdio.Writer that emits "command" SSE events as output.
 func NewSSEWriter(sse *SSEOutput) stdio.Writer {
 	return &sseWriter{sse: sse}
 }
 
-// NewSSEErrWriter creates an stdio.Writer that emits "command_error" SSE events.
+// NewSSEErrWriter creates an stdio.Writer that emits "command" SSE events as errors.
 func NewSSEErrWriter(sse *SSEOutput) stdio.Writer {
 	return &sseWriter{sse: sse, errMode: true}
 }
 
 func (w *sseWriter) Write(p []byte) (int, error) {
-	// ANSI Stripping: The sseWriter dynamically filters out terminal color ANSI escape sequences using Charmbracelet's parser, ensuring clean, plain-text command outputs for web clients while keeping Rich UIs intact on terminal.
+	// Strip terminal ANSI escape sequences to produce clean plain-text for web clients.
 	text := ansi.Strip(string(p))
 	if w.errMode {
-		w.sse.WriteSSEEvent("command_error", text)
+		w.sse.WriteCommandEvent("", text)
 	} else {
-		w.sse.WriteSSEEvent("command_output", text)
+		w.sse.WriteCommandEvent(text, "")
 	}
 	return len(p), nil
 }

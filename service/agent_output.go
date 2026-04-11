@@ -43,7 +43,7 @@ It writes a status message to both Std and OutputFile if they are available.
 */
 func (ag *Agent) StartReasoning() {
 	if ag.SSEOutput != nil {
-		ag.SSEOutput.WriteSSEEvent("status", "start_reasoning")
+		ag.SSEOutput.WriteStatusEvent("start_reasoning")
 	}
 
 	if ag.StdOutput != nil {
@@ -65,7 +65,7 @@ func (ag *Agent) StartReasoning() {
 
 func (ag *Agent) CompleteReasoning() {
 	if ag.SSEOutput != nil {
-		ag.SSEOutput.WriteSSEEvent("status", "end_reasoning")
+		ag.SSEOutput.WriteStatusEvent("end_reasoning")
 	}
 
 	if ag.StdOutput != nil {
@@ -152,9 +152,10 @@ func (ag *Agent) WriteFunctionCall(text string) {
 
 	if ag.SSEOutput != nil {
 		if err == nil {
-			ag.SSEOutput.WriteSSEEvent("tool_call", toolData)
+			ag.SSEOutput.WriteToolCallEvent(toolData.Function, toolData.Args)
 		} else {
-			ag.SSEOutput.WriteSSEEvent("tool_call", text)
+			// Fallback: raw text was not valid JSON, emit with empty function name
+			ag.SSEOutput.WriteToolCallEvent("", text)
 		}
 	}
 
@@ -267,7 +268,7 @@ func (ag *Agent) WriteFunctionCallOver() {
 
 func (ag *Agent) WriteEnd() {
 	if ag.SSEOutput != nil {
-		ag.SSEOutput.WriteSSEEvent("status", "agent_finished")
+		ag.SSEOutput.WriteStatusEvent("agent_finished")
 	}
 
 	// Ensure output ends with a newline to prevent shell from displaying %

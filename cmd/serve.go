@@ -56,6 +56,7 @@ func chatCompletionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Set SSE headers (keep alive)
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -117,7 +118,7 @@ func chatCompletionHandler(w http.ResponseWriter, r *http.Request) {
 	err = runAgentHeadless(prompt, guideline, sessionName, sseOut, agent)
 	if err != nil {
 		util.LogErrorf("Server agent error: %v\n", err)
-		sseOut.WriteSSEEvent("error", map[string]string{"message": err.Error()})
+		sseOut.WriteErrorEvent(err.Error(), "agent_error")
 	}
 
 	sseOut.Close()
@@ -247,15 +248,15 @@ func handleWebCommand(prompt string, sessionName string, sseOut *io.SSEOutput) (
 	}
 }
 
-func runAgentHeadless(prompt string, guideline string, sessionName string, customIO *io.SSEOutput, agent *data.AgentConfig) error {
+func runAgentHeadless(prompt string, guideline string, sessionName string, sseIO *io.SSEOutput, agent *data.AgentConfig) error {
 	sharedState := data.NewSharedState()
 	defer sharedState.Clear() // Clean up on session end
 
 	for {
 		// Ensure session compatibility (headless hook)
 		hook := service.SessionConvertHook{
-			OnStartConvert:    func() { customIO.WriteSSEEvent("status", "Converting session format...") },
-			OnFinishedConvert: func() { customIO.WriteSSEEvent("status", "Session ready") },
+			OnStartConvert:    func() { sseIO.WriteStatusEvent("converting_session") },
+			OnFinishedConvert: func() { sseIO.WriteStatusEvent("session_ready") },
 		}
 		if err := service.EnsureSessionCompatibility(agent, sessionName, hook); err != nil {
 			return err
@@ -281,12 +282,12 @@ func runAgentHeadless(prompt string, guideline string, sessionName string, custo
 			YoloMode:      true, // Headless server typically auto-approves tool uses
 			OutputFile:    "",
 			QuietMode:     false,
+			SSEOutput:     sseIO, // SSE Output for streaming
 			SessionName:   sessionName,
 			MCPConfig:     mcpConfig,
 			SharedState:   sharedState,
 			AgentName:     agent.Name,
 			ModelName:     agent.Model.Name,
-			SSEOutput:     customIO,
 		}
 
 		err = service.CallAgent(&op)
