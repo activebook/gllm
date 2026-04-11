@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	stdio "io"
 	"os"
@@ -103,8 +104,16 @@ func parseCommandArgs(input string) []string {
 	return args
 }
 
-// runCommand executes a command with arguments
+// runCommand executes a command with arguments using background context
 func runCommand(cmd *cobra.Command, args []string, w ...stdio.Writer) {
+	// REPL mode: context baked with global sessionName
+	runCommandCtx(NewContextWithSession(sessionName), cmd, args, w...)
+
+	// Headless: runCommandCtx(ctx, ...)  → context baked with per-request sessionName (from HTTP body)
+}
+
+// runCommandCtx executes a command with a context
+func runCommandCtx(ctx context.Context, cmd *cobra.Command, args []string, w ...stdio.Writer) {
 	out := stdio.Discard
 	if len(w) > 0 && w[0] != nil {
 		out = w[0]
@@ -113,6 +122,7 @@ func runCommand(cmd *cobra.Command, args []string, w ...stdio.Writer) {
 	}
 	cmd.SetOut(out)
 	cmd.SetErr(out)
+	cmd.SetContext(ctx)
 
 	// Find the target subcommand
 	targetCmd, targetArgs, err := cmd.Find(args)
@@ -120,6 +130,8 @@ func runCommand(cmd *cobra.Command, args []string, w ...stdio.Writer) {
 		util.Errorf(cmd, "Command not found: %v\n", err)
 		return
 	}
+
+	targetCmd.SetContext(ctx)
 
 	// Reset flags for the target command to avoid accumulation in the REPL
 	targetCmd.Flags().VisitAll(func(f *pflag.Flag) {
@@ -202,7 +214,8 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 		ri.viewSessionHistory()
 
 	case "/clear":
-		ri.clearContext()
+		runCommand(sessionClearCurrentCmd, parts[1:])
+		ri.Files = []*service.FileData{}
 
 	case "/model":
 		runCommand(modelCmd, parts[1:])
@@ -235,10 +248,10 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 		runCommand(sessionCmd, parts[1:])
 
 	case "/compress":
-		ri.compressContext()
+		runCommand(sessionCompressCurrentCmd, parts[1:])
 
 	case "/rename":
-		ri.renameSession()
+		runCommand(sessionRenameCurrentCmd, parts[1:])
 
 	case "/think":
 		runCommand(thinkCmd, parts[1:])

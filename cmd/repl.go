@@ -2,13 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"runtime"
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
@@ -371,30 +369,6 @@ func (ri *ReplInfo) startWithLocalCommand(line string) bool {
 	return strings.HasPrefix(line, "!")
 }
 
-// clearContext clears the session context
-func (ri *ReplInfo) clearContext() {
-	agent, err := EnsureActiveAgent()
-	if err != nil {
-		util.LogErrorf("%v\n", err)
-		return
-	}
-	// Construct session manager
-	session, err := service.ConstructSession(sessionName, agent.Model.Provider)
-	if err != nil {
-		util.LogErrorf("Error constructing session manager: %v\n", err)
-		return
-	}
-	// Clear session history
-	err = session.Clear()
-	if err != nil {
-		util.LogErrorf("Error clearing context: %v\n", err)
-		return
-	}
-	// Empty attachments
-	ri.Files = []*service.FileData{}
-	fmt.Printf("Context cleared.\n")
-}
-
 // printSessionHistory loads and renders existing messages when resuming a session.
 // It is a no-op when the session is brand-new (no data on disk) or when
 // the session name is empty (anonymous single-turn mode).
@@ -467,107 +441,15 @@ func (ri *ReplInfo) viewSessionHistory() {
 	}
 }
 
-// compressContext compresses the session context by replacing it with a summary
-func (ri *ReplInfo) compressContext() {
-	// Get active agent
-	agent, err := EnsureActiveAgent()
-	if err != nil {
-		util.LogErrorf("%v\n", err)
-		return
-	}
-
-	// Get session data
-	sessionData, err := service.ReadSessionContent(sessionName)
-	if err != nil {
-		if os.IsNotExist(err) {
-			fmt.Println("No available session yet.")
-			return
-		}
-		util.LogErrorf("%v\n", err)
-		return
-	}
-
-	// Compress the session context
-	ui.GetIndicator().Start(ui.IndicatorCompressingContext)
-	summary, err := service.CompressSession(agent, sessionData)
-	ui.GetIndicator().Stop()
-
-	if err != nil {
-		util.LogErrorf("Failed to compress session: %v\n", err)
-		return
-	}
-
-	// Build the new compressed session
-	newData, err := service.BuildCompressedSession(summary, agent.Model.Provider)
-	if err != nil {
-		util.LogErrorf("Failed to build compressed session: %v\n", err)
-		return
-	}
-
-	// Save back to the file format
-	err = service.WriteSessionContent(sessionName, newData)
-	if err != nil {
-		util.LogErrorf("Failed to save compressed session: %v\n", err)
-		return
-	}
-
-	util.LogSuccessln("Compressed successfully!\nUse /history to view the compressed session.")
-}
-
-// renameSession uses the model synchronously to infer a meaningful name for
-// the current session and renames the session directory on disk.
-// It mirrors the /compress UX: a spinner is shown during the model call,
-// and the package-level sessionName variable is updated on success.
-func (ri *ReplInfo) renameSession() {
-	agent, err := EnsureActiveAgent()
-	if err != nil {
-		util.LogErrorf("%v\n", err)
-		return
-	}
-
-	sessionData, err := service.ReadSessionContent(sessionName)
-	if err != nil {
-		if os.IsNotExist(err) {
-			fmt.Println("No session history yet — nothing to rename.")
-			return
-		}
-		util.LogErrorf("%v\n", err)
-		return
-	}
-	if len(sessionData) == 0 {
-		fmt.Println("Session is empty — nothing to rename.")
-		return
-	}
-
-	ui.GetIndicator().Start(ui.IndicatorRenamingSession)
-	newName, err := service.GenerateSessionName(agent, sessionData)
-	ui.GetIndicator().Stop()
-
-	if err != nil {
-		util.LogErrorf("Failed to generate session name: %v\n", err)
-		return
-	}
-	if newName == sessionName {
-		util.LogSuccessln("Session name is already optimal: " + sessionName)
-		return
-	}
-
-	if err := service.RenameSession(sessionName, newName); err != nil {
-		util.LogErrorf("Failed to rename session: %v\n", err)
-		return
-	}
-
-	oldName := sessionName
-	sessionName = newName
-	util.LogSuccessln(fmt.Sprintf("Session renamed: %s → %s", oldName, newName))
-}
+// compressContext has been refactored to sessionCompressCmd.
+// renameSession has been refactored to sessionAutoRenameCmd.
 
 func (ri *ReplInfo) autoRenameSessionOnce() {
 	// Auto-rename: fire exactly once, asynchronously, on the first successful
 	// turn of a default-named session. The sync.Once on ReplInfo guarantees
 	// that a rapid second turn cannot trigger a duplicate rename.
 	ri.autoRenameOnce.Do(func() {
-		if !isDefaultSessionName(sessionName) {
+		if !IsDefaultSessionName(sessionName) {
 			return
 		}
 		agent, err := EnsureActiveAgent()
@@ -582,7 +464,7 @@ func (ri *ReplInfo) autoRenameSessionOnce() {
 		// Bugfix:
 		// Don't run it at background
 		// At backgound the output will break the input frame
-		ri.renameSession()
+		runCommand(sessionRenameCurrentCmd, []string{})
 	})
 }
 
@@ -657,20 +539,4 @@ func (ri *ReplInfo) executeShellCommand(command string) {
 		// shell output color
 		fmt.Printf(data.ShellOutputColor+"%s\n"+data.ResetSeq, output)
 	}
-}
-
-// isDefaultSessionName returns true when the session name is the auto-generated
-// timestamp form produced by GenerateSessionName() in repl.go: "session-YYYY-MM-DD_HH-MM-SS".
-func isDefaultSessionName(name string) bool {
-	return strings.HasPrefix(name, "session-")
-}
-
-func GenerateSessionName() string {
-	// Get the current time
-	currentTime := time.Now()
-
-	// Format the time as a string in the format "chat_YYYY-MM-DD_HH-MM-SS.json"
-	filename := fmt.Sprintf("session-%s", currentTime.Format("2006-01-02_15-04-05"))
-
-	return filename
 }

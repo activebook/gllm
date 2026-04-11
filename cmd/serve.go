@@ -85,7 +85,7 @@ func chatCompletionHandler(w http.ResponseWriter, r *http.Request) {
 
 	sessionName := req.Session
 	if sessionName == "" {
-		sessionName = "headless_default"
+		sessionName = GenerateSessionName()
 	}
 
 	agent, err := EnsureActiveAgent()
@@ -97,7 +97,7 @@ func chatCompletionHandler(w http.ResponseWriter, r *http.Request) {
 	var guideline string
 	if strings.HasPrefix(prompt, "/") {
 		var handled bool
-		handled, prompt, guideline = handleWebCommand(prompt, sessionName, sseOut, agent)
+		handled, prompt, guideline = handleWebCommand(prompt, sessionName, sseOut)
 		if handled {
 			sseOut.Close()
 			return
@@ -115,7 +115,7 @@ func chatCompletionHandler(w http.ResponseWriter, r *http.Request) {
 
 // handleWebCommand intercepts REPL commands and maps their state mutations to the requested headless session
 // Returns: (handledAndClosed bool, newPrompt string, newGuideline string)
-func handleWebCommand(prompt string, sessionName string, sseOut *io.SSEOutput, agent *data.AgentConfig) (bool, string, string) {
+func handleWebCommand(prompt string, sessionName string, sseOut *io.SSEOutput) (bool, string, string) {
 	parts := parseCommandArgs(prompt)
 	if len(parts) == 0 {
 		return false, prompt, ""
@@ -124,48 +124,15 @@ func handleWebCommand(prompt string, sessionName string, sseOut *io.SSEOutput, a
 
 	switch command {
 	case "/clear":
-		session, err := service.ConstructSession(sessionName, agent.Model.Provider)
-		if err == nil {
-			session.Clear()
-			sseOut.WriteSSEEvent("system_response", "Session context cleared.")
-		} else {
-			sseOut.WriteSSEEvent("error", map[string]string{"message": "Failed to construct session: " + err.Error()})
-		}
+		runCommandCtx(NewContextWithSession(sessionName), sessionClearCurrentCmd, parts[1:], io.NewSSEWriter(sseOut))
 		return true, prompt, ""
 
 	case "/compress":
-		sessionData, err := service.ReadSessionContent(sessionName)
-		if err != nil || len(sessionData) == 0 {
-			sseOut.WriteSSEEvent("system_response", "No session history to compress.")
-			return true, prompt, ""
-		}
-		sseOut.WriteSSEEvent("status", "Compressing context...")
-		summary, err := service.CompressSession(agent, sessionData)
-		if err == nil {
-			newData, _ := service.BuildCompressedSession(summary, agent.Model.Provider)
-			service.WriteSessionContent(sessionName, newData)
-			sseOut.WriteSSEEvent("system_response", "Context successfully compressed.")
-		} else {
-			sseOut.WriteSSEEvent("error", map[string]string{"message": "Compression failed: " + err.Error()})
-		}
+		runCommandCtx(NewContextWithSession(sessionName), sessionCompressCurrentCmd, parts[1:], io.NewSSEWriter(sseOut))
 		return true, prompt, ""
 
 	case "/rename":
-		sessionData, err := service.ReadSessionContent(sessionName)
-		if err != nil || len(sessionData) == 0 {
-			sseOut.WriteSSEEvent("system_response", "No session history to rename.")
-			return true, prompt, ""
-		}
-		sseOut.WriteSSEEvent("status", "Renaming session...")
-		newName, err := service.GenerateSessionName(agent, sessionData)
-		if err == nil {
-			if newName != sessionName {
-				service.RenameSession(sessionName, newName)
-				sseOut.WriteSSEEvent("system_response", fmt.Sprintf("Session renamed to: %s", newName))
-			} else {
-				sseOut.WriteSSEEvent("system_response", "Session name is already optimal.")
-			}
-		}
+		runCommandCtx(NewContextWithSession(sessionName), sessionRenameCurrentCmd, parts[1:], io.NewSSEWriter(sseOut))
 		return true, prompt, ""
 
 	case "/model":

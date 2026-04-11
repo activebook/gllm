@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/io"
@@ -15,6 +17,27 @@ import (
 )
 
 var ()
+
+func init() {
+	// Add session command to root command
+	rootCmd.AddCommand(sessionCmd)
+
+	// Add subcommands to session command
+	sessionCmd.AddCommand(sessionListCmd)
+	sessionCmd.AddCommand(sessionRemoveCmd)
+	sessionCmd.AddCommand(sessionInfoCmd)
+	sessionCmd.AddCommand(sessionClearCmd)
+	sessionCmd.AddCommand(sessionRenameCmd)
+	sessionCmd.AddCommand(sessionShareCmd)
+	sessionCmd.AddCommand(sessionClearCurrentCmd)
+	sessionCmd.AddCommand(sessionCompressCurrentCmd)
+	sessionCmd.AddCommand(sessionRenameCurrentCmd)
+
+	// Add flags for other prompt commands if needed in the future
+	sessionRemoveCmd.Flags().BoolP("force", "f", false, "Skip confirm")
+	sessionClearCmd.Flags().BoolP("force", "f", false, "Force clear all without confirmation")
+	sessionRenameCmd.Flags().BoolP("force", "f", false, "Skip confirm")
+}
 
 // sessionCmd represents the session command
 var sessionCmd = &cobra.Command{
@@ -521,20 +544,176 @@ var sessionShareCmd = &cobra.Command{
 	},
 }
 
-func init() {
-	// Add session command to root command
-	rootCmd.AddCommand(sessionCmd)
+var sessionClearCurrentCmd = &cobra.Command{
+	Use:    "clear-current",
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		tgtSession := GetContextSession(cmd)
+		if tgtSession == "" {
+			util.Errorf(cmd, "No active session to clear.\n")
+			return nil
+		}
 
-	// Add subcommands to session command
-	sessionCmd.AddCommand(sessionListCmd)
-	sessionCmd.AddCommand(sessionRemoveCmd)
-	sessionCmd.AddCommand(sessionInfoCmd)
-	sessionCmd.AddCommand(sessionClearCmd)
-	sessionCmd.AddCommand(sessionRenameCmd)
-	sessionCmd.AddCommand(sessionShareCmd)
+		agent, err := EnsureActiveAgent()
+		if err != nil {
+			util.Errorf(cmd, "%v\n", err)
+			return nil
+		}
 
-	// Add flags for other prompt commands if needed in the future
-	sessionRemoveCmd.Flags().BoolP("force", "f", false, "Skip confirm")
-	sessionClearCmd.Flags().BoolP("force", "f", false, "Force clear all without confirmation")
-	sessionRenameCmd.Flags().BoolP("force", "f", false, "Skip confirm")
+		session, err := service.ConstructSession(tgtSession, agent.Model.Provider)
+		if err != nil {
+			util.Errorf(cmd, "Error constructing session manager: %v\n", err)
+			return nil
+		}
+		if err := session.Clear(); err != nil {
+			util.Errorf(cmd, "Error clearing context: %v\n", err)
+			return nil
+		}
+		util.Successln(cmd, "Context cleared successfully.")
+		return nil
+	},
+}
+
+var sessionCompressCurrentCmd = &cobra.Command{
+	Use:    "compress-current",
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		tgtSession := GetContextSession(cmd)
+		if tgtSession == "" {
+			util.Errorf(cmd, "No active session to compress.\n")
+			return nil
+		}
+
+		agent, err := EnsureActiveAgent()
+		if err != nil {
+			util.Errorf(cmd, "%v\n", err)
+			return nil
+		}
+
+		sessionData, err := service.ReadSessionContent(tgtSession)
+		if err != nil {
+			util.Errorf(cmd, "%v\n", err)
+			return nil
+		}
+		if len(sessionData) == 0 {
+			util.Println(cmd, "Session is empty — nothing to compress.")
+			return nil
+		}
+
+		ui.GetIndicator().Start(ui.IndicatorCompressingContext)
+		summary, err := service.CompressSession(agent, sessionData)
+		ui.GetIndicator().Stop()
+
+		if err != nil {
+			util.Errorf(cmd, "Failed to compress session: %v\n", err)
+			return nil
+		}
+
+		newData, err := service.BuildCompressedSession(summary, agent.Model.Provider)
+		if err != nil {
+			util.Errorf(cmd, "Failed to build compressed session: %v\n", err)
+			return nil
+		}
+
+		err = service.WriteSessionContent(tgtSession, newData)
+		if err != nil {
+			util.Errorf(cmd, "Failed to save compressed session: %v\n", err)
+			return nil
+		}
+
+		util.Successln(cmd, "Compressed successfully!\nUse /history to view the compressed session.")
+		return nil
+	},
+}
+
+var sessionRenameCurrentCmd = &cobra.Command{
+	Use:    "rename-current",
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		tgtSession := GetContextSession(cmd)
+		if tgtSession == "" {
+			util.Errorf(cmd, "No active session to rename.\n")
+			return nil
+		}
+
+		agent, err := EnsureActiveAgent()
+		if err != nil {
+			util.Errorf(cmd, "%v\n", err)
+			return nil
+		}
+
+		sessionData, err := service.ReadSessionContent(tgtSession)
+		if err != nil {
+			util.Println(cmd, "No session history yet — nothing to rename.")
+			return nil
+		}
+		if len(sessionData) == 0 {
+			util.Println(cmd, "Session is empty — nothing to rename.")
+			return nil
+		}
+
+		ui.GetIndicator().Start(ui.IndicatorRenamingSession)
+		newName, err := service.GenerateSessionName(agent, sessionData)
+		ui.GetIndicator().Stop()
+
+		if err != nil {
+			util.Errorf(cmd, "Failed to generate session name: %v\n", err)
+			return nil
+		}
+		if newName == tgtSession {
+			util.Successln(cmd, "Session name is already optimal: "+tgtSession)
+			return nil
+		}
+
+		if err := service.RenameSession(tgtSession, newName); err != nil {
+			util.Errorf(cmd, "Failed to rename session: %v\n", err)
+			return nil
+		}
+
+		// Update the global if it was the global that got renamed
+		if tgtSession == sessionName {
+			sessionName = newName
+		}
+
+		util.Successln(cmd, fmt.Sprintf("Session renamed: %s → %s", tgtSession, newName))
+		return nil
+	},
+}
+
+/*
+ * Session name helper functions
+ */
+
+type sessionContextKey string
+
+// targetSessionName is a context key used to store the target session name
+const targetSessionName sessionContextKey = "targetSessionName"
+
+// IsDefaultSessionName returns true when the session name is the auto-generated
+// timestamp form produced by GenerateSessionName() in repl.go: "session-YYYY-MM-DD_HH-MM-SS".
+func IsDefaultSessionName(name string) bool {
+	return strings.HasPrefix(name, "session-")
+}
+
+func GenerateSessionName() string {
+	// Get the current time
+	currentTime := time.Now()
+
+	// Format the time as a string in the format "chat_YYYY-MM-DD_HH-MM-SS.json"
+	filename := fmt.Sprintf("session-%s", currentTime.Format("2006-01-02_15-04-05"))
+
+	return filename
+}
+
+// NewContextWithSession returns a new context with the session name set
+func NewContextWithSession(sessionName string) context.Context {
+	return context.WithValue(context.Background(), targetSessionName, sessionName)
+}
+
+// GetContextSession returns the session name from the context
+func GetContextSession(cmd *cobra.Command) string {
+	if s, ok := cmd.Context().Value(targetSessionName).(string); ok && s != "" {
+		return s
+	}
+	return sessionName
 }
