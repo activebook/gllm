@@ -86,6 +86,16 @@ func chatCompletionHandler(w http.ResponseWriter, r *http.Request) {
 	sessionName := req.Session
 	if sessionName == "" {
 		sessionName = GenerateSessionName()
+	} else {
+		// Resolve index-based names to their canonical file name.
+		name, err := service.FindSessionByIndex(sessionName)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if name != "" {
+			sessionName = name
+		}
 	}
 
 	agent, err := EnsureActiveAgent()

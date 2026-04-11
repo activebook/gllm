@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/activebook/gllm/util"
@@ -34,13 +33,13 @@ The command will display lines that are different between the two files:
 
 		content1, err := os.ReadFile(file1)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", file1, err)
+			util.Errorf(cmd, "Error reading %s: %v\n", file1, err)
 			os.Exit(1)
 		}
 
 		content2, err := os.ReadFile(file2)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", file2, err)
+			util.Errorf(cmd, "Error reading %s: %v\n", file2, err)
 			os.Exit(1)
 		}
 

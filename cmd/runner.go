@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"sync"
 
 	"github.com/activebook/gllm/data"
@@ -216,14 +215,13 @@ func ProcessAttachment(path string) *service.FileData {
 	// Handle stdin or regular file
 	data, err := readContentFromPath(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading file[%s]: %v\n", path, err)
+		util.LogErrorf("Error reading file[%s]: %v\n", path, err)
 		return nil
 	}
 
-	// Check if content is an image
 	isImage, format, err := service.CheckIfImageFromBytes(data)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error checking content type: %v\n", err)
+		util.LogErrorf("Error checking content type: %v\n", err)
 		return nil
 	}
 

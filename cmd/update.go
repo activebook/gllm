@@ -25,7 +25,7 @@ var updateCmd = &cobra.Command{
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runUpdate(true)
+		return runUpdate(cmd, true)
 	},
 }
 
@@ -61,8 +61,8 @@ func StartBackgroundUpdateCheck() {
 
 // runUpdate performs the explicit update flow.
 // interactive => prompt for confirmation via huh; otherwise auto-apply.
-func runUpdate(interactive bool) error {
-	fmt.Printf("Current version: %s\n", version)
+func runUpdate(cmd *cobra.Command, interactive bool) error {
+	util.Printf(cmd, "Current version: %s\n", version)
 
 	ui.GetIndicator().Start(ui.IndicatorCheckingUpdate)
 	release, err := service.CheckLatest(version)
@@ -73,13 +73,13 @@ func runUpdate(interactive bool) error {
 
 	if !release.Newer {
 		util.LogSuccessf("You are already on the latest version (%s).\n", release.Version)
-		printAlternativeUpdateInstructions()
+		util.Print(cmd, renderAlternativeUpdateInstructions())
 		return nil
 	}
 
-	fmt.Printf("New version available: %s\n", release.Version)
-	printAlternativeUpdateInstructions()
-	fmt.Println()
+	util.Printf(cmd, "New version available: %s\n", release.Version)
+	util.Print(cmd, renderAlternativeUpdateInstructions())
+	util.Println(cmd)
 
 	if interactive {
 		var confirmed bool
@@ -89,7 +89,7 @@ func runUpdate(interactive bool) error {
 			Value(&confirmed).
 			Run()
 		if err != nil || !confirmed {
-			fmt.Println("Update cancelled.")
+			util.Println(cmd, "Update cancelled.")
 			return nil
 		}
 	}
@@ -102,8 +102,8 @@ func runUpdate(interactive bool) error {
 	}
 
 	notifyStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(data.UpdateSuccessHex))
-	fmt.Println(notifyStyle.Render(fmt.Sprintf("✓ Successfully updated to %s!", release.Version)))
-	fmt.Println("Please restart gllm to use the new version.")
+	util.Println(cmd, notifyStyle.Render(fmt.Sprintf("✓ Successfully updated to %s!", release.Version)))
+	util.Println(cmd, "Please restart gllm to use the new version.")
 	return nil
 }
 
@@ -128,9 +128,8 @@ func UpdateWarn(warn string) {
 	ui.SendEvent(ui.BannerMsg{Text: text})
 }
 
-// printAlternativeUpdateInstructions shows the platform-specific package
-// manager command as an alternative update path.
-func printAlternativeUpdateInstructions() {
+// renderAlternativeUpdateInstructions builds the platform-specific update hint as a string.
+func renderAlternativeUpdateInstructions() string {
 	var cmd string
 	switch runtime.GOOS {
 	case "darwin":
@@ -142,5 +141,5 @@ func printAlternativeUpdateInstructions() {
 	}
 	labelStyle := lipgloss.NewStyle().Faint(true)
 	codeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(data.KeyHex))
-	fmt.Printf("%s %s\n", labelStyle.Render("Alternative update method:"), codeStyle.Render(cmd))
+	return fmt.Sprintf("%s %s\n", labelStyle.Render("Alternative update method:"), codeStyle.Render(cmd))
 }

@@ -150,7 +150,7 @@ var configPrintCmd = &cobra.Command{
 
 		// Plugins section
 		printSection("Tools")
-		ListAllTools()
+		ListAllTools(cmd)
 		w.Flush()
 
 		// Skills section

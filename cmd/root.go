@@ -78,7 +78,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 				response = strings.ToLower(strings.TrimSpace(response))
 
 				if response == "" || response == "y" || response == "yes" {
-					return RunInitWizard()
+					return RunInitWizard(cmd)
 				}
 
 				return fmt.Errorf("configuration required to proceed. Run 'gllm init' to setup")

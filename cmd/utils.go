@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/activebook/gllm/service"
+	"github.com/activebook/gllm/util"
 )
 
 // readStdin checks if there's piped input and reads it
@@ -35,7 +36,7 @@ func readStdin() string {
 		// Read all content from stdin
 		_, err := io.Copy(&buffer, reader)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading from stdin: %v\n", err)
+			util.LogErrorf("Error reading from stdin: %v\n", err)
 			return ""
 		}
 

@@ -78,7 +78,7 @@ have a continuous session with the model.`,
 		ui.GetIndicator().Stop()
 
 		// Start the REPL
-		ri.startREPL()
+		ri.startREPL(cmd)
 		return nil
 	},
 }
@@ -279,7 +279,7 @@ func (ri *ReplInfo) getChatInputHooks(agent *data.AgentConfig) ui.ChatInputHooks
 	}
 }
 
-func (ri *ReplInfo) startREPL() {
+func (ri *ReplInfo) startREPL(cmd *cobra.Command) {
 	// Initialize SharedState for the session
 	ri.sharedState = data.NewSharedState()
 	defer ri.sharedState.Clear()
@@ -331,7 +331,7 @@ func (ri *ReplInfo) startREPL() {
 			// Reset editor input
 			ri.EditorInput = ""
 			// Handle inner command
-			ri.handleCommand(input)
+			ri.handleCommand(cmd, input)
 			if ri.QuitFlag {
 				break
 			}

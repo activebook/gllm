@@ -25,7 +25,7 @@ When enabled, displays detailed tool calls, reasoning steps, and subagent progre
 		util.Println(cmd)
 		settings := data.GetSettingsStore()
 		current := settings.GetVerboseEnabled()
-		PrintVerboseStatus(current)
+		util.Print(cmd, renderVerboseStatus(current))
 	},
 }
 
@@ -66,16 +66,14 @@ var verboseSwitchCmd = &cobra.Command{
 			return
 		}
 
-		PrintVerboseStatus(enable)
+		util.Print(cmd, renderVerboseStatus(enable))
 	},
 }
 
-func PrintVerboseStatus(enabled bool) {
-	var status string
+func renderVerboseStatus(enabled bool) string {
+	status := data.SwitchOffColor + "false" + data.ResetSeq
 	if enabled {
 		status = data.SwitchOnColor + "true" + data.ResetSeq
-	} else {
-		status = data.SwitchOffColor + "false" + data.ResetSeq
 	}
-	fmt.Printf("Verbose mode: %s\n", status)
+	return fmt.Sprintf("Verbose mode: %s\n", status)
 }

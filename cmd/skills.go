@@ -84,8 +84,8 @@ var skillsListCmd = &cobra.Command{
 			return
 		}
 
-		util.Println(cmd, "Installed skills:")
-		util.Println(cmd)
+		var sb strings.Builder
+		sb.WriteString("Installed skills:\n\n")
 
 		// Sort skills by name
 		sort.Slice(skills, func(i, j int) bool {
@@ -93,10 +93,12 @@ var skillsListCmd = &cobra.Command{
 		})
 
 		for _, skill := range skills {
-			printSkillMeta(skill)
+			sb.WriteString(renderSkillMeta(skill))
 		}
-		util.Printf(cmd, "%s = Enabled skill\n", ui.FormatEnabledIndicator(true))
-		util.Printf(cmd, "Skills directory: %s\n", data.GetSkillsDirPath())
+		fmt.Fprintf(&sb, "%s = Enabled skill\n", ui.FormatEnabledIndicator(true))
+		fmt.Fprintf(&sb, "Skills directory: %s\n", data.GetSkillsDirPath())
+
+		util.Print(cmd, sb.String())
 	},
 }
 
@@ -134,7 +136,7 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 			cleanup = func() { os.RemoveAll(tempDir) }
 			defer cleanup()
 
-			if err := downloadRepo(source, tempDir); err != nil {
+			if err := downloadRepo(cmd, source, tempDir); err != nil {
 				util.Errorf(cmd, "%v\n", err)
 				return
 			}
@@ -195,7 +197,7 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 				util.Printf(cmd, "Installing: %s\n", subPath)
 			}
 
-			if err := installSingleSkill(absSkillDir, isRemote, source, subPath); err != nil {
+			if err := installSingleSkill(cmd, absSkillDir, isRemote, source, subPath); err != nil {
 				util.Errorf(cmd, "Failed to install skill from path '%s': %v\n", subPath, err)
 				failCount++
 			} else {
@@ -217,7 +219,7 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 }
 
 // installSingleSkill handles the validation, copying, and metadata saving of a single skill directory
-func installSingleSkill(absSkillDirPath string, isRemote bool, sourceURL string, subPath string) error {
+func installSingleSkill(cmd *cobra.Command, absSkillDirPath string, isRemote bool, sourceURL string, subPath string) error {
 	// Check if source exists and is a directory
 	info, err := os.Stat(absSkillDirPath)
 	if err != nil {
@@ -283,7 +285,7 @@ func installSingleSkill(absSkillDirPath string, isRemote bool, sourceURL string,
 		}
 	}
 
-	fmt.Printf("Skill '%s' installed successfully.\n", meta.Name)
+	util.Printf(cmd, "Skill '%s' installed successfully.\n", meta.Name)
 	return nil
 }
 
@@ -583,7 +585,7 @@ Use 'gllm skills update --all' to update all skills that support updating.`,
 			}
 
 			// Execute batch update - all skills processed together efficiently
-			if err := executeSkillUpdate(updatableSkills...); err != nil {
+			if err := executeSkillUpdate(cmd, updatableSkills...); err != nil {
 				util.Errorf(cmd, "Update failed: %v\n", err)
 			}
 
@@ -624,7 +626,7 @@ Use 'gllm skills update --all' to update all skills that support updating.`,
 			}
 
 			// Single skill update
-			if err := executeSkillUpdate(*targetSkill); err != nil {
+			if err := executeSkillUpdate(cmd, *targetSkill); err != nil {
 				util.Errorf(cmd, "Failed to update %s: %v\n", targetSkill.Name, err)
 			} else {
 				// Success message already printed by executeSkillUpdate
@@ -638,9 +640,9 @@ Use 'gllm skills update --all' to update all skills that support updating.`,
 
 // downloadRepo downloads or clones a repository to a temporary directory
 // This is a shared helper for both install and update commands
-func downloadRepo(sourceURL, destDir string) error {
+func downloadRepo(cmd *cobra.Command, sourceURL, destDir string) error {
 	if util.HasGit() {
-		fmt.Printf("Cloning %s...\n", sourceURL)
+		util.Printf(cmd, "Cloning %s...\n", sourceURL)
 		gitCmd := exec.Command("git", "clone", sourceURL, destDir)
 		gitCmd.Stdout = os.Stdout
 		gitCmd.Stderr = os.Stderr
@@ -648,7 +650,7 @@ func downloadRepo(sourceURL, destDir string) error {
 			return fmt.Errorf("failed to clone repository: %w", err)
 		}
 	} else if util.IsGitHubURL(sourceURL) {
-		fmt.Printf("Downloading archive from %s...\n", sourceURL)
+		util.Printf(cmd, "Downloading archive from %s...\n", sourceURL)
 		zipURL := util.GetGitHubZipURL(sourceURL)
 		if err := util.DownloadAndExtractZip(zipURL, destDir); err != nil {
 			return fmt.Errorf("failed to download and extract skill: %w", err)
@@ -661,7 +663,7 @@ func downloadRepo(sourceURL, destDir string) error {
 
 // executeSkillUpdate handles the download/replace logic for one or more skills
 // Uses batch processing for efficiency when multiple skills share the same source URL
-func executeSkillUpdate(skills ...data.SkillMetadata) error {
+func executeSkillUpdate(cmd *cobra.Command, skills ...data.SkillMetadata) error {
 	if len(skills) == 0 {
 		return fmt.Errorf("no skills to update")
 	}
@@ -683,7 +685,7 @@ func executeSkillUpdate(skills ...data.SkillMetadata) error {
 	// Process each source URL once
 	for sourceURL, groupSkills := range skillsByURL {
 		if len(groupSkills) > 1 {
-			fmt.Printf("\nProcessing %d skills from %s...\n", len(groupSkills), sourceURL)
+			util.Printf(cmd, "\nProcessing %d skills from %s...\n", len(groupSkills), sourceURL)
 		}
 
 		// Create temp directory for this source
@@ -694,7 +696,7 @@ func executeSkillUpdate(skills ...data.SkillMetadata) error {
 		}
 
 		// Download/clone once per source URL
-		if err := downloadRepo(sourceURL, tempDir); err != nil {
+		if err := downloadRepo(cmd, sourceURL, tempDir); err != nil {
 			util.LogErrorf("Failed to download source from %s: %v\n", sourceURL, err)
 			os.RemoveAll(tempDir)
 			continue
@@ -703,7 +705,7 @@ func executeSkillUpdate(skills ...data.SkillMetadata) error {
 		// Update all skills from this source
 		for i, skill := range groupSkills {
 			if len(groupSkills) > 1 {
-				fmt.Printf("[%d/%d] Updating %s...\n", i+1, len(groupSkills), skill.Name)
+				util.Printf(cmd, "[%d/%d] Updating %s...\n", i+1, len(groupSkills), skill.Name)
 			}
 
 			meta := skill.SourceMeta
@@ -744,7 +746,7 @@ func executeSkillUpdate(skills ...data.SkillMetadata) error {
 				util.LogWarnf("Failed to update metadata for %s: %v\n", skill.Name, err)
 			}
 
-			fmt.Printf("Skill '%s' updated successfully.\n", skill.Name)
+			util.Printf(cmd, "Skill '%s' updated successfully.\n", skill.Name)
 		}
 
 		// Cleanup temp directory after processing all skills from this source
@@ -754,20 +756,21 @@ func executeSkillUpdate(skills ...data.SkillMetadata) error {
 	return nil
 }
 
-// printSkillMeta prints a skill in a formatted way
-func printSkillMeta(skill data.SkillMetadata) {
+// renderSkillMeta returns a formatted skill metadata summary as a string
+func renderSkillMeta(skill data.SkillMetadata) string {
+	var sb strings.Builder
 	settingsStore := data.GetSettingsStore()
 	enabled := !settingsStore.IsSkillDisabled(skill.Name)
 	indicator := ui.FormatEnabledIndicator(enabled)
 
-	fmt.Printf("%s %s\n", indicator, skill.Name)
+	fmt.Fprintf(&sb, "%s %s\n", indicator, skill.Name)
 	if skill.Description != "" {
-		lines := strings.Split(skill.Description, "\n")
-		for _, line := range lines {
+		for _, line := range strings.Split(skill.Description, "\n") {
 			if strings.TrimSpace(line) != "" {
-				fmt.Printf("%s%s%s\n", data.DetailColor, line, data.ResetSeq)
+				fmt.Fprintf(&sb, "%s%s%s\n", data.DetailColor, line, data.ResetSeq)
 			}
 		}
 	}
-	fmt.Println()
+	sb.WriteString("\n")
+	return sb.String()
 }

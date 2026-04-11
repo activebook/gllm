@@ -3,6 +3,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/activebook/gllm/util"
 
@@ -40,7 +41,7 @@ Use 'gllm plugin switch' to toggle plugins on or off.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		store := data.GetSettingsStore()
 		enabled := store.GetEnabledPlugins()
-		printPluginSummary(enabled)
+		util.Print(cmd, renderPluginSummary(enabled))
 		util.Println(cmd, "Use 'gllm plugin switch' to change.")
 	},
 }
@@ -106,13 +107,13 @@ var pluginSwitchCmd = &cobra.Command{
 
 		util.Printf(cmd, "Plugin settings updated. %d enabled.\n", len(selected))
 		util.Println(cmd)
-		printPluginSummary(selected)
+		util.Print(cmd, renderPluginSummary(selected))
 	},
 }
 
-func printPluginSummary(enabled []string) {
-	fmt.Println("Available Plugins:")
-	fmt.Println()
+func renderPluginSummary(enabled []string) string {
+	var sb strings.Builder
+	sb.WriteString("Available Plugins:\n\n")
 
 	enabledSet := make(map[string]bool, len(enabled))
 	for _, id := range enabled {
@@ -121,12 +122,13 @@ func printPluginSummary(enabled []string) {
 
 	for _, p := range KnownPlugins {
 		indicator := ui.FormatEnabledIndicator(enabledSet[p.ID])
-		fmt.Printf("%s %s\n", indicator, p.Label)
+		fmt.Fprintf(&sb, "%s %s\n", indicator, p.Label)
 		if p.Desc != "" {
-			fmt.Printf("%s%s%s\n", data.DetailColor, p.Desc, data.ResetSeq)
+			fmt.Fprintf(&sb, "%s%s%s\n", data.DetailColor, p.Desc, data.ResetSeq)
 		}
-		fmt.Println()
+		sb.WriteString("\n")
 	}
 
-	fmt.Printf("%s = Enabled\n", ui.FormatEnabledIndicator(true))
+	fmt.Fprintf(&sb, "%s = Enabled\n", ui.FormatEnabledIndicator(true))
+	return sb.String()
 }

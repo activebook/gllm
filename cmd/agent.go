@@ -53,8 +53,7 @@ different AI assistant setups with different models, tools, and settings.`,
 			return
 		}
 		util.Println(cmd, "Current agent configuration:")
-		printAgentConfigDetails(activeAgent, "")
-		util.Println(cmd)
+		util.Print(cmd, renderAgentConfigDetails(activeAgent, ""))
 
 		// Then show the list of available agents
 		agentListCmd.Run(agentListCmd, args)
@@ -782,8 +781,7 @@ var agentInfoCmd = &cobra.Command{
 		}
 
 		util.Printf(cmd, "Agent '%s' configuration:\n", name)
-		// Display configuration using the same formatting as add/set commands
-		printAgentConfigDetails(agentConfig, "")
+		util.Print(cmd, renderAgentConfigDetails(agentConfig, ""))
 		return nil
 	},
 }
@@ -893,44 +891,41 @@ func init() {
 // Legacy function removed in data layer refactoring
 
 // printAgentConfigDetails prints the agent details in a formatted way
-func printAgentConfigDetails(agent *data.AgentConfig, spaceholder string) {
+// renderAgentConfigDetails builds a formatted summary of an agent configuration
+// and returns it as a string. Callers are responsible for writing it to the output.
+func renderAgentConfigDetails(agent *data.AgentConfig, spaceholder string) string {
+	var sb strings.Builder
+
 	if agent.Name != "" {
-		fmt.Printf("%sName: %s\n", spaceholder, agent.Name)
+		fmt.Fprintf(&sb, "%sName: %s\n", spaceholder, agent.Name)
 	}
-
 	if agent.Description != "" {
-		fmt.Printf("%sDescription: %s\n", spaceholder, agent.Description)
+		fmt.Fprintf(&sb, "%sDescription: %s\n", spaceholder, agent.Description)
 	}
-
 	if agent.Model.Name != "" {
-		fmt.Printf("%sModel: %s\n", spaceholder, agent.Model.Name)
+		fmt.Fprintf(&sb, "%sModel: %s\n", spaceholder, agent.Model.Name)
 	}
 
 	if agent.SystemPrompt != "" {
-		resolvedSysPrompt := agent.SystemPrompt
-		// Inject memory, skills, plan mode into system prompt
-		resolvedSysPrompt = service.ConstructSystemPrompt(resolvedSysPrompt, agent.Capabilities)
-		// Show the resolved system prompt
-		fmt.Printf("%sSystem Prompt:\n%s\n\n", spaceholder, resolvedSysPrompt)
+		resolvedSysPrompt := service.ConstructSystemPrompt(agent.SystemPrompt, agent.Capabilities)
+		fmt.Fprintf(&sb, "%sSystem Prompt:\n%s\n\n", spaceholder, resolvedSysPrompt)
 	} else {
-		fmt.Printf("%sSystem Prompt: \n\n", spaceholder)
+		fmt.Fprintf(&sb, "%sSystem Prompt: \n\n", spaceholder)
 	}
 
 	level := service.ParseThinkingLevel(agent.Think)
-	fmt.Printf("%sThinking Level: %s\n\n", spaceholder, level.Display())
+	fmt.Fprintf(&sb, "%sThinking Level: %s\n\n", spaceholder, level.Display())
 
-	fmt.Printf("%sTools:\n", spaceholder)
-	toolsList := GetAllTools(agent)
-	fmt.Println(toolsList)
+	fmt.Fprintf(&sb, "%sTools:\n%s\n", spaceholder, GetAllTools(agent))
 
-	// capabilities
-	capsSlice := ""
+	var capsSlice strings.Builder
 	for _, cap := range agent.Capabilities {
-		capsSlice += fmt.Sprintf("\n%s  - %s", spaceholder, cap)
+		fmt.Fprintf(&capsSlice, "\n%s  - %s", spaceholder, cap)
 	}
-	fmt.Printf("%sCapabilities:%s\n", spaceholder, capsSlice)
+	fmt.Fprintf(&sb, "%sCapabilities:%s\n", spaceholder, capsSlice.String())
+	fmt.Fprintf(&sb, "%sMax Recursions: %d\n", spaceholder, agent.MaxRecursions)
 
-	fmt.Printf("%sMax Recursions: %d\n", spaceholder, agent.MaxRecursions)
+	return sb.String()
 }
 
 func ValidateMaxRecursions(s string) error {

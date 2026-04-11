@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/activebook/gllm/util"
 
@@ -47,7 +48,7 @@ Use 'gllm tools sw' to select which tools to enable for the current agent.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		util.Println(cmd, cmd.Long)
 		util.Println(cmd)
-		ListAllTools()
+		ListAllTools(cmd)
 	},
 }
 
@@ -114,7 +115,7 @@ var toolsSwCmd = &cobra.Command{
 			return
 		}
 
-		ListAllTools()
+		ListAllTools(cmd)
 	},
 }
 
@@ -194,15 +195,17 @@ func GetAllTools(agent *data.AgentConfig) string {
 	return toolsList
 }
 
-func ListAllTools() {
+func ListAllTools(cmd *cobra.Command) {
 	store := data.NewConfigStore()
 	agent := store.GetActiveAgent()
 	if agent == nil {
-		fmt.Println("No active agent found")
+		util.Println(cmd, "No active agent found")
 		return
 	}
 
-	toolsList := GetAllTools(agent)
-	fmt.Println(toolsList)
-	fmt.Println("* behind the tool name means it is a built-in capabilities tool which can be switched on/off in agent capabilities settings.")
+	var sb strings.Builder
+	sb.WriteString(GetAllTools(agent))
+	sb.WriteString("* behind the tool name means it is a built-in capabilities tool which can be switched on/off in agent capabilities settings.\n")
+
+	util.Print(cmd, sb.String())
 }

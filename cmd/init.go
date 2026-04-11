@@ -26,7 +26,7 @@ It will create or update the 'gllm.yaml' configuration file and GLLM.md instruct
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := RunInitWizard(); err != nil {
+		if err := RunInitWizard(cmd); err != nil {
 			return fmt.Errorf("Initialization failed: %w\n", err)
 		}
 		return nil
@@ -50,7 +50,7 @@ func buildToolsOptions() []huh.Option[string] {
 
 // RunInitWizard runs the interactive setup
 // Exported so it can be called from root.go
-func RunInitWizard() error {
+func RunInitWizard(cmd *cobra.Command) error {
 	var (
 		agentName             string
 		agentDesc             string
@@ -70,7 +70,7 @@ func RunInitWizard() error {
 
 	// --- Dual-entry mode: if gllm.yaml already exists, offer a branching menu ---
 	if store.ConfigExists() {
-		fmt.Printf("Note: Updating existing configuration at %s\n\n", store.ConfigFileUsed())
+		util.Printf(cmd, "Note: Updating existing configuration at %s\n\n", store.ConfigFileUsed())
 
 		var wizardMode string
 		err := huh.NewForm(
@@ -96,7 +96,7 @@ func RunInitWizard() error {
 			if agent == nil {
 				return fmt.Errorf("no active agent found; run 'gllm init' to create one first")
 			}
-			return runInstructionWizard(agent)
+			return runInstructionWizard(cmd, agent)
 		case "both":
 			// fall through to run the full agent wizard, then append instruction wizard at the end
 		case "agent":
@@ -364,7 +364,7 @@ func RunInitWizard() error {
 	}
 
 	if !confirm {
-		fmt.Printf("Configuration aborted.\n")
+		util.Println(cmd, "Configuration aborted.")
 		return nil
 	}
 
@@ -416,9 +416,9 @@ func RunInitWizard() error {
 		return fmt.Errorf("failed to set active agent: %w", err)
 	}
 
-	fmt.Printf("\n")
-	fmt.Printf("✅ Configuration saved to %s\n", store.ConfigFileUsed())
-	fmt.Printf("🎉 You are ready to go! Try running: gllm \"Hello World\"\n")
+	util.Println(cmd)
+	util.Printf(cmd, "✅ Configuration saved to %s\n", store.ConfigFileUsed())
+	util.Printf(cmd, "🎉 You are ready to go! Try running: gllm \"Hello World\"\n")
 
 	// Offer GLLM.md generation after a successful agent save.
 	// We re-fetch the agent so the caller always gets the freshly persisted config.
@@ -438,8 +438,8 @@ func RunInitWizard() error {
 	).Run()
 
 	if wantInstruction {
-		if err := runInstructionWizard(newAgentConfig); err != nil {
-			fmt.Printf("⚠️  Instruction file generation skipped: %v\n", err)
+		if err := runInstructionWizard(cmd, newAgentConfig); err != nil {
+			util.Printf(cmd, "⚠️  Instruction file generation skipped: %v\n", err)
 		}
 	}
 
@@ -453,7 +453,7 @@ func RunInitWizard() error {
 //  4. On confirmation, write the file using os.WriteFile.
 //
 // agentConfig must be the fully resolved active agent (used for provider dispatch).
-func runInstructionWizard(agentConfig *data.AgentConfig) error {
+func runInstructionWizard(cmd *cobra.Command, agentConfig *data.AgentConfig) error {
 	height := io.GetTermFitHeight(8)
 
 	var storageChoice string
@@ -504,20 +504,20 @@ func runInstructionWizard(agentConfig *data.AgentConfig) error {
 	}
 
 	// Render the generated Markdown so the user can review it before committing to save.
-	fmt.Println()
-	fmt.Println(strings.Repeat("─", 60))
+	util.Println(cmd)
+	util.Println(cmd, strings.Repeat("─", 60))
 	glamourStyle := data.MostSimilarGlamourStyle()
 	if tr, err := glamour.NewTermRenderer(glamour.WithStandardStyle(glamourStyle)); err == nil {
 		if rendered, err := tr.Render(content); err == nil {
-			fmt.Print(rendered)
+			util.Print(cmd, rendered)
 		} else {
-			fmt.Println(content) // graceful fallback
+			util.Println(cmd, content) // graceful fallback
 		}
 	} else {
-		fmt.Println(content) // graceful fallback
+		util.Println(cmd, content) // graceful fallback
 	}
-	fmt.Println(strings.Repeat("─", 60))
-	fmt.Println()
+	util.Println(cmd, strings.Repeat("─", 60))
+	util.Println(cmd)
 
 	var saveConfirm bool
 	err = huh.NewForm(
@@ -534,7 +534,7 @@ func runInstructionWizard(agentConfig *data.AgentConfig) error {
 	}
 
 	if !saveConfirm {
-		fmt.Println("Discarded — no file written.")
+		util.Println(cmd, "Discarded — no file written.")
 		return nil
 	}
 
@@ -545,7 +545,7 @@ func runInstructionWizard(agentConfig *data.AgentConfig) error {
 		return err
 	}
 
-	fmt.Printf("✅ GLLM.md written to %s\n", targetPath)
+	util.Printf(cmd, "✅ GLLM.md written to %s\n", targetPath)
 	return nil
 }
 

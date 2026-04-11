@@ -33,8 +33,7 @@ Use 'gllm features switch' to toggle capabilities on or off.`,
 			return
 		}
 
-		printCapSummary(agent.Capabilities)
-
+		util.Print(cmd, renderCapSummary(agent.Capabilities))
 		util.Println(cmd, "Use 'gllm features switch' to change.")
 	},
 }
@@ -189,40 +188,42 @@ var capsSwitchCmd = &cobra.Command{
 
 		util.Printf(cmd, "Capabilities updated. %d enabled.\n", len(newCaps))
 		util.Println(cmd)
-		printCapSummary(agent.Capabilities)
+		util.Print(cmd, renderCapSummary(agent.Capabilities))
 	},
 }
 
-func printCapSummary(caps []string) {
-	fmt.Println("Current Agent Features and Capabilities:")
-	fmt.Println()
+func renderCapSummary(caps []string) string {
+	var sb strings.Builder
+	sb.WriteString("Current Agent Features and Capabilities:\n\n")
 
-	printCapStatus(service.CapabilityTokenUsageTitle, service.IsTokenUsageEnabled(caps))
-	printCapStatus(service.CapabilityMarkdownTitle, service.IsMarkdownEnabled(caps))
-	printCapStatus(service.CapabilityWebSearchTitle, service.IsWebSearchEnabled(caps))
-	printCapStatus(service.CapabilityMCPTitle, service.IsMCPServersEnabled(caps))
-	printCapStatus(service.CapabilitySkillsTitle, service.IsAgentSkillsEnabled(caps))
-	printCapStatus(service.CapabilityMemoryTitle, service.IsAgentMemoryEnabled(caps))
-	printCapStatus(service.CapabilitySubAgentsTitle, service.IsSubAgentsEnabled(caps))
-	printCapStatus(service.CapabilityAutoRenameTitle, service.IsAutoRenameEnabled(caps))
-	printCapStatus(service.CapabilityAutoCompressTitle, service.IsAutoCompressionEnabled(caps))
-	printCapStatus(service.CapabilityPlanModeTitle, service.IsPlanModeEnabled(caps))
+	sb.WriteString(renderCapStatus(service.CapabilityTokenUsageTitle, service.IsTokenUsageEnabled(caps)))
+	sb.WriteString(renderCapStatus(service.CapabilityMarkdownTitle, service.IsMarkdownEnabled(caps)))
+	sb.WriteString(renderCapStatus(service.CapabilityWebSearchTitle, service.IsWebSearchEnabled(caps)))
+	sb.WriteString(renderCapStatus(service.CapabilityMCPTitle, service.IsMCPServersEnabled(caps)))
+	sb.WriteString(renderCapStatus(service.CapabilitySkillsTitle, service.IsAgentSkillsEnabled(caps)))
+	sb.WriteString(renderCapStatus(service.CapabilityMemoryTitle, service.IsAgentMemoryEnabled(caps)))
+	sb.WriteString(renderCapStatus(service.CapabilitySubAgentsTitle, service.IsSubAgentsEnabled(caps)))
+	sb.WriteString(renderCapStatus(service.CapabilityAutoRenameTitle, service.IsAutoRenameEnabled(caps)))
+	sb.WriteString(renderCapStatus(service.CapabilityAutoCompressTitle, service.IsAutoCompressionEnabled(caps)))
+	sb.WriteString(renderCapStatus(service.CapabilityPlanModeTitle, service.IsPlanModeEnabled(caps)))
 
-	fmt.Printf("%s = Enabled capability\n", ui.FormatEnabledIndicator(true))
+	fmt.Fprintf(&sb, "%s = Enabled capability\n", ui.FormatEnabledIndicator(true))
+	return sb.String()
 }
 
-func printCapStatus(name string, enabled bool) {
+func renderCapStatus(name string, enabled bool) string {
+	var sb strings.Builder
 	indicator := ui.FormatEnabledIndicator(enabled)
-	fmt.Printf("%s %s\n", indicator, name)
+	fmt.Fprintf(&sb, "%s %s\n", indicator, name)
 
 	desc := service.GetCapabilityDescription(name)
 	if desc != "" {
-		lines := strings.Split(desc, "\n")
-		for _, line := range lines {
+		for _, line := range strings.Split(desc, "\n") {
 			if strings.TrimSpace(line) != "" {
-				fmt.Printf("%s%s%s\n", data.DetailColor, line, data.ResetSeq)
+				fmt.Fprintf(&sb, "%s%s%s\n", data.DetailColor, line, data.ResetSeq)
 			}
 		}
 	}
-	fmt.Println()
+	sb.WriteString("\n")
+	return sb.String()
 }
