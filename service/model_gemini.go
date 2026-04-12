@@ -121,7 +121,7 @@ func (ag *Agent) SortGeminiMessagesByOrder() error {
 // systemPrompt is the system prompt to be used for the sync generation, it's majorly a role.
 // the last message is the user prompt to do the task.
 func (ag *Agent) GenerateGeminiSync(messages []*genai.Content, systemPrompt string) (string, error) {
-	ctx := context.Background()
+	ctx := ag.Ctx
 	ga, err := ag.initGeminiAgent(ctx)
 	if err != nil {
 		return "", err
@@ -160,7 +160,7 @@ func (ag *Agent) GenerateGeminiSync(messages []*genai.Content, systemPrompt stri
 func (ag *Agent) GenerateGeminiStream() error {
 	var err error
 	// Check the setup of Gemini client
-	ctx := context.Background()
+	ctx := ag.Ctx
 	ga, err := ag.initGeminiAgent(ctx)
 	if err != nil {
 		return err

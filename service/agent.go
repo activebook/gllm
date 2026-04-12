@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"math"
 
@@ -37,6 +38,7 @@ type ModelInfo struct {
 }
 
 type Agent struct {
+	Ctx             context.Context // Optional completion cancellation context
 	Model           *ModelInfo
 	SystemPrompt    string
 	UserPrompt      string
@@ -267,6 +269,7 @@ func ConstructSession(sessionName string, provider string) (Session, error) {
 }
 
 type AgentOptions struct {
+	Ctx           context.Context // Context to carry cancellation logic
 	Prompt        string
 	SysPrompt     string
 	Files         []*FileData
@@ -378,6 +381,7 @@ func CallAgent(op *AgentOptions) error {
 	enabledTools := constructEnabledTools(op.EnabledTools, op.Capabilities)
 
 	ag := Agent{
+		Ctx:           op.Ctx,
 		Model:         mi,
 		SystemPrompt:  op.SysPrompt,
 		UserPrompt:    op.Prompt,
@@ -402,6 +406,11 @@ func CallAgent(op *AgentOptions) error {
 		AgentName:     op.AgentName,
 		ModelName:     op.ModelName,
 		Verbose:       verboseMode,
+	}
+
+	// If no context is provided, use background context
+	if ag.Ctx == nil {
+		ag.Ctx = context.Background()
 	}
 
 	// Construct session manager

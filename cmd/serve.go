@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -125,7 +126,9 @@ func chatCompletionHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	err = runAgentHeadless(prompt, guideline, sessionName, sseOut, agent)
+	// Create a context that can be cancelled by the HTTP request's Done channel
+	ctx := r.Context()
+	err = runAgentHeadless(prompt, guideline, sessionName, sseOut, agent, ctx)
 	if err != nil {
 		util.LogErrorf("Server agent error: %v\n", err)
 		sseOut.WriteErrorEvent(err.Error(), "agent_error")
@@ -258,7 +261,7 @@ func handleWebCommand(prompt string, sessionName string, sseOut *io.SSEOutput) (
 	}
 }
 
-func runAgentHeadless(prompt string, guideline string, sessionName string, sseIO *io.SSEOutput, agent *data.AgentConfig) error {
+func runAgentHeadless(prompt string, guideline string, sessionName string, sseIO *io.SSEOutput, agent *data.AgentConfig, ctx context.Context) error {
 	sharedState := data.NewSharedState()
 	defer sharedState.Clear() // Clean up on session end
 
@@ -281,6 +284,7 @@ func runAgentHeadless(prompt string, guideline string, sessionName string, sseIO
 		}
 
 		op := service.AgentOptions{
+			Ctx:           ctx, // Carry HTTP completion cancellation context
 			Prompt:        finalPrompt,
 			SysPrompt:     agent.SystemPrompt,
 			Files:         nil, // Can map attachments later if needed

@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -133,7 +132,7 @@ func prependOpenChatSystemMessage(systemPrompt string, history []*model.ChatComp
 // systemPrompt is the system prompt to be used for the sync generation, it's majorly a role.
 // the last message is the user prompt to do the task.
 func (ag *Agent) GenerateOpenChatSync(messages []*model.ChatCompletionMessage, systemPrompt string) (string, error) {
-	ctx := context.Background()
+	ctx := ag.Ctx
 	client := arkruntime.NewClientWithApiKey(
 		ag.Model.ApiKey,
 		arkruntime.WithTimeout(30*time.Minute),
@@ -173,7 +172,7 @@ func (ag *Agent) GenerateOpenChatSync(messages []*model.ChatCompletionMessage, s
 func (ag *Agent) GenerateOpenChatStream() error {
 
 	// Initialize the Client
-	ctx := context.Background()
+	ctx := ag.Ctx
 	// Create a client config with custom base URL
 	client := arkruntime.NewClientWithApiKey(
 		ag.Model.ApiKey,

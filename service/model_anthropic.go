@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -52,7 +51,7 @@ func (ag *Agent) getAnthropicFilePart(file *FileData) *anthropic.ContentBlockPar
 // systemPrompt — injected as the API-level system role.
 // the last message in messages — the instruction for the background task (rename, compress, …).
 func (ag *Agent) GenerateAnthropicSync(messages []anthropic.MessageParam, systemPrompt string) (string, error) {
-	ctx := context.Background()
+	ctx := ag.Ctx
 	opts := []option.RequestOption{
 		option.WithAPIKey(ag.Model.ApiKey),
 		option.WithAuthToken(ag.Model.ApiKey),
@@ -117,7 +116,7 @@ func (ag *Agent) GenerateAnthropicSync(messages []anthropic.MessageParam, system
 // GenerateAnthropicStream generates a streaming response using Anthropic API
 func (ag *Agent) GenerateAnthropicStream() error {
 	// Initialize the Client
-	ctx := context.Background()
+	ctx := ag.Ctx
 
 	// Set both APIKey and AuthToken to ensure it works on X-Api-Key or Bearer
 	opts := []option.RequestOption{

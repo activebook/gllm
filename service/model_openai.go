@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -173,7 +172,7 @@ func prependOpenAISystemMessage(systemPrompt string, history []openai.ChatComple
 // systemPrompt is the system prompt to be used for the sync generation, it's majorly a role.
 // the last message is the user prompt to do the task.
 func (ag *Agent) GenerateOpenAISync(messages []openai.ChatCompletionMessageParamUnion, systemPrompt string) (string, error) {
-	ctx := context.Background()
+	ctx := ag.Ctx
 	opts := []option.RequestOption{option.WithAPIKey(ag.Model.ApiKey)}
 	if ag.Model.EndPoint != "" {
 		opts = append(opts, option.WithBaseURL(ag.Model.EndPoint))
@@ -214,7 +213,7 @@ func (ag *Agent) GenerateOpenAISync(messages []openai.ChatCompletionMessageParam
 func (ag *Agent) GenerateOpenAIStream() error {
 
 	// Initialize the Client
-	ctx := context.Background()
+	ctx := ag.Ctx
 	// Create a client config with custom base URL
 	clientOpts := []option.RequestOption{
 		option.WithAPIKey(ag.Model.ApiKey),
