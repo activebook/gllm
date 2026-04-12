@@ -16,7 +16,8 @@ import (
 )
 
 var (
-	servePort int
+	servePort    int
+	serveVerbose bool
 )
 
 var serveCmd = &cobra.Command{
@@ -35,6 +36,7 @@ var serveCmd = &cobra.Command{
 
 func init() {
 	serveCmd.Flags().IntVarP(&servePort, "port", "p", 8080, "Port to listen on")
+	serveCmd.Flags().BoolVarP(&serveVerbose, "verbose", "v", false, "Enable verbose output to stdio")
 	rootCmd.AddCommand(serveCmd)
 }
 
@@ -295,8 +297,8 @@ func runAgentHeadless(prompt string, guideline string, sessionName string, sseIO
 			Capabilities:  agent.Capabilities,
 			YoloMode:      true, // Headless server typically auto-approves tool uses
 			OutputFile:    "",
-			QuietMode:     false,
-			SSEOutput:     sseIO, // SSE Output for streaming
+			QuietMode:     !serveVerbose, // True by default unless --verbose is provided
+			SSEOutput:     sseIO,         // SSE Output for streaming
 			SessionName:   sessionName,
 			MCPConfig:     mcpConfig,
 			SharedState:   sharedState,
