@@ -249,6 +249,7 @@ func (ag *Agent) GenerateOpenAIStream() error {
 		proceed:    ag.ProceedChan,
 		search:     ag.SearchEngine,
 		toolsUse:   &ag.ToolsUse,
+		quiet:      ag.QuietMode,
 		queries:    make([]string, 0),
 		references: make([]map[string]interface{}, 0), // Updated to match new field type
 		status:     &ag.Status,

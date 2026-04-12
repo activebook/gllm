@@ -1685,6 +1685,7 @@ type OpenProcessor struct {
 	proceed    <-chan bool              // Main Channel to receive proceed signal
 	search     *SearchEngine            // Search engine
 	toolsUse   *data.ToolsUse           // Use tools
+	quiet      bool                     // Whether to suppress console output
 	queries    []string                 // List of queries to be sent to the AI assistant
 	references []map[string]interface{} // keep track of the references
 	status     *StatusStack             // Stack to manage streaming status

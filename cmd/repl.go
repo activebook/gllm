@@ -101,11 +101,10 @@ func init() {
 
 type ReplInfo struct {
 	Files          []*service.FileData
-	QuitFlag       bool     // for cmd /quit or /exit
-	EditorInput    string   // for /e editor edit
-	Guideline      string   // for underlying guideline (e.g. skill activation)
-	History        []string // for input history
-	outputFile     string
+	QuitFlag       bool              // for cmd /quit or /exit
+	EditorInput    string            // for /e editor edit
+	Guideline      string            // for underlying guideline (e.g. skill activation)
+	History        []string          // for input history
 	sharedState    *data.SharedState // Persistent SharedState for the session
 	autoRenameOnce sync.Once         // ensures auto-rename fires at most once per REPL session
 }
@@ -494,7 +493,7 @@ func (ri *ReplInfo) callAgent(input string) {
 	}
 
 	// Call agent using the shared runner, passing persisted SharedState
-	err := RunAgent(prompt, guideline, ri.Files, sessionName, ri.outputFile, ri.sharedState)
+	err := RunAgent(prompt, guideline, ri.Files, sessionName, "", ri.sharedState)
 	if err != nil {
 		util.LogErrorf("%v\n", err)
 		return

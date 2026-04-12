@@ -117,7 +117,7 @@ func runGeminiTool(call *genai.FunctionCall, fn ToolFunc) (*genai.FunctionRespon
 func (op *OpenProcessor) dispatchGeminiToolCall(call *genai.FunctionCall, a *map[string]interface{}) (*genai.FunctionResponse, error) {
 	switch call.Name {
 	case ToolShell:
-		return runGeminiTool(call, func() (string, error) { return shellToolCallImpl(a, op.toolsUse) })
+		return runGeminiTool(call, func() (string, error) { return shellToolCallImpl(a, op.toolsUse, op.quiet) })
 	case ToolReadFile:
 		return runGeminiTool(call, func() (string, error) { return readFileToolCallImpl(a) })
 	case ToolWriteFile:
@@ -151,7 +151,7 @@ func (op *OpenProcessor) dispatchGeminiToolCall(call *genai.FunctionCall, a *map
 	case ToolListAgent:
 		return runGeminiTool(call, func() (string, error) { return listAgentToolCallImpl() })
 	case ToolSpawnSubAgents:
-		return runGeminiTool(call, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op.toolsUse, op.executor) })
+		return runGeminiTool(call, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op.agentName, op.toolsUse, op.executor) })
 	case ToolGetState:
 		return runGeminiTool(call, func() (string, error) { return getStateToolCallImpl(a, op.sharedState) })
 	case ToolSetState:

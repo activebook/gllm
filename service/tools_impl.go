@@ -661,7 +661,7 @@ func readMultipleFilesToolCallImpl(argsMap *map[string]interface{}) (string, err
 	return result.String(), nil
 }
 
-func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse, quiet bool) (string, error) {
 	if err := CheckToolPermission(ToolShell, argsMap); err != nil {
 		return "", err
 	}
@@ -743,8 +743,8 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse)
 	// Create a response that prompts the LLM to provide insightful analysis of the command output
 	finalResponse := fmt.Sprintf(ToolRespShellOutput, cmdStr, errorInfo, outputInfo)
 
-	// In verbose mode, also echo the output directly to the terminal so the user can see it.
-	if data.GetSettingsStore().GetVerboseEnabled() {
+	// Respect QuietMode – only output to Console if NOT in quiet mode and Verbose is enabled
+	if !quiet && data.GetSettingsStore().GetVerboseEnabled() {
 		fmt.Fprintf(os.Stderr, "%s$ %s%s\n", data.ToolCallColor, cmdStr, data.ResetSeq)
 		if outStr != "" {
 			fmt.Fprintf(os.Stderr, "%s%s%s", data.ShellOutputColor, outStr, data.ResetSeq)
@@ -1540,6 +1540,7 @@ func formatAgentInfo(name string, ag *data.AgentConfig) string {
 // Invokes one or more sub-agents and returns progress summary
 func spawnSubAgentsToolCallImpl(
 	argsMap *map[string]interface{},
+	callerAgentName string,
 	toolsUse *data.ToolsUse,
 	executor *SubAgentExecutor,
 ) (string, error) {
@@ -1613,7 +1614,7 @@ func spawnSubAgentsToolCallImpl(
 		}
 
 		tasks = append(tasks, &SubAgentTask{
-			CallerAgentName: toolsUse.AgentName,
+			CallerAgentName: callerAgentName,
 			AgentName:       agentName,
 			Instruction:     instruction,
 			TaskKey:         taskKey,

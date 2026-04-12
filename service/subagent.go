@@ -49,16 +49,15 @@ type SubAgentTask struct {
 
 // SubAgentResult represents the outcome of a sub-agent execution
 type SubAgentResult struct {
-	AgentName  string         // Agent that executed
-	Status     SubAgentStatus // Execution status
-	Progress   string         // Human-readable progress description
-	OutputFile string         // Path to detailed output
-	TaskKey    string         // Original task key
-	StateKey   string         // Key where result was stored in SharedState (agentName_taskKey)
-	Error      error          // Error if failed
-	Duration   time.Duration  // Execution duration
-	StartTime  time.Time      // When execution started
-	EndTime    time.Time      // When execution ended
+	AgentName string         // Agent that executed
+	Status    SubAgentStatus // Execution status
+	Progress  string         // Human-readable progress description
+	TaskKey   string         // Original task key
+	StateKey  string         // Key where result was stored in SharedState (agentName_taskKey)
+	Error     error          // Error if failed
+	Duration  time.Duration  // Execution duration
+	StartTime time.Time      // When execution started
+	EndTime   time.Time      // When execution ended
 }
 
 // AgentMessage is a task delivery envelope sent on an agent's TaskChan.

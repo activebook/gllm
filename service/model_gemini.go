@@ -180,6 +180,7 @@ func (ag *Agent) GenerateGeminiStream() error {
 		proceed:    ag.ProceedChan,
 		search:     ag.SearchEngine,
 		toolsUse:   &ag.ToolsUse,
+		quiet:      ag.QuietMode,
 		queries:    make([]string, 0),
 		references: make([]map[string]interface{}, 0),
 		status:     &ag.Status,

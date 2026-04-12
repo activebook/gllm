@@ -85,7 +85,7 @@ func runAnthropicTool(toolID string, fn ToolFunc) (anthropic.MessageParam, error
 func (op *OpenProcessor) dispatchAnthropicToolCall(toolCall anthropic.ToolUseBlockParam, a *map[string]interface{}) (anthropic.MessageParam, error) {
 	switch toolCall.Name {
 	case ToolShell:
-		return runAnthropicTool(toolCall.ID, func() (string, error) { return shellToolCallImpl(a, op.toolsUse) })
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return shellToolCallImpl(a, op.toolsUse, op.quiet) })
 	case ToolWebFetch:
 		return runAnthropicTool(toolCall.ID, func() (string, error) { return webFetchToolCallImpl(a) })
 	case ToolWebSearch:
@@ -125,7 +125,7 @@ func (op *OpenProcessor) dispatchAnthropicToolCall(toolCall anthropic.ToolUseBlo
 	case ToolListAgent:
 		return runAnthropicTool(toolCall.ID, func() (string, error) { return listAgentToolCallImpl() })
 	case ToolSpawnSubAgents:
-		return runAnthropicTool(toolCall.ID, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op.toolsUse, op.executor) })
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op.agentName, op.toolsUse, op.executor) })
 	case ToolGetState:
 		return runAnthropicTool(toolCall.ID, func() (string, error) { return getStateToolCallImpl(a, op.sharedState) })
 	case ToolSetState:

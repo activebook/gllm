@@ -133,7 +133,7 @@ func runOpenChatTool(tc *model.ToolCall, fn ToolFunc) (*model.ChatCompletionMess
 func (op *OpenProcessor) dispatchOpenChatToolCall(toolCall *model.ToolCall, a *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	switch toolCall.Function.Name {
 	case ToolShell:
-		return runOpenChatTool(toolCall, func() (string, error) { return shellToolCallImpl(a, op.toolsUse) })
+		return runOpenChatTool(toolCall, func() (string, error) { return shellToolCallImpl(a, op.toolsUse, op.quiet) })
 	case ToolWebFetch:
 		return runOpenChatTool(toolCall, func() (string, error) { return webFetchToolCallImpl(a) })
 	case ToolWebSearch:
@@ -169,7 +169,7 @@ func (op *OpenProcessor) dispatchOpenChatToolCall(toolCall *model.ToolCall, a *m
 	case ToolListAgent:
 		return runOpenChatTool(toolCall, func() (string, error) { return listAgentToolCallImpl() })
 	case ToolSpawnSubAgents:
-		return runOpenChatTool(toolCall, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op.toolsUse, op.executor) })
+		return runOpenChatTool(toolCall, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op.agentName, op.toolsUse, op.executor) })
 	case ToolGetState:
 		return runOpenChatTool(toolCall, func() (string, error) { return getStateToolCallImpl(a, op.sharedState) })
 	case ToolSetState:

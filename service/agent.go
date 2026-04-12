@@ -67,7 +67,10 @@ type Agent struct {
 	SharedState *data.SharedState // Shared state for inter-agent communication
 	AgentName   string            // Current agent name for metadata tracking
 	ModelName   string            // Current model name of current agent (agent model key)
-	Verbose     bool              // Whether verbose output mode is enabled
+
+	// Output mode
+	Verbose   bool // Whether verbose output mode is enabled
+	QuietMode bool // Whether quiet mode is enabled
 }
 
 func constructModelInfo(model *data.Model) *ModelInfo {
@@ -300,7 +303,7 @@ func CallAgent(op *AgentOptions) error {
 	se := constructSearchEngine(op.Capabilities)
 
 	// Set up tools use settings
-	toolsUse := data.ToolsUse{AutoApprove: op.YoloMode, AgentName: op.AgentName}
+	toolsUse := data.ToolsUse{AutoApprove: op.YoloMode}
 
 	// Set up code tool settings
 	exeCode := IsCodeExecutionEnabled()
@@ -406,6 +409,7 @@ func CallAgent(op *AgentOptions) error {
 		AgentName:     op.AgentName,
 		ModelName:     op.ModelName,
 		Verbose:       verboseMode,
+		QuietMode:     op.QuietMode,
 	}
 
 	// If no context is provided, use background context

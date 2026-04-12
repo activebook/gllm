@@ -79,7 +79,7 @@ func runOpenAITool(tc openai.ChatCompletionMessageToolCallUnion, fn ToolFunc) (o
 func (op *OpenProcessor) dispatchOpenAIToolCall(toolCall openai.ChatCompletionMessageToolCallUnion, a *map[string]interface{}) (openai.ChatCompletionMessageParamUnion, error) {
 	switch toolCall.Function.Name {
 	case ToolShell:
-		return runOpenAITool(toolCall, func() (string, error) { return shellToolCallImpl(a, op.toolsUse) })
+		return runOpenAITool(toolCall, func() (string, error) { return shellToolCallImpl(a, op.toolsUse, op.quiet) })
 	case ToolWebFetch:
 		return runOpenAITool(toolCall, func() (string, error) { return webFetchToolCallImpl(a) })
 	case ToolWebSearch:
@@ -117,7 +117,7 @@ func (op *OpenProcessor) dispatchOpenAIToolCall(toolCall openai.ChatCompletionMe
 	case ToolListAgent:
 		return runOpenAITool(toolCall, func() (string, error) { return listAgentToolCallImpl() })
 	case ToolSpawnSubAgents:
-		return runOpenAITool(toolCall, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op.toolsUse, op.executor) })
+		return runOpenAITool(toolCall, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op.agentName, op.toolsUse, op.executor) })
 	case ToolGetState:
 		return runOpenAITool(toolCall, func() (string, error) { return getStateToolCallImpl(a, op.sharedState) })
 	case ToolSetState:
