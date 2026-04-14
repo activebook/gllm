@@ -274,6 +274,7 @@ func (e *SubAgentExecutor) executeTask(agent *ActiveAgent, task *SubAgentTask) *
 		ThinkingLevel: agent.Config.Think,
 		EnabledTools:  agent.Config.Tools,
 		Capabilities:  agent.Config.Capabilities,
+		Interaction:   nil,  // Sub-agents don't need interaction
 		YoloMode:      true, // Sub-agents always auto-approve
 		QuietMode:     true, // Sub-agents run quietly
 		SessionName:   sessionName,

@@ -160,7 +160,7 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
 	}
-	op.toolsUse.FilePath = path // Set the file path in toolsUse for potential use in confirmation prompt
+	op.toolsUse.FilePath = path // Set the file path in op.toolsUse for potential use in confirmation prompt
 
 	content, ok := (*argsMap)["content"].(string)
 	if !ok {
@@ -179,7 +179,7 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (
 		}
 
 		// Show diff if we have current content
-		diff := event.RequestDiff(currentContent, content, 3)
+		diff := op.interaction.RequestDiff(currentContent, content, 3)
 		op.fileHooks.OpenDiff(path, content)
 		op.showDiffConfirm(diff)
 
@@ -190,7 +190,7 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (
 		}
 
 		// Prompt user for confirmation
-		event.RequestConfirm(purpose, op.toolsUse)
+		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
 		op.closeDiffConfirm() // Close the diff
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			op.fileHooks.RejectDiff(path)
@@ -214,7 +214,7 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (
 	return fmt.Sprintf("Successfully wrote to file %s", path), nil
 }
 
-func createDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+func createDirectoryToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolCreateDirectory, argsMap); err != nil {
 		return "", err
 	}
@@ -224,7 +224,7 @@ func createDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data
 		return "", fmt.Errorf("path not found in arguments")
 	}
 
-	if !toolsUse.AutoApprove {
+	if !op.toolsUse.AutoApprove {
 		// Get purpose if provided
 		purpose, _ := (*argsMap)["purpose"].(string)
 		if purpose == "" {
@@ -232,8 +232,8 @@ func createDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data
 		}
 
 		// Prompt user for confirmation
-		event.RequestConfirm(purpose, toolsUse)
-		if toolsUse.Confirm == data.ToolConfirmCancel {
+		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
+		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: create directory %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
@@ -301,7 +301,7 @@ func listDirectoryToolCallImpl(argsMap *map[string]interface{}) (string, error) 
 	return result.String(), nil
 }
 
-func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+func deleteFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolDeleteFile, argsMap); err != nil {
 		return "", err
 	}
@@ -310,9 +310,9 @@ func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tool
 	if !ok {
 		return "", fmt.Errorf("path not found in arguments")
 	}
-	toolsUse.FilePath = path
+	op.toolsUse.FilePath = path
 
-	if !toolsUse.AutoApprove {
+	if !op.toolsUse.AutoApprove {
 		// Get purpose if provided
 		purpose, _ := (*argsMap)["purpose"].(string)
 		if purpose == "" {
@@ -320,8 +320,8 @@ func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tool
 		}
 
 		// Prompt user for confirmation
-		event.RequestConfirm(purpose, toolsUse)
-		if toolsUse.Confirm == data.ToolConfirmCancel {
+		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
+		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: delete file %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
@@ -335,7 +335,7 @@ func deleteFileToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tool
 	return fmt.Sprintf("Successfully deleted file %s", path), nil
 }
 
-func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolDeleteDirectory, argsMap); err != nil {
 		return "", err
 	}
@@ -345,7 +345,7 @@ func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data
 		return "", fmt.Errorf("path not found in arguments")
 	}
 
-	if !toolsUse.AutoApprove {
+	if !op.toolsUse.AutoApprove {
 		// Get purpose if provided
 		purpose, _ := (*argsMap)["purpose"].(string)
 		if purpose == "" {
@@ -353,8 +353,8 @@ func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data
 		}
 
 		// Prompt user for confirmation
-		event.RequestConfirm(purpose, toolsUse)
-		if toolsUse.Confirm == data.ToolConfirmCancel {
+		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
+		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: delete directory %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
@@ -368,7 +368,7 @@ func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, toolsUse *data
 	return fmt.Sprintf("Successfully deleted directory %s", path), nil
 }
 
-func moveToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+func moveToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolMove, argsMap); err != nil {
 		return "", err
 	}
@@ -383,7 +383,7 @@ func moveToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) 
 		return "", fmt.Errorf("destination not found in arguments")
 	}
 
-	if !toolsUse.AutoApprove {
+	if !op.toolsUse.AutoApprove {
 		// Get purpose if provided
 		purpose, _ := (*argsMap)["purpose"].(string)
 		if purpose == "" {
@@ -391,8 +391,8 @@ func moveToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) 
 		}
 
 		// Prompt user for confirmation
-		event.RequestConfirm(purpose, toolsUse)
-		if toolsUse.Confirm == data.ToolConfirmCancel {
+		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
+		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: move %s to %s", source, destination), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
@@ -661,7 +661,7 @@ func readMultipleFilesToolCallImpl(argsMap *map[string]interface{}) (string, err
 	return result.String(), nil
 }
 
-func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse, quiet bool) (string, error) {
+func shellToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolShell, argsMap); err != nil {
 		return "", err
 	}
@@ -679,7 +679,7 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse,
 		}
 	}
 
-	if !toolsUse.AutoApprove {
+	if !op.toolsUse.AutoApprove {
 		// Directly prompt user for confirmation
 		descStr, ok := (*argsMap)["purpose"].(string)
 		if !ok {
@@ -687,8 +687,8 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse,
 			descStr = ""
 		}
 		// Use the command string as the info for confirmation
-		event.RequestConfirm(descStr, toolsUse)
-		if toolsUse.Confirm == data.ToolConfirmCancel {
+		if op.interaction != nil { op.interaction.RequestConfirm(descStr, op.toolsUse) }
+		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: shell command '%s'", cmdStr), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
@@ -744,7 +744,7 @@ func shellToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse,
 	finalResponse := fmt.Sprintf(ToolRespShellOutput, cmdStr, errorInfo, outputInfo)
 
 	// Respect QuietMode – only output to Console if NOT in quiet mode and Verbose is enabled
-	if !quiet && data.GetSettingsStore().GetVerboseEnabled() {
+	if !op.quiet && data.GetSettingsStore().GetVerboseEnabled() {
 		fmt.Fprintf(os.Stderr, "%s$ %s%s\n", data.ToolCallColor, cmdStr, data.ResetSeq)
 		if outStr != "" {
 			fmt.Fprintf(os.Stderr, "%s%s%s", data.ShellOutputColor, outStr, data.ResetSeq)
@@ -790,7 +790,7 @@ func webFetchToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	return fmt.Sprintf("Fetched content from %s:\n%s", url, res.Content), nil
 }
 
-func webSearchToolCallImpl(argsMap *map[string]interface{}, queries *[]string, references *[]map[string]interface{}, search *SearchEngine) (string, error) {
+func webSearchToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolWebSearch, argsMap); err != nil {
 		return "", err
 	}
@@ -801,22 +801,22 @@ func webSearchToolCallImpl(argsMap *map[string]interface{}, queries *[]string, r
 	}
 
 	// Call the search function
-	engine := search.Name
+	engine := op.search.Name
 	var data map[string]any
 	var err error
 	switch engine {
 	case GoogleSearchEngine:
 		// Use Google Search Engine
-		data, err = search.GoogleSearch(query)
+		data, err = op.search.GoogleSearch(query)
 	case BingSearchEngine:
 		// Use Bing Search Engine
-		data, err = search.BingSearch(query)
+		data, err = op.search.BingSearch(query)
 	case TavilySearchEngine:
 		// Use Tavily Search Engine
-		data, err = search.TavilySearch(query)
+		data, err = op.search.TavilySearch(query)
 	case NoneSearchEngine:
 		// Use None Search Engine
-		data, err = search.NoneSearch(query)
+		data, err = op.search.NoneSearch(query)
 	default:
 		err = fmt.Errorf("unknown search engine: %s", engine)
 	}
@@ -825,8 +825,8 @@ func webSearchToolCallImpl(argsMap *map[string]interface{}, queries *[]string, r
 		return "", fmt.Errorf("error performing search for query '%s': %v", query, err)
 	}
 	// keep the search results for references
-	*queries = append(*queries, query)
-	*references = append(*references, data)
+	op.queries = append(op.queries, query)
+	op.references = append(op.references, data)
 
 	// Convert search results to JSON string
 	resultsJSON, err := json.Marshal(data)
@@ -1008,7 +1008,7 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (s
 
 	// ── Phase 3: Show diff and request user confirmation ──────────────────────
 	if !op.toolsUse.AutoApprove {
-		diff := event.RequestDiff(content, simulatedContent, 3)
+		diff := op.interaction.RequestDiff(content, simulatedContent, 3)
 		op.fileHooks.OpenDiff(path, simulatedContent)
 		op.showDiffConfirm(diff)
 
@@ -1016,7 +1016,7 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (s
 		if purpose == "" {
 			purpose = fmt.Sprintf("edit file: %s", path)
 		}
-		event.RequestConfirm(purpose, op.toolsUse)
+		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
 		op.closeDiffConfirm()
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			op.fileHooks.RejectDiff(path)
@@ -1044,7 +1044,7 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (s
 	return result.String(), nil
 }
 
-func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+func copyToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolCopy, argsMap); err != nil {
 		return "", err
 	}
@@ -1059,7 +1059,7 @@ func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) 
 		return "", fmt.Errorf("destination not found in arguments")
 	}
 
-	if !toolsUse.AutoApprove {
+	if !op.toolsUse.AutoApprove {
 		// Get purpose if provided
 		purpose, _ := (*argsMap)["purpose"].(string)
 		if purpose == "" {
@@ -1067,8 +1067,8 @@ func copyToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) 
 		}
 
 		// Prompt user for confirmation
-		event.RequestConfirm(purpose, toolsUse)
-		if toolsUse.Confirm == data.ToolConfirmCancel {
+		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
+		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: copy %s to %s", source, destination), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
@@ -1227,7 +1227,7 @@ func saveMemoryToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 }
 
 // switchAgentToolCallImpl handles the switch_agent tool call
-func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+func switchAgentToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolSwitchAgent, argsMap); err != nil {
 		return "", err
 	}
@@ -1284,10 +1284,10 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Too
 		return fmt.Sprintf("You are already using agent '%s'. No need to switch.", name), nil
 	}
 
-	if !toolsUse.AutoApprove {
+	if !op.toolsUse.AutoApprove {
 		purpose := fmt.Sprintf("switch to agent '%s'", name)
-		event.RequestConfirm(purpose, toolsUse)
-		if toolsUse.Confirm == data.ToolConfirmCancel {
+		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
+		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: switch to agent %s", name), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
@@ -1312,7 +1312,7 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Too
 // It performs deterministic validation of all enum-constrained fields
 // before writing the agent .md file, returning a structured corrective
 // error message to the LLM on any validation failure (reflection loop).
-func buildAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+func buildAgentToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolBuildAgent, argsMap); err != nil {
 		return "", err
 	}
@@ -1437,10 +1437,10 @@ func buildAgentToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.Tool
 
 	// ── Confirm before writing ───────────────────────────────────────────────
 
-	if !toolsUse.AutoApprove {
+	if !op.toolsUse.AutoApprove {
 		purpose := fmt.Sprintf("build agent '%s' with %d tools and %d capabilities", name, len(selectedTools), len(selectedCaps))
-		event.RequestConfirm(purpose, toolsUse)
-		if toolsUse.Confirm == data.ToolConfirmCancel {
+		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
+		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: build agent '%s'", name), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
@@ -1538,16 +1538,11 @@ func formatAgentInfo(name string, ag *data.AgentConfig) string {
 
 // spawnSubAgentsToolCallImpl handles the spawn_subagents tool call
 // Invokes one or more sub-agents and returns progress summary
-func spawnSubAgentsToolCallImpl(
-	argsMap *map[string]interface{},
-	callerAgentName string,
-	toolsUse *data.ToolsUse,
-	executor *SubAgentExecutor,
-) (string, error) {
+func spawnSubAgentsToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolSpawnSubAgents, argsMap); err != nil {
 		return "", err
 	}
-	if executor == nil {
+	if op.executor == nil {
 		return "", fmt.Errorf("sub-agent executor not initialized")
 	}
 
@@ -1561,7 +1556,7 @@ func spawnSubAgentsToolCallImpl(
 		return "No tasks provided. Please specify at least one task.", nil
 	}
 
-	if !toolsUse.AutoApprove {
+	if !op.toolsUse.AutoApprove {
 		// Build brief description of tasks
 		var taskDesc strings.Builder
 		for i, task := range tasksInterface {
@@ -1574,8 +1569,8 @@ func spawnSubAgentsToolCallImpl(
 				taskDesc.WriteString(fmt.Sprintf("- Task %d: %s [Agent: %s]", i+1, taskKey, agentName))
 			}
 		}
-		event.RequestConfirm(taskDesc.String(), toolsUse)
-		if toolsUse.Confirm == data.ToolConfirmCancel {
+		if op.interaction != nil { op.interaction.RequestConfirm(taskDesc.String(), op.toolsUse) }
+		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return "Operation cancelled by user: spawn sub-agents", UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
@@ -1614,7 +1609,7 @@ func spawnSubAgentsToolCallImpl(
 		}
 
 		tasks = append(tasks, &SubAgentTask{
-			CallerAgentName: callerAgentName,
+			CallerAgentName: op.agentName,
 			AgentName:       agentName,
 			Instruction:     instruction,
 			TaskKey:         taskKey,
@@ -1623,25 +1618,22 @@ func spawnSubAgentsToolCallImpl(
 	}
 
 	// Dispatch tasks concurrently via the actor model
-	responses, err := executor.Dispatch(tasks)
+	responses, err := op.executor.Dispatch(tasks)
 	if err != nil {
 		return "", fmt.Errorf("failed to dispatch sub-agents: %v", err)
 	}
 
 	// Return formatted summary
-	return executor.FormatSummary(responses), nil
+	return op.executor.FormatSummary(responses), nil
 }
 
 // getStateToolCallImpl handles the get_state tool call
 // Retrieves a value from SharedState
-func getStateToolCallImpl(
-	argsMap *map[string]interface{},
-	state *data.SharedState,
-) (string, error) {
+func getStateToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolGetState, argsMap); err != nil {
 		return "", err
 	}
-	if state == nil {
+	if op.sharedState == nil {
 		return "", fmt.Errorf("shared state not initialized")
 	}
 
@@ -1651,7 +1643,7 @@ func getStateToolCallImpl(
 	}
 
 	// Get metadata for context
-	meta := state.GetMetadata(key)
+	meta := op.sharedState.GetMetadata(key)
 	if meta == nil {
 		return fmt.Sprintf("Key '%s' not found in SharedState. Use list_state to see available keys.", key), nil
 	}
@@ -1662,7 +1654,7 @@ func getStateToolCallImpl(
 	result.WriteString(fmt.Sprintf("Type: %s\n", meta.ContentType))
 	result.WriteString(fmt.Sprintf("Size: %d bytes\n", meta.Size))
 
-	value := state.GetString(key)
+	value := op.sharedState.GetString(key)
 	result.WriteString("\nValue:\n")
 	result.WriteString(value)
 
@@ -1673,13 +1665,12 @@ func getStateToolCallImpl(
 // Stores a value in SharedState
 func setStateToolCallImpl(
 	argsMap *map[string]interface{},
-	agentName string,
-	state *data.SharedState,
+	op *OpenProcessor,
 ) (string, error) {
 	if err := CheckToolPermission(ToolSetState, argsMap); err != nil {
 		return "", err
 	}
-	if state == nil {
+	if op.sharedState == nil {
 		return "", fmt.Errorf("shared state not initialized")
 	}
 
@@ -1694,9 +1685,9 @@ func setStateToolCallImpl(
 	}
 
 	// Check if key already exists
-	existed := state.Has(key)
+	existed := op.sharedState.Has(key)
 
-	err := state.Set(key, value, agentName)
+	err := op.sharedState.Set(key, value, op.agentName)
 	if err != nil {
 		return "", fmt.Errorf("failed to set state: %v", err)
 	}
@@ -1709,20 +1700,20 @@ func setStateToolCallImpl(
 
 // listStateToolCallImpl handles the list_state tool call
 // Lists all keys and metadata in SharedState
-func listStateToolCallImpl(state *data.SharedState) (string, error) {
+func listStateToolCallImpl(op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolListState, nil); err != nil {
 		return "", err
 	}
 
-	if state == nil {
+	if op.sharedState == nil {
 		return "", fmt.Errorf("shared state not initialized")
 	}
 
-	return state.FormatList(), nil
+	return op.sharedState.FormatList(), nil
 }
 
 // activateSkillToolCallImpl handles the activate_skill tool call.
-func activateSkillToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+func activateSkillToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolActivateSkill, argsMap); err != nil {
 		return "", err
 	}
@@ -1741,10 +1732,10 @@ func activateSkillToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.T
 	}
 
 	// Check if confirmation is needed (default logic: always confirm unless AutoApprove is true)
-	if !toolsUse.AutoApprove {
+	if !op.toolsUse.AutoApprove {
 		description := "Activate Skill:\n" + name + "\n\nDescription:\n" + desc + "\n\nResources:\n" + tree
-		event.RequestConfirm(description, toolsUse)
-		if toolsUse.Confirm == data.ToolConfirmCancel {
+		if op.interaction != nil { op.interaction.RequestConfirm(description, op.toolsUse) }
+		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: activate skill %s", name), UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
@@ -1753,7 +1744,7 @@ func activateSkillToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.T
 }
 
 // askUserToolCallImpl handles the ask_user tool call.
-func askUserToolCallImpl(argsMap *map[string]interface{}) (string, error) {
+func askUserToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolAskUser, argsMap); err != nil {
 		return "", err
 	}
@@ -1778,7 +1769,7 @@ func askUserToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 		Placeholder:  placeholder,
 	}
 
-	resp, err := event.RequestAskUser(req)
+	resp, err := op.interaction.RequestAskUser(req)
 	if err != nil {
 		return "", err
 	}
@@ -1789,7 +1780,7 @@ func askUserToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 }
 
 // enterPlanModeToolCallImpl handles the enter_plan_mode tool call.
-func enterPlanModeToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+func enterPlanModeToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolEnterPlanMode, argsMap); err != nil {
 		return "", err
 	}
@@ -1800,14 +1791,14 @@ func enterPlanModeToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.T
 	}
 
 	// Request user confirmation before entering Plan Mode
-	if !toolsUse.AutoApprove {
+	if !op.toolsUse.AutoApprove {
 		// Get purpose (required parameter)
 		purpose, ok := (*argsMap)["purpose"].(string)
 		if !ok || purpose == "" {
 			return "", fmt.Errorf("purpose is required")
 		}
-		event.RequestConfirm(purpose, toolsUse)
-		if toolsUse.Confirm == data.ToolConfirmCancel {
+		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
+		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return "Operation cancelled by user: User denied entering Plan Mode.", UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}
@@ -1821,20 +1812,20 @@ func enterPlanModeToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.T
 }
 
 // exitPlanModeToolCallImpl handles the exit_plan_mode tool call.
-func exitPlanModeToolCallImpl(argsMap *map[string]interface{}, toolsUse *data.ToolsUse) (string, error) {
+func exitPlanModeToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolExitPlanMode, argsMap); err != nil {
 		return "", err
 	}
 
 	// If auto approve, we still notify but we just go directly
-	if !toolsUse.AutoApprove {
+	if !op.toolsUse.AutoApprove {
 		// Get purpose if provided
 		purpose, _ := (*argsMap)["purpose"].(string)
 		if purpose == "" {
 			purpose = "exit Plan Mode and enter normal execution mode"
 		}
-		event.RequestConfirm(purpose, toolsUse)
-		if toolsUse.Confirm == data.ToolConfirmCancel {
+		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
+		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return "Operation cancelled by user: User denied exiting Plan Mode.", UserCancelError{Reason: UserCancelReasonDeny}
 		}
 	}

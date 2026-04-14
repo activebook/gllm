@@ -1679,18 +1679,19 @@ Use this tool when your planning phase is complete, and you require the reinstat
 // - It manages the context, notifications, data streaming, and tool usage
 // - It handles queries and references, and maintains the status stack
 type OpenProcessor struct {
-	ctx        context.Context
-	notify     chan<- StreamNotify      // Sub Channel to send notifications
-	data       chan<- StreamData        // Sub Channel to send data
-	proceed    <-chan bool              // Main Channel to receive proceed signal
-	search     *SearchEngine            // Search engine
-	toolsUse   *data.ToolsUse           // Use tools
-	quiet      bool                     // Whether to suppress console output
-	queries    []string                 // List of queries to be sent to the AI assistant
-	references []map[string]interface{} // keep track of the references
-	status     *StatusStack             // Stack to manage streaming status
-	mcpClient  *MCPClient               // MCP client for MCP tool calls
-	fileHooks  FileHooks                // lifecycle hooks for file write/edit events
+	ctx         context.Context          // Context for model generation
+	notify      chan<- StreamNotify      // Sub Channel to send notifications
+	data        chan<- StreamData        // Sub Channel to send data
+	proceed     <-chan bool              // Main Channel to receive proceed signal
+	search      *SearchEngine            // Search engine
+	toolsUse    *data.ToolsUse           // Use tools
+	interaction InteractionHandler       // Handle interactive dialogs
+	quiet       bool                     // Whether to suppress console output
+	queries     []string                 // List of queries to be sent to the AI assistant
+	references  []map[string]interface{} // keep track of the references
+	status      *StatusStack             // Stack to manage streaming status
+	mcpClient   *MCPClient               // MCP client for MCP tool calls
+	fileHooks   FileHooks                // lifecycle hooks for file write/edit events
 
 	// Sub-agent orchestration
 	sharedState *data.SharedState // Shared state for inter-agent communication

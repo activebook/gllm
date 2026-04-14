@@ -17,7 +17,7 @@ import (
 func Ptr[T any](t T) *T { return &t }
 
 func (op *OpenProcessor) openChatSwitchAgentToolCall(toolCall *model.ToolCall, argsMap *map[string]interface{}) (*model.ChatCompletionMessage, error) {
-	response, err := switchAgentToolCallImpl(argsMap, op.toolsUse)
+	response, err := switchAgentToolCallImpl(argsMap, op)
 
 	toolMessage := model.ChatCompletionMessage{
 		Role:       model.ChatMessageRoleTool,
@@ -133,11 +133,11 @@ func runOpenChatTool(tc *model.ToolCall, fn ToolFunc) (*model.ChatCompletionMess
 func (op *OpenProcessor) dispatchOpenChatToolCall(toolCall *model.ToolCall, a *map[string]interface{}) (*model.ChatCompletionMessage, error) {
 	switch toolCall.Function.Name {
 	case ToolShell:
-		return runOpenChatTool(toolCall, func() (string, error) { return shellToolCallImpl(a, op.toolsUse, op.quiet) })
+		return runOpenChatTool(toolCall, func() (string, error) { return shellToolCallImpl(a, op) })
 	case ToolWebFetch:
 		return runOpenChatTool(toolCall, func() (string, error) { return webFetchToolCallImpl(a) })
 	case ToolWebSearch:
-		return runOpenChatTool(toolCall, func() (string, error) { return webSearchToolCallImpl(a, &op.queries, &op.references, op.search) })
+		return runOpenChatTool(toolCall, func() (string, error) { return webSearchToolCallImpl(a, op) })
 	case ToolReadFile:
 		return runOpenChatTool(toolCall, func() (string, error) { return readFileToolCallImpl(a) })
 	case ToolWriteFile:
@@ -145,17 +145,17 @@ func (op *OpenProcessor) dispatchOpenChatToolCall(toolCall *model.ToolCall, a *m
 	case ToolEditFile:
 		return runOpenChatTool(toolCall, func() (string, error) { return editFileToolCallImpl(a, op) })
 	case ToolCreateDirectory:
-		return runOpenChatTool(toolCall, func() (string, error) { return createDirectoryToolCallImpl(a, op.toolsUse) })
+		return runOpenChatTool(toolCall, func() (string, error) { return createDirectoryToolCallImpl(a, op) })
 	case ToolListDirectory:
 		return runOpenChatTool(toolCall, func() (string, error) { return listDirectoryToolCallImpl(a) })
 	case ToolDeleteFile:
-		return runOpenChatTool(toolCall, func() (string, error) { return deleteFileToolCallImpl(a, op.toolsUse) })
+		return runOpenChatTool(toolCall, func() (string, error) { return deleteFileToolCallImpl(a, op) })
 	case ToolDeleteDirectory:
-		return runOpenChatTool(toolCall, func() (string, error) { return deleteDirectoryToolCallImpl(a, op.toolsUse) })
+		return runOpenChatTool(toolCall, func() (string, error) { return deleteDirectoryToolCallImpl(a, op) })
 	case ToolMove:
-		return runOpenChatTool(toolCall, func() (string, error) { return moveToolCallImpl(a, op.toolsUse) })
+		return runOpenChatTool(toolCall, func() (string, error) { return moveToolCallImpl(a, op) })
 	case ToolCopy:
-		return runOpenChatTool(toolCall, func() (string, error) { return copyToolCallImpl(a, op.toolsUse) })
+		return runOpenChatTool(toolCall, func() (string, error) { return copyToolCallImpl(a, op) })
 	case ToolSearchFiles:
 		return runOpenChatTool(toolCall, func() (string, error) { return searchFilesToolCallImpl(a) })
 	case ToolSearchTextInFile:
@@ -169,23 +169,23 @@ func (op *OpenProcessor) dispatchOpenChatToolCall(toolCall *model.ToolCall, a *m
 	case ToolListAgent:
 		return runOpenChatTool(toolCall, func() (string, error) { return listAgentToolCallImpl() })
 	case ToolSpawnSubAgents:
-		return runOpenChatTool(toolCall, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op.agentName, op.toolsUse, op.executor) })
+		return runOpenChatTool(toolCall, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op) })
 	case ToolGetState:
-		return runOpenChatTool(toolCall, func() (string, error) { return getStateToolCallImpl(a, op.sharedState) })
+		return runOpenChatTool(toolCall, func() (string, error) { return getStateToolCallImpl(a, op) })
 	case ToolSetState:
-		return runOpenChatTool(toolCall, func() (string, error) { return setStateToolCallImpl(a, op.agentName, op.sharedState) })
+		return runOpenChatTool(toolCall, func() (string, error) { return setStateToolCallImpl(a, op) })
 	case ToolListState:
-		return runOpenChatTool(toolCall, func() (string, error) { return listStateToolCallImpl(op.sharedState) })
+		return runOpenChatTool(toolCall, func() (string, error) { return listStateToolCallImpl(op) })
 	case ToolActivateSkill:
-		return runOpenChatTool(toolCall, func() (string, error) { return activateSkillToolCallImpl(a, op.toolsUse) })
+		return runOpenChatTool(toolCall, func() (string, error) { return activateSkillToolCallImpl(a, op) })
 	case ToolAskUser:
-		return runOpenChatTool(toolCall, func() (string, error) { return askUserToolCallImpl(a) })
+		return runOpenChatTool(toolCall, func() (string, error) { return askUserToolCallImpl(a, op) })
 	case ToolExitPlanMode:
-		return runOpenChatTool(toolCall, func() (string, error) { return exitPlanModeToolCallImpl(a, op.toolsUse) })
+		return runOpenChatTool(toolCall, func() (string, error) { return exitPlanModeToolCallImpl(a, op) })
 	case ToolEnterPlanMode:
-		return runOpenChatTool(toolCall, func() (string, error) { return enterPlanModeToolCallImpl(a, op.toolsUse) })
+		return runOpenChatTool(toolCall, func() (string, error) { return enterPlanModeToolCallImpl(a, op) })
 	case ToolBuildAgent:
-		return runOpenChatTool(toolCall, func() (string, error) { return buildAgentToolCallImpl(a, op.toolsUse) })
+		return runOpenChatTool(toolCall, func() (string, error) { return buildAgentToolCallImpl(a, op) })
 	case ToolSwitchAgent:
 		return op.openChatSwitchAgentToolCall(toolCall, a)
 	default:

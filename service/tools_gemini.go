@@ -71,7 +71,7 @@ func (op *OpenProcessor) geminiSwitchAgentToolCall(call *genai.FunctionCall, a *
 	}
 
 	// Call shared implementation
-	response, err := switchAgentToolCallImpl(a, op.toolsUse)
+	response, err := switchAgentToolCallImpl(a, op)
 	error := ""
 	if err != nil {
 		if IsSwitchAgentError(err) {
@@ -117,23 +117,23 @@ func runGeminiTool(call *genai.FunctionCall, fn ToolFunc) (*genai.FunctionRespon
 func (op *OpenProcessor) dispatchGeminiToolCall(call *genai.FunctionCall, a *map[string]interface{}) (*genai.FunctionResponse, error) {
 	switch call.Name {
 	case ToolShell:
-		return runGeminiTool(call, func() (string, error) { return shellToolCallImpl(a, op.toolsUse, op.quiet) })
+		return runGeminiTool(call, func() (string, error) { return shellToolCallImpl(a, op) })
 	case ToolReadFile:
 		return runGeminiTool(call, func() (string, error) { return readFileToolCallImpl(a) })
 	case ToolWriteFile:
 		return runGeminiTool(call, func() (string, error) { return writeFileToolCallImpl(a, op) })
 	case ToolCreateDirectory:
-		return runGeminiTool(call, func() (string, error) { return createDirectoryToolCallImpl(a, op.toolsUse) })
+		return runGeminiTool(call, func() (string, error) { return createDirectoryToolCallImpl(a, op) })
 	case ToolListDirectory:
 		return runGeminiTool(call, func() (string, error) { return listDirectoryToolCallImpl(a) })
 	case ToolDeleteFile:
-		return runGeminiTool(call, func() (string, error) { return deleteFileToolCallImpl(a, op.toolsUse) })
+		return runGeminiTool(call, func() (string, error) { return deleteFileToolCallImpl(a, op) })
 	case ToolDeleteDirectory:
-		return runGeminiTool(call, func() (string, error) { return deleteDirectoryToolCallImpl(a, op.toolsUse) })
+		return runGeminiTool(call, func() (string, error) { return deleteDirectoryToolCallImpl(a, op) })
 	case ToolMove:
-		return runGeminiTool(call, func() (string, error) { return moveToolCallImpl(a, op.toolsUse) })
+		return runGeminiTool(call, func() (string, error) { return moveToolCallImpl(a, op) })
 	case ToolCopy:
-		return runGeminiTool(call, func() (string, error) { return copyToolCallImpl(a, op.toolsUse) })
+		return runGeminiTool(call, func() (string, error) { return copyToolCallImpl(a, op) })
 	case ToolSearchFiles:
 		return runGeminiTool(call, func() (string, error) { return searchFilesToolCallImpl(a) })
 	case ToolSearchTextInFile:
@@ -151,23 +151,23 @@ func (op *OpenProcessor) dispatchGeminiToolCall(call *genai.FunctionCall, a *map
 	case ToolListAgent:
 		return runGeminiTool(call, func() (string, error) { return listAgentToolCallImpl() })
 	case ToolSpawnSubAgents:
-		return runGeminiTool(call, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op.agentName, op.toolsUse, op.executor) })
+		return runGeminiTool(call, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op) })
 	case ToolGetState:
-		return runGeminiTool(call, func() (string, error) { return getStateToolCallImpl(a, op.sharedState) })
+		return runGeminiTool(call, func() (string, error) { return getStateToolCallImpl(a, op) })
 	case ToolSetState:
-		return runGeminiTool(call, func() (string, error) { return setStateToolCallImpl(a, op.agentName, op.sharedState) })
+		return runGeminiTool(call, func() (string, error) { return setStateToolCallImpl(a, op) })
 	case ToolListState:
-		return runGeminiTool(call, func() (string, error) { return listStateToolCallImpl(op.sharedState) })
+		return runGeminiTool(call, func() (string, error) { return listStateToolCallImpl(op) })
 	case ToolActivateSkill:
-		return runGeminiTool(call, func() (string, error) { return activateSkillToolCallImpl(a, op.toolsUse) })
+		return runGeminiTool(call, func() (string, error) { return activateSkillToolCallImpl(a, op) })
 	case ToolAskUser:
-		return runGeminiTool(call, func() (string, error) { return askUserToolCallImpl(a) })
+		return runGeminiTool(call, func() (string, error) { return askUserToolCallImpl(a, op) })
 	case ToolExitPlanMode:
-		return runGeminiTool(call, func() (string, error) { return exitPlanModeToolCallImpl(a, op.toolsUse) })
+		return runGeminiTool(call, func() (string, error) { return exitPlanModeToolCallImpl(a, op) })
 	case ToolEnterPlanMode:
-		return runGeminiTool(call, func() (string, error) { return enterPlanModeToolCallImpl(a, op.toolsUse) })
+		return runGeminiTool(call, func() (string, error) { return enterPlanModeToolCallImpl(a, op) })
 	case ToolBuildAgent:
-		return runGeminiTool(call, func() (string, error) { return buildAgentToolCallImpl(a, op.toolsUse) })
+		return runGeminiTool(call, func() (string, error) { return buildAgentToolCallImpl(a, op) })
 	case ToolSwitchAgent:
 		return op.geminiSwitchAgentToolCall(call, a)
 	default:

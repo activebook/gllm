@@ -95,6 +95,9 @@ func RunAgent(prompt string, guideline string, files []*service.FileData, sessio
 		// Stop indicator
 		ui.GetIndicator().Stop()
 
+		// Default interaction handler (using inner event bus)
+		interaction := service.DefaultInteractionHandler{}
+
 		// Prepare Agent Options
 		op := service.AgentOptions{
 			Prompt:        finalPrompt,
@@ -110,6 +113,7 @@ func RunAgent(prompt string, guideline string, files []*service.FileData, sessio
 			QuietMode:     false,
 			SessionName:   sessionName,
 			MCPConfig:     mcpConfig,
+			Interaction:   interaction,
 			// Sub-agent orchestration
 			SharedState: sharedState,
 			AgentName:   agent.Name,

@@ -46,22 +46,27 @@ type Agent struct {
 	NotifyChan      chan<- StreamNotify // Sub Channel to send notifications
 	DataChan        chan<- StreamData   // Sub Channel to receive streamed text data
 	ProceedChan     <-chan bool         // Sub Channel to receive proceed signal
-	SearchEngine    *SearchEngine       // Search engine name
-	ToolsUse        data.ToolsUse       // Use tools
-	EnabledTools    []string            // List of enabled embedding tools
-	UseCodeTool     bool                // Use code tool
 	ThinkingLevel   ThinkingLevel       // Thinking level: off, low, medium, high
-	MCPClient       *MCPClient          // MCP client for MCP tools
 	MaxRecursions   int                 // Maximum number of recursions for model calls
 	Markdown        *Markdown           // Markdown renderer
 	TokenUsage      *TokenUsage         // Token usage metainfo
-	StdOutput       io.Output           // Standard I/O
-	FileOutput      io.Output           // File I/O
-	SSEOutput       *io.SSEOutput       // Network I/O for Server-Sent Events
 	Status          StatusStack         // Stack to manage streaming status
 	Session         Session             // Session
 	Context         ContextManager      // Context manager
 	LastWrittenData string              // Last written data
+
+	// Tools
+	SearchEngine *SearchEngine      // Search engine name
+	ToolsUse     data.ToolsUse      // Use tools
+	Interaction  InteractionHandler // Handler for confirmations and prompts
+	EnabledTools []string           // List of enabled embedding tools
+	UseCodeTool  bool               // Use code tool
+	MCPClient    *MCPClient         // MCP client for MCP tools
+
+	// Output triage
+	StdOutput  io.Output     // Standard I/O
+	FileOutput io.Output     // File I/O
+	SSEOutput  *io.SSEOutput // Network I/O for Server-Sent Events
 
 	// Sub-agent orchestration
 	SharedState *data.SharedState // Shared state for inter-agent communication
@@ -287,6 +292,7 @@ type AgentOptions struct {
 	SSEOutput     *io.SSEOutput // SSE networking adapter
 	SessionName   string
 	MCPConfig     map[string]*data.MCPServer
+	Interaction   InteractionHandler // Handler for confirmations and prompts
 
 	// Sub-agent orchestration fields
 	SharedState *data.SharedState // Shared state for inter-agent communication
@@ -394,6 +400,7 @@ func CallAgent(op *AgentOptions) error {
 		ProceedChan:   proceedCh,
 		SearchEngine:  se,
 		ToolsUse:      toolsUse,
+		Interaction:   op.Interaction,
 		EnabledTools:  enabledTools,
 		UseCodeTool:   exeCode,
 		MCPClient:     mc,
