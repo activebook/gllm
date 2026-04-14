@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -51,7 +52,9 @@ func (ag *Agent) getAnthropicFilePart(file *FileData) *anthropic.ContentBlockPar
 // systemPrompt — injected as the API-level system role.
 // the last message in messages — the instruction for the background task (rename, compress, …).
 func (ag *Agent) GenerateAnthropicSync(messages []anthropic.MessageParam, systemPrompt string) (string, error) {
-	ctx := ag.Ctx
+	if ag.Ctx == nil {
+		ag.Ctx = context.Background()
+	}
 	opts := []option.RequestOption{
 		option.WithAPIKey(ag.Model.ApiKey),
 		option.WithAuthToken(ag.Model.ApiKey),
@@ -89,7 +92,7 @@ func (ag *Agent) GenerateAnthropicSync(messages []anthropic.MessageParam, system
 
 	// Use streaming transport — Anthropic rejects the batch API for large contexts.
 	// We drain all SSE events synchronously and only collect text_delta payloads.
-	stream := client.Messages.NewStreaming(ctx, params)
+	stream := client.Messages.NewStreaming(ag.Ctx, params)
 	defer stream.Close()
 
 	var sb strings.Builder
@@ -116,8 +119,6 @@ func (ag *Agent) GenerateAnthropicSync(messages []anthropic.MessageParam, system
 // GenerateAnthropicStream generates a streaming response using Anthropic API
 func (ag *Agent) GenerateAnthropicStream() error {
 	// Initialize the Client
-	ctx := ag.Ctx
-
 	// Set both APIKey and AuthToken to ensure it works on X-Api-Key or Bearer
 	opts := []option.RequestOption{
 		option.WithAPIKey(ag.Model.ApiKey),
@@ -149,19 +150,18 @@ func (ag *Agent) GenerateAnthropicStream() error {
 	}
 
 	op := OpenProcessor{
-		ctx:        ctx,
-		notify:     ag.NotifyChan,
-		data:       ag.DataChan,
-		proceed:    ag.ProceedChan,
-		search:     ag.SearchEngine,
-		toolsUse:   &ag.ToolsUse,
+		notify:      ag.NotifyChan,
+		data:        ag.DataChan,
+		proceed:     ag.ProceedChan,
+		search:      ag.SearchEngine,
+		toolsUse:    &ag.ToolsUse,
 		interaction: ag.Interaction,
-		quiet:      ag.QuietMode,
-		queries:    make([]string, 0),
-		references: make([]map[string]interface{}, 0),
-		status:     &ag.Status,
-		mcpClient:  ag.MCPClient,
-		fileHooks:  NewFileHooks(),
+		quiet:       ag.QuietMode,
+		queries:     make([]string, 0),
+		references:  make([]map[string]interface{}, 0),
+		status:      &ag.Status,
+		mcpClient:   ag.MCPClient,
+		fileHooks:   NewFileHooks(),
 		// Sub-agent orchestration
 		sharedState: ag.SharedState,
 		executor:    executor,
@@ -262,7 +262,7 @@ func (a *Anthropic) process(ag *Agent) error {
 			params.TopP = param.NewOpt(float64(ag.Model.TopP))
 		}
 
-		stream := a.client.Messages.NewStreaming(a.op.ctx, params)
+		stream := a.client.Messages.NewStreaming(ag.Ctx, params)
 		a.op.status.ChangeTo(a.op.notify, StreamNotify{Status: StatusStarted}, a.op.proceed)
 
 		// Process stream

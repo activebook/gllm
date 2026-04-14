@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -132,7 +133,9 @@ func prependOpenChatSystemMessage(systemPrompt string, history []*model.ChatComp
 // systemPrompt is the system prompt to be used for the sync generation, it's majorly a role.
 // the last message is the user prompt to do the task.
 func (ag *Agent) GenerateOpenChatSync(messages []*model.ChatCompletionMessage, systemPrompt string) (string, error) {
-	ctx := ag.Ctx
+	if ag.Ctx == nil {
+		ag.Ctx = context.Background()
+	}
 	client := arkruntime.NewClientWithApiKey(
 		ag.Model.ApiKey,
 		arkruntime.WithTimeout(30*time.Minute),
@@ -155,7 +158,7 @@ func (ag *Agent) GenerateOpenChatSync(messages []*model.ChatCompletionMessage, s
 		Messages:    messages,
 	}
 
-	resp, err := client.CreateChatCompletion(ctx, req)
+	resp, err := client.CreateChatCompletion(ag.Ctx, req)
 	if err != nil {
 		return "", fmt.Errorf("sync chat completion error: %w", err)
 	}
@@ -170,9 +173,7 @@ func (ag *Agent) GenerateOpenChatSync(messages []*model.ChatCompletionMessage, s
 // In current openchat api, we can't use cached tokens
 // The context api and response api are not available for current golang lib
 func (ag *Agent) GenerateOpenChatStream() error {
-
 	// Initialize the Client
-	ctx := ag.Ctx
 	// Create a client config with custom base URL
 	client := arkruntime.NewClientWithApiKey(
 		ag.Model.ApiKey,
@@ -200,19 +201,18 @@ func (ag *Agent) GenerateOpenChatStream() error {
 	}
 
 	op := OpenProcessor{
-		ctx:        ctx,
-		notify:     ag.NotifyChan,
-		data:       ag.DataChan,
-		proceed:    ag.ProceedChan,
-		search:     ag.SearchEngine,
-		toolsUse:   &ag.ToolsUse,
+		notify:      ag.NotifyChan,
+		data:        ag.DataChan,
+		proceed:     ag.ProceedChan,
+		search:      ag.SearchEngine,
+		toolsUse:    &ag.ToolsUse,
 		interaction: ag.Interaction,
-		quiet:      ag.QuietMode,
-		queries:    make([]string, 0),
-		references: make([]map[string]interface{}, 0), // Updated to match new field type
-		status:     &ag.Status,
-		mcpClient:  ag.MCPClient,
-		fileHooks:  NewFileHooks(),
+		quiet:       ag.QuietMode,
+		queries:     make([]string, 0),
+		references:  make([]map[string]interface{}, 0), // Updated to match new field type
+		status:      &ag.Status,
+		mcpClient:   ag.MCPClient,
+		fileHooks:   NewFileHooks(),
 		// Sub-agent orchestration
 		sharedState: ag.SharedState,
 		executor:    executor,
@@ -318,7 +318,7 @@ func (c *OpenChat) process(ag *Agent) error {
 		}
 
 		// Make the streaming request
-		stream, err := c.client.CreateChatCompletionStream(c.op.ctx, req)
+		stream, err := c.client.CreateChatCompletionStream(ag.Ctx, req)
 		if err != nil {
 			// Try to extract detailed API error information
 			var apiErr *model.APIError

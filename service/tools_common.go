@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"slices"
 
 	"github.com/activebook/gllm/data"
@@ -1679,7 +1678,6 @@ Use this tool when your planning phase is complete, and you require the reinstat
 // - It manages the context, notifications, data streaming, and tool usage
 // - It handles queries and references, and maintains the status stack
 type OpenProcessor struct {
-	ctx         context.Context          // Context for model generation
 	notify      chan<- StreamNotify      // Sub Channel to send notifications
 	data        chan<- StreamData        // Sub Channel to send data
 	proceed     <-chan bool              // Main Channel to receive proceed signal
