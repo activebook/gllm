@@ -28,6 +28,7 @@ var serveCmd = &cobra.Command{
 		port := strconv.Itoa(servePort)
 
 		http.HandleFunc("/v1/chat/completions", chatCompletionHandler)
+		http.HandleFunc("/v1/interact", interactHandler)
 
 		util.LogInfof("Starting headless GLLM SSE server on port %s...\n", port)
 		return http.ListenAndServe(":"+port, nil)
@@ -130,7 +131,7 @@ func chatCompletionHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Create a context that can be cancelled by the HTTP request's Done channel
 	ctx := r.Context()
-	err = runAgentHeadless(prompt, guideline, sessionName, sseOut, agent, ctx)
+	err = runAgentWithSSE(prompt, guideline, sessionName, sseOut, agent, ctx)
 	if err != nil {
 		util.LogErrorf("Server agent error: %v\n", err)
 		sseOut.WriteErrorEvent(err.Error(), "agent_error")
@@ -263,7 +264,7 @@ func handleWebCommand(prompt string, sessionName string, sseOut *io.SSEOutput) (
 	}
 }
 
-func runAgentHeadless(prompt string, guideline string, sessionName string, sseIO *io.SSEOutput, agent *data.AgentConfig, ctx context.Context) error {
+func runAgentWithSSE(prompt string, guideline string, sessionName string, sseIO *io.SSEOutput, agent *data.AgentConfig, ctx context.Context) error {
 	sharedState := data.NewSharedState()
 	defer sharedState.Clear() // Clean up on session end
 
@@ -285,6 +286,18 @@ func runAgentHeadless(prompt string, guideline string, sessionName string, sseIO
 			return err
 		}
 
+		// Build an interaction handler that suspends the goroutine and emits SSE events
+		// so the frontend can surface approval dialogs and POST back user decisions.
+		sseInteraction := service.NewSSEInteractionHandler(
+			func(id string, kind service.InteractionKind, purpose string, toolName *string) {
+				sseIO.WriteRequestEvent(id, string(kind), purpose, toolName)
+			},
+			func(before, after string) {
+				sseIO.WriteDiffEvent(before, after)
+			},
+			0, // no timeout: block until frontend responds
+		)
+
 		op := service.AgentOptions{
 			Ctx:           ctx, // Carry HTTP completion cancellation context
 			Prompt:        finalPrompt,
@@ -295,12 +308,13 @@ func runAgentHeadless(prompt string, guideline string, sessionName string, sseIO
 			ThinkingLevel: agent.Think,
 			EnabledTools:  agent.Tools,
 			Capabilities:  agent.Capabilities,
-			YoloMode:      true, // Headless server typically auto-approves tool uses
+			YoloMode:      false, // Now user-driven; approval comes via /v1/interact
 			OutputFile:    "",
 			QuietMode:     !serveVerbose, // True by default unless --verbose is provided
 			SSEOutput:     sseIO,         // SSE Output for streaming
 			SessionName:   sessionName,
 			MCPConfig:     mcpConfig,
+			Interaction:   sseInteraction,
 			SharedState:   sharedState,
 			AgentName:     agent.Name,
 			ModelName:     agent.Model.Name,
@@ -323,4 +337,55 @@ func runAgentHeadless(prompt string, guideline string, sessionName string, sseIO
 		break
 	}
 	return nil
+}
+
+// InteractRequest is the body of POST /v1/interact used by the frontend to
+// resolve a pending interaction (tool confirm, ask-user, etc.).
+type InteractRequest struct {
+	ID        string `json:"id"`                  // UUID matching the SSE interaction_request event
+	Kind      string `json:"kind"`                // "tool_confirm" | "ask_user"
+	Approve   string `json:"approve,omitempty"`   // For tool_confirm ("once", "always", "cancel")
+	Answer    string `json:"answer,omitempty"`    // For ask_user
+	Cancelled bool   `json:"cancelled,omitempty"` // For ask_user: user dismissed the dialog
+}
+
+// interactHandler handles POST /v1/interact.
+// It routes the frontend response to the corresponding suspended goroutine via InteractionRegistry.
+func interactHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req InteractRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var resolveErr error
+	switch req.Kind {
+	case string(service.InteractionKindConfirm):
+		resolveErr = service.InteractionRegistry.ResolveConfirm(req.ID, req.Approve)
+	case string(service.InteractionKindAskUser):
+		resolveErr = service.InteractionRegistry.ResolveAskUser(req.ID, req.Answer, req.Cancelled)
+	default:
+		http.Error(w, fmt.Sprintf("unknown interaction kind: %s", req.Kind), http.StatusBadRequest)
+		return
+	}
+
+	if resolveErr != nil {
+		http.Error(w, resolveErr.Error(), http.StatusNotFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

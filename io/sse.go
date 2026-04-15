@@ -139,3 +139,29 @@ func (s *SSEOutput) WriteErrorEvent(content string, code string) {
 		"code":    code,
 	})
 }
+
+// WriteDiffEvent emits a raw diff to the client so it can render the changes interactively.
+//
+//	data: {"type":"diff","data":{"before":"...","after":"..."}}
+func (s *SSEOutput) WriteDiffEvent(before, after string) {
+	s.writeSSEEvent("diff", map[string]interface{}{
+		"before": before,
+		"after":  after,
+	})
+}
+
+// WriteRequestEvent emits a request that the server has paused and needs user input.
+// This is typically used for tool confirmations or "ask user" prompts.
+//
+//	data: {"type":"request","data":{"id":"...","type":"...","purpose":"..."}}
+func (s *SSEOutput) WriteRequestEvent(id string, reqType string, purpose string, tool *string) {
+	payload := map[string]interface{}{
+		"id":      id,
+		"type":    reqType,
+		"purpose": purpose,
+	}
+	if tool != nil {
+		payload["tool"] = *tool
+	}
+	s.writeSSEEvent("request", payload)
+}
