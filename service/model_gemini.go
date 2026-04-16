@@ -170,7 +170,7 @@ func (ag *Agent) GenerateGeminiStream() error {
 	// Initialize sub-agent executor if SharedState is available
 	var executor *SubAgentExecutor
 	if ag.SharedState != nil {
-		executor = NewSubAgentExecutor(ag.SharedState, ag.Session.GetTopSessionName())
+		executor = NewSubAgentExecutor(ag.SharedState, ag.Session.GetTopSessionName(), ag.StdOutput, ag.FileOutput, ag.SSEOutput)
 		defer executor.Shutdown()
 	}
 

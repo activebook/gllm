@@ -43,7 +43,7 @@ func defaultState() *data.SharedState {
 func TestDispatchMultipleTasks(t *testing.T) {
 	setupTestConfig()
 	state := defaultState()
-	executor := NewSubAgentExecutor(state, "test_session")
+	executor := NewSubAgentExecutor(state, "test_session", nil, nil, nil)
 
 	// Inject custom runner
 	executor.runner = func(op *AgentOptions) error {
@@ -84,7 +84,7 @@ func TestDispatchMultipleTasks(t *testing.T) {
 func TestCrossAgentCallDeadlock(t *testing.T) {
 	setupTestConfig()
 	state := defaultState()
-	executor := NewSubAgentExecutor(state, "test_session")
+	executor := NewSubAgentExecutor(state, "test_session", nil, nil, nil)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -133,7 +133,7 @@ func TestCrossAgentCallDeadlock(t *testing.T) {
 
 func TestFormatSummary(t *testing.T) {
 	state := defaultState()
-	executor := NewSubAgentExecutor(state, "test_session")
+	executor := NewSubAgentExecutor(state, "test_session", nil, nil, nil)
 
 	responses := []AgentResponse{
 		{

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/activebook/gllm/data"
+	"github.com/activebook/gllm/io"
 	"github.com/activebook/gllm/util"
 )
 
@@ -93,16 +94,22 @@ type SubAgentExecutor struct {
 	mu           sync.RWMutex
 	activeAgents map[string]*ActiveAgent
 	mcpStore     *data.MCPStore
+	stdOutput    io.Output
+	fileOutput   io.Output
+	sseOutput    *io.SSEOutput
 }
 
 // NewSubAgentExecutor creates a new SubAgentExecutor
-func NewSubAgentExecutor(state *data.SharedState, mainSessionName string) *SubAgentExecutor {
+func NewSubAgentExecutor(state *data.SharedState, mainSessionName string, stdOutput io.Output, fileOutput io.Output, sseOutput *io.SSEOutput) *SubAgentExecutor {
 	return &SubAgentExecutor{
 		state:           state,
 		mainSessionName: mainSessionName,
 		activeAgents:    make(map[string]*ActiveAgent),
 		mcpStore:        data.NewMCPStore(),
 		runner:          CallAgent, // Default runner
+		stdOutput:       stdOutput,
+		fileOutput:      fileOutput,
+		sseOutput:       sseOutput,
 	}
 }
 
@@ -323,7 +330,16 @@ func (e *SubAgentExecutor) setTaskStart(result *SubAgentResult, task *SubAgentTa
 	if SessionExists(sessionName, true) {
 		mode = "Resuming"
 	}
-	fmt.Printf("==> %s task: %s %s[%s -> %s]%s ...\n", mode, task.TaskKey, data.AgentRoleColor, task.CallerAgentName, task.AgentName, data.ResetSeq)
+	
+	if e.stdOutput != nil {
+		e.stdOutput.Writef("==> %s task: %s %s[%s -> %s]%s ...\n", mode, task.TaskKey, data.AgentRoleColor, task.CallerAgentName, task.AgentName, data.ResetSeq)
+	}
+	if e.fileOutput != nil {
+		e.fileOutput.Writef("==> %s task: %s [%s -> %s] ...\n", mode, task.TaskKey, task.CallerAgentName, task.AgentName)
+	}
+	if e.sseOutput != nil {
+		e.sseOutput.Writef("==> %s task: %s [%s -> %s] ...\n", mode, task.TaskKey, task.CallerAgentName, task.AgentName)
+	}
 }
 
 // setTaskCompleted sets the task to completed status and prints the success message.
@@ -333,7 +349,16 @@ func (e *SubAgentExecutor) setTaskCompleted(result *SubAgentResult, taskKey stri
 	result.Duration = result.EndTime.Sub(result.StartTime)
 	result.Error = nil
 	result.Progress = fmt.Sprintf("Completed in %s", result.Duration.Round(time.Millisecond))
-	fmt.Printf("%s✓ > Task completed: %s%s\n", data.StatusSuccessColor, taskKey, data.ResetSeq)
+	
+	if e.stdOutput != nil {
+		e.stdOutput.Writef("%s✓ > Task completed: %s%s\n", data.StatusSuccessColor, taskKey, data.ResetSeq)
+	}
+	if e.fileOutput != nil {
+		e.fileOutput.Writef("✓ > Task completed: %s\n", taskKey)
+	}
+	if e.sseOutput != nil {
+		e.sseOutput.Writef("✓ > Task completed: %s\n", taskKey)
+	}
 }
 
 // setTaskError sets the task to failed status and prints the error message.
@@ -343,7 +368,16 @@ func (e *SubAgentExecutor) setTaskError(result *SubAgentResult, taskKey string, 
 	result.Duration = result.EndTime.Sub(result.StartTime)
 	result.Error = err
 	result.Progress = fmt.Sprintf("Failed after %s: %v", result.Duration.Round(time.Millisecond), err)
-	fmt.Printf("%s✗ > Task failed: %s - %v%s\n", data.StatusErrorColor, taskKey, err, data.ResetSeq)
+	
+	if e.stdOutput != nil {
+		e.stdOutput.Writef("%s✗ > Task failed: %s - %v%s\n", data.StatusErrorColor, taskKey, err, data.ResetSeq)
+	}
+	if e.fileOutput != nil {
+		e.fileOutput.Writef("✗ > Task failed: %s - %v\n", taskKey, err)
+	}
+	if e.sseOutput != nil {
+		e.sseOutput.Writef("✗ > Task failed: %s - %v\n", taskKey, err)
+	}
 }
 
 // FormatSummary returns a brief summary of task execution
