@@ -46,19 +46,14 @@ func printReplWelcome() {
 	sort.Strings(specs)
 	specsText := strings.Join(specs, "\n")
 
-	// --- 3. Tips Panel (Flexible Width) ---
-	tips := getRandomTips(5)
-	var tipsLines []string
-	tipsLines = append(tipsLines, lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(data.KeyHex)).Render("💡 Pro Tips:"))
-	for _, tip := range tips {
-		tipsLines = append(tipsLines, fmt.Sprintf("• %s", tip))
-	}
-	tipsText := strings.Join(tipsLines, "\n")
+	// tips room
+	tipsMaxRoom := 2
 
 	// --- Layout Engine (Breakpoints) ---
 	var inner string
 
 	if termWidth >= 100 {
+		// Breakpoint 1: Ultrawide (Show all 3 columns)
 		specsWidth := 40
 		specsContent := lipgloss.NewStyle().
 			Foreground(lipgloss.Color(data.LabelHex)).
@@ -72,13 +67,32 @@ func printReplWelcome() {
 		if tipsWidth < 20 {
 			tipsWidth = 20 // minimum viable width
 		}
-		tipsContent := lipgloss.NewStyle().
+
+		maxHeight := lipgloss.Height(specsContent)
+		if lipgloss.Height(logoContent) > maxHeight {
+			maxHeight = lipgloss.Height(logoContent)
+		}
+
+		tipsStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color(data.DetailHex)).
 			Width(tipsWidth).
 			Align(lipgloss.Left).
-			Padding(0, 0, 0, 2).
-			Render(tipsText)
-		// Breakpoint 1: Ultrawide (Show all 3 columns)
+			Padding(0, 0, 0, 2)
+
+		tips := getRandomTips(5)
+		var validTipsLines []string
+		validTipsLines = append(validTipsLines, lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(data.KeyHex)).Render("💡 Pro Tips:"))
+
+		for _, tip := range tips {
+			testLines := append(validTipsLines, fmt.Sprintf("• %s", tip))
+			testContent := tipsStyle.Render(strings.Join(testLines, "\n"))
+			if lipgloss.Height(testContent) > maxHeight+tipsMaxRoom {
+				break
+			}
+			validTipsLines = testLines
+		}
+		tipsContent := tipsStyle.Render(strings.Join(validTipsLines, "\n"))
+
 		inner = lipgloss.JoinHorizontal(
 			lipgloss.Top,
 			logoContent,
@@ -87,7 +101,6 @@ func printReplWelcome() {
 		)
 	} else if termWidth >= 80 {
 		// Breakpoint 2: Wide (Show Logo + Specs, hide Tips)
-		// Adjust specs to take remaining space
 		flexibleSpecs := lipgloss.NewStyle().
 			Foreground(lipgloss.Color(data.LabelHex)).
 			Width(innerWidth-logoWidth).
@@ -105,7 +118,6 @@ func printReplWelcome() {
 		leftColumnWidth := 38
 		rightColumnWidth := innerWidth - leftColumnWidth
 
-		// Re-render logo and specs for the left column
 		stackedLogo := lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color(data.KeyHex)).
@@ -127,13 +139,27 @@ func printReplWelcome() {
 			stackedSpecs,
 		)
 
-		// Re-render tips for the right column
-		stackedTips := lipgloss.NewStyle().
+		maxHeight := lipgloss.Height(leftColumn)
+
+		tipsStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color(data.DetailHex)).
 			Width(rightColumnWidth).
 			Align(lipgloss.Left).
-			Padding(0, 0, 0, 1).
-			Render(tipsText)
+			Padding(0, 0, 0, 1)
+
+		tips := getRandomTips(5)
+		var validTipsLines []string
+		validTipsLines = append(validTipsLines, lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(data.KeyHex)).Render("💡 Pro Tips:"))
+
+		for _, tip := range tips {
+			testLines := append(validTipsLines, fmt.Sprintf("• %s", tip))
+			testContent := tipsStyle.Render(strings.Join(testLines, "\n"))
+			if lipgloss.Height(testContent) > maxHeight+tipsMaxRoom {
+				break
+			}
+			validTipsLines = testLines
+		}
+		stackedTips := tipsStyle.Render(strings.Join(validTipsLines, "\n"))
 
 		inner = lipgloss.JoinHorizontal(
 			lipgloss.Top,

@@ -6,24 +6,18 @@ import (
 )
 
 var replTips = []string{
-	"Use @path or @file.go to include files in your prompt.",
-	"Type !bash or !ls to execute local shell commands.",
-	"Press Shift+Tab to toggle between Normal, Plan, and YOLO modes.",
-	"Type /help to see all available commands and shortcuts.",
-	"Use /editor to open your default editor for multi-line input.",
-	"Use /history to view the current session's history in a pager.",
-	"Type /clear to wipe the current session's history.",
-	"Press Ctrl+V to paste an image from your clipboard.",
-	"Use /attach <path> to manually add files or URLs to context.",
-	"Type /copy to copy the last assistant response to clipboard.",
-	"Use /yolo to let the agent run commands without confirmation.",
-	"Use /plan to let the agent think and propose a plan first.",
-	"Type /rename to auto-generate a title for your session.",
-	"Use /compress to summarize context when it gets too long.",
-	"Use /skills to manage and activate specialized agent skills.",
-	"Type /mcp to manage and connect to MCP servers.",
-	"Use /tools to enable or disable specific embedding tools.",
-	"Type /agent to switch to a different agent persona.",
+	"Use '@path/to/folder/' to include an entire directory's context in your prompt.",
+	"Enable '/plan' mode for complex refactoring; the agent will outline its strategy before modifying files.",
+	"Use '/yolo' mode to let the agent autonomously execute shell commands and file edits.",
+	"Connect to local databases or tools using the Model Context Protocol via the '/mcp' command.",
+	"Write complex, multi-line prompts in your favorite terminal editor (Vim/Nano) using '/editor'.",
+	"When a session gets too long and hits token limits, use '/compress' to intelligently summarize the context.",
+	"Paste images directly from your clipboard with 'Ctrl+V' to let vision models analyze screenshots.",
+	"Create custom personas with specific system prompts and toolsets using '/agent'.",
+	"Install and activate specialized workflows using '/skills' to extend the agent's capabilities.",
+	"Seamlessly switch between OpenAI, Anthropic, and Gemini mid-session using the '/model' command.",
+	"Sub-agents can communicate and share data using the persistent SharedState blackboard.",
+	"Run 'gllm serve' to launch the local web interface for a rich, browser-based chat experience.",
 }
 
 // getRandomTips returns n random tips from the replTips slice.
