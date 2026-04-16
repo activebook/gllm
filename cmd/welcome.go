@@ -46,9 +46,6 @@ func printReplWelcome() {
 	sort.Strings(specs)
 	specsText := strings.Join(specs, "\n")
 
-	// tips room
-	tipsMaxRoom := 2
-
 	// --- Layout Engine (Breakpoints) ---
 	var inner string
 
@@ -79,14 +76,14 @@ func printReplWelcome() {
 			Align(lipgloss.Left).
 			Padding(0, 0, 0, 2)
 
-		tips := getRandomTips(5)
+		tips := getRandomTips(6)
 		var validTipsLines []string
 		validTipsLines = append(validTipsLines, lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(data.KeyHex)).Render("💡 Pro Tips:"))
 
 		for _, tip := range tips {
 			testLines := append(validTipsLines, fmt.Sprintf("• %s", tip))
 			testContent := tipsStyle.Render(strings.Join(testLines, "\n"))
-			if lipgloss.Height(testContent) > maxHeight+tipsMaxRoom {
+			if lipgloss.Height(testContent) > maxHeight {
 				break
 			}
 			validTipsLines = testLines
@@ -154,7 +151,7 @@ func printReplWelcome() {
 		for _, tip := range tips {
 			testLines := append(validTipsLines, fmt.Sprintf("• %s", tip))
 			testContent := tipsStyle.Render(strings.Join(testLines, "\n"))
-			if lipgloss.Height(testContent) > maxHeight+tipsMaxRoom {
+			if lipgloss.Height(testContent) > maxHeight+2 {
 				break
 			}
 			validTipsLines = testLines
