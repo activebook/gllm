@@ -116,12 +116,7 @@ func readFileToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	limit := -1 // -1 means read all lines
 
 	if offsetVal, exists := (*argsMap)["offset"]; exists {
-		switch v := offsetVal.(type) {
-		case float64:
-			offset = int(v)
-		case int:
-			offset = v
-		}
+		offset = int(toInt64(offsetVal))
 		if offset > 0 {
 			offset-- // Convert from 1-indexed to 0-indexed
 		}
@@ -130,12 +125,7 @@ func readFileToolCallImpl(argsMap *map[string]interface{}) (string, error) {
 	// Support both 'limit' and 'lines' parameter names (learned from model behavior)
 	for _, paramName := range []string{"limit", "lines"} {
 		if limitVal, exists := (*argsMap)[paramName]; exists {
-			switch v := limitVal.(type) {
-			case float64:
-				limit = int(v)
-			case int:
-				limit = v
-			}
+			limit = int(toInt64(limitVal))
 			break // Use first found parameter
 		}
 	}

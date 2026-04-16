@@ -34,15 +34,9 @@ func shellToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (stri
 	// Get timeout from arguments, default to DefaultShellTimeout
 	timeout := DefaultShellTimeout
 	if timeoutValue, exists := (*argsMap)["timeout"]; exists {
-		switch v := timeoutValue.(type) {
-		case float64:
-			if v > 0 {
-				timeout = time.Duration(v) * time.Second
-			}
-		case int:
-			if v > 0 {
-				timeout = time.Duration(v) * time.Second
-			}
+		v := toInt64(timeoutValue)
+		if v > 0 {
+			timeout = time.Duration(v) * time.Second
 		}
 	}
 

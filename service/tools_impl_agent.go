@@ -287,12 +287,7 @@ func buildAgentToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) 
 	// ── optional max_recursions ──────────────────────────────────────────────
 	maxRecursions := 50
 	if v, ok := args["max_recursions"]; ok {
-		switch mv := v.(type) {
-		case float64:
-			maxRecursions = int(mv)
-		case int:
-			maxRecursions = mv
-		}
+		maxRecursions = int(toInt64(v))
 	}
 
 	// ── Confirm before writing ───────────────────────────────────────────────
