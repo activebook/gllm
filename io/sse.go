@@ -155,14 +155,11 @@ func (s *SSEOutput) WriteDiffEvent(before, after string) {
 // This is typically used for tool confirmations or "ask user" prompts.
 //
 //	data: {"type":"request","data":{"id":"...","type":"...","purpose":"..."}}
-func (s *SSEOutput) WriteRequestEvent(id string, reqType string, purpose string, tool *string) {
+func (s *SSEOutput) WriteRequestEvent(id string, reqType string, purpose string) {
 	payload := map[string]interface{}{
 		"id":      id,
 		"type":    reqType,
 		"purpose": purpose,
-	}
-	if tool != nil {
-		payload["tool"] = *tool
 	}
 	s.writeSSEEvent("request", payload)
 }

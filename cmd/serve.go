@@ -289,8 +289,8 @@ func runAgentWithSSE(prompt string, guideline string, sessionName string, sseIO 
 		// Build an interaction handler that suspends the goroutine and emits SSE events
 		// so the frontend can surface approval dialogs and POST back user decisions.
 		sseInteraction := service.NewSSEInteractionHandler(
-			func(id string, kind service.InteractionKind, purpose string, toolName *string) {
-				sseIO.WriteRequestEvent(id, string(kind), purpose, toolName)
+			func(id string, kind service.InteractionKind, purpose string) {
+				sseIO.WriteRequestEvent(id, string(kind), purpose)
 			},
 			func(before, after string) {
 				sseIO.WriteDiffEvent(before, after)

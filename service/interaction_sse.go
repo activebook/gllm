@@ -103,7 +103,7 @@ func (r *interactionRegistry) ResolveAskUser(id string, answer string, cancelled
 type SSEInteractionHandler struct {
 	// emitFunc sends any SSE event to the open stream. It must be safe to call
 	// from a different goroutine than the one that owns the http.ResponseWriter.
-	emitFunc func(id string, kind InteractionKind, purpose string, toolName *string)
+	emitFunc func(id string, kind InteractionKind, purpose string)
 
 	diffFunc func(before, after string)
 
@@ -114,7 +114,7 @@ type SSEInteractionHandler struct {
 
 // NewSSEInteractionHandler creates the headless handler bound to an SSE emit function.
 func NewSSEInteractionHandler(
-	emitFunc func(id string, kind InteractionKind, purpose string, toolName *string),
+	emitFunc func(id string, kind InteractionKind, purpose string),
 	diffFunc func(before, after string),
 	timeout time.Duration,
 ) *SSEInteractionHandler {
@@ -135,7 +135,7 @@ func (h *SSEInteractionHandler) RequestConfirm(description string, toolsUse *dat
 		confirm: &pendingConfirm{toolsUse: toolsUse, done: done},
 	})
 
-	h.emitFunc(id, InteractionKindConfirm, description, nil)
+	h.emitFunc(id, InteractionKindConfirm, description)
 
 	// Block until the frontend resolves or the timeout expires.
 	if h.timeout > 0 {
@@ -159,7 +159,7 @@ func (h *SSEInteractionHandler) RequestAskUser(req event.AskUserRequest) (event.
 		askUser: &pendingAskUser{resp: respCh},
 	})
 
-	h.emitFunc(id, InteractionKindAskUser, req.Question, nil)
+	h.emitFunc(id, InteractionKindAskUser, req.Question)
 
 	var resp event.AskUserResponse
 	if h.timeout > 0 {
