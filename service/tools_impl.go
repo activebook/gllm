@@ -934,6 +934,65 @@ type editOutcome struct {
 	normalized    bool // true if matched only via WS normalization fallback
 }
 
+// validateEditSchema enforces a strict whitelist on each edit object's keys.
+// The ONLY valid keys are "search" and "replace".  Any other key — regardless
+// of its name — means the model put a value somewhere it doesn't belong, which
+// is a hallucination.  We report every unexpected key verbatim so the model
+// knows exactly what to remove.
+func validateEditSchema(editsInterface []interface{}) string {
+	var errs []string
+
+	for i, editInterface := range editsInterface {
+		editMap, ok := editInterface.(map[string]interface{})
+		if !ok {
+			continue // type/format mismatch is handled downstream in Phase 1
+		}
+
+		var problems []string
+
+		// Whitelist check: reject every key that isn't "search" or "replace".
+		for k := range editMap {
+			if k != "search" && k != "replace" {
+				problems = append(problems, fmt.Sprintf(
+					"    unexpected field %q — remove it (only \"search\" and \"replace\" are allowed)", k))
+			}
+		}
+
+		// Required-field check: both must be present (possibly in addition to
+		// the spurious keys above — e.g. model sent search+replace+expected).
+		if _, ok := editMap["search"].(string); !ok {
+			problems = append(problems, `    missing required field "search" (must be a string)`)
+		}
+		if _, ok := editMap["replace"].(string); !ok {
+			problems = append(problems, `    missing required field "replace" (must be a string)`)
+		}
+
+		if len(problems) > 0 {
+			sort.Strings(problems)
+			errs = append(errs, fmt.Sprintf(
+				"edit[%d]: schema violation — each edit must contain exactly "+
+					"{\"search\": \"<old text>\", \"replace\": \"<new text>\"} and nothing else.\n"+
+					"  Problems found:\n%s",
+				i, strings.Join(problems, "\n")))
+		}
+	}
+	if len(errs) > 0 {
+		var msg strings.Builder
+		msg.WriteString(fmt.Sprintf(
+			"EDIT REJECTED — no changes written.\n"+
+				"The 'edits' array contains %d edit(s) with invalid field names.\n\n"+
+				"Correct schema for every edit object:\n"+
+				"  { \"search\": \"<exact text to find>\", \"replace\": \"<replacement text>\" }\n\n"+
+				"Violations:\n", len(errs)))
+		for _, e := range errs {
+			msg.WriteString(fmt.Sprintf("  • %s\n\n", e))
+		}
+		msg.WriteString("Fix the field names above and retry the full batch.")
+		return msg.String()
+	}
+	return ""
+}
+
 func editFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
 	if err := CheckToolPermission(ToolEditFile, argsMap); err != nil {
 		return "", err
@@ -948,6 +1007,14 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (s
 	editsInterface, ok := (*argsMap)["edits"].([]interface{})
 	if !ok {
 		return "", fmt.Errorf("edits not found in arguments or not an array")
+	}
+
+	// ── Phase 0: Schema defence ────────────────────────────────────────────────
+	// Reject immediately if any edit item uses wrong field names (e.g. "new"
+	// instead of "replace"). No file I/O is performed. The returned message
+	// teaches the model the correct schema so it can self-correct and retry.
+	if schemaErr := validateEditSchema(editsInterface); schemaErr != "" {
+		return "", fmt.Errorf("%s", schemaErr)
 	}
 
 	// Read the original file content once.
