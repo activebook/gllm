@@ -181,7 +181,7 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (
 		// Show diff if we have current content
 		diff := op.interaction.RequestDiff(currentContent, content, 3)
 		op.fileHooks.OpenDiff(path, content)
-		op.showDiffConfirm(diff)
+		op.showDiff(diff)
 
 		// Get purpose if provided
 		purpose, _ := (*argsMap)["purpose"].(string)
@@ -190,8 +190,10 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (
 		}
 
 		// Prompt user for confirmation
-		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
-		op.closeDiffConfirm() // Close the diff
+		if op.interaction != nil {
+			op.interaction.RequestConfirm(purpose, op.toolsUse)
+		}
+		op.closeDiff() // Close the diff
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			op.fileHooks.RejectDiff(path)
 			return fmt.Sprintf("Operation cancelled by user: write to file %s", path), UserCancelError{Reason: UserCancelReasonDeny}
@@ -232,7 +234,9 @@ func createDirectoryToolCallImpl(argsMap *map[string]interface{}, op *OpenProces
 		}
 
 		// Prompt user for confirmation
-		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
+		if op.interaction != nil {
+			op.interaction.RequestConfirm(purpose, op.toolsUse)
+		}
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: create directory %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -320,7 +324,9 @@ func deleteFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) 
 		}
 
 		// Prompt user for confirmation
-		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
+		if op.interaction != nil {
+			op.interaction.RequestConfirm(purpose, op.toolsUse)
+		}
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: delete file %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -353,7 +359,9 @@ func deleteDirectoryToolCallImpl(argsMap *map[string]interface{}, op *OpenProces
 		}
 
 		// Prompt user for confirmation
-		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
+		if op.interaction != nil {
+			op.interaction.RequestConfirm(purpose, op.toolsUse)
+		}
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: delete directory %s", path), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -391,7 +399,9 @@ func moveToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (strin
 		}
 
 		// Prompt user for confirmation
-		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
+		if op.interaction != nil {
+			op.interaction.RequestConfirm(purpose, op.toolsUse)
+		}
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: move %s to %s", source, destination), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -687,7 +697,9 @@ func shellToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (stri
 			descStr = ""
 		}
 		// Use the command string as the info for confirmation
-		if op.interaction != nil { op.interaction.RequestConfirm(descStr, op.toolsUse) }
+		if op.interaction != nil {
+			op.interaction.RequestConfirm(descStr, op.toolsUse)
+		}
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: shell command '%s'", cmdStr), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -1010,14 +1022,16 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (s
 	if !op.toolsUse.AutoApprove {
 		diff := op.interaction.RequestDiff(content, simulatedContent, 3)
 		op.fileHooks.OpenDiff(path, simulatedContent)
-		op.showDiffConfirm(diff)
+		op.showDiff(diff)
 
 		purpose, _ := (*argsMap)["purpose"].(string)
 		if purpose == "" {
 			purpose = fmt.Sprintf("edit file: %s", path)
 		}
-		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
-		op.closeDiffConfirm()
+		if op.interaction != nil {
+			op.interaction.RequestConfirm(purpose, op.toolsUse)
+		}
+		op.closeDiff()
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			op.fileHooks.RejectDiff(path)
 			return fmt.Sprintf(ToolRespDiscardEditFile, path), UserCancelError{Reason: UserCancelReasonDeny}
@@ -1067,7 +1081,9 @@ func copyToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (strin
 		}
 
 		// Prompt user for confirmation
-		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
+		if op.interaction != nil {
+			op.interaction.RequestConfirm(purpose, op.toolsUse)
+		}
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: copy %s to %s", source, destination), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -1286,7 +1302,9 @@ func switchAgentToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor)
 
 	if !op.toolsUse.AutoApprove {
 		purpose := fmt.Sprintf("switch to agent '%s'", name)
-		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
+		if op.interaction != nil {
+			op.interaction.RequestConfirm(purpose, op.toolsUse)
+		}
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: switch to agent %s", name), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -1439,7 +1457,9 @@ func buildAgentToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) 
 
 	if !op.toolsUse.AutoApprove {
 		purpose := fmt.Sprintf("build agent '%s' with %d tools and %d capabilities", name, len(selectedTools), len(selectedCaps))
-		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
+		if op.interaction != nil {
+			op.interaction.RequestConfirm(purpose, op.toolsUse)
+		}
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: build agent '%s'", name), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -1569,7 +1589,9 @@ func spawnSubAgentsToolCallImpl(argsMap *map[string]interface{}, op *OpenProcess
 				taskDesc.WriteString(fmt.Sprintf("- Task %d: %s [Agent: %s]", i+1, taskKey, agentName))
 			}
 		}
-		if op.interaction != nil { op.interaction.RequestConfirm(taskDesc.String(), op.toolsUse) }
+		if op.interaction != nil {
+			op.interaction.RequestConfirm(taskDesc.String(), op.toolsUse)
+		}
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return "Operation cancelled by user: spawn sub-agents", UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -1734,7 +1756,9 @@ func activateSkillToolCallImpl(argsMap *map[string]interface{}, op *OpenProcesso
 	// Check if confirmation is needed (default logic: always confirm unless AutoApprove is true)
 	if !op.toolsUse.AutoApprove {
 		description := "Activate Skill:\n" + name + "\n\nDescription:\n" + desc + "\n\nResources:\n" + tree
-		if op.interaction != nil { op.interaction.RequestConfirm(description, op.toolsUse) }
+		if op.interaction != nil {
+			op.interaction.RequestConfirm(description, op.toolsUse)
+		}
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return fmt.Sprintf("Operation cancelled by user: activate skill %s", name), UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -1797,7 +1821,9 @@ func enterPlanModeToolCallImpl(argsMap *map[string]interface{}, op *OpenProcesso
 		if !ok || purpose == "" {
 			return "", fmt.Errorf("purpose is required")
 		}
-		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
+		if op.interaction != nil {
+			op.interaction.RequestConfirm(purpose, op.toolsUse)
+		}
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return "Operation cancelled by user: User denied entering Plan Mode.", UserCancelError{Reason: UserCancelReasonDeny}
 		}
@@ -1824,7 +1850,9 @@ func exitPlanModeToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor
 		if purpose == "" {
 			purpose = "exit Plan Mode and enter normal execution mode"
 		}
-		if op.interaction != nil { op.interaction.RequestConfirm(purpose, op.toolsUse) }
+		if op.interaction != nil {
+			op.interaction.RequestConfirm(purpose, op.toolsUse)
+		}
 		if op.toolsUse.Confirm == data.ToolConfirmCancel {
 			return "Operation cancelled by user: User denied exiting Plan Mode.", UserCancelError{Reason: UserCancelReasonDeny}
 		}

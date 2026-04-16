@@ -1698,16 +1698,17 @@ type OpenProcessor struct {
 }
 
 // Diff confirm func
-func (op *OpenProcessor) showDiffConfirm(diff string) {
+func (op *OpenProcessor) showDiff(diff string) {
 	// Function call is over
 	op.status.ChangeTo(op.notify, StreamNotify{Status: StatusFunctionCallingOver}, op.proceed)
 
-	// Show the diff confirm
-	op.status.ChangeTo(op.notify, StreamNotify{Data: diff, Status: StatusDiffConfirm}, op.proceed)
+	// Show the diff
+	op.status.ChangeTo(op.notify, StreamNotify{Data: diff, Status: StatusShowDiff}, op.proceed)
 }
 
 // Diff close func
-func (op *OpenProcessor) closeDiffConfirm() {
-	// Confirm diff is over
-	op.status.ChangeTo(op.notify, StreamNotify{Status: StatusDiffConfirmOver}, op.proceed)
+func (op *OpenProcessor) closeDiff() {
+	// close diff just change status to show diff over
+	// because in terminal, the diff cannot be closed
+	op.status.ChangeTo(op.notify, StreamNotify{Status: StatusShowDiffOver}, op.proceed)
 }

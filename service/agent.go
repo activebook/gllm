@@ -619,11 +619,11 @@ func CallAgent(op *AgentOptions) error {
 			case StatusFunctionCallingOver:
 				ag.WriteFunctionCallOver()
 				proceedCh <- true
-			case StatusDiffConfirm:
-				ag.WriteDiffConfirm(notify.Data)
+			case StatusShowDiff:
+				ag.WriteDiff(notify.Data)
 				proceedCh <- true
-			case StatusDiffConfirmOver:
-				ag.WriteDiffConfirm("") // just write a newline
+			case StatusShowDiffOver:
+				ag.WriteDiff("") // just write a newline
 				proceedCh <- true
 			}
 

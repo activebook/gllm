@@ -129,7 +129,7 @@ func (ag *Agent) WriteUsage() {
 	}
 }
 
-func (ag *Agent) WriteDiffConfirm(text string) {
+func (ag *Agent) WriteDiff(text string) {
 	// Only write to stdout
 	if ag.StdOutput != nil {
 		ag.StdOutput.Writeln(text)
