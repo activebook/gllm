@@ -193,7 +193,6 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 		}
 
 		// Connect and add session
-		var err error
 		var session *MCPSession
 		if server.Type == "sse" || server.URL != "" || server.BaseURL != "" {
 			// Add SSE server
@@ -216,16 +215,19 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 			break
 		}
 
-		tools, err := mc.GetTools(initCtx, session)
-		if err != nil {
-			err = fmt.Errorf("error loading mcp server %s: %w", serverName, err)
-			break
+		var tools *[]MCPTool
+		if option.LoadTools {
+			tools, err = mc.GetTools(initCtx, session)
+			if err != nil {
+				err = fmt.Errorf("error loading mcp server %s: %w", serverName, err)
+				break
+			}
 		}
 		var resources *[]MCPResource
-		var prompts *[]MCPPrompt
 		if option.LoadResources {
 			resources, _ = mc.GetResources(initCtx, session)
 		}
+		var prompts *[]MCPPrompt
 		if option.LoadPrompts {
 			prompts, _ = mc.GetPrompts(initCtx, session)
 		}
@@ -233,6 +235,9 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 		mc.mu.Lock()
 
 		// Populate tool to session map for fast lookup
+		// Bugfix: remember we load servers in parallel (/mcp load and autoload in background),
+		// so we need to check for duplicates when multiple servers have the same tool name
+		// or, the same server is loaded multiple times
 		var filteredTools []MCPTool
 		if tools != nil {
 			for _, tool := range *tools {
@@ -253,11 +258,12 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 			}
 		}
 
-		// Add server to servers
-		mc.servers = append(mc.servers, &MCPServer{
-			Name: serverName, Allowed: server.Allowed,
-			Tools: &filteredTools, Prompts: prompts, Resources: resources})
-
+		// Add server to servers only when there isn't already.
+		if !mc.connected[serverName] {
+			mc.servers = append(mc.servers, &MCPServer{
+				Name: serverName, Allowed: server.Allowed,
+				Tools: &filteredTools, Prompts: prompts, Resources: resources})
+		}
 		mc.connected[serverName] = true
 		mc.mu.Unlock()
 	}
