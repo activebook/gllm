@@ -150,15 +150,6 @@ func (ag *Agent) WriteFunctionCall(text string) {
 	var toolData ToolCallData
 	err := json.Unmarshal([]byte(text), &toolData)
 
-	if ag.SSEOutput != nil {
-		if err == nil {
-			ag.SSEOutput.WriteToolCallEvent(toolData.Function, toolData.Args)
-		} else {
-			// Fallback: raw text was not valid JSON, emit with empty function name
-			ag.SSEOutput.WriteToolCallEvent("", text)
-		}
-	}
-
 	if ag.StdOutput != nil {
 		if err != nil {
 			// Fallback to original text if not JSON
@@ -255,6 +246,18 @@ func (ag *Agent) WriteFunctionCall(text string) {
 	// if ag.FileOutput != nil {
 	// 	ag.FileOutput.Writef("\n%s\n", text)
 	// }
+
+	// For sse, we only write the function name and the first argument
+	// We shouldn't expose the full arguments to the client
+	if ag.SSEOutput != nil {
+		if err == nil {
+			detail := extractFirstArg(toolData.Args)
+			ag.SSEOutput.WriteToolCallEvent(toolData.Function, detail)
+		} else {
+			// Fallback: raw text was not valid JSON, emit with empty function name
+			ag.SSEOutput.WriteToolCallEvent("", text)
+		}
+	}
 }
 
 func (ag *Agent) WriteFunctionCallOver() {

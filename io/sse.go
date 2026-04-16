@@ -104,14 +104,15 @@ func (s *SSEOutput) WriteStatusEvent(status string) {
 }
 
 // WriteToolCallEvent emits a tool invocation event. The content is a structured
-// object containing the function name and its arguments.
+// object containing the function name and its description.
+// it shouldn't expose the arguments of the function to the web client
 //
-//	data: {"type":"tool_call","data":{"content":{"function":"...","args":{...}}}}
-func (s *SSEOutput) WriteToolCallEvent(function string, args interface{}) {
+//	data: {"type":"tool_call","data":{"content":{"function":"...","description":"..."}}}
+func (s *SSEOutput) WriteToolCallEvent(function string, description string) {
 	s.writeSSEEvent("tool_call", map[string]interface{}{
 		"content": map[string]interface{}{
-			"function": function,
-			"args":     args,
+			"function":    function,
+			"description": description,
 		},
 	})
 }
