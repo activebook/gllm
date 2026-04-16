@@ -206,8 +206,14 @@ func writeFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (
 		return fmt.Sprintf("Error creating directory for %s: %v", path, err), nil
 	}
 
+	// Determine file permissions
+	mode := os.FileMode(0644)
+	if info, err := os.Stat(path); err == nil {
+		mode = info.Mode()
+	}
+
 	// Write the file
-	err := os.WriteFile(path, []byte(content), 0644)
+	err := os.WriteFile(path, []byte(content), mode)
 	if err != nil {
 		op.fileHooks.RejectDiff(path)
 		return fmt.Sprintf("Error writing file %s: %v", path, err), nil
@@ -684,8 +690,15 @@ func shellToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (stri
 	// Get timeout from arguments, default to DefaultShellTimeout
 	timeout := DefaultShellTimeout
 	if timeoutValue, exists := (*argsMap)["timeout"]; exists {
-		if timeoutFloat, ok := timeoutValue.(float64); ok && timeoutFloat > 0 {
-			timeout = time.Duration(timeoutFloat) * time.Second
+		switch v := timeoutValue.(type) {
+		case float64:
+			if v > 0 {
+				timeout = time.Duration(v) * time.Second
+			}
+		case int:
+			if v > 0 {
+				timeout = time.Duration(v) * time.Second
+			}
 		}
 	}
 
@@ -1039,7 +1052,13 @@ func editFileToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (s
 	}
 
 	// ── Phase 4: Write (only reached when all edits validated and user approved) ─
-	if err := os.WriteFile(path, []byte(simulatedContent), 0644); err != nil {
+	// Determine file permissions
+	mode := os.FileMode(0644)
+	if info, err := os.Stat(path); err == nil {
+		mode = info.Mode()
+	}
+
+	if err := os.WriteFile(path, []byte(simulatedContent), mode); err != nil {
 		op.fileHooks.RejectDiff(path)
 		return fmt.Sprintf("Error writing file %s: %v", path, err), nil
 	}
