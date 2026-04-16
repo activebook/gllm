@@ -122,22 +122,9 @@ func (ri *ReplInfo) printWelcome() {
 
 	innerWidth := safeWidth - borderStyle.GetHorizontalFrameSize()
 
-	// Split into left (~40%) and right (~60%) columns
-	leftWidth := innerWidth * 40 / 100
-	rightWidth := innerWidth - leftWidth
-
 	// --- Left panel: logo + welcome ---
 	logo := ui.GetLogo(data.KeyHex, data.LabelHex, 0.5)
 	welcomeText := logo + "\nWelcome back!\n" + data.DetailColor + " (v" + version + ")" + data.ResetSeq
-
-	leftContent := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color(data.KeyHex)).
-		Width(leftWidth).
-		Align(lipgloss.Center).
-		Padding(1, 1, 0, 1).
-		Margin(0, 0, 0, 0).
-		Render(welcomeText)
 
 	specs := []string{}
 	for cmd, desc := range replSpecMap {
@@ -145,19 +132,58 @@ func (ri *ReplInfo) printWelcome() {
 	}
 	sort.Strings(specs)
 
-	rightContent := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(data.LabelHex)).
-		Width(rightWidth).
-		Align(lipgloss.Left).
-		Padding(0, 0, 0, 2).
-		Render(strings.Join(specs, "\n"))
+	var inner string
 
-	// --- Combine panels horizontally ---
-	inner := lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		leftContent,
-		rightContent,
-	)
+	if termWidth >= 80 {
+		// Split into left (~40%) and right (~60%) columns
+		leftWidth := innerWidth * 40 / 100
+		rightWidth := innerWidth - leftWidth
+
+		leftContent := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color(data.KeyHex)).
+			Width(leftWidth).
+			Align(lipgloss.Center).
+			Padding(1, 1, 0, 1).
+			Render(welcomeText)
+
+		rightContent := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(data.LabelHex)).
+			Width(rightWidth).
+			Align(lipgloss.Left).
+			Padding(0, 0, 0, 2).
+			Render(strings.Join(specs, "\n"))
+
+		// --- Combine panels horizontally ---
+		inner = lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			leftContent,
+			rightContent,
+		)
+	} else {
+		// --- Vertical Layout (Stacked) ---
+		// Both panels take full innerWidth
+		leftContent := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color(data.KeyHex)).
+			Width(innerWidth).
+			Align(lipgloss.Left).
+			Padding(0, 0, 0, 0).
+			Render(welcomeText)
+
+		rightContent := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(data.LabelHex)).
+			Width(innerWidth).
+			Align(lipgloss.Left). // Center the command list as a block
+			Padding(1, 0, 0, 0).
+			Render(strings.Join(specs, "\n"))
+
+		inner = lipgloss.JoinVertical(
+			lipgloss.Center,
+			leftContent,
+			rightContent,
+		)
+	}
 
 	banner := borderStyle.Render(inner)
 	fmt.Println(banner)

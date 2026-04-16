@@ -342,7 +342,7 @@ func runAgentWithSSE(prompt string, guideline string, sessionName string, sseIO 
 // InteractRequest is the body of POST /v1/interact used by the frontend to
 // resolve a pending interaction (tool confirm, ask-user, etc.).
 type InteractRequest struct {
-	ID        string `json:"id"`                  // UUID matching the SSE interaction_request event
+	ID        string `json:"id"`                  // UUID matching the SSE interaction request event
 	Kind      string `json:"kind"`                // "tool_confirm" | "ask_user"
 	Approve   string `json:"approve,omitempty"`   // For tool_confirm ("once", "always", "cancel")
 	Answer    string `json:"answer,omitempty"`    // For ask_user
