@@ -231,17 +231,32 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 		}
 
 		mc.mu.Lock()
+
 		// Populate tool to session map for fast lookup
+		var filteredTools []MCPTool
 		if tools != nil {
 			for _, tool := range *tools {
+				// Prevent shadowing built-in system tools
+				if IsAvailableOpenTool(tool.Name) {
+					util.LogWarnf("MCP tool %q from server %q conflicts with built-in tool, ignored\n", tool.Name, serverName)
+					continue
+				}
+
+				// Prevent duplicates across different MCP servers
+				if _, exists := mc.toolToSession[tool.Name]; exists {
+					util.LogWarnf("Duplicate MCP tool ignored: %q (from server %q)\n", tool.Name, serverName)
+					continue
+				}
+
 				mc.toolToSession[tool.Name] = session
+				filteredTools = append(filteredTools, tool)
 			}
 		}
 
 		// Add server to servers
 		mc.servers = append(mc.servers, &MCPServer{
 			Name: serverName, Allowed: server.Allowed,
-			Tools: tools, Prompts: prompts, Resources: resources})
+			Tools: &filteredTools, Prompts: prompts, Resources: resources})
 
 		mc.connected[serverName] = true
 		mc.mu.Unlock()
