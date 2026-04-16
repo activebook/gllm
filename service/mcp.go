@@ -71,6 +71,7 @@ type MCPSession struct {
 
 type MCPClient struct {
 	mu            sync.Mutex
+	serverMu      map[string]*sync.Mutex // Per-server locks to prevent duplicate connections
 	ctx           context.Context
 	cancel        context.CancelFunc
 	client        *mcp.Client
@@ -168,6 +169,7 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 		mc.ctx, mc.cancel = context.WithCancel(context.Background())
 		mc.toolToSession = make(map[string]*MCPSession)
 		mc.connected = make(map[string]bool)
+		mc.serverMu = make(map[string]*sync.Mutex)
 		// Create a new client, with no features.
 		mc.client = mcp.NewClient(&mcp.Implementation{Name: "mcp-client", Version: "v1.0.0"}, nil)
 	}
@@ -184,11 +186,27 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 			continue
 		}
 
+		// Retrieve or create a per-server mutex under the global lock.
+		// This prevents concurrent Init calls from spawning duplicate connections
+		// to the same server (e.g. background autoload + user /mcp load racing).
+		mc.mu.Lock()
+		if mc.serverMu[serverName] == nil {
+			mc.serverMu[serverName] = &sync.Mutex{}
+		}
+		srvMu := mc.serverMu[serverName]
+		mc.mu.Unlock()
+
+		// Acquire the per-server lock BEFORE checking isConnected.
+		// Any concurrent goroutine attempting the same server will block here
+		// and then see isConnected == true once the first goroutine finishes.
+		srvMu.Lock()
+
 		mc.mu.Lock()
 		isConnected := mc.connected[serverName]
 		mc.mu.Unlock()
 
 		if isConnected {
+			srvMu.Unlock()
 			continue // Already connected, skip
 		}
 
@@ -212,6 +230,7 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 		if err != nil {
 			// don't continue with other servers
 			err = fmt.Errorf("error loading mcp server %s: %w", serverName, err)
+			srvMu.Unlock()
 			break
 		}
 
@@ -220,6 +239,7 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 			tools, err = mc.GetTools(initCtx, session)
 			if err != nil {
 				err = fmt.Errorf("error loading mcp server %s: %w", serverName, err)
+				srvMu.Unlock()
 				break
 			}
 		}
@@ -258,14 +278,12 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 			}
 		}
 
-		// Add server to servers only when there isn't already.
-		if !mc.connected[serverName] {
-			mc.servers = append(mc.servers, &MCPServer{
-				Name: serverName, Allowed: server.Allowed,
-				Tools: &filteredTools, Prompts: prompts, Resources: resources})
-		}
+		mc.servers = append(mc.servers, &MCPServer{
+			Name: serverName, Allowed: server.Allowed,
+			Tools: &filteredTools, Prompts: prompts, Resources: resources})
 		mc.connected[serverName] = true
 		mc.mu.Unlock()
+		srvMu.Unlock()
 	}
 	mc.mu.Lock()
 	mc.loaded = true
