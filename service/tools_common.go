@@ -65,15 +65,6 @@ type OpenFunctionDefinition struct {
 }
 
 const (
-	// ToolRespConfirmShell is the template for the response to the user before executing a command.
-	ToolRespConfirmShell = "```\n%s\n```\n%s"
-
-	// ToolRespShellOutput is the template for the response to the user after executing a command.
-	ToolRespShellOutput = `shell executed: %s
-Status:
-%s
-%s`
-
 	ToolUserConfirmPrompt = "Do you want to proceed?"
 
 	// ToolRespConfirmEdityFile is the template for the response to the user before modifying a file, including the diff.
