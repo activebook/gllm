@@ -18,6 +18,7 @@ var replTips = []string{
 	"Seamlessly switch between OpenAI, Anthropic, and Gemini mid-session using the '/model' command.",
 	"Sub-agents can communicate and share data using the persistent SharedState blackboard.",
 	"Run 'gllm serve' to launch the local web interface for a rich, browser-based chat experience.",
+	"Install gllm Companion VSCode extension to bring changes into VSCode as native inline diffs, and enriches sessions.",
 }
 
 // getRandomTips returns n random tips from the replTips slice.
@@ -25,19 +26,19 @@ func getRandomTips(n int) []string {
 	if n <= 0 {
 		return nil
 	}
-	
+
 	// Create a copy to shuffle
 	tips := make([]string, len(replTips))
 	copy(tips, replTips)
-	
+
 	// Initialize random source
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	
+
 	// Shuffle
 	r.Shuffle(len(tips), func(i, j int) {
 		tips[i], tips[j] = tips[j], tips[i]
 	})
-	
+
 	// Return up to n tips
 	if n > len(tips) {
 		n = len(tips)
