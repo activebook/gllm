@@ -109,94 +109,6 @@ type ReplInfo struct {
 	autoRenameOnce sync.Once         // ensures auto-rename fires at most once per REPL session
 }
 
-func (ri *ReplInfo) printWelcome() {
-	termWidth := io.GetTerminalWidth()
-	safeWidth := max(40, termWidth-4)
-
-	borderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(data.BorderHex)).
-		Width(safeWidth).
-		Margin(0, 1).
-		Padding(0, 1)
-
-	innerWidth := safeWidth - borderStyle.GetHorizontalFrameSize()
-
-	// --- Left panel: logo + welcome ---
-	logo := ui.GetLogo(data.KeyHex, data.LabelHex, 0.5)
-	welcomeText := logo + "\nWelcome back!\n" + data.DetailColor + " (v" + version + ")" + data.ResetSeq
-
-	specs := []string{}
-	for cmd, desc := range replSpecMap {
-		specs = append(specs, fmt.Sprintf("• %s: %s", cmd, desc))
-	}
-	sort.Strings(specs)
-
-	var inner string
-
-	if termWidth >= 80 {
-		// Split into left (~40%) and right (~60%) columns
-		leftWidth := innerWidth * 40 / 100
-		rightWidth := innerWidth - leftWidth
-
-		leftContent := lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color(data.KeyHex)).
-			Width(leftWidth).
-			Align(lipgloss.Center).
-			Padding(1, 1, 0, 1).
-			Render(welcomeText)
-
-		rightContent := lipgloss.NewStyle().
-			Foreground(lipgloss.Color(data.LabelHex)).
-			Width(rightWidth).
-			Align(lipgloss.Left).
-			Padding(0, 0, 0, 2).
-			Render(strings.Join(specs, "\n"))
-
-		// --- Combine panels horizontally ---
-		inner = lipgloss.JoinHorizontal(
-			lipgloss.Top,
-			leftContent,
-			rightContent,
-		)
-	} else {
-		// --- Vertical Layout (Stacked) ---
-		// Both panels take full innerWidth
-		leftContent := lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color(data.KeyHex)).
-			Width(innerWidth).
-			Align(lipgloss.Left).
-			Padding(0, 0, 0, 0).
-			Render(welcomeText)
-
-		rightContent := lipgloss.NewStyle().
-			Foreground(lipgloss.Color(data.LabelHex)).
-			Width(innerWidth).
-			Align(lipgloss.Left). // Center the command list as a block
-			Padding(1, 0, 0, 0).
-			Render(strings.Join(specs, "\n"))
-
-		inner = lipgloss.JoinVertical(
-			lipgloss.Center,
-			leftContent,
-			rightContent,
-		)
-	}
-
-	banner := borderStyle.Render(inner)
-	fmt.Println(banner)
-
-	hintStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(data.DetailHex)).
-		Width(safeWidth).
-		Align(lipgloss.Center).
-		Italic(true)
-	fmt.Println(hintStyle.Padding(0, 2).Render("Type your message below and press Enter to send."))
-	fmt.Println()
-}
-
 // This is the new awaitInput function, which uses bubbletea, support auto-complete
 func (ri *ReplInfo) awaitInput() (string, error) {
 	agent, err := EnsureActiveAgent()
@@ -312,8 +224,8 @@ func (ri *ReplInfo) startREPL(cmd *cobra.Command) {
 	// Set auto approve for the session
 	data.SetYoloModeInSession(yoloFlag)
 
-	// Start the REPL
-	ri.printWelcome()
+	// Print welcome banner
+	printReplWelcome()
 
 	// Print session history if available
 	ri.printSessionHistory()
