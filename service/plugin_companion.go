@@ -211,7 +211,7 @@ func GetVSCodeContext() string {
 	}
 
 	context := fmt.Sprintf("Here is the user's editor context as a JSON object.\n```json\n%s\n```\n", string(jsonBytes))
-	util.Debugf("VSCode Context: %s\n", context)
+	util.LogDebugf("VSCode Context: %s\n", context)
 	return context
 }
 

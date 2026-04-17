@@ -57,8 +57,8 @@ Use 'gllm skills update --all' to update all installed skills that have source t
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(cmd.Long)
-		fmt.Println()
+		util.Println(cmd, cmd.Long)
+		util.Println(cmd)
 		// Default action: list skills
 		skillsListCmd.Run(skillsListCmd, args)
 	},
@@ -73,19 +73,19 @@ var skillsListCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		skills, err := data.ScanSkills()
 		if err != nil {
-			util.Errorf("Failed to scan skills: %v\n", err)
+			util.Errorf(cmd, "Failed to scan skills: %v\n", err)
 			return
 		}
 
 		if len(skills) == 0 {
-			fmt.Println("No skills installed.")
-			fmt.Println()
-			fmt.Println("Use 'gllm skills install <path>' to install a skill.")
+			util.Println(cmd, "No skills installed.")
+			util.Println(cmd)
+			util.Println(cmd, "Use 'gllm skills install <path>' to install a skill.")
 			return
 		}
 
-		fmt.Println("Installed skills:")
-		fmt.Println()
+		var sb strings.Builder
+		sb.WriteString("Installed skills:\n\n")
 
 		// Sort skills by name
 		sort.Slice(skills, func(i, j int) bool {
@@ -93,10 +93,12 @@ var skillsListCmd = &cobra.Command{
 		})
 
 		for _, skill := range skills {
-			printSkillMeta(skill)
+			sb.WriteString(renderSkillMeta(skill))
 		}
-		fmt.Printf("%s = Enabled skill\n", ui.FormatEnabledIndicator(true))
-		fmt.Printf("Skills directory: %s\n", data.GetSkillsDirPath())
+		fmt.Fprintf(&sb, "%s = Enabled skill\n", ui.FormatEnabledIndicator(true))
+		fmt.Fprintf(&sb, "Skills directory: %s\n", data.GetSkillsDirPath())
+
+		util.Print(cmd, sb.String())
 	},
 }
 
@@ -128,14 +130,14 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 			var err error
 			tempDir, err = os.MkdirTemp("", "gllm-skill-clone-*")
 			if err != nil {
-				util.Errorf("Failed to create temp directory: %v\n", err)
+				util.Errorf(cmd, "Failed to create temp directory: %v\n", err)
 				return
 			}
 			cleanup = func() { os.RemoveAll(tempDir) }
 			defer cleanup()
 
-			if err := downloadRepo(source, tempDir); err != nil {
-				util.Errorf("%v\n", err)
+			if err := downloadRepo(cmd, source, tempDir); err != nil {
+				util.Errorf(cmd, "%v\n", err)
 				return
 			}
 		} else {
@@ -143,7 +145,7 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 			var err error
 			tempDir, err = filepath.Abs(source)
 			if err != nil {
-				util.Errorf("Invalid path: %v\n", err)
+				util.Errorf(cmd, "Invalid path: %v\n", err)
 				return
 			}
 		}
@@ -151,7 +153,7 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 		// Discover skills in the specified paths
 		targetSubPaths, err := discoverSkills(tempDir, skillsInstallPaths)
 		if err != nil {
-			util.Errorf("Discovery failed: %v\n", err)
+			util.Errorf(cmd, "Discovery failed: %v\n", err)
 			return
 		}
 
@@ -177,7 +179,7 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 				Value(&confirm).
 				Run()
 			if err != nil || !confirm {
-				fmt.Println("Aborted.")
+				util.Println(cmd, "Aborted.")
 				return
 			}
 		}
@@ -192,11 +194,11 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 			}
 
 			if len(targetSubPaths) > 1 {
-				fmt.Printf("Installing: %s\n", subPath)
+				util.Printf(cmd, "Installing: %s\n", subPath)
 			}
 
-			if err := installSingleSkill(absSkillDir, isRemote, source, subPath); err != nil {
-				util.Errorf("Failed to install skill from path '%s': %v\n", subPath, err)
+			if err := installSingleSkill(cmd, absSkillDir, isRemote, source, subPath); err != nil {
+				util.Errorf(cmd, "Failed to install skill from path '%s': %v\n", subPath, err)
 				failCount++
 			} else {
 				successCount++
@@ -205,9 +207,9 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 
 		if len(targetSubPaths) > 1 {
 			if failCount > 0 {
-				fmt.Printf("Installation complete. Successfully installed %d skills. %d failures.\n", successCount, failCount)
+				util.Printf(cmd, "Installation complete. Successfully installed %d skills. %d failures.\n", successCount, failCount)
 			} else {
-				fmt.Printf("Installation complete. Successfully installed %d skills.\n", successCount)
+				util.Printf(cmd, "Installation complete. Successfully installed %d skills.\n", successCount)
 			}
 		}
 
@@ -217,7 +219,7 @@ The source (local or resolved git path) must contain a valid SKILL.md file with 
 }
 
 // installSingleSkill handles the validation, copying, and metadata saving of a single skill directory
-func installSingleSkill(absSkillDirPath string, isRemote bool, sourceURL string, subPath string) error {
+func installSingleSkill(cmd *cobra.Command, absSkillDirPath string, isRemote bool, sourceURL string, subPath string) error {
 	// Check if source exists and is a directory
 	info, err := os.Stat(absSkillDirPath)
 	if err != nil {
@@ -256,7 +258,7 @@ func installSingleSkill(absSkillDirPath string, isRemote bool, sourceURL string,
 			Value(&confirm).
 			Run()
 		if err != nil || !confirm {
-			util.Warnf("user aborted overwrite for skill '%s'", meta.Name)
+			util.LogWarnf("user aborted overwrite for skill '%s'", meta.Name)
 			return nil
 		}
 		// Remove existing
@@ -279,11 +281,11 @@ func installSingleSkill(absSkillDirPath string, isRemote bool, sourceURL string,
 		}
 		if err := data.SaveSkillSourceMeta(destDir, sourceMeta); err != nil {
 			// Don't fail the whole installation, but warn the user
-			util.Warnf("Failed to save source tracking metadata: %v\n", err)
+			util.LogWarnf("Failed to save source tracking metadata: %v\n", err)
 		}
 	}
 
-	fmt.Printf("Skill '%s' installed successfully.\n", meta.Name)
+	util.Printf(cmd, "Skill '%s' installed successfully.\n", meta.Name)
 	return nil
 }
 
@@ -347,11 +349,11 @@ var skillsUninstallCmd = &cobra.Command{
 			// Interactive select
 			skills, err := data.ScanSkills()
 			if err != nil {
-				util.Errorf("Failed to scan skills: %v\n", err)
+				util.Errorf(cmd, "Failed to scan skills: %v\n", err)
 				return
 			}
 			if len(skills) == 0 {
-				fmt.Println("No skills installed.")
+				util.Println(cmd, "No skills installed.")
 				return
 			}
 
@@ -370,7 +372,7 @@ var skillsUninstallCmd = &cobra.Command{
 				Value(&skillName).
 				Run()
 			if err != nil {
-				fmt.Println("Aborted.")
+				util.Println(cmd, "Aborted.")
 				return
 			}
 		}
@@ -378,7 +380,7 @@ var skillsUninstallCmd = &cobra.Command{
 		// Find skill directory
 		skills, err := data.ScanSkills()
 		if err != nil {
-			util.Errorf("Failed to scan skills: %v\n", err)
+			util.Errorf(cmd, "Failed to scan skills: %v\n", err)
 			return
 		}
 
@@ -392,7 +394,7 @@ var skillsUninstallCmd = &cobra.Command{
 		}
 
 		if skillPath == "" {
-			util.Errorf("Skill '%s' not found\n", skillName)
+			util.Errorf(cmd, "Skill '%s' not found\n", skillName)
 			return
 		}
 
@@ -405,13 +407,13 @@ var skillsUninstallCmd = &cobra.Command{
 			Value(&confirm).
 			Run()
 		if err != nil || !confirm {
-			fmt.Println("Aborted.")
+			util.Println(cmd, "Aborted.")
 			return
 		}
 
 		// Remove directory
 		if err := os.RemoveAll(skillPath); err != nil {
-			util.Errorf("Failed to remove skill: %v\n", err)
+			util.Errorf(cmd, "Failed to remove skill: %v\n", err)
 			return
 		}
 
@@ -419,7 +421,7 @@ var skillsUninstallCmd = &cobra.Command{
 		settingsStore := data.GetSettingsStore()
 		_ = settingsStore.EnableSkill(skillName) // Ignore error, just cleanup
 
-		fmt.Printf("Skill '%s' removed successfully.\n", skillName)
+		util.Printf(cmd, "Skill '%s' removed successfully.\n", skillName)
 	},
 }
 
@@ -432,12 +434,12 @@ var skillsSwCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		skills, err := data.ScanSkills()
 		if err != nil {
-			util.Errorf("Failed to scan skills: %v\n", err)
+			util.Errorf(cmd, "Failed to scan skills: %v\n", err)
 			return
 		}
 
 		if len(skills) == 0 {
-			fmt.Println("No skills installed.")
+			util.Println(cmd, "No skills installed.")
 			return
 		}
 
@@ -480,7 +482,7 @@ var skillsSwCmd = &cobra.Command{
 		).Run()
 
 		if err != nil {
-			util.Errorf("%v\n", err)
+			util.Errorf(cmd, "%v\n", err)
 			return
 		}
 
@@ -499,8 +501,8 @@ var skillsSwCmd = &cobra.Command{
 		}
 
 		// Run skills list to show updated list
-		fmt.Printf("%d skill(s) enabled.\n", len(selectedSkills))
-		fmt.Println()
+		util.Printf(cmd, "%d skill(s) enabled.\n", len(selectedSkills))
+		util.Println(cmd)
 		skillsListCmd.Run(skillsListCmd, args)
 	},
 }
@@ -520,17 +522,17 @@ Use 'gllm skills update --all' to update all skills that support updating.`,
 		ui.GetIndicator().Stop()
 
 		if !skillsUpdateAll && len(args) == 0 {
-			util.Errorf("You must specify a skill name or use the --all flag.\n")
+			util.Errorf(cmd, "You must specify a skill name or use the --all flag.\n")
 			return
 		}
 		if skillsUpdateAll && len(args) > 0 {
-			util.Errorf("Cannot specify both a skill name and the --all flag.\n")
+			util.Errorf(cmd, "Cannot specify both a skill name and the --all flag.\n")
 			return
 		}
 
 		skills, err := data.ScanSkills()
 		if err != nil {
-			util.Errorf("Failed to scan skills: %v\n", err)
+			util.Errorf(cmd, "Failed to scan skills: %v\n", err)
 			return
 		}
 
@@ -543,7 +545,7 @@ Use 'gllm skills update --all' to update all skills that support updating.`,
 		}
 
 		if len(updatableSkills) == 0 {
-			fmt.Println("No updatable skills found. (Only skills installed from a URL can be updated)")
+			util.Println(cmd, "No updatable skills found. (Only skills installed from a URL can be updated)")
 			return
 		}
 
@@ -565,7 +567,7 @@ Use 'gllm skills update --all' to update all skills that support updating.`,
 				Value(&confirm1).
 				Run()
 			if err != nil || !confirm1 {
-				fmt.Println("Aborted.")
+				util.Println(cmd, "Aborted.")
 				return
 			}
 
@@ -578,13 +580,13 @@ Use 'gllm skills update --all' to update all skills that support updating.`,
 				Value(&confirm2).
 				Run()
 			if err != nil || !confirm2 {
-				fmt.Println("Aborted.")
+				util.Println(cmd, "Aborted.")
 				return
 			}
 
 			// Execute batch update - all skills processed together efficiently
-			if err := executeSkillUpdate(updatableSkills...); err != nil {
-				util.Errorf("Update failed: %v\n", err)
+			if err := executeSkillUpdate(cmd, updatableSkills...); err != nil {
+				util.Errorf(cmd, "Update failed: %v\n", err)
 			}
 
 		} else {
@@ -603,11 +605,11 @@ Use 'gllm skills update --all' to update all skills that support updating.`,
 				// Check if it exists but just doesn't have metadata to give a better error message
 				for _, s := range skills {
 					if strings.EqualFold(s.Name, skillName) {
-						util.Errorf("Skill holds no origin metadata (likely installed from a local path) and cannot be updated.\n")
+						util.Errorf(cmd, "Skill holds no origin metadata (likely installed from a local path) and cannot be updated.\n")
 						return
 					}
 				}
-				util.Errorf("Skill '%s' not found.\n", skillName)
+				util.Errorf(cmd, "Skill '%s' not found.\n", skillName)
 				return
 			}
 
@@ -619,13 +621,13 @@ Use 'gllm skills update --all' to update all skills that support updating.`,
 				Value(&confirm).
 				Run()
 			if err != nil || !confirm {
-				fmt.Println("Aborted.")
+				util.Println(cmd, "Aborted.")
 				return
 			}
 
 			// Single skill update
-			if err := executeSkillUpdate(*targetSkill); err != nil {
-				util.Errorf("Failed to update %s: %v\n", targetSkill.Name, err)
+			if err := executeSkillUpdate(cmd, *targetSkill); err != nil {
+				util.Errorf(cmd, "Failed to update %s: %v\n", targetSkill.Name, err)
 			} else {
 				// Success message already printed by executeSkillUpdate
 			}
@@ -638,9 +640,9 @@ Use 'gllm skills update --all' to update all skills that support updating.`,
 
 // downloadRepo downloads or clones a repository to a temporary directory
 // This is a shared helper for both install and update commands
-func downloadRepo(sourceURL, destDir string) error {
+func downloadRepo(cmd *cobra.Command, sourceURL, destDir string) error {
 	if util.HasGit() {
-		fmt.Printf("Cloning %s...\n", sourceURL)
+		util.Printf(cmd, "Cloning %s...\n", sourceURL)
 		gitCmd := exec.Command("git", "clone", sourceURL, destDir)
 		gitCmd.Stdout = os.Stdout
 		gitCmd.Stderr = os.Stderr
@@ -648,7 +650,7 @@ func downloadRepo(sourceURL, destDir string) error {
 			return fmt.Errorf("failed to clone repository: %w", err)
 		}
 	} else if util.IsGitHubURL(sourceURL) {
-		fmt.Printf("Downloading archive from %s...\n", sourceURL)
+		util.Printf(cmd, "Downloading archive from %s...\n", sourceURL)
 		zipURL := util.GetGitHubZipURL(sourceURL)
 		if err := util.DownloadAndExtractZip(zipURL, destDir); err != nil {
 			return fmt.Errorf("failed to download and extract skill: %w", err)
@@ -661,7 +663,7 @@ func downloadRepo(sourceURL, destDir string) error {
 
 // executeSkillUpdate handles the download/replace logic for one or more skills
 // Uses batch processing for efficiency when multiple skills share the same source URL
-func executeSkillUpdate(skills ...data.SkillMetadata) error {
+func executeSkillUpdate(cmd *cobra.Command, skills ...data.SkillMetadata) error {
 	if len(skills) == 0 {
 		return fmt.Errorf("no skills to update")
 	}
@@ -683,19 +685,19 @@ func executeSkillUpdate(skills ...data.SkillMetadata) error {
 	// Process each source URL once
 	for sourceURL, groupSkills := range skillsByURL {
 		if len(groupSkills) > 1 {
-			fmt.Printf("\nProcessing %d skills from %s...\n", len(groupSkills), sourceURL)
+			util.Printf(cmd, "\nProcessing %d skills from %s...\n", len(groupSkills), sourceURL)
 		}
 
 		// Create temp directory for this source
 		tempDir, err := os.MkdirTemp("", "gllm-skill-update-*")
 		if err != nil {
-			util.Errorf("Failed to create temp directory for %s: %v\n", sourceURL, err)
+			util.LogErrorf("Failed to create temp directory for %s: %v\n", sourceURL, err)
 			continue
 		}
 
 		// Download/clone once per source URL
-		if err := downloadRepo(sourceURL, tempDir); err != nil {
-			util.Errorf("Failed to download source from %s: %v\n", sourceURL, err)
+		if err := downloadRepo(cmd, sourceURL, tempDir); err != nil {
+			util.LogErrorf("Failed to download source from %s: %v\n", sourceURL, err)
 			os.RemoveAll(tempDir)
 			continue
 		}
@@ -703,12 +705,12 @@ func executeSkillUpdate(skills ...data.SkillMetadata) error {
 		// Update all skills from this source
 		for i, skill := range groupSkills {
 			if len(groupSkills) > 1 {
-				fmt.Printf("[%d/%d] Updating %s...\n", i+1, len(groupSkills), skill.Name)
+				util.Printf(cmd, "[%d/%d] Updating %s...\n", i+1, len(groupSkills), skill.Name)
 			}
 
 			meta := skill.SourceMeta
 			if meta == nil {
-				util.Errorf("Missing source metadata for %s\n", skill.Name)
+				util.LogErrorf("Missing source metadata for %s\n", skill.Name)
 				continue
 			}
 
@@ -723,28 +725,28 @@ func executeSkillUpdate(skills ...data.SkillMetadata) error {
 			// Validate new skill
 			skillFilePath := filepath.Join(absPath, data.SkillFile)
 			if _, err := os.Stat(skillFilePath); err != nil {
-				util.Errorf("New version of %s does not contain %s\n", skill.Name, data.SkillFile)
+				util.LogErrorf("New version of %s does not contain %s\n", skill.Name, data.SkillFile)
 				continue
 			}
 
 			// Remove old and copy new
 			if err := os.RemoveAll(destDir); err != nil {
-				util.Errorf("Failed to clean existing directory for %s: %v\n", skill.Name, err)
+				util.LogErrorf("Failed to clean existing directory for %s: %v\n", skill.Name, err)
 				continue
 			}
 
 			if err := copyDir(absPath, destDir); err != nil {
-				util.Errorf("Failed to copy new files for %s: %v\n", skill.Name, err)
+				util.LogErrorf("Failed to copy new files for %s: %v\n", skill.Name, err)
 				continue
 			}
 
 			// Update metadata timestamp
 			meta.InstallDate = time.Now().UTC().Format(time.RFC3339)
 			if err := data.SaveSkillSourceMeta(destDir, meta); err != nil {
-				util.Warnf("Failed to update metadata for %s: %v\n", skill.Name, err)
+				util.LogWarnf("Failed to update metadata for %s: %v\n", skill.Name, err)
 			}
 
-			fmt.Printf("Skill '%s' updated successfully.\n", skill.Name)
+			util.Printf(cmd, "Skill '%s' updated successfully.\n", skill.Name)
 		}
 
 		// Cleanup temp directory after processing all skills from this source
@@ -754,20 +756,21 @@ func executeSkillUpdate(skills ...data.SkillMetadata) error {
 	return nil
 }
 
-// printSkillMeta prints a skill in a formatted way
-func printSkillMeta(skill data.SkillMetadata) {
+// renderSkillMeta returns a formatted skill metadata summary as a string
+func renderSkillMeta(skill data.SkillMetadata) string {
+	var sb strings.Builder
 	settingsStore := data.GetSettingsStore()
 	enabled := !settingsStore.IsSkillDisabled(skill.Name)
 	indicator := ui.FormatEnabledIndicator(enabled)
 
-	fmt.Printf("%s %s\n", indicator, skill.Name)
+	fmt.Fprintf(&sb, "%s %s\n", indicator, skill.Name)
 	if skill.Description != "" {
-		lines := strings.Split(skill.Description, "\n")
-		for _, line := range lines {
+		for _, line := range strings.Split(skill.Description, "\n") {
 			if strings.TrimSpace(line) != "" {
-				fmt.Printf("%s%s%s\n", data.DetailColor, line, data.ResetSeq)
+				fmt.Fprintf(&sb, "%s%s%s\n", data.DetailColor, line, data.ResetSeq)
 			}
 		}
 	}
-	fmt.Println()
+	sb.WriteString("\n")
+	return sb.String()
 }

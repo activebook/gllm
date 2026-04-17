@@ -47,23 +47,23 @@ var workflowListCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		wm := service.GetWorkflowManager()
 		if err := wm.LoadMetadata(replCommandMap); err != nil {
-			util.Errorf("Failed to load workflows: %v\n", err)
+			util.Errorf(cmd, "Failed to load workflows: %v\n", err)
 			return
 		}
 
 		names := wm.GetWorkflowNames()
 		if len(names) == 0 {
-			fmt.Println("No workflows found.")
+			util.Println(cmd, "No workflows found.")
 			return
 		}
 
-		fmt.Println("Available workflows:")
+		util.Println(cmd, "Available workflows:")
 		for _, name := range names {
 			_, desc, _ := wm.GetWorkflowByName(name)
 			if desc != "" {
-				fmt.Printf("/%s - %s\n", name, desc)
+				util.Printf(cmd, "/%s - %s\n", name, desc)
 			} else {
-				fmt.Printf("/%s\n", name)
+				util.Printf(cmd, "/%s\n", name)
 			}
 		}
 	},
@@ -77,7 +77,7 @@ var workflowAddCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		wm := service.GetWorkflowManager()
 		if err := wm.LoadMetadata(replCommandMap); err != nil {
-			util.Errorf("Failed to load workflows: %v\n", err)
+			util.Errorf(cmd, "Failed to load workflows: %v\n", err)
 			return
 		}
 
@@ -85,11 +85,11 @@ var workflowAddCmd = &cobra.Command{
 		if len(args) > 0 {
 			name = args[0]
 			if err := util.ValidateResourceName("workflow", name); err != nil {
-				util.Errorf("%v\n", err)
+				util.Errorf(cmd, "%v\n", err)
 				return
 			}
 			if util.Contains(wm.GetWorkflowNames(), name, true) {
-				util.Errorf("workflow '%s' already exists\n", name)
+				util.Errorf(cmd, "workflow '%s' already exists\n", name)
 				return
 			}
 		} else {
@@ -133,7 +133,7 @@ var workflowAddCmd = &cobra.Command{
 		editor := getPreferredEditor()
 		tempFile, err := createTempFile(workflowTempFile)
 		if err != nil {
-			util.Errorf("Failed to create temp file: %v\n", err)
+			util.Errorf(cmd, "Failed to create temp file: %v\n", err)
 			return
 		}
 		defer os.Remove(tempFile)
@@ -144,28 +144,28 @@ var workflowAddCmd = &cobra.Command{
 		cmdExec.Stderr = os.Stderr
 
 		if err := cmdExec.Run(); err != nil {
-			util.Errorf("Editor failed: %v\n", err)
+			util.Errorf(cmd, "Editor failed: %v\n", err)
 			return
 		}
 
 		contentBytes, err := os.ReadFile(tempFile)
 		if err != nil {
-			util.Errorf("Failed to read content: %v\n", err)
+			util.Errorf(cmd, "Failed to read content: %v\n", err)
 			return
 		}
 		content := strings.TrimSpace(string(contentBytes))
 
 		if content == "" {
-			fmt.Println("Empty content, workflow creation aborted.")
+			util.Println(cmd, "Empty content, workflow creation aborted.")
 			return
 		}
 
 		if err := wm.CreateWorkflow(name, description, content); err != nil {
-			util.Errorf("Failed to create workflow: %v\n", err)
+			util.Errorf(cmd, "Failed to create workflow: %v\n", err)
 			return
 		}
 
-		fmt.Printf("Workflow '/%s' created successfully.\n", name)
+		util.Printf(cmd, "Workflow '/%s' created successfully.\n", name)
 	},
 }
 
@@ -177,7 +177,7 @@ var workflowRemoveCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		wm := service.GetWorkflowManager()
 		if err := wm.LoadMetadata(replCommandMap); err != nil {
-			util.Errorf("Failed to load workflows: %v\n", err)
+			util.Errorf(cmd, "Failed to load workflows: %v\n", err)
 			return
 		}
 
@@ -187,7 +187,7 @@ var workflowRemoveCmd = &cobra.Command{
 		} else {
 			names := wm.GetWorkflowNames()
 			if len(names) == 0 {
-				fmt.Println("No workflows to remove.")
+				util.Println(cmd, "No workflows to remove.")
 				return
 			}
 			options := make([]huh.Option[string], len(names))
@@ -218,16 +218,16 @@ var workflowRemoveCmd = &cobra.Command{
 			Run()
 
 		if err != nil || !confirm {
-			fmt.Println("Aborted.")
+			util.Println(cmd, "Aborted.")
 			return
 		}
 
 		if err := wm.RemoveWorkflow(name); err != nil {
-			util.Errorf("Failed to remove workflow: %v\n", err)
+			util.Errorf(cmd, "Failed to remove workflow: %v\n", err)
 			return
 		}
 
-		fmt.Printf("Workflow '/%s' removed.\n", name)
+		util.Printf(cmd, "Workflow '/%s' removed.\n", name)
 	},
 }
 
@@ -239,7 +239,7 @@ var workflowRenameCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		wm := service.GetWorkflowManager()
 		if err := wm.LoadMetadata(replCommandMap); err != nil {
-			util.Errorf("Failed to load workflows: %v\n", err)
+			util.Errorf(cmd, "Failed to load workflows: %v\n", err)
 			return
 		}
 
@@ -250,11 +250,11 @@ var workflowRenameCmd = &cobra.Command{
 		if len(args) >= 2 {
 			newName = args[1]
 			if err := util.ValidateResourceName("workflow", newName); err != nil {
-				util.Errorf("%v\n", err)
+				util.Errorf(cmd, "%v\n", err)
 				return
 			}
 			if util.Contains(wm.GetWorkflowNames(), newName, true) {
-				util.Errorf("workflow '%s' already exists\n", newName)
+				util.Errorf(cmd, "workflow '%s' already exists\n", newName)
 				return
 			}
 		}
@@ -262,7 +262,7 @@ var workflowRenameCmd = &cobra.Command{
 		if oldName == "" {
 			names := wm.GetWorkflowNames()
 			if len(names) == 0 {
-				fmt.Println("No workflows to rename.")
+				util.Println(cmd, "No workflows to rename.")
 				return
 			}
 			options := make([]huh.Option[string], len(names))
@@ -311,11 +311,11 @@ var workflowRenameCmd = &cobra.Command{
 		}
 
 		if err := wm.RenameWorkflow(oldName, newName); err != nil {
-			util.Errorf("Failed to rename workflow: %v\n", err)
+			util.Errorf(cmd, "Failed to rename workflow: %v\n", err)
 			return
 		}
 
-		fmt.Printf("Renamed '/%s' to '/%s'.\n", oldName, newName)
+		util.Printf(cmd, "Renamed '/%s' to '/%s'.\n", oldName, newName)
 	},
 }
 
@@ -327,7 +327,7 @@ var workflowInfoCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		wm := service.GetWorkflowManager()
 		if err := wm.LoadMetadata(replCommandMap); err != nil {
-			util.Errorf("Failed to load workflows: %v\n", err)
+			util.Errorf(cmd, "Failed to load workflows: %v\n", err)
 			return
 		}
 
@@ -337,7 +337,7 @@ var workflowInfoCmd = &cobra.Command{
 		} else {
 			names := wm.GetWorkflowNames()
 			if len(names) == 0 {
-				fmt.Println("No workflows found.")
+				util.Println(cmd, "No workflows found.")
 				return
 			}
 			options := make([]huh.Option[string], len(names))
@@ -360,15 +360,15 @@ var workflowInfoCmd = &cobra.Command{
 
 		content, desc, err := wm.GetWorkflowByName(name)
 		if err != nil {
-			util.Errorf("%v\n", err)
+			util.Errorf(cmd, "%v\n", err)
 			return
 		}
 
-		fmt.Printf("%sWorkflow:%s\n", data.HighlightColor, data.ResetSeq)
-		fmt.Printf("%s---%s\n", data.BorderColor, data.ResetSeq)
-		fmt.Printf("%sName: %s%s%s\n", data.LabelColor, data.ResetSeq, name, data.ResetSeq)
-		fmt.Printf("%sDescription: %s%s%s\n", data.LabelColor, data.ResetSeq, desc, data.ResetSeq)
-		fmt.Printf("%s---%s\n%s\n", data.BorderColor, data.ResetSeq, content)
+		util.Printf(cmd, "%sWorkflow:%s\n", data.HighlightColor, data.ResetSeq)
+		util.Printf(cmd, "%s---%s\n", data.BorderColor, data.ResetSeq)
+		util.Printf(cmd, "%sName: %s%s%s\n", data.LabelColor, data.ResetSeq, name, data.ResetSeq)
+		util.Printf(cmd, "%sDescription: %s%s%s\n", data.LabelColor, data.ResetSeq, desc, data.ResetSeq)
+		util.Printf(cmd, "%s---%s\n%s\n", data.BorderColor, data.ResetSeq, content)
 	},
 }
 
@@ -380,7 +380,7 @@ var workflowSetCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		wm := service.GetWorkflowManager()
 		if err := wm.LoadMetadata(replCommandMap); err != nil {
-			util.Errorf("Failed to load workflows: %v\n", err)
+			util.Errorf(cmd, "Failed to load workflows: %v\n", err)
 			return
 		}
 
@@ -390,7 +390,7 @@ var workflowSetCmd = &cobra.Command{
 		} else {
 			names := wm.GetWorkflowNames()
 			if len(names) == 0 {
-				fmt.Println("No workflows to modify.")
+				util.Println(cmd, "No workflows to modify.")
 				return
 			}
 			options := make([]huh.Option[string], len(names))
@@ -413,7 +413,7 @@ var workflowSetCmd = &cobra.Command{
 
 		content, desc, err := wm.GetWorkflowByName(name)
 		if err != nil {
-			util.Errorf("%v\n", err)
+			util.Errorf(cmd, "%v\n", err)
 			return
 		}
 
@@ -433,13 +433,13 @@ var workflowSetCmd = &cobra.Command{
 		editor := getPreferredEditor()
 		tempFile, err := createTempFile(workflowTempFile)
 		if err != nil {
-			util.Errorf("Failed to create temp file: %v\n", err)
+			util.Errorf(cmd, "Failed to create temp file: %v\n", err)
 			return
 		}
 		defer os.Remove(tempFile)
 
 		if err := os.WriteFile(tempFile, []byte(content), 0644); err != nil {
-			util.Errorf("Failed to write to temp file: %v\n", err)
+			util.Errorf(cmd, "Failed to write to temp file: %v\n", err)
 			return
 		}
 
@@ -449,27 +449,27 @@ var workflowSetCmd = &cobra.Command{
 		cmdExec.Stderr = os.Stderr
 
 		if err := cmdExec.Run(); err != nil {
-			util.Errorf("Editor failed: %v\n", err)
+			util.Errorf(cmd, "Editor failed: %v\n", err)
 			return
 		}
 
 		contentBytes, err := os.ReadFile(tempFile)
 		if err != nil {
-			util.Errorf("Failed to read content: %v\n", err)
+			util.Errorf(cmd, "Failed to read content: %v\n", err)
 			return
 		}
 		newContent := strings.TrimSpace(string(contentBytes))
 
 		if newContent == "" {
-			fmt.Println("Empty content, workflow update aborted.")
+			util.Println(cmd, "Empty content, workflow update aborted.")
 			return
 		}
 
 		if err := wm.UpdateWorkflow(name, newDescription, newContent); err != nil {
-			util.Errorf("Failed to update workflow: %v\n", err)
+			util.Errorf(cmd, "Failed to update workflow: %v\n", err)
 			return
 		}
 
-		fmt.Printf("Workflow '/%s' updated successfully.\n", name)
+		util.Printf(cmd, "Workflow '/%s' updated successfully.\n", name)
 	},
 }

@@ -7,8 +7,9 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/util"
+
+	"github.com/activebook/gllm/data"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +21,7 @@ var configCmd = &cobra.Command{
 	Long: `View and manage settings for gllm.
 use 'config path' to see where the settings file is located.`,
 	// Run: func(cmd *cobra.Command, args []string) {
-	// 	fmt.Println("Use 'gllm config [subcommand] --help' for more information.")
+	// 	util.Println(cmd, "Use 'gllm config [subcommand] --help' for more information.")
 	// },
 	// Suggest showing help if 'gllm config' is run without subcommand
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -43,9 +44,9 @@ var configPathCmd = &cobra.Command{
 		// Check if a config file was explicitly loaded by Viper
 		usedCfgFile := store.ConfigFileUsed()
 		if usedCfgFile != "" {
-			fmt.Printf("Configuration file in use: %s\n", usedCfgFile)
+			util.Printf(cmd, "Configuration file in use: %s\n", usedCfgFile)
 		} else {
-			fmt.Printf("No configuration file loaded.\nDefault location is: %s\n", data.GetConfigFilePath())
+			util.Printf(cmd, "No configuration file loaded.\nDefault location is: %s\n", data.GetConfigFilePath())
 		}
 	},
 }
@@ -80,11 +81,11 @@ in the current directory.`,
 
 		// Write the configuration to the file using ConfigStore
 		if err := configStore.Export(exportPath); err != nil {
-			util.Errorf("Error exporting configuration: %s\n", err)
+			util.Errorf(cmd, "Error exporting configuration: %s\n", err)
 			return
 		}
 
-		fmt.Printf("Configuration exported successfully to: %s\n", exportPath)
+		util.Printf(cmd, "Configuration exported successfully to: %s\n", exportPath)
 	},
 }
 
@@ -101,7 +102,7 @@ This will replace the current configuration with the settings from the specified
 
 		// Check if main config file exists
 		if _, err := os.Stat(importFile); os.IsNotExist(err) {
-			util.Errorf("Configuration file does not exist: %s\n", importFile)
+			util.Errorf(cmd, "Configuration file does not exist: %s\n", importFile)
 			return
 		}
 
@@ -109,11 +110,11 @@ This will replace the current configuration with the settings from the specified
 
 		// Import the configuration using ConfigStore
 		if err := storeConfig.Import(importFile); err != nil {
-			util.Errorf("Error importing configuration: %s\n", err)
+			util.Errorf(cmd, "Error importing configuration: %s\n", err)
 			return
 		}
 
-		fmt.Printf("Configuration imported successfully from: %s\n", importFile)
+		util.Printf(cmd, "Configuration imported successfully from: %s\n", importFile)
 	},
 }
 
@@ -127,16 +128,15 @@ var configPrintCmd = &cobra.Command{
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
 		printSection := func(title string) {
-			fmt.Println()
+			util.Println(cmd)
 			fullTitle := fmt.Sprintf("=== %s ===", strings.ToUpper(title))
-			fmt.Printf("%s%s%s\n", data.SectionColor, fullTitle, data.ResetSeq)
+			util.Printf(cmd, "%s%s%s\n", data.SectionColor, fullTitle, data.ResetSeq)
 		}
 
 		// Models section
 		printSection("Models")
 		modelListCmd.Run(modelListCmd, []string{})
 		w.Flush()
-
 
 		// Memory section
 		printSection("Memory")
@@ -150,7 +150,7 @@ var configPrintCmd = &cobra.Command{
 
 		// Plugins section
 		printSection("Tools")
-		ListAllTools()
+		ListAllTools(cmd)
 		w.Flush()
 
 		// Skills section

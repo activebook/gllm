@@ -98,7 +98,7 @@ func (s *SearchEngine) TavilySearch(query string) (map[string]any, error) {
 	// Create a new POST request with the payload
 	req, err := http.NewRequest("POST", TavilyUrl, strings.NewReader(payload))
 	if err != nil {
-		util.Errorf("[Tavily]Error creating request: %v\n", err)
+		util.LogErrorf("[Tavily]Error creating request: %v\n", err)
 		return nil, fmt.Errorf("[Tavily]Error creating request: %v", err)
 	}
 
@@ -109,7 +109,7 @@ func (s *SearchEngine) TavilySearch(query string) (map[string]any, error) {
 	// Execute the request
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		util.Errorf("[Tavily]Error sending request: %v\n", err)
+		util.LogErrorf("[Tavily]Error sending request: %v\n", err)
 		return nil, fmt.Errorf("[Tavily]Error sending request: %v", err)
 	}
 	defer res.Body.Close()
@@ -117,27 +117,27 @@ func (s *SearchEngine) TavilySearch(query string) (map[string]any, error) {
 	// Read the response body
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		util.Errorf("[Tavily]Error reading response: %v\n", err)
+		util.LogErrorf("[Tavily]Error reading response: %v\n", err)
 		return nil, fmt.Errorf("[Tavily]Error reading response: %v", err)
 	}
 
 	if res.StatusCode != 200 {
 		var tavilyError TavilyError
 		if err := json.Unmarshal([]byte(body), &tavilyError); err != nil {
-			util.Errorf("[Tavily]Error parsing JSON: %v\n", err)
+			util.LogErrorf("[Tavily]Error parsing JSON: %v\n", err)
 		}
 		return nil, fmt.Errorf("[Tavily]Error: %s", tavilyError.Detail.Error)
 	}
 
 	var tavilyResp TavilyResponse
 	if err := json.Unmarshal([]byte(body), &tavilyResp); err != nil {
-		util.Errorf("[Tavily]Error parsing JSON: %v\n", err)
+		util.LogErrorf("[Tavily]Error parsing JSON: %v\n", err)
 		return nil, fmt.Errorf("[Tavily]Error parsing JSON: %v", err)
 	}
 
 	formatted, err := s.tavilyFormatResponse(&tavilyResp)
 	if err != nil {
-		util.Errorf("[Tavily]Error formatting response: %v\n", err)
+		util.LogErrorf("[Tavily]Error formatting response: %v\n", err)
 		return nil, fmt.Errorf("[Tavily]Error formatting response: %v", err)
 	}
 	return formatted, nil
@@ -209,13 +209,13 @@ func (s *SearchEngine) GoogleSearch(query string) (map[string]any, error) {
 	ctx := context.Background() // Required for NewService
 	svc, err := customsearch.NewService(ctx, option.WithAPIKey(s.ApiKey))
 	if err != nil {
-		util.Errorf("[Google]Error creating service: %v\n", err)
+		util.LogErrorf("[Google]Error creating service: %v\n", err)
 		return nil, fmt.Errorf("[Google]Error creating service: %v", err)
 	}
 
 	resp, err := svc.Cse.List().Safe("off").Num(10).Cx(s.CxKey).Q(query).Do()
 	if err != nil {
-		util.Errorf("[Google]Error making API call: %v\n", err)
+		util.LogErrorf("[Google]Error making API call: %v\n", err)
 		return nil, fmt.Errorf("[Google]Error making API call: %v", err)
 	}
 

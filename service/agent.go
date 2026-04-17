@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"math"
 
@@ -37,6 +38,7 @@ type ModelInfo struct {
 }
 
 type Agent struct {
+	Ctx             context.Context // Optional completion cancellation context
 	Model           *ModelInfo
 	SystemPrompt    string
 	UserPrompt      string
@@ -44,27 +46,36 @@ type Agent struct {
 	NotifyChan      chan<- StreamNotify // Sub Channel to send notifications
 	DataChan        chan<- StreamData   // Sub Channel to receive streamed text data
 	ProceedChan     <-chan bool         // Sub Channel to receive proceed signal
-	SearchEngine    *SearchEngine       // Search engine name
-	ToolsUse        data.ToolsUse       // Use tools
-	EnabledTools    []string            // List of enabled embedding tools
-	UseCodeTool     bool                // Use code tool
 	ThinkingLevel   ThinkingLevel       // Thinking level: off, low, medium, high
-	MCPClient       *MCPClient          // MCP client for MCP tools
 	MaxRecursions   int                 // Maximum number of recursions for model calls
 	Markdown        *Markdown           // Markdown renderer
 	TokenUsage      *TokenUsage         // Token usage metainfo
-	StdOutput       io.Output           // Standard I/O
-	FileOutput      io.Output           // File I/O
 	Status          StatusStack         // Stack to manage streaming status
 	Session         Session             // Session
 	Context         ContextManager      // Context manager
 	LastWrittenData string              // Last written data
 
+	// Tools
+	SearchEngine *SearchEngine      // Search engine name
+	ToolsUse     data.ToolsUse      // Use tools
+	Interaction  InteractionHandler // Handler for confirmations and prompts
+	EnabledTools []string           // List of enabled embedding tools
+	UseCodeTool  bool               // Use code tool
+	MCPClient    *MCPClient         // MCP client for MCP tools
+
+	// Output triage
+	StdOutput  io.Output     // Standard I/O
+	FileOutput io.Output     // File I/O
+	SSEOutput  *io.SSEOutput // Network I/O for Server-Sent Events
+
 	// Sub-agent orchestration
 	SharedState *data.SharedState // Shared state for inter-agent communication
 	AgentName   string            // Current agent name for metadata tracking
 	ModelName   string            // Current model name of current agent (agent model key)
-	Verbose     bool              // Whether verbose output mode is enabled
+
+	// Output mode
+	Verbose   bool // Whether verbose output mode is enabled
+	QuietMode bool // Whether quiet mode is enabled
 }
 
 func constructModelInfo(model *data.Model) *ModelInfo {
@@ -72,10 +83,10 @@ func constructModelInfo(model *data.Model) *ModelInfo {
 	provider := model.Provider
 	if provider == "" {
 		// Auto-detect provider if not set
-		util.Debugf("Auto-detecting provider for %s\n", model.Model)
+		util.LogDebugf("Auto-detecting provider for %s\n", model.Model)
 		provider = DetectModelProvider(model.Endpoint, model.Model)
 	} else {
-		util.Debugf("Provider: [%s]\n", provider)
+		util.LogDebugf("Provider: [%s]\n", provider)
 	}
 	mi.Model = model.Model
 	mi.Provider = provider
@@ -118,7 +129,7 @@ func constructSearchEngine(capabilities []string) *SearchEngine {
 		}
 	}
 
-	util.Debugf("Search engine: %v, %v\n", se.Name, se.UseSearch)
+	util.LogDebugf("Search engine: %v, %v\n", se.Name, se.UseSearch)
 	return &se
 }
 
@@ -135,7 +146,7 @@ func constructIO(quiet bool, outputFile string) (io.Output, io.Output) {
 		var err error
 		fileIO, err = io.NewFileOutput(outputFile)
 		if err != nil {
-			util.Warnf("failed to create output file %s: %v\n", outputFile, err)
+			util.LogWarnf("failed to create output file %s: %v\n", outputFile, err)
 			return nil, nil
 		}
 	}
@@ -266,19 +277,22 @@ func ConstructSession(sessionName string, provider string) (Session, error) {
 }
 
 type AgentOptions struct {
+	Ctx           context.Context // Context to carry cancellation logic
 	Prompt        string
 	SysPrompt     string
 	Files         []*FileData
 	ModelInfo     *data.Model
 	MaxRecursions int
 	ThinkingLevel string
-	EnabledTools  []string // List of enabled embedding tools
-	Capabilities  []string // List of enabled capabilities
-	YoloMode      bool     // Whether to automatically approve tools
-	QuietMode     bool     // If Quiet mode then don't print to console
-	OutputFile    string   // If OutputFile is set then write to file
+	EnabledTools  []string      // List of enabled embedding tools
+	Capabilities  []string      // List of enabled capabilities
+	YoloMode      bool          // Whether to automatically approve tools
+	QuietMode     bool          // If Quiet mode then don't print to console
+	OutputFile    string        // If OutputFile is set then write to file
+	SSEOutput     *io.SSEOutput // SSE networking adapter
 	SessionName   string
 	MCPConfig     map[string]*data.MCPServer
+	Interaction   InteractionHandler // Handler for confirmations and prompts
 
 	// Sub-agent orchestration fields
 	SharedState *data.SharedState // Shared state for inter-agent communication
@@ -295,7 +309,7 @@ func CallAgent(op *AgentOptions) error {
 	se := constructSearchEngine(op.Capabilities)
 
 	// Set up tools use settings
-	toolsUse := data.ToolsUse{AutoApprove: op.YoloMode, AgentName: op.AgentName}
+	toolsUse := data.ToolsUse{AutoApprove: op.YoloMode}
 
 	// Set up code tool settings
 	exeCode := IsCodeExecutionEnabled()
@@ -311,7 +325,7 @@ func CallAgent(op *AgentOptions) error {
 	if op.MaxRecursions < 0 {
 		op.MaxRecursions = math.MaxInt
 	}
-	util.Debugf("Max session turns:%d\n", op.MaxRecursions)
+	util.LogDebugf("Max session turns:%d\n", op.MaxRecursions)
 
 	// Create a channel to receive notifications
 	notifyCh := make(chan StreamNotify, 10) // Buffer to prevent blocking(used for status updates)
@@ -323,9 +337,8 @@ func CallAgent(op *AgentOptions) error {
 	activeDataCh := dataCh
 
 	// Provide StdRenderer from options
-	// Bug: Before we assigned a nil pointer to an interface, that created an interface with (type=*io.StdOutput, value=nil).
-	// Bugfix: use interfaces, not concrete types
 	stdIO, fileIO := constructIO(op.QuietMode, op.OutputFile)
+
 	if stdIO != nil {
 		defer stdIO.Close()
 	}
@@ -349,7 +362,7 @@ func CallAgent(op *AgentOptions) error {
 		}
 		if err != nil {
 			// MCP load failed, warn but continue without MCP tools
-			util.Warnf("MCP servers unavailable: %v\n", err)
+			util.LogWarnf("MCP servers unavailable: %v\n", err)
 			mc = nil
 		}
 		// We shouldn't clean up MCP client resources when agent exits
@@ -377,6 +390,7 @@ func CallAgent(op *AgentOptions) error {
 	enabledTools := constructEnabledTools(op.EnabledTools, op.Capabilities)
 
 	ag := Agent{
+		Ctx:           op.Ctx,
 		Model:         mi,
 		SystemPrompt:  op.SysPrompt,
 		UserPrompt:    op.Prompt,
@@ -386,6 +400,7 @@ func CallAgent(op *AgentOptions) error {
 		ProceedChan:   proceedCh,
 		SearchEngine:  se,
 		ToolsUse:      toolsUse,
+		Interaction:   op.Interaction,
 		EnabledTools:  enabledTools,
 		UseCodeTool:   exeCode,
 		MCPClient:     mc,
@@ -395,11 +410,18 @@ func CallAgent(op *AgentOptions) error {
 		TokenUsage:    tu,
 		StdOutput:     stdIO,
 		FileOutput:    fileIO,
+		SSEOutput:     op.SSEOutput,
 		Status:        StatusStack{},
 		SharedState:   op.SharedState,
 		AgentName:     op.AgentName,
 		ModelName:     op.ModelName,
 		Verbose:       verboseMode,
+		QuietMode:     op.QuietMode,
+	}
+
+	// If no context is provided, use background context
+	if ag.Ctx == nil {
+		ag.Ctx = context.Background()
 	}
 
 	// Construct session manager
@@ -597,11 +619,11 @@ func CallAgent(op *AgentOptions) error {
 			case StatusFunctionCallingOver:
 				ag.WriteFunctionCallOver()
 				proceedCh <- true
-			case StatusDiffConfirm:
-				ag.WriteDiffConfirm(notify.Data)
+			case StatusShowDiff:
+				ag.WriteDiff(notify.Data)
 				proceedCh <- true
-			case StatusDiffConfirmOver:
-				ag.WriteDiffConfirm("") // just write a newline
+			case StatusShowDiffOver:
+				ag.WriteDiff("") // just write a newline
 				proceedCh <- true
 			}
 

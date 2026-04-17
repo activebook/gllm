@@ -2,7 +2,7 @@
 package cmd
 
 import (
-	"fmt"
+	"github.com/activebook/gllm/util"
 	// No need for "runtime" import here anymore
 
 	"github.com/spf13/cobra"
@@ -26,6 +26,6 @@ var versionCmd = &cobra.Command{
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(version)
+		util.Println(cmd, version)
 	},
 }

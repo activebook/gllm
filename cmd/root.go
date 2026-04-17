@@ -65,20 +65,20 @@ Configure your API keys and preferred models, then start chatting or executing c
 			if !store.ConfigExists() {
 				// Config missing!
 				// Ask user if they want to setup
-				fmt.Println("Configuration file not found.")
+				util.Println(cmd, "Configuration file not found.")
 				// We can't use 'huh' here easily without importing it, but since we are in 'cmd', we can call RunInitWizard
 				// But we need to ask permission first?
 				// Let's call RunInitWizard directly which has a "Welcome" note.
 				// Or ask for confirmation first.
 
 				// Standard simple confirm before launching full TUI
-				fmt.Print("Would you like to run the setup wizard now? [Y/n]: ")
+				util.Print(cmd, "Would you like to run the setup wizard now? [Y/n]: ")
 				var response string
 				fmt.Scanln(&response) // Simple scan
 				response = strings.ToLower(strings.TrimSpace(response))
 
 				if response == "" || response == "y" || response == "yes" {
-					return RunInitWizard()
+					return RunInitWizard(cmd)
 				}
 
 				return fmt.Errorf("configuration required to proceed. Run 'gllm init' to setup")
@@ -89,7 +89,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 		Run: func(cmd *cobra.Command, args []string) {
 			// Your main command logic goes here
 			// For example, you can print a message or perform some action
-			util.Debugf("Start processing...\n")
+			util.LogDebugf("Start processing...\n")
 			//service.Debugf("Arguments received: %#v\n", args)
 
 			// If no arguments and no relevant flags are set, show help instead
@@ -102,14 +102,14 @@ Configure your API keys and preferred models, then start chatting or executing c
 				// Default to interactive REPL mode when no prompt or subcommand is provided.
 				// -g/--agent and -s/--session are forwarded via shared package-level globals.
 				if err := replCmd.RunE(replCmd, args); err != nil {
-					util.Errorf("%v\n", err)
+					util.Errorf(cmd, "%v\n", err)
 				}
 				return
 			}
 
 			// print version
 			if len(args) == 0 && versionFlag {
-				fmt.Printf("%s\n", version)
+				util.Printf(cmd, "%s\n", version)
 				return
 			}
 
@@ -133,7 +133,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 				// Bugfix: When sessionName is an index number, and use it to find session file
 				name, err := service.FindSessionByIndex(sessionName)
 				if err != nil {
-					util.Errorf("error finding session: %v\n", err)
+					util.Errorf(cmd, "error finding session: %v\n", err)
 					return
 				}
 				if name != "" {
@@ -146,7 +146,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 			if cmd.Flags().Changed("agent") {
 				// Check if agent exists
 				if store.GetAgent(agentName) == nil {
-					util.Errorf("Agent %s does not exist\n", agentName)
+					util.Errorf(cmd, "Agent %s does not exist\n", agentName)
 					return
 				}
 				store.SetActiveAgent(agentName)
@@ -154,7 +154,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 			// Get active agent
 			activeAgent := store.GetActiveAgent()
 			if activeAgent == nil {
-				util.Errorf("No active agent found\n")
+				util.Errorf(cmd, "No active agent found\n")
 				return
 			}
 
@@ -170,7 +170,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 			// Call agent using the shared runner, passing nil for SharedState (single turn)
 			err := RunAgent(prompt, "", files, sessionName, "", nil)
 			if err != nil {
-				util.Errorf("%v\n", err)
+				util.Errorf(cmd, "%v\n", err)
 				return
 			}
 		},
@@ -194,7 +194,7 @@ func Execute() {
 	// Actually, we don't need to Close it, because the process would exit
 	// defer service.GetMCPClient().Close()
 	if err := rootCmd.Execute(); err != nil {
-		util.Errorf("'%s'\n", err)
+		util.LogErrorf("'%s'\n", err)
 		os.Exit(1)
 	}
 }
@@ -377,7 +377,7 @@ func setupLogging() {
 		var err error
 		level, err = log.ParseLevel(logLevelStr)
 		if err != nil {
-			util.Warnf("Invalid log level '%s' in config, using 'info': %v\n", logLevelStr, err)
+			util.LogWarnf("Invalid log level '%s' in config, using 'info': %v\n", logLevelStr, err)
 			level = log.InfoLevel
 			logLevelStr = "info (due to invalid config value)"
 		} else {
@@ -386,5 +386,5 @@ func setupLogging() {
 	util.SetLoggerLevel(level)
 
 	// Log the final configuration being used (at Debug level)
-	util.Debugf("Logger initialized: level=%s\n", logLevelStr)
+	util.LogDebugf("Logger initialized: level=%s\n", logLevelStr)
 }

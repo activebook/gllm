@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/io"
+	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -18,7 +20,7 @@ var editorCmd = &cobra.Command{
 	Use:   "editor [NAME]",
 	Short: "Manage preferred text editor for multi-line input",
 	Run: func(cmd *cobra.Command, args []string) {
-		listAvailableEditors()
+		listAvailableEditors(cmd)
 	},
 }
 
@@ -68,7 +70,7 @@ var editorSwitchCmd = &cobra.Command{
 			}
 		}
 
-		return setPreferredEditor(name)
+		return setPreferredEditor(cmd, name)
 	},
 }
 
@@ -105,12 +107,12 @@ func getPreferredEditor() string {
 }
 
 // setPreferredEditor sets the user's preferred editor in config
-func setPreferredEditor(editor string) error {
+func setPreferredEditor(cmd *cobra.Command, editor string) error {
 	store := data.GetSettingsStore()
 
 	// Check if editor exists
 	if _, err := exec.LookPath(editor); err != nil {
-		fmt.Printf("Editor '%s' is not found in PATH.\n", editor)
+		util.Printf(cmd, "Editor '%s' is not found in PATH.\n", editor)
 
 		// Find the best available editor (ignoring current config)
 		var bestEditor string
@@ -139,7 +141,7 @@ func setPreferredEditor(editor string) error {
 			bestEditor = "vim"
 		}
 
-		fmt.Printf("Using '%s' instead.\n", bestEditor)
+		util.Printf(cmd, "Using '%s' instead.\n", bestEditor)
 		if err := store.SetEditor(bestEditor); err != nil {
 			return fmt.Errorf("failed to save preferred editor: %w", err)
 		}
@@ -148,16 +150,16 @@ func setPreferredEditor(editor string) error {
 		if err := store.SetEditor(editor); err != nil {
 			return fmt.Errorf("failed to save preferred editor: %w", err)
 		}
-		fmt.Printf("Preferred editor set to: %s\n", editor)
+		util.Printf(cmd, "Preferred editor set to: %s\n", editor)
 	}
 
 	return nil
 }
 
 // listAvailableEditors shows all available editors
-func listAvailableEditors() {
-	fmt.Println("Available editors:")
-	fmt.Println()
+func listAvailableEditors(cmd *cobra.Command) {
+	var sb strings.Builder
+	sb.WriteString("Available editors:\n\n")
 
 	commonEditors := []string{"vim", "vi", "nvim", "neovim", "nano", "pico", "emacs", "emacsclient", "code", "code-insiders", "subl", "sublime_text", "atom", "gedit", "pluma", "kate", "kwrite", "notepad.exe", "notepad++", "textedit"}
 	store := data.GetSettingsStore()
@@ -167,15 +169,17 @@ func listAvailableEditors() {
 		enableIndicator := ui.FormatEnabledIndicator(editor == current)
 		if _, err := exec.LookPath(editor); err == nil {
 			pname := editor
-			fmt.Printf("  %s %-14s %s%s%s\n", enableIndicator, pname, data.SwitchOnColor, "(installed)", data.ResetSeq)
+			fmt.Fprintf(&sb, "  %s %-14s %s%s%s\n", enableIndicator, pname, data.SwitchOnColor, "(installed)", data.ResetSeq)
 		} else {
-			fmt.Printf("  %s %-14s %s%s%s\n", enableIndicator, editor, data.SwitchOffColor, "(not found)", data.ResetSeq)
+			fmt.Fprintf(&sb, "  %s %-14s %s%s%s\n", enableIndicator, editor, data.SwitchOffColor, "(not found)", data.ResetSeq)
 		}
 	}
 
 	if current != "" {
-		fmt.Printf("\n%s = Current preferred editor\n", ui.FormatEnabledIndicator(true))
+		fmt.Fprintf(&sb, "\n%s = Current preferred editor\n", ui.FormatEnabledIndicator(true))
 	} else {
-		fmt.Println("\nNo preferred editor set. Use 'gllm editor switch' to select one.")
+		sb.WriteString("\nNo preferred editor set. Use 'gllm editor switch' to select one.\n")
 	}
+
+	util.Print(cmd, sb.String())
 }

@@ -31,12 +31,20 @@ var DefaultModelLimits = ModelLimits{
 	MaxOutputTokens: 8192,
 }
 
-// stripDateStamp removes trailing date/version stamps from model names.
+// stripDateStamp removes trailing numeric date/version stamps from model names.
 // Handles patterns like: -2024-05-13, -08-2024, -2512, -0528, -20250514
 var dateStampRe = regexp.MustCompile(`(-\d{4}-\d{2}-\d{2}|-\d{2}-\d{4}|-\d{4,8})$`)
 
 func stripDateStamp(name string) string {
 	return dateStampRe.ReplaceAllString(name, "")
+}
+
+// stripVersionSuffix removes trailing semantic version/release labels from model names.
+// Handles patterns like: -preview, -latest, -beta, -exp, -stable, -rc.
+var versionSuffixRe = regexp.MustCompile(`-(preview|latest|beta|exp|stable|rc)(\d*)$`)
+
+func stripVersionSuffix(name string) string {
+	return versionSuffixRe.ReplaceAllString(name, "")
 }
 
 // MaxInputTokens calculates the maximum input tokens with a safety buffer.
@@ -61,26 +69,31 @@ func NormalizeModelName(configModelName string) string {
 	return parts[len(parts)-1]
 }
 
-// findBestMatch searches the remote model index for the best matching entry.
+// findBestModelMatch searches the remote model index for the best matching entry.
 // Tiered strategy:
-//  1. Exact match (case-insensitive)
+//  1. Exact match (input is already lowercased by the caller)
 //  2. Date-stamp-stripped match (strips trailing date patterns like -2024-05-13, -2512)
-//  3. Prefix match: input starts with index entry name — NOT the reverse, to prevent
+//  3. Version-suffix-stripped match (strips -preview, -beta, -exp, -stable, etc.)
+//  4. Prefix match: input starts with index entry name — NOT the reverse, to prevent
 //     short/generic index entries ("free", "auto", "router") from spuriously matching.
 //     Entry name must be >= 6 chars as an additional guard.
+//  5. Reverse-prefix match: index entry starts with input name, allowing a canonical
+//     name (e.g. "gemini-3-flash") to match a specific variant ("gemini-3-flash-preview").
+//     Guard: input must be >= 10 chars and the match must occur at a word boundary.
 //
 // Returns nil if no confident match is found.
 func findBestModelMatch(name string, index []remoteModelIndexEntry) *remoteModelIndexEntry {
 	inputDateStripped := stripDateStamp(name)
+	inputFullyStripped := stripVersionSuffix(inputDateStripped)
 
-	// Phase 1: Exact match
+	// Phase 1: Exact match (caller is responsible for lowercasing the input)
 	for i, entry := range index {
 		if strings.ToLower(entry.Name) == name {
 			return &index[i]
 		}
 	}
 
-	// Phase 2: Match after stripping trailing date stamps
+	// Phase 2: Match after stripping trailing numeric date stamps
 	// e.g. "gpt-4o-2024-08-06" -> "gpt-4o" matches index entry "gpt-4o"
 	// e.g. "command-r-08-2024" -> "command-r" matches index entry "command-r"
 	for i, entry := range index {
@@ -90,13 +103,38 @@ func findBestModelMatch(name string, index []remoteModelIndexEntry) *remoteModel
 		}
 	}
 
-	// Phase 3: Input is a more specific variant of an index entry.
+	// Phase 3: Match after stripping trailing semantic version suffixes
+	// e.g. "gemini-2.5-pro-preview" -> "gemini-2.5-pro" matches index entry "gemini-2.5-pro"
+	for i, entry := range index {
+		entryFullyStripped := stripVersionSuffix(stripDateStamp(strings.ToLower(entry.Name)))
+		if entryFullyStripped == inputFullyStripped {
+			return &index[i]
+		}
+	}
+
+	// Phase 4: Input is a more specific variant of an index entry.
 	// e.g. "gpt-4o-mini-2024-07-18" starts with index entry "gpt-4o-mini"
 	// Guard: entry must be >= 6 chars to block generic names like "free", "auto", "router"
 	for i, entry := range index {
 		entryLower := strings.ToLower(entry.Name)
 		if len(entryLower) >= 6 && strings.HasPrefix(inputDateStripped, entryLower) {
 			return &index[i]
+		}
+	}
+
+	// Phase 5: Reverse-prefix — index entry is a more specific variant of the input.
+	// e.g. input "gemini-3-flash" matches index entry "gemini-3-flash-preview"
+	// Guards:
+	//   - Input must be >= 10 chars to avoid false positives from short generic names.
+	//   - Match must occur at a word boundary (next char in entry is '-') to prevent
+	//     partial token matches like "gemini-3-flas" spuriously matching "gemini-3-flash".
+	for i, entry := range index {
+		entryLower := strings.ToLower(entry.Name)
+		if len(name) >= 10 && strings.HasPrefix(entryLower, name) {
+			// Verify boundary: entry must extend with '-' (not a mid-token match)
+			if len(entryLower) == len(name) || entryLower[len(name)] == '-' {
+				return &index[i]
+			}
 		}
 	}
 

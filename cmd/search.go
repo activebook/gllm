@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/activebook/gllm/util"
+
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
@@ -26,14 +28,14 @@ You can switch to use which search engine.`,
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(cmd.Long)
+		util.Println(cmd, cmd.Long)
 		settings := data.GetSettingsStore()
 		defaultEngine := settings.GetAllowedSearchEngine()
-		fmt.Println()
+		util.Println(cmd)
 		if defaultEngine != "" {
-			fmt.Printf("Current search engine set to %s%s%s\n", data.SwitchOnColor, defaultEngine, data.ResetSeq)
+			util.Printf(cmd, "Current search engine set to %s%s%s\n", data.SwitchOnColor, defaultEngine, data.ResetSeq)
 		} else {
-			fmt.Println("No search engine set.")
+			util.Println(cmd, "No search engine set.")
 		}
 	},
 }
@@ -95,9 +97,9 @@ var searchSwitchCmd = &cobra.Command{
 		}
 
 		if engine == service.NoneSearchEngine {
-			fmt.Println("Search engine disabled.")
+			util.Println(cmd, "Search engine disabled.")
 		} else {
-			fmt.Printf("Switched search engine to: %s\n", engine)
+			util.Printf(cmd, "Switched search engine to: %s\n", engine)
 		}
 
 		return nil
@@ -289,7 +291,7 @@ var searchSetCmd = &cobra.Command{
 			return fmt.Errorf("failed to save %s config: %w", engine, err)
 		}
 
-		fmt.Printf("Configuration for '%s' saved successfully.\n", engine)
+		util.Printf(cmd, "Configuration for '%s' saved successfully.\n", engine)
 		return nil
 	},
 }
@@ -301,8 +303,8 @@ var searchListCmd = &cobra.Command{
 	Aliases: []string{"ls"},
 	Long:    `Display details for all configured search engines.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Configured Search Engines:")
-		fmt.Println()
+		util.Println(cmd, "Configured Search Engines:")
+		util.Println(cmd)
 
 		store := data.NewConfigStore()
 		engines := store.GetSearchEngines()
@@ -310,49 +312,49 @@ var searchListCmd = &cobra.Command{
 		// Google
 		googleConfig := engines[service.GoogleSearchEngine]
 		if googleConfig != nil {
-			fmt.Println("Google Search:")
-			// fmt.Printf("  API Key: %s\n", maskAPIKey(googleConfig.Config["key"]))
-			// fmt.Printf("  CX: %s\n", maskAPIKey(googleConfig.Config["cx"]))
-			fmt.Println("  DeepDive limit: ", googleConfig.DeepDive)
-			fmt.Println("  Max References: ", googleConfig.Reference)
-			fmt.Println("  Quota: 100 searches per day (free tier)")
+			util.Println(cmd, "Google Search:")
+			// util.Printf(cmd, "  API Key: %s\n", maskAPIKey(googleConfig.Config["key"]))
+			// util.Printf(cmd, "  CX: %s\n", maskAPIKey(googleConfig.Config["cx"]))
+			util.Println(cmd, "  DeepDive limit: ", googleConfig.DeepDive)
+			util.Println(cmd, "  Max References: ", googleConfig.Reference)
+			util.Println(cmd, "  Quota: 100 searches per day (free tier)")
 		}
 
 		// Tavily
 		tavilyConfig := engines[service.TavilySearchEngine]
 		if tavilyConfig != nil {
-			fmt.Println("Tavily Search:")
-			// fmt.Printf("  API Key: %s\n", maskAPIKey(tavilyConfig.Config["key"]))
-			fmt.Println("  DeepDive limit: ", tavilyConfig.DeepDive)
-			fmt.Println("  Max References: ", tavilyConfig.Reference)
-			fmt.Println("  Quota: 1000 searches per month (free tier)")
+			util.Println(cmd, "Tavily Search:")
+			// util.Printf(cmd, "  API Key: %s\n", maskAPIKey(tavilyConfig.Config["key"]))
+			util.Println(cmd, "  DeepDive limit: ", tavilyConfig.DeepDive)
+			util.Println(cmd, "  Max References: ", tavilyConfig.Reference)
+			util.Println(cmd, "  Quota: 1000 searches per month (free tier)")
 		}
 
 		// Bing
 		bingConfig := engines[service.BingSearchEngine]
 		if bingConfig != nil {
-			fmt.Println("Bing Search:")
-			// fmt.Printf("  API Key: %s\n", maskAPIKey(bingConfig.Config["key"]))
-			fmt.Println("  DeepDive limit: ", bingConfig.DeepDive)
-			fmt.Println("  Max References: ", bingConfig.Reference)
-			fmt.Println("  Quota: 100 searches per month (free tier) - SerpAPI")
+			util.Println(cmd, "Bing Search:")
+			// util.Printf(cmd, "  API Key: %s\n", maskAPIKey(bingConfig.Config["key"]))
+			util.Println(cmd, "  DeepDive limit: ", bingConfig.DeepDive)
+			util.Println(cmd, "  Max References: ", bingConfig.Reference)
+			util.Println(cmd, "  Quota: 100 searches per month (free tier) - SerpAPI")
 		}
 
 		if (googleConfig == nil || googleConfig.Config["key"] == "") &&
 			(tavilyConfig == nil || tavilyConfig.Config["key"] == "") &&
 			(bingConfig == nil || bingConfig.Config["key"] == "") {
-			fmt.Println("No search engines are currently configured.")
-			fmt.Println("Use 'gllm search [engine] --key YOUR_KEY' to configure.")
+			util.Println(cmd, "No search engines are currently configured.")
+			util.Println(cmd, "Use 'gllm search [engine] --key YOUR_KEY' to configure.")
 		}
 
-		fmt.Println()
+		util.Println(cmd)
 
 		// Update the list command to show default status
 		defaultEngine := GetEffectSearchEngineName()
 		if defaultEngine != "" {
-			fmt.Printf("Current search engine set to %s%s%s%s%s\n", data.SwitchOnColor, defaultEngine, data.ResetSeq, "", "")
+			util.Printf(cmd, "Current search engine set to %s%s%s%s%s\n", data.SwitchOnColor, defaultEngine, data.ResetSeq, "", "")
 		} else {
-			fmt.Println("No search engine set.")
+			util.Println(cmd, "No search engine set.")
 		}
 	},
 }

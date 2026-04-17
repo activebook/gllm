@@ -1,12 +1,11 @@
 package cmd
 
 import (
-	"fmt"
+	"github.com/activebook/gllm/util"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/service"
-	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -38,7 +37,7 @@ The actual behavior depends on the model provider:
 		store := data.NewConfigStore()
 		agent := store.GetActiveAgent()
 		if agent == nil {
-			fmt.Println("No active agent found")
+			util.Println(cmd, "No active agent found")
 			return
 		}
 
@@ -47,16 +46,16 @@ The actual behavior depends on the model provider:
 			level := service.ParseThinkingLevel(args[0])
 			agent.Think = string(level)
 			if err := store.SetAgent(agent.Name, agent); err != nil {
-				util.Errorf("failed to save thinking level: %v\n", err)
+				util.Errorf(cmd, "failed to save thinking level: %v\n", err)
 				return
 			}
-			fmt.Printf("Thinking level: %s\n", level.Display())
+			util.Printf(cmd, "Thinking level: %s\n", level.Display())
 			return
 		}
 
 		// No argument - display current level
 		level := service.ParseThinkingLevel(agent.Think)
-		fmt.Printf("Thinking level: %s\n", level.Display())
+		util.Printf(cmd, "Thinking level: %s\n", level.Display())
 	},
 }
 
@@ -69,7 +68,7 @@ var thinkSwitchCmd = &cobra.Command{
 		store := data.NewConfigStore()
 		agent := store.GetActiveAgent()
 		if agent == nil {
-			fmt.Println("No active agent found")
+			util.Println(cmd, "No active agent found")
 			return
 		}
 
@@ -104,10 +103,10 @@ var thinkSwitchCmd = &cobra.Command{
 		level := service.ParseThinkingLevel(selected)
 		agent.Think = string(level)
 		if err := store.SetAgent(agent.Name, agent); err != nil {
-			util.Errorf("failed to save thinking level: %v\n", err)
+			util.Errorf(cmd, "failed to save thinking level: %v\n", err)
 			return
 		}
-		fmt.Printf("Thinking level: %s\n", level.Display())
+		util.Printf(cmd, "Thinking level: %s\n", level.Display())
 	},
 }
 

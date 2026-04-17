@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"slices"
 
 	"github.com/activebook/gllm/data"
@@ -66,15 +65,6 @@ type OpenFunctionDefinition struct {
 }
 
 const (
-	// ToolRespConfirmShell is the template for the response to the user before executing a command.
-	ToolRespConfirmShell = "```\n%s\n```\n%s"
-
-	// ToolRespShellOutput is the template for the response to the user after executing a command.
-	ToolRespShellOutput = `shell executed: %s
-Status:
-%s
-%s`
-
 	ToolUserConfirmPrompt = "Do you want to proceed?"
 
 	// ToolRespConfirmEdityFile is the template for the response to the user before modifying a file, including the diff.
@@ -370,12 +360,12 @@ func RemovePlanTools(tools []string) []string {
 }
 
 // GetOpenToolsFiltered returns tools filtered by the allowed list.
-// If allowedTools is nil or empty, returns all tools.
+// If allowedTools is nil or empty, returns nil (no tools). This adheres to the Principle of Least Privilege.
 // Unknown tool names are gracefully ignored.
 func GetOpenToolsFiltered(allowedTools []string) []*OpenTool {
 	allTools := getOpenTools()
 
-	// If no filter specified, return all tools
+	// If no filter specified, return no tools (secure by default)
 	if len(allowedTools) == 0 {
 		return nil
 	}
@@ -469,91 +459,127 @@ func (ot *OpenTool) ToAnthropicTool() anthropic.ToolUnionParam {
 
 // ToGeminiFunctions converts a GenericTool to a genai.Tool
 func (ot *OpenTool) ToGeminiFunctions() *genai.FunctionDeclaration {
-	// Convert parameters from map[string]interface{} to *genai.Schema
-	properties := make(map[string]*genai.Schema)
+	schema := toGeminiSchema(ot.Function.Parameters)
+	// Gemini requires FunctionDeclaration.Parameters to be TypeObject
+	if schema.Type == "" {
+		schema.Type = genai.TypeObject
+	}
+	return &genai.FunctionDeclaration{
+		Name:        ot.Function.Name,
+		Description: ot.Function.Description,
+		Parameters:  schema,
+	}
+}
 
-	// Extract properties from the OpenTool parameters
-	if props, ok := ot.Function.Parameters["properties"].(map[string]interface{}); ok {
+// toGeminiSchema recursively converts a JSON-schema-like map to a *genai.Schema.
+func toGeminiSchema(params map[string]interface{}) *genai.Schema {
+	schema := &genai.Schema{}
+
+	// Set Type
+	if typeVal, ok := params["type"].(string); ok {
+		switch typeVal {
+		case "string":
+			schema.Type = genai.TypeString
+		case "integer":
+			schema.Type = genai.TypeInteger
+		case "number":
+			schema.Type = genai.TypeNumber
+		case "boolean":
+			schema.Type = genai.TypeBoolean
+		case "array":
+			schema.Type = genai.TypeArray
+		case "object":
+			schema.Type = genai.TypeObject
+		}
+	}
+
+	// Set Description
+	if descVal, ok := params["description"].(string); ok {
+		schema.Description = descVal
+	}
+
+	// Set Format
+	if formatVal, ok := params["format"].(string); ok {
+		schema.Format = formatVal
+	}
+
+	// Set Nullable
+	if nullableVal, ok := params["nullable"].(bool); ok {
+		schema.Nullable = &nullableVal
+	}
+
+	// Set Default
+	if defaultVal, ok := params["default"]; ok {
+		schema.Default = defaultVal
+	}
+
+	// Set Enum
+	if enumVal, ok := params["enum"]; ok {
+		if enumSlice, ok := enumVal.([]interface{}); ok {
+			var enumStrs []string
+			for _, e := range enumSlice {
+				if str, ok := e.(string); ok {
+					enumStrs = append(enumStrs, str)
+				}
+			}
+			schema.Enum = enumStrs
+		} else if enumStrSlice, ok := enumVal.([]string); ok {
+			schema.Enum = enumStrSlice
+		}
+	}
+
+	// Set Properties (Recursive for Object)
+	if props, ok := params["properties"].(map[string]interface{}); ok {
+		schema.Properties = make(map[string]*genai.Schema)
 		for key, value := range props {
 			if propMap, ok := value.(map[string]interface{}); ok {
-				schema := &genai.Schema{}
-				if typeVal, ok := propMap["type"]; ok {
-					switch typeVal {
-					case "string":
-						schema.Type = genai.TypeString
-					case "integer":
-						schema.Type = genai.TypeInteger
-					case "boolean":
-						schema.Type = genai.TypeBoolean
-					case "array":
-						schema.Type = genai.TypeArray
-					case "object":
-						schema.Type = genai.TypeObject
-					}
-				}
-				if descVal, ok := propMap["description"]; ok {
-					if descStr, ok := descVal.(string); ok {
-						schema.Description = descStr
-					}
-				}
-				if defaultVal, ok := propMap["default"]; ok {
-					schema.Default = defaultVal
-				}
-				if enumVal, ok := propMap["enum"]; ok {
-					if enumSlice, ok := enumVal.([]interface{}); ok {
-						var enumStrs []string
-						for _, e := range enumSlice {
-							if str, ok := e.(string); ok {
-								enumStrs = append(enumStrs, str)
-							}
-						}
-						schema.Enum = enumStrs
-					} else if enumStrSlice, ok := enumVal.([]string); ok {
-						schema.Enum = enumStrSlice
-					}
-				}
-				if itemsVal, ok := propMap["items"]; ok {
-					if itemsMap, ok := itemsVal.(map[string]interface{}); ok {
-						itemSchema := &genai.Schema{}
-						if typeVal, ok := itemsMap["type"]; ok {
-							switch typeVal {
-							case "string":
-								itemSchema.Type = genai.TypeString
-							case "integer":
-								itemSchema.Type = genai.TypeInteger
-							case "boolean":
-								itemSchema.Type = genai.TypeBoolean
-							}
-						}
-						schema.Items = itemSchema
-					}
-				}
-				properties[key] = schema
+				schema.Properties[key] = toGeminiSchema(propMap)
 			}
 		}
 	}
 
-	// Handle required fields
-	var required []string
-	if req, ok := ot.Function.Parameters["required"].([]string); ok {
-		required = req
-	} else if req, ok := ot.Function.Parameters["required"].([]interface{}); ok {
+	// Set Items (Recursive for Array)
+	if itemsVal, ok := params["items"].(map[string]interface{}); ok {
+		schema.Items = toGeminiSchema(itemsVal)
+	}
+
+	// Set MinItems / MaxItems
+	if v, ok := params["minItems"]; ok {
+		n := toInt64(v)
+		schema.MinItems = &n
+	}
+	if v, ok := params["maxItems"]; ok {
+		n := toInt64(v)
+		schema.MaxItems = &n
+	}
+
+	// Set Required
+	if req, ok := params["required"].([]string); ok {
+		schema.Required = req
+	} else if req, ok := params["required"].([]interface{}); ok {
+		var required []string
 		for _, r := range req {
 			if s, ok := r.(string); ok {
 				required = append(required, s)
 			}
 		}
+		schema.Required = required
 	}
 
-	return &genai.FunctionDeclaration{
-		Name:        ot.Function.Name,
-		Description: ot.Function.Description,
-		Parameters: &genai.Schema{
-			Type:       genai.TypeObject,
-			Properties: properties,
-			Required:   required,
-		},
+	return schema
+}
+
+// toInt64 safely converts JSON numeric types to int64.
+func toInt64(v interface{}) int64 {
+	switch n := v.(type) {
+	case float64:
+		return int64(n)
+	case int:
+		return int64(n)
+	case int64:
+		return n
 	}
+	return 0
 }
 
 // getOpenTools returns the tools for all models
@@ -1679,17 +1705,18 @@ Use this tool when your planning phase is complete, and you require the reinstat
 // - It manages the context, notifications, data streaming, and tool usage
 // - It handles queries and references, and maintains the status stack
 type OpenProcessor struct {
-	ctx        context.Context
-	notify     chan<- StreamNotify      // Sub Channel to send notifications
-	data       chan<- StreamData        // Sub Channel to send data
-	proceed    <-chan bool              // Main Channel to receive proceed signal
-	search     *SearchEngine            // Search engine
-	toolsUse   *data.ToolsUse           // Use tools
-	queries    []string                 // List of queries to be sent to the AI assistant
-	references []map[string]interface{} // keep track of the references
-	status     *StatusStack             // Stack to manage streaming status
-	mcpClient  *MCPClient               // MCP client for MCP tool calls
-	fileHooks  FileHooks                // lifecycle hooks for file write/edit events
+	notify      chan<- StreamNotify      // Sub Channel to send notifications
+	data        chan<- StreamData        // Sub Channel to send data
+	proceed     <-chan bool              // Main Channel to receive proceed signal
+	search      *SearchEngine            // Search engine
+	toolsUse    *data.ToolsUse           // Use tools
+	interaction InteractionHandler       // Handle interactive dialogs
+	quiet       bool                     // Whether to suppress console output
+	queries     []string                 // List of queries to be sent to the AI assistant
+	references  []map[string]interface{} // keep track of the references
+	status      *StatusStack             // Stack to manage streaming status
+	mcpClient   *MCPClient               // MCP client for MCP tool calls
+	fileHooks   FileHooks                // lifecycle hooks for file write/edit events
 
 	// Sub-agent orchestration
 	sharedState *data.SharedState // Shared state for inter-agent communication
@@ -1698,16 +1725,17 @@ type OpenProcessor struct {
 }
 
 // Diff confirm func
-func (op *OpenProcessor) showDiffConfirm(diff string) {
+func (op *OpenProcessor) showDiff(diff string) {
 	// Function call is over
 	op.status.ChangeTo(op.notify, StreamNotify{Status: StatusFunctionCallingOver}, op.proceed)
 
-	// Show the diff confirm
-	op.status.ChangeTo(op.notify, StreamNotify{Data: diff, Status: StatusDiffConfirm}, op.proceed)
+	// Show the diff
+	op.status.ChangeTo(op.notify, StreamNotify{Data: diff, Status: StatusShowDiff}, op.proceed)
 }
 
 // Diff close func
-func (op *OpenProcessor) closeDiffConfirm() {
-	// Confirm diff is over
-	op.status.ChangeTo(op.notify, StreamNotify{Status: StatusDiffConfirmOver}, op.proceed)
+func (op *OpenProcessor) closeDiff() {
+	// close diff just change status to show diff over
+	// because in terminal, the diff cannot be closed
+	op.status.ChangeTo(op.notify, StreamNotify{Status: StatusShowDiffOver}, op.proceed)
 }

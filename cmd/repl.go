@@ -2,13 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"runtime"
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
@@ -80,7 +78,7 @@ have a continuous session with the model.`,
 		ui.GetIndicator().Stop()
 
 		// Start the REPL
-		ri.startREPL()
+		ri.startREPL(cmd)
 		return nil
 	},
 }
@@ -103,75 +101,12 @@ func init() {
 
 type ReplInfo struct {
 	Files          []*service.FileData
-	QuitFlag       bool     // for cmd /quit or /exit
-	EditorInput    string   // for /e editor edit
-	Guideline      string   // for underlying guideline (e.g. skill activation)
-	History        []string // for input history
-	outputFile     string
+	QuitFlag       bool              // for cmd /quit or /exit
+	EditorInput    string            // for /e editor edit
+	Guideline      string            // for underlying guideline (e.g. skill activation)
+	History        []string          // for input history
 	sharedState    *data.SharedState // Persistent SharedState for the session
 	autoRenameOnce sync.Once         // ensures auto-rename fires at most once per REPL session
-}
-
-func (ri *ReplInfo) printWelcome() {
-	termWidth := io.GetTerminalWidth()
-	safeWidth := max(40, termWidth-4)
-
-	borderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(data.BorderHex)).
-		Width(safeWidth).
-		Margin(0, 1).
-		Padding(0, 1)
-
-	innerWidth := safeWidth - borderStyle.GetHorizontalFrameSize()
-
-	// Split into left (~40%) and right (~60%) columns
-	leftWidth := innerWidth * 40 / 100
-	rightWidth := innerWidth - leftWidth
-
-	// --- Left panel: logo + welcome ---
-	logo := ui.GetLogo(data.KeyHex, data.LabelHex, 0.5)
-	welcomeText := logo + "\nWelcome back!\n" + data.DetailColor + " (v" + version + ")" + data.ResetSeq
-
-	leftContent := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color(data.KeyHex)).
-		Width(leftWidth).
-		Align(lipgloss.Center).
-		Padding(1, 1, 0, 1).
-		Margin(0, 0, 0, 0).
-		Render(welcomeText)
-
-	specs := []string{}
-	for cmd, desc := range replSpecMap {
-		specs = append(specs, fmt.Sprintf("• %s: %s", cmd, desc))
-	}
-	sort.Strings(specs)
-
-	rightContent := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(data.LabelHex)).
-		Width(rightWidth).
-		Align(lipgloss.Left).
-		Padding(0, 0, 0, 2).
-		Render(strings.Join(specs, "\n"))
-
-	// --- Combine panels horizontally ---
-	inner := lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		leftContent,
-		rightContent,
-	)
-
-	banner := borderStyle.Render(inner)
-	fmt.Println(banner)
-
-	hintStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(data.DetailHex)).
-		Width(safeWidth).
-		Align(lipgloss.Center).
-		Italic(true)
-	fmt.Println(hintStyle.Padding(0, 2).Render("Type your message below and press Enter to send."))
-	fmt.Println()
 }
 
 // This is the new awaitInput function, which uses bubbletea, support auto-complete
@@ -281,7 +216,7 @@ func (ri *ReplInfo) getChatInputHooks(agent *data.AgentConfig) ui.ChatInputHooks
 	}
 }
 
-func (ri *ReplInfo) startREPL() {
+func (ri *ReplInfo) startREPL(cmd *cobra.Command) {
 	// Initialize SharedState for the session
 	ri.sharedState = data.NewSharedState()
 	defer ri.sharedState.Clear()
@@ -289,8 +224,8 @@ func (ri *ReplInfo) startREPL() {
 	// Set auto approve for the session
 	data.SetYoloModeInSession(yoloFlag)
 
-	// Start the REPL
-	ri.printWelcome()
+	// Print welcome banner
+	printReplWelcome()
 
 	// Print session history if available
 	ri.printSessionHistory()
@@ -321,7 +256,7 @@ func (ri *ReplInfo) startREPL() {
 				fmt.Println("\nSession ended.")
 				break
 			}
-			util.Errorf("%v\n", err)
+			util.LogErrorf("%v\n", err)
 			break
 		}
 		if input == "" {
@@ -333,7 +268,7 @@ func (ri *ReplInfo) startREPL() {
 			// Reset editor input
 			ri.EditorInput = ""
 			// Handle inner command
-			ri.handleCommand(input)
+			ri.handleCommand(cmd, input)
 			if ri.QuitFlag {
 				break
 			}
@@ -371,30 +306,6 @@ func (ri *ReplInfo) startWithLocalCommand(line string) bool {
 	return strings.HasPrefix(line, "!")
 }
 
-// clearContext clears the session context
-func (ri *ReplInfo) clearContext() {
-	agent, err := EnsureActiveAgent()
-	if err != nil {
-		util.Errorf("%v\n", err)
-		return
-	}
-	// Construct session manager
-	session, err := service.ConstructSession(sessionName, agent.Model.Provider)
-	if err != nil {
-		util.Errorf("Error constructing session manager: %v\n", err)
-		return
-	}
-	// Clear session history
-	err = session.Clear()
-	if err != nil {
-		util.Errorf("Error clearing context: %v\n", err)
-		return
-	}
-	// Empty attachments
-	ri.Files = []*service.FileData{}
-	fmt.Printf("Context cleared.\n")
-}
-
 // printSessionHistory loads and renders existing messages when resuming a session.
 // It is a no-op when the session is brand-new (no data on disk) or when
 // the session name is empty (anonymous single-turn mode).
@@ -409,7 +320,7 @@ func (ri *ReplInfo) printSessionHistory() {
 
 	rendered, notice, err := service.RenderSessionHistory(agent, sessionName)
 	if err != nil {
-		util.Errorf("%v\n", err)
+		util.LogErrorf("%v\n", err)
 		return
 	}
 	if util.IsEmpty(rendered) {
@@ -427,7 +338,7 @@ func (ri *ReplInfo) printSessionHistory() {
 
 	// Print notice at the end if any
 	if !util.IsEmpty(notice) {
-		util.Warnf("%v\n", notice)
+		util.LogWarnf("%v\n", notice)
 	}
 }
 
@@ -435,13 +346,13 @@ func (ri *ReplInfo) printSessionHistory() {
 func (ri *ReplInfo) viewSessionHistory() {
 	agent, err := EnsureActiveAgent()
 	if err != nil {
-		util.Errorf("%v\n", err)
+		util.LogErrorf("%v\n", err)
 		return
 	}
 
 	provider, content, notice, err := service.RenderSessionForViewport(agent, sessionName)
 	if err != nil {
-		util.Errorf("%v\n", err)
+		util.LogErrorf("%v\n", err)
 		return
 	}
 	// If content is empty, return
@@ -458,121 +369,29 @@ func (ri *ReplInfo) viewSessionHistory() {
 	// p := tea.NewProgram(m, tea.WithAltScreen())
 	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
-		util.Errorf("Error running viewport: %v\n", err)
+		util.LogErrorf("Error running viewport: %v\n", err)
 	}
 
 	// Print notice after close the view if any
 	if !util.IsEmpty(notice) {
-		util.Warnf("%v\n", notice)
+		util.LogWarnf("%v\n", notice)
 	}
 }
 
-// compressContext compresses the session context by replacing it with a summary
-func (ri *ReplInfo) compressContext() {
-	// Get active agent
-	agent, err := EnsureActiveAgent()
-	if err != nil {
-		util.Errorf("%v\n", err)
-		return
-	}
-
-	// Get session data
-	sessionData, err := service.ReadSessionContent(sessionName)
-	if err != nil {
-		if os.IsNotExist(err) {
-			fmt.Println("No available session yet.")
-			return
-		}
-		util.Errorf("%v\n", err)
-		return
-	}
-
-	// Compress the session context
-	ui.GetIndicator().Start(ui.IndicatorCompressingContext)
-	summary, err := service.CompressSession(agent, sessionData)
-	ui.GetIndicator().Stop()
-
-	if err != nil {
-		util.Errorf("Failed to compress session: %v\n", err)
-		return
-	}
-
-	// Build the new compressed session
-	newData, err := service.BuildCompressedSession(summary, agent.Model.Provider)
-	if err != nil {
-		util.Errorf("Failed to build compressed session: %v\n", err)
-		return
-	}
-
-	// Save back to the file format
-	err = service.WriteSessionContent(sessionName, newData)
-	if err != nil {
-		util.Errorf("Failed to save compressed session: %v\n", err)
-		return
-	}
-
-	util.Successln("Compressed successfully!\nUse /history to view the compressed session.")
-}
-
-// renameSession uses the model synchronously to infer a meaningful name for
-// the current session and renames the session directory on disk.
-// It mirrors the /compress UX: a spinner is shown during the model call,
-// and the package-level sessionName variable is updated on success.
-func (ri *ReplInfo) renameSession() {
-	agent, err := EnsureActiveAgent()
-	if err != nil {
-		util.Errorf("%v\n", err)
-		return
-	}
-
-	sessionData, err := service.ReadSessionContent(sessionName)
-	if err != nil {
-		if os.IsNotExist(err) {
-			fmt.Println("No session history yet — nothing to rename.")
-			return
-		}
-		util.Errorf("%v\n", err)
-		return
-	}
-	if len(sessionData) == 0 {
-		fmt.Println("Session is empty — nothing to rename.")
-		return
-	}
-
-	ui.GetIndicator().Start(ui.IndicatorRenamingSession)
-	newName, err := service.GenerateSessionName(agent, sessionData)
-	ui.GetIndicator().Stop()
-
-	if err != nil {
-		util.Errorf("Failed to generate session name: %v\n", err)
-		return
-	}
-	if newName == sessionName {
-		util.Successln("Session name is already optimal: " + sessionName)
-		return
-	}
-
-	if err := service.RenameSession(sessionName, newName); err != nil {
-		util.Errorf("Failed to rename session: %v\n", err)
-		return
-	}
-
-	oldName := sessionName
-	sessionName = newName
-	util.Successln(fmt.Sprintf("Session renamed: %s → %s", oldName, newName))
-}
+// compressContext has been refactored to sessionCompressCmd.
+// renameSession has been refactored to sessionAutoRenameCmd.
 
 func (ri *ReplInfo) autoRenameSessionOnce() {
 	// Auto-rename: fire exactly once, asynchronously, on the first successful
 	// turn of a default-named session. The sync.Once on ReplInfo guarantees
 	// that a rapid second turn cannot trigger a duplicate rename.
 	ri.autoRenameOnce.Do(func() {
-		if !isDefaultSessionName(sessionName) {
+		if !IsDefaultSessionName(sessionName) {
 			return
 		}
 		agent, err := EnsureActiveAgent()
 		if err != nil {
-			util.Errorf("%v\n", err)
+			util.LogErrorf("%v\n", err)
 			return
 		}
 		if !service.IsAutoRenameEnabled(agent.Capabilities) {
@@ -582,7 +401,7 @@ func (ri *ReplInfo) autoRenameSessionOnce() {
 		// Bugfix:
 		// Don't run it at background
 		// At backgound the output will break the input frame
-		ri.renameSession()
+		runCommand(sessionRenameCurrentCmd, []string{})
 	})
 }
 
@@ -598,9 +417,9 @@ func (ri *ReplInfo) copyLastMessage() {
 	// Actually copy to clipboard using atotto/clipboard
 	err := data.WriteClipboardText(lastAssistantMessage)
 	if err != nil {
-		util.Errorf("Failed to copy to clipboard: %v\n", err)
+		util.LogErrorf("Failed to copy to clipboard: %v\n", err)
 	}
-	util.Successln("Copied the last response to clipboard.")
+	util.LogSuccessln("Copied the last response to clipboard.")
 }
 
 func (ri *ReplInfo) callAgent(input string) {
@@ -612,9 +431,9 @@ func (ri *ReplInfo) callAgent(input string) {
 	}
 
 	// Call agent using the shared runner, passing persisted SharedState
-	err := RunAgent(prompt, guideline, ri.Files, sessionName, ri.outputFile, ri.sharedState)
+	err := RunAgent(prompt, guideline, ri.Files, sessionName, "", ri.sharedState)
 	if err != nil {
-		util.Errorf("%v\n", err)
+		util.LogErrorf("%v\n", err)
 		return
 	}
 
@@ -646,9 +465,9 @@ func (ri *ReplInfo) executeShellCommand(command string) {
 	// Display error if command failed
 	if err != nil {
 		if exitError, ok := err.(*exec.ExitError); ok {
-			util.Errorf("Command failed with exit code %d\n", exitError.ExitCode())
+			util.LogErrorf("Command failed with exit code %d\n", exitError.ExitCode())
 		} else {
-			util.Errorf("Command failed: %v\n", err)
+			util.LogErrorf("Command failed: %v\n", err)
 		}
 	}
 
@@ -657,20 +476,4 @@ func (ri *ReplInfo) executeShellCommand(command string) {
 		// shell output color
 		fmt.Printf(data.ShellOutputColor+"%s\n"+data.ResetSeq, output)
 	}
-}
-
-// isDefaultSessionName returns true when the session name is the auto-generated
-// timestamp form produced by GenerateSessionName() in repl.go: "session-YYYY-MM-DD_HH-MM-SS".
-func isDefaultSessionName(name string) bool {
-	return strings.HasPrefix(name, "session-")
-}
-
-func GenerateSessionName() string {
-	// Get the current time
-	currentTime := time.Now()
-
-	// Format the time as a string in the format "chat_YYYY-MM-DD_HH-MM-SS.json"
-	filename := fmt.Sprintf("session-%s", currentTime.Format("2006-01-02_15-04-05"))
-
-	return filename
 }

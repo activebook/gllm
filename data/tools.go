@@ -10,7 +10,6 @@ const (
 type ToolsUse struct {
 	AutoApprove bool              // Whether tools can be used without user confirmation
 	Confirm     ToolConfirmResult // User confirmation result
-	AgentName   string            // Name of the currently executing agent
 	FilePath    string            // File path relevant to the tool use, if any
 }
 

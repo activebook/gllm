@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/io"
@@ -15,6 +17,27 @@ import (
 )
 
 var ()
+
+func init() {
+	// Add session command to root command
+	rootCmd.AddCommand(sessionCmd)
+
+	// Add subcommands to session command
+	sessionCmd.AddCommand(sessionListCmd)
+	sessionCmd.AddCommand(sessionRemoveCmd)
+	sessionCmd.AddCommand(sessionInfoCmd)
+	sessionCmd.AddCommand(sessionClearCmd)
+	sessionCmd.AddCommand(sessionRenameCmd)
+	sessionCmd.AddCommand(sessionShareCmd)
+	sessionCmd.AddCommand(sessionClearCurrentCmd)
+	sessionCmd.AddCommand(sessionCompressCurrentCmd)
+	sessionCmd.AddCommand(sessionRenameCurrentCmd)
+
+	// Add flags for other prompt commands if needed in the future
+	sessionRemoveCmd.Flags().BoolP("force", "f", false, "Skip confirm")
+	sessionClearCmd.Flags().BoolP("force", "f", false, "Force clear all without confirmation")
+	sessionRenameCmd.Flags().BoolP("force", "f", false, "Skip confirm")
+}
 
 // sessionCmd represents the session command
 var sessionCmd = &cobra.Command{
@@ -43,15 +66,15 @@ var sessionListCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sessions, err := service.ListSortedSessions(true, true)
 		if err != nil {
-			fmt.Println(err)
+			util.Println(cmd, err)
 			return nil
 		}
 		if len(sessions) == 0 {
-			fmt.Println("No sessions found.")
+			util.Println(cmd, "No sessions found.")
 			return nil
 		}
 
-		fmt.Println("Available sessions:")
+		util.Println(cmd, "Available sessions:")
 		width := len(fmt.Sprintf("%d", len(sessions)))
 		for index, session := range sessions {
 			// Visually indent sub-sessions
@@ -62,9 +85,9 @@ var sessionListCmd = &cobra.Command{
 
 			// Display with title if available
 			if session.Provider != "" {
-				fmt.Printf("[%*d] %s%s [%s]\n", width, index+1, prefix, session.Name, session.Provider)
+				util.Printf(cmd, "[%*d] %s%s [%s]\n", width, index+1, prefix, session.Name, session.Provider)
 			} else {
-				fmt.Printf("[%*d] %s%s\n", width, index+1, prefix, session.Name)
+				util.Printf(cmd, "[%*d] %s%s\n", width, index+1, prefix, session.Name)
 			}
 		}
 		return nil
@@ -94,7 +117,7 @@ gllm session remove "2 - 5" --force`,
 		} else {
 			sessions, err := service.ListSortedSessions(true, true)
 			if err != nil || len(sessions) == 0 {
-				fmt.Println("No sessions found.")
+				util.Println(cmd, "No sessions found.")
 				return nil
 			}
 
@@ -139,11 +162,11 @@ gllm session remove "2 - 5" --force`,
 				if err1 == nil && err2 == nil {
 					sessions, err := service.ListSortedSessions(false, true)
 					if err != nil {
-						fmt.Println(err)
+						util.Println(cmd, err)
 						return nil
 					}
 					if len(sessions) == 0 {
-						fmt.Println("No sessions found.")
+						util.Println(cmd, "No sessions found.")
 						return nil
 					}
 
@@ -164,7 +187,7 @@ gllm session remove "2 - 5" --force`,
 					var err error
 					names, err = service.FindSessionsByPattern(pattern)
 					if err != nil {
-						fmt.Printf("Error finding sessions: %v\n", err)
+						util.Printf(cmd, "Error finding sessions: %v\n", err)
 						return nil
 					}
 				}
@@ -173,7 +196,7 @@ gllm session remove "2 - 5" --force`,
 				var err error
 				names, err = service.FindSessionsByPattern(pattern)
 				if err != nil {
-					fmt.Printf("Error finding sessions: %v\n", err)
+					util.Printf(cmd, "Error finding sessions: %v\n", err)
 					return nil
 				}
 			}
@@ -181,7 +204,7 @@ gllm session remove "2 - 5" --force`,
 
 		if len(names) == 0 {
 			if pattern != "" {
-				fmt.Printf("No sessions found matching '%s'.\n", pattern)
+				util.Printf(cmd, "No sessions found matching '%s'.\n", pattern)
 			}
 			return nil
 		}
@@ -189,9 +212,9 @@ gllm session remove "2 - 5" --force`,
 		// Ask for confirmation if not forced
 		force, _ := cmd.Flags().GetBool("force")
 		if !force {
-			fmt.Printf("The following sessions will be removed:\n")
+			util.Printf(cmd, "The following sessions will be removed:\n")
 			for _, name := range names {
-				fmt.Printf("  - %s\n", name)
+				util.Printf(cmd, "  - %s\n", name)
 			}
 
 			var confirm bool
@@ -200,7 +223,7 @@ gllm session remove "2 - 5" --force`,
 				Value(&confirm).
 				Run()
 			if err != nil || !confirm {
-				fmt.Println("Operation cancelled.")
+				util.Println(cmd, "Operation cancelled.")
 				return nil
 			}
 		}
@@ -208,9 +231,9 @@ gllm session remove "2 - 5" --force`,
 		// Remove the matching sessions
 		for _, name := range names {
 			if err := service.RemoveSession(name); err != nil {
-				fmt.Printf("Failed to remove '%s': %v\n", name, err)
+				util.Printf(cmd, "Failed to remove '%s': %v\n", name, err)
 			} else {
-				fmt.Printf("Session '%s' removed successfully.\n", name)
+				util.Printf(cmd, "Session '%s' removed successfully.\n", name)
 			}
 		}
 
@@ -230,7 +253,7 @@ gllm session clear --force`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sessions, err := service.ListSortedSessions(false, false)
 		if err != nil || len(sessions) == 0 {
-			fmt.Println("No sessions found.")
+			util.Println(cmd, "No sessions found.")
 			return nil
 		}
 
@@ -244,7 +267,7 @@ gllm session clear --force`,
 				Value(&confirm).
 				Run()
 			if err != nil || !confirm {
-				fmt.Println("Operation cancelled.")
+				util.Println(cmd, "Operation cancelled.")
 				return nil
 			}
 		}
@@ -252,13 +275,13 @@ gllm session clear --force`,
 		for _, session := range sessions {
 			name := session.Name
 			if err := service.RemoveSession(name); err != nil {
-				fmt.Printf("failed to remove session directory %s: %v\n", name, err)
+				util.Printf(cmd, "failed to remove session directory %s: %v\n", name, err)
 			} else {
-				fmt.Printf("  - '%s' removed.\n", name)
+				util.Printf(cmd, "  - '%s' removed.\n", name)
 			}
 		}
 
-		fmt.Println("All sessions have been cleared.")
+		util.Println(cmd, "All sessions have been cleared.")
 		return nil
 	},
 }
@@ -278,7 +301,7 @@ var sessionInfoCmd = &cobra.Command{
 			// Select session
 			sessions, err := service.ListSortedSessions(true, true)
 			if err != nil || len(sessions) == 0 {
-				fmt.Println("No sessions found.")
+				util.Println(cmd, "No sessions found.")
 				return nil
 			}
 
@@ -321,7 +344,7 @@ var sessionInfoCmd = &cobra.Command{
 
 		// Check if session exists
 		if !service.SessionExists(sessionName, true) {
-			fmt.Printf("Session '%s' not found.\n", sessionName)
+			util.Printf(cmd, "Session '%s' not found.\n", sessionName)
 			return nil
 		}
 
@@ -332,7 +355,7 @@ var sessionInfoCmd = &cobra.Command{
 		}
 
 		// Display session details
-		fmt.Printf("Name: %s\n", sessionName)
+		util.Printf(cmd, "Name: %s\n", sessionName)
 
 		// Detect provider based on message format
 		provider := service.DetectMessageProviderByContent(data)
@@ -347,7 +370,7 @@ var sessionInfoCmd = &cobra.Command{
 		case service.ModelProviderAnthropic:
 			content = service.RenderAnthropicSessionLog(data)
 		default:
-			fmt.Println("Unknown session format.")
+			util.Println(cmd, "Unknown session format.")
 			return nil
 		}
 
@@ -378,13 +401,13 @@ var sessionRenameCmd = &cobra.Command{
 			oldName = args[0]
 			newName = args[1]
 			if err := util.ValidateResourceName("session", newName); err != nil {
-				util.Errorf("%v\n", err)
+				util.Errorf(cmd, "%v\n", err)
 				return err
 			}
 		} else {
 			sessions, err := service.ListSortedSessions(true, true)
 			if err != nil || len(sessions) == 0 {
-				fmt.Println("No sessions found.")
+				util.Println(cmd, "No sessions found.")
 				return nil
 			}
 
@@ -460,7 +483,7 @@ var sessionRenameCmd = &cobra.Command{
 		oldName = resolvedName
 
 		if strings.EqualFold(oldName, newName) {
-			fmt.Println("No changes made.")
+			util.Println(cmd, "No changes made.")
 			return nil
 		}
 
@@ -473,7 +496,7 @@ var sessionRenameCmd = &cobra.Command{
 				Value(&confirm).
 				Run()
 			if err != nil || !confirm {
-				fmt.Println("Operation cancelled.")
+				util.Println(cmd, "Operation cancelled.")
 				return nil
 			}
 		}
@@ -483,7 +506,7 @@ var sessionRenameCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Session renamed from '%s' to '%s' successfully.\n", oldName, newName)
+		util.Printf(cmd, "Session renamed from '%s' to '%s' successfully.\n", oldName, newName)
 		return nil
 	},
 }
@@ -516,25 +539,181 @@ var sessionShareCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Session '%s' exported successfully\n", sessionName)
+		util.Printf(cmd, "Session '%s' exported successfully\n", sessionName)
 		return nil
 	},
 }
 
-func init() {
-	// Add session command to root command
-	rootCmd.AddCommand(sessionCmd)
+var sessionClearCurrentCmd = &cobra.Command{
+	Use:    "clear-current",
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		tgtSession := GetContextSession(cmd)
+		if tgtSession == "" {
+			util.Errorf(cmd, "No active session to clear.\n")
+			return nil
+		}
 
-	// Add subcommands to session command
-	sessionCmd.AddCommand(sessionListCmd)
-	sessionCmd.AddCommand(sessionRemoveCmd)
-	sessionCmd.AddCommand(sessionInfoCmd)
-	sessionCmd.AddCommand(sessionClearCmd)
-	sessionCmd.AddCommand(sessionRenameCmd)
-	sessionCmd.AddCommand(sessionShareCmd)
+		agent, err := EnsureActiveAgent()
+		if err != nil {
+			util.Errorf(cmd, "%v\n", err)
+			return nil
+		}
 
-	// Add flags for other prompt commands if needed in the future
-	sessionRemoveCmd.Flags().BoolP("force", "f", false, "Skip confirm")
-	sessionClearCmd.Flags().BoolP("force", "f", false, "Force clear all without confirmation")
-	sessionRenameCmd.Flags().BoolP("force", "f", false, "Skip confirm")
+		session, err := service.ConstructSession(tgtSession, agent.Model.Provider)
+		if err != nil {
+			util.Errorf(cmd, "Error constructing session manager: %v\n", err)
+			return nil
+		}
+		if err := session.Clear(); err != nil {
+			util.Errorf(cmd, "Error clearing context: %v\n", err)
+			return nil
+		}
+		util.Successln(cmd, "Context cleared successfully.")
+		return nil
+	},
+}
+
+var sessionCompressCurrentCmd = &cobra.Command{
+	Use:    "compress-current",
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		tgtSession := GetContextSession(cmd)
+		if tgtSession == "" {
+			util.Errorf(cmd, "No active session to compress.\n")
+			return nil
+		}
+
+		agent, err := EnsureActiveAgent()
+		if err != nil {
+			util.Errorf(cmd, "%v\n", err)
+			return nil
+		}
+
+		sessionData, err := service.ReadSessionContent(tgtSession)
+		if err != nil {
+			util.Errorf(cmd, "%v\n", err)
+			return nil
+		}
+		if len(sessionData) == 0 {
+			util.Println(cmd, "Session is empty — nothing to compress.")
+			return nil
+		}
+
+		ui.GetIndicator().Start(ui.IndicatorCompressingContext)
+		summary, err := service.CompressSession(agent, sessionData)
+		ui.GetIndicator().Stop()
+
+		if err != nil {
+			util.Errorf(cmd, "Failed to compress session: %v\n", err)
+			return nil
+		}
+
+		newData, err := service.BuildCompressedSession(summary, agent.Model.Provider)
+		if err != nil {
+			util.Errorf(cmd, "Failed to build compressed session: %v\n", err)
+			return nil
+		}
+
+		err = service.WriteSessionContent(tgtSession, newData)
+		if err != nil {
+			util.Errorf(cmd, "Failed to save compressed session: %v\n", err)
+			return nil
+		}
+
+		util.Successln(cmd, "Compressed successfully!\nUse /history to view the compressed session.")
+		return nil
+	},
+}
+
+var sessionRenameCurrentCmd = &cobra.Command{
+	Use:    "rename-current",
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		tgtSession := GetContextSession(cmd)
+		if tgtSession == "" {
+			util.Errorf(cmd, "No active session to rename.\n")
+			return nil
+		}
+
+		agent, err := EnsureActiveAgent()
+		if err != nil {
+			util.Errorf(cmd, "%v\n", err)
+			return nil
+		}
+
+		sessionData, err := service.ReadSessionContent(tgtSession)
+		if err != nil {
+			util.Println(cmd, "No session history yet — nothing to rename.")
+			return nil
+		}
+		if len(sessionData) == 0 {
+			util.Println(cmd, "Session is empty — nothing to rename.")
+			return nil
+		}
+
+		ui.GetIndicator().Start(ui.IndicatorRenamingSession)
+		newName, err := service.GenerateSessionName(agent, sessionData)
+		ui.GetIndicator().Stop()
+
+		if err != nil {
+			util.Errorf(cmd, "Failed to generate session name: %v\n", err)
+			return nil
+		}
+		if newName == tgtSession {
+			util.Successln(cmd, "Session name is already optimal: "+tgtSession)
+			return nil
+		}
+
+		if err := service.RenameSession(tgtSession, newName); err != nil {
+			util.Errorf(cmd, "Failed to rename session: %v\n", err)
+			return nil
+		}
+
+		// Update the global if it was the global that got renamed
+		if tgtSession == sessionName {
+			sessionName = newName
+		}
+
+		util.Successln(cmd, fmt.Sprintf("Session renamed: %s → %s", tgtSession, newName))
+		return nil
+	},
+}
+
+/*
+ * Session name helper functions
+ */
+
+type sessionContextKey string
+
+// targetSessionName is a context key used to store the target session name
+const targetSessionName sessionContextKey = "targetSessionName"
+
+// IsDefaultSessionName returns true when the session name is the auto-generated
+// timestamp form produced by GenerateSessionName() in repl.go: "session-YYYY-MM-DD_HH-MM-SS".
+func IsDefaultSessionName(name string) bool {
+	return strings.HasPrefix(name, "session-")
+}
+
+func GenerateSessionName() string {
+	// Get the current time
+	currentTime := time.Now()
+
+	// Format the time as a string in the format "chat_YYYY-MM-DD_HH-MM-SS.json"
+	filename := fmt.Sprintf("session-%s", currentTime.Format("2006-01-02_15-04-05"))
+
+	return filename
+}
+
+// NewContextWithSession returns a new context with the session name set
+func NewContextWithSession(sessionName string) context.Context {
+	return context.WithValue(context.Background(), targetSessionName, sessionName)
+}
+
+// GetContextSession returns the session name from the context
+func GetContextSession(cmd *cobra.Command) string {
+	if s, ok := cmd.Context().Value(targetSessionName).(string); ok && s != "" {
+		return s
+	}
+	return sessionName
 }

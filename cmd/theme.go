@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/activebook/gllm/util"
+
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/io"
@@ -135,7 +137,7 @@ var themeCmd = &cobra.Command{
 		)
 
 		banner := borderStyle.Render(inner)
-		fmt.Println(banner)
+		util.Println(cmd, banner)
 	},
 }
 
@@ -175,16 +177,16 @@ var themeSwitchCmd = &cobra.Command{
 
 		err := data.LoadTheme(name)
 		if err != nil {
-			fmt.Printf("%sError: %v%s\n", data.StatusErrorColor, err, data.ResetSeq)
+			util.Printf(cmd, "%sError: %v%s\n", data.StatusErrorColor, err, data.ResetSeq)
 			return
 		}
 
 		err = data.SaveThemeConfig(name)
 		if err != nil {
-			fmt.Printf("%sWarning: Failed to save theme config: %v%s\n", data.StatusWarnColor, err, data.ResetSeq)
+			util.Printf(cmd, "%sWarning: Failed to save theme config: %v%s\n", data.StatusWarnColor, err, data.ResetSeq)
 		}
 
-		fmt.Printf("%sSuccessfully switched to theme: %s%s\n", data.StatusSuccessColor, name, data.ResetSeq)
+		util.Printf(cmd, "%sSuccessfully switched to theme: %s%s\n", data.StatusSuccessColor, name, data.ResetSeq)
 		// Run theme command to show new samples
 		themeCmd.Run(themeCmd, []string{})
 	},

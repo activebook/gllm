@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
+	stdio "io"
 	"os"
 	"os/exec"
 	"sort"
@@ -102,14 +104,34 @@ func parseCommandArgs(input string) []string {
 	return args
 }
 
-// runCommand executes a command with arguments
-func runCommand(cmd *cobra.Command, args []string) {
+// runCommand executes a command with arguments using background context
+func runCommand(cmd *cobra.Command, args []string, w ...stdio.Writer) {
+	// REPL mode: context baked with global sessionName
+	runCommandCtx(NewContextWithSession(sessionName), cmd, args, w...)
+
+	// Headless: runCommandCtx(ctx, ...)  → context baked with per-request sessionName (from HTTP body)
+}
+
+// runCommandCtx executes a command with a context
+func runCommandCtx(ctx context.Context, cmd *cobra.Command, args []string, w ...stdio.Writer) {
+	out := stdio.Discard
+	if len(w) > 0 && w[0] != nil {
+		out = w[0]
+	} else {
+		out = os.Stdout
+	}
+	cmd.SetOut(out)
+	cmd.SetErr(out)
+	cmd.SetContext(ctx)
+
 	// Find the target subcommand
 	targetCmd, targetArgs, err := cmd.Find(args)
 	if err != nil {
-		util.Errorf("Command not found: %v\n", err)
+		util.Errorf(cmd, "Command not found: %v\n", err)
 		return
 	}
+
+	targetCmd.SetContext(ctx)
 
 	// Reset flags for the target command to avoid accumulation in the REPL
 	targetCmd.Flags().VisitAll(func(f *pflag.Flag) {
@@ -130,7 +152,7 @@ func runCommand(cmd *cobra.Command, args []string) {
 			targetCmd.Help()
 			return
 		}
-		util.Errorf("Flag error: %v\n", err)
+		util.Errorf(cmd, "Flag error: %v\n", err)
 		return
 	}
 
@@ -140,7 +162,7 @@ func runCommand(cmd *cobra.Command, args []string) {
 	// Validate positional arguments if the command has an Args validator
 	if targetCmd.Args != nil {
 		if err := targetCmd.Args(targetCmd, parsedArgs); err != nil {
-			util.Errorf("Argument error: %v\n", err)
+			util.Errorf(cmd, "Argument error: %v\n", err)
 			return
 		}
 	}
@@ -148,25 +170,25 @@ func runCommand(cmd *cobra.Command, args []string) {
 	// Execute the command's Run or RunE function
 	if targetCmd.RunE != nil {
 		if err := targetCmd.RunE(targetCmd, parsedArgs); err != nil {
-			util.Errorf("%v\n", err)
+			util.Errorf(cmd, "%v\n", err)
 		}
 	} else if targetCmd.Run != nil {
 		targetCmd.Run(targetCmd, parsedArgs)
 	} else {
 		// If neither Run nor RunE is defined, it might be a parent command without a default action
-		util.Errorf("Incomplete command. Use help to see available subcommands.\n")
+		util.Errorf(cmd, "Incomplete command. Use help to see available subcommands.\n")
 	}
 }
 
 // handleCommand processes commands
-func (ri *ReplInfo) handleCommand(cmd string) {
+func (ri *ReplInfo) handleCommand(cmd *cobra.Command, input string) {
 	// Split the command into parts
 	// Robust parsing: find the command (first word) and the raw arguments string
-	cmd = strings.TrimSpace(cmd)
-	if cmd == "" {
+	input = strings.TrimSpace(input)
+	if input == "" {
 		return
 	}
-	parts := parseCommandArgs(cmd)
+	parts := parseCommandArgs(input)
 	if len(parts) == 0 {
 		return
 	}
@@ -180,11 +202,11 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 
 	case "/exit", "/quit":
 		ri.QuitFlag = true
-		fmt.Println("Session Ended")
+		fmt.Println("Session Ended") // intentional: terminal-only farewell, no SSE needed
 		return
 
 	case "/help":
-		ri.showHelp()
+		ri.showHelp(cmd)
 
 	case "/history":
 		// Arguments (num, chars) are deprecated/ignored in viewport mode
@@ -192,7 +214,8 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 		ri.viewSessionHistory()
 
 	case "/clear":
-		ri.clearContext()
+		runCommand(sessionClearCurrentCmd, parts[1:])
+		ri.Files = []*service.FileData{}
 
 	case "/model":
 		runCommand(modelCmd, parts[1:])
@@ -216,19 +239,19 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 		runCommand(memoryCmd, parts[1:])
 
 	case "/yolo":
-		switchYoloMode(showYoloModeStatus)
+		switchYoloMode(cmd, showYoloModeStatus)
 
 	case "/plan":
-		switchPlanMode(showPlanModeStatus)
+		switchPlanMode(cmd, showPlanModeStatus)
 
 	case "/session":
 		runCommand(sessionCmd, parts[1:])
 
 	case "/compress":
-		ri.compressContext()
+		runCommand(sessionCompressCurrentCmd, parts[1:])
 
 	case "/rename":
-		ri.renameSession()
+		runCommand(sessionRenameCurrentCmd, parts[1:])
 
 	case "/think":
 		runCommand(thinkCmd, parts[1:])
@@ -245,23 +268,23 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 
 	case "/attach":
 		if len(parts) < 2 {
-			fmt.Println("Please specify a file path or URL")
+			util.Printf(cmd, "Please specify a file path or URL\n") // terminal-only; no cmd in scope
 			return
 		}
-		ri.attachFiles(cmd)
+		ri.attachFiles(cmd, input)
 
 	case "/detach":
 		if len(parts) < 2 {
-			fmt.Println("Please specify a file path, URL, or 'all'")
+			util.Printf(cmd, "Please specify a file path, URL, or 'all'\n")
 			return
 		}
-		ri.detachFiles(cmd)
+		ri.detachFiles(cmd, input)
 
 	case "/copy":
 		ri.copyLastMessage()
 
 	case "/about":
-		ri.showInfo()
+		ri.showInfo(cmd)
 
 	case "/theme":
 		runCommand(themeCmd, parts[1:])
@@ -285,12 +308,12 @@ func (ri *ReplInfo) handleCommand(cmd string) {
 		if ri.executeSkill(command, parts) {
 			return
 		}
-		fmt.Printf("Unknown command: %s\n", command)
+		util.Printf(cmd, "Unknown command: %s\n", command) // terminal-only
 	}
 }
 
 // showHelp displays available commands
-func (ri *ReplInfo) showHelp() {
+func (ri *ReplInfo) showHelp(cmd *cobra.Command) {
 	// Extract keys into a slice
 	commands := make([]string, 0, len(replCommandMap)+len(replSpecMap))
 	for cmd := range replCommandMap {
@@ -339,55 +362,49 @@ func (ri *ReplInfo) showHelp() {
 	}
 
 	suggestionsView := style.Render(strings.Join(listItems, "\n"))
-	fmt.Println(suggestionsView)
+	util.Printf(cmd, "%s\n", suggestionsView) // intentional: richly styled, terminal-only display
 }
 
 // showInfo displays current settings and information
-func (ri *ReplInfo) showInfo() {
+func (ri *ReplInfo) showInfo(cmd *cobra.Command) {
+	var sb strings.Builder
 
 	printSection := func(title string) {
-		fmt.Println()
+		sb.WriteString("\n")
 		fullTitle := fmt.Sprintf("=== %s ===", strings.ToUpper(title))
-		fmt.Printf("%s%s%s\n", data.SectionColor, fullTitle, data.ResetSeq)
+		fmt.Fprintf(&sb, "%s%s%s\n", data.SectionColor, fullTitle, data.ResetSeq)
 	}
 
 	printSection("CURRENT SESSION")
+	fmt.Fprintf(&sb, "Name: %s%s%s\n", data.KeyColor, sessionName, data.ResetSeq)
 
-	// Session Name
-	fmt.Printf("Name: %s%s%s\n", data.KeyColor, sessionName, data.ResetSeq)
-
-	// Memory section (included in system prompt)
-	// printSection("Memory")
-	// memoryListCmd.Run(memoryListCmd, []string{})
-	// w.Flush()
-
-	// Search Engines section
 	printSection("Search Engines")
+	searchListCmd.SetOut(&sb)
 	searchListCmd.Run(searchListCmd, []string{})
 
-	// Current Agent section
 	printSection("Agents")
+	agentCmd.SetOut(&sb)
 	agentCmd.Run(agentCmd, []string{})
 
-	// Attachments
 	printSection("ATTACHMENTS")
 	if len(ri.Files) > 0 {
-		fmt.Printf("%s%s%s (%d):\n", data.KeyColor, "Attachments", data.ResetSeq, len(ri.Files))
+		fmt.Fprintf(&sb, "%s%s%s (%d):\n", data.KeyColor, "Attachments", data.ResetSeq, len(ri.Files))
 		for _, file := range ri.Files {
-			fmt.Printf("  - [%s]: %s\n", file.Format(), file.Path())
+			fmt.Fprintf(&sb, "  - [%s]: %s\n", file.Format(), file.Path())
 		}
 	} else {
-		fmt.Println("Attachments: None")
+		sb.WriteString("Attachments: None\n")
 	}
+	sb.WriteString("\n")
 
-	fmt.Println()
+	util.Print(cmd, sb.String())
 }
 
 func (ri *ReplInfo) handleEditor() {
 	// No arguments - check if preferred editor is set
 	if getPreferredEditor() == "" {
 		// No preferred editor set, show list
-		listAvailableEditors()
+		listAvailableEditors(editorCmd)
 	} else {
 		// Preferred editor set, open it
 		ri.handleEditorCommand()
@@ -398,7 +415,7 @@ func (ri *ReplInfo) handleEditorCommand() {
 	editor := getPreferredEditor()
 	tempFile, err := createTempFile(editTempFile)
 	if err != nil {
-		util.Errorf("Failed to create temp file: %v\n", err)
+		util.LogErrorf("Failed to create temp file: %v\n", err)
 		return
 	}
 	defer os.Remove(tempFile)
@@ -409,23 +426,23 @@ func (ri *ReplInfo) handleEditorCommand() {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	fmt.Printf("Opening in %s...\n", editor)
+	util.Printf(editorCmd, "Opening in %s...\n", editor) // terminal-only; editor is TUI anyway
 	if err := cmd.Run(); err != nil {
-		util.Errorf("Editor failed: %v\n", err)
+		util.LogErrorf("Editor failed: %v\n", err)
 		return
 	}
 
 	// Read back edited content
 	recv, err := os.ReadFile(tempFile)
 	if err != nil {
-		util.Errorf("Failed to read edited content: %v\n", err)
+		util.LogErrorf("Failed to read edited content: %v\n", err)
 		return
 	}
 
 	content := string(recv)
 	content = strings.Trim(content, " \n")
 	if len(content) == 0 {
-		fmt.Println("No content.")
+		util.Println(editorCmd, "No content.") // terminal-only; editor is TUI anyway
 		return
 	}
 
@@ -433,7 +450,7 @@ func (ri *ReplInfo) handleEditorCommand() {
 	ri.EditorInput = content
 }
 
-func (ri *ReplInfo) attachFiles(input string) {
+func (ri *ReplInfo) attachFiles(cmd *cobra.Command, input string) {
 	// Split input into tokens respecting quotes
 	tokens := parseCommandArgs(input)
 
@@ -455,14 +472,14 @@ func (ri *ReplInfo) attachFiles(input string) {
 						fileInfo, err := os.Stat(filePath)
 						if err != nil {
 							if os.IsNotExist(err) {
-								util.Errorf("File not found: %s\n", filePath)
+								util.LogErrorf("File not found: %s\n", filePath)
 							} else {
-								util.Errorf("Error accessing file %s: %v\n", filePath, err)
+								util.LogErrorf("Error accessing file %s: %v\n", filePath, err)
 							}
 							return
 						}
 						if fileInfo.IsDir() {
-							util.Errorf("Cannot attach directory: %s\n", filePath)
+							util.LogErrorf("Cannot attach directory: %s\n", filePath)
 							return
 						}
 					}
@@ -478,14 +495,14 @@ func (ri *ReplInfo) attachFiles(input string) {
 					mu.Unlock()
 					// If file is already attached, skip processing
 					if found {
-						util.Warnf("File already attached: %s\n", filePath)
+						util.LogWarnf("File already attached: %s\n", filePath)
 						return
 					}
 
 					// Process the attachment
 					file := ProcessAttachment(filePath)
 					if file == nil {
-						util.Errorf("Error loading attachment: %s\n", filePath)
+						util.LogErrorf("Error loading attachment: %s\n", filePath)
 						return
 					}
 
@@ -493,10 +510,10 @@ func (ri *ReplInfo) attachFiles(input string) {
 					mu.Lock()
 					ri.Files = append(ri.Files, file)
 					mu.Unlock()
-					fmt.Printf("Attachment loaded: %s\n", filePath)
+					util.Printf(cmd, "Attachment loaded: %s\n", filePath)
 				}(filePath)
 			} else {
-				fmt.Println("Please specify a file path or URL after /attach")
+				util.Println(cmd, "Please specify a file path or URL after /attach")
 			}
 		}
 		// Ignore other tokens
@@ -504,19 +521,19 @@ func (ri *ReplInfo) attachFiles(input string) {
 	wg.Wait()
 
 	if len(ri.Files) == 0 {
-		fmt.Println("No attachments were loaded")
+		util.Println(cmd, "No attachments were loaded")
 	}
 }
 
-func (ri *ReplInfo) detachFiles(input string) {
+func (ri *ReplInfo) detachFiles(cmd *cobra.Command, input string) {
 	// Handle "all" case
 	if strings.Contains(input, "/detach all") {
 		if len(ri.Files) == 0 {
-			fmt.Println("No attachments to detach")
+			util.Println(cmd, "No attachments to detach")
 			return
 		}
 		ri.Files = []*service.FileData{}
-		fmt.Println("Detached all attachments")
+		util.Println(cmd, "Detached all attachments")
 		return
 	}
 
@@ -529,7 +546,7 @@ func (ri *ReplInfo) detachFiles(input string) {
 		if tokens[i] == "/detach" {
 			// Check if there's a file path or URL after /detach
 			if i+1 >= len(tokens) {
-				fmt.Println("Please specify a file path or URL after /detach")
+				util.Println(cmd, "Please specify a file path or URL after /detach")
 				continue
 			}
 
@@ -542,7 +559,7 @@ func (ri *ReplInfo) detachFiles(input string) {
 			for j, file := range ri.Files {
 				if file.Path() == filePath {
 					ri.Files = append(ri.Files[:j], ri.Files[j+1:]...)
-					fmt.Printf("Detached: %s\n", filePath)
+					util.Printf(cmd, "Detached: %s\n", filePath)
 					detachedAny = true
 					found = true
 					break
@@ -550,13 +567,13 @@ func (ri *ReplInfo) detachFiles(input string) {
 			}
 
 			if !found {
-				fmt.Printf("Attachment not found: %s\n", filePath)
+				util.Printf(cmd, "Attachment not found: %s\n", filePath)
 			}
 		}
 	}
 
 	if !detachedAny {
-		fmt.Println("No valid detachment")
+		util.Println(cmd, "No valid detachment")
 	}
 }
 
@@ -636,24 +653,24 @@ func (ri *ReplInfo) executeSkill(command string, parts []string) bool {
  * /plan and /yolo is exclusive, if both are enabled, it will switch to normal mode
  */
 
-func showPlanModeStatus(plan bool) {
+func showPlanModeStatus(cmd *cobra.Command, plan bool) {
 	if plan {
-		fmt.Printf("Plan mode: %s -> %s\n", data.SwitchOffColor+"off"+data.ResetSeq, data.SwitchOnColor+"on"+data.ResetSeq)
+		util.Printf(cmd, "Plan mode: %s -> %s\n", data.SwitchOffColor+"off"+data.ResetSeq, data.SwitchOnColor+"on"+data.ResetSeq)
 	} else {
-		fmt.Printf("Plan mode: %s -> %s\n", data.SwitchOnColor+"on"+data.ResetSeq, data.SwitchOffColor+"off"+data.ResetSeq)
+		util.Printf(cmd, "Plan mode: %s -> %s\n", data.SwitchOnColor+"on"+data.ResetSeq, data.SwitchOffColor+"off"+data.ResetSeq)
 	}
 }
 
-func showYoloModeStatus(yolo bool) {
+func showYoloModeStatus(cmd *cobra.Command, yolo bool) {
 	if yolo {
-		fmt.Printf("YOLO mode: %s -> %s\n", data.SwitchOffColor+"off"+data.ResetSeq, data.SwitchOnColor+"on"+data.ResetSeq)
+		util.Printf(cmd, "YOLO mode: %s -> %s\n", data.SwitchOffColor+"off"+data.ResetSeq, data.SwitchOnColor+"on"+data.ResetSeq)
 	} else {
-		fmt.Printf("YOLO mode: %s -> %s\n", data.SwitchOnColor+"on"+data.ResetSeq, data.SwitchOffColor+"off"+data.ResetSeq)
+		util.Printf(cmd, "YOLO mode: %s -> %s\n", data.SwitchOnColor+"on"+data.ResetSeq, data.SwitchOffColor+"off"+data.ResetSeq)
 	}
 }
 
 // switchYoloMode toggles YOLO mode
-func switchYoloMode(showStatus func(bool)) {
+func switchYoloMode(cmd *cobra.Command, showStatus func(*cobra.Command, bool)) {
 	yolo := data.GetYoloModeInSession()
 	// Switch yolo mode
 	data.SetYoloModeInSession(!yolo)
@@ -668,15 +685,15 @@ func switchYoloMode(showStatus func(bool)) {
 		ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModeNormal})
 	}
 	if showStatus != nil {
-		showStatus(yolo)
+		showStatus(cmd, yolo)
 	}
 }
 
 // switchPlanMode toggles Plan mode
-func switchPlanMode(showStatus func(bool)) {
+func switchPlanMode(cmd *cobra.Command, showStatus func(*cobra.Command, bool)) {
 	// The /plan command in the REPL should only be available if the "Plan Mode" feature is enabled for the current agent.
 	if !data.IsPlanModeInSessionEnabled() {
-		util.Warnln("Please enable Plan Mode feature first.")
+		util.LogWarnln("Please enable Plan Mode feature first.")
 		return
 	}
 
@@ -694,7 +711,7 @@ func switchPlanMode(showStatus func(bool)) {
 		ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModeNormal})
 	}
 	if showStatus != nil {
-		showStatus(plan)
+		showStatus(cmd, plan)
 	}
 }
 
@@ -735,7 +752,7 @@ func switchSessionMode() {
 		ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModeNormal})
 	} else {
 		// back to normal
-		util.Errorln("Plan mode and yolo mode shouldn't be both turned on.")
+		util.LogErrorln("Plan mode and yolo mode shouldn't be both turned on.")
 		data.SetPlanModeInSession(false)
 		data.SetYoloModeInSession(false)
 		ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModeNormal})

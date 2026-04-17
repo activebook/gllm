@@ -39,7 +39,7 @@ func GetUserConfigDir() string {
 	// Prefer os.UserConfigDir()
 	userConfigDir, err := os.UserConfigDir()
 	if err != nil {
-		Warnf("Warning: Could not find user dir, falling back to home directory.%v\n", err)
+		LogWarnf("Warning: Could not find user dir, falling back to home directory.%v\n", err)
 		userConfigDir, _ = os.UserHomeDir()
 	}
 	return userConfigDir
@@ -49,7 +49,7 @@ func MakeUserSubDir(subparts ...string) string {
 	userConfigDir := GetUserConfigDir()
 	subDir := filepath.Join(userConfigDir, filepath.Join(subparts...))
 	if err := os.MkdirAll(subDir, 0750); err != nil { // 0750 permissions: user rwx, group rx, others none
-		Errorf("Error creating subdirectory '%s': %v\n", subDir, err)
+		LogErrorf("Error creating subdirectory '%s': %v\n", subDir, err)
 		return ""
 	}
 	return subDir

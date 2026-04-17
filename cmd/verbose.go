@@ -3,6 +3,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/activebook/gllm/util"
+
 	"github.com/activebook/gllm/data"
 	"github.com/spf13/cobra"
 )
@@ -19,11 +21,11 @@ var verboseCmd = &cobra.Command{
 When enabled, displays detailed tool calls, reasoning steps, and subagent progress.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Print Long description
-		fmt.Println(cmd.Long)
-		fmt.Println()
+		util.Println(cmd, cmd.Long)
+		util.Println(cmd)
 		settings := data.GetSettingsStore()
 		current := settings.GetVerboseEnabled()
-		PrintVerboseStatus(current)
+		util.Print(cmd, renderVerboseStatus(current))
 	},
 }
 
@@ -54,26 +56,24 @@ var verboseSwitchCmd = &cobra.Command{
 			case "false", "off", "disable":
 				enable = false
 			default:
-				fmt.Printf("%sInvalid argument: %s. Use 'true' or 'false'.%s\n", data.StatusErrorColor, arg, data.ResetSeq)
+				util.Printf(cmd, "%sInvalid argument: %s. Use 'true' or 'false'.%s\n", data.StatusErrorColor, arg, data.ResetSeq)
 				return
 			}
 		}
 
 		if err := settings.SetVerboseEnabled(enable); err != nil {
-			fmt.Printf("%sFailed to update settings: %v%s\n", data.StatusErrorColor, err, data.ResetSeq)
+			util.Printf(cmd, "%sFailed to update settings: %v%s\n", data.StatusErrorColor, err, data.ResetSeq)
 			return
 		}
 
-		PrintVerboseStatus(enable)
+		util.Print(cmd, renderVerboseStatus(enable))
 	},
 }
 
-func PrintVerboseStatus(enabled bool) {
-	var status string
+func renderVerboseStatus(enabled bool) string {
+	status := data.SwitchOffColor + "false" + data.ResetSeq
 	if enabled {
 		status = data.SwitchOnColor + "true" + data.ResetSeq
-	} else {
-		status = data.SwitchOffColor + "false" + data.ResetSeq
 	}
-	fmt.Printf("Verbose mode: %s\n", status)
+	return fmt.Sprintf("Verbose mode: %s\n", status)
 }

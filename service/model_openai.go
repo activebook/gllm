@@ -173,7 +173,9 @@ func prependOpenAISystemMessage(systemPrompt string, history []openai.ChatComple
 // systemPrompt is the system prompt to be used for the sync generation, it's majorly a role.
 // the last message is the user prompt to do the task.
 func (ag *Agent) GenerateOpenAISync(messages []openai.ChatCompletionMessageParamUnion, systemPrompt string) (string, error) {
-	ctx := context.Background()
+	if ag.Ctx == nil {
+		ag.Ctx = context.Background()
+	}
 	opts := []option.RequestOption{option.WithAPIKey(ag.Model.ApiKey)}
 	if ag.Model.EndPoint != "" {
 		opts = append(opts, option.WithBaseURL(ag.Model.EndPoint))
@@ -198,7 +200,7 @@ func (ag *Agent) GenerateOpenAISync(messages []openai.ChatCompletionMessageParam
 		req.Seed = openai.Int(int64(*ag.Model.Seed))
 	}
 
-	resp, err := client.Chat.Completions.New(ctx, req)
+	resp, err := client.Chat.Completions.New(ag.Ctx, req)
 	if err != nil {
 		return "", fmt.Errorf("sync chat completion error: %w", err)
 	}
@@ -212,9 +214,7 @@ func (ag *Agent) GenerateOpenAISync(messages []openai.ChatCompletionMessageParam
 
 // GenerateOpenAIStream generates a streaming response using OpenAI API
 func (ag *Agent) GenerateOpenAIStream() error {
-
 	// Initialize the Client
-	ctx := context.Background()
 	// Create a client config with custom base URL
 	clientOpts := []option.RequestOption{
 		option.WithAPIKey(ag.Model.ApiKey),
@@ -239,22 +239,23 @@ func (ag *Agent) GenerateOpenAIStream() error {
 	// Initialize sub-agent executor if SharedState is available
 	var executor *SubAgentExecutor
 	if ag.SharedState != nil {
-		executor = NewSubAgentExecutor(ag.SharedState, ag.Session.GetTopSessionName())
+		executor = NewSubAgentExecutor(ag.SharedState, ag.Session.GetTopSessionName(), ag.StdOutput, ag.FileOutput, ag.SSEOutput)
 		defer executor.Shutdown()
 	}
 
 	op := OpenProcessor{
-		ctx:        ctx,
-		notify:     ag.NotifyChan,
-		data:       ag.DataChan,
-		proceed:    ag.ProceedChan,
-		search:     ag.SearchEngine,
-		toolsUse:   &ag.ToolsUse,
-		queries:    make([]string, 0),
-		references: make([]map[string]interface{}, 0), // Updated to match new field type
-		status:     &ag.Status,
-		mcpClient:  ag.MCPClient,
-		fileHooks:  NewFileHooks(),
+		notify:      ag.NotifyChan,
+		data:        ag.DataChan,
+		proceed:     ag.ProceedChan,
+		search:      ag.SearchEngine,
+		toolsUse:    &ag.ToolsUse,
+		interaction: ag.Interaction,
+		quiet:       ag.QuietMode,
+		queries:     make([]string, 0),
+		references:  make([]map[string]interface{}, 0), // Updated to match new field type
+		status:      &ag.Status,
+		mcpClient:   ag.MCPClient,
+		fileHooks:   NewFileHooks(),
 		// Sub-agent orchestration
 		sharedState: ag.SharedState,
 		executor:    executor,
@@ -314,7 +315,7 @@ func (oa *OpenAI) process(ag *Agent) error {
 		messages, _ := ag.Session.GetMessages().([]openai.ChatCompletionMessageParamUnion)
 
 		// Apply context window management.
-		util.Debugf("Context messages: [%d]\n", len(messages))
+		util.LogDebugf("Context messages: [%d]\n", len(messages))
 		pruned, truncated, err := ag.Context.PruneMessages(messages, ag.SystemPrompt, oa.tools)
 		if err != nil {
 			return fmt.Errorf("failed to prune context: %w", err)
@@ -322,8 +323,8 @@ func (oa *OpenAI) process(ag *Agent) error {
 		messages = pruned.([]openai.ChatCompletionMessageParamUnion)
 
 		if truncated {
-			util.Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.\n", ag.Context.GetStrategy())
-			util.Debugf("Context messages after truncation: [%d]\n", len(messages))
+			util.LogWarnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.\n", ag.Context.GetStrategy())
+			util.LogDebugf("Context messages after truncation: [%d]\n", len(messages))
 			// Save back only non-system messages to keep the session clean.
 			ag.Session.SetMessages(messages)
 			if err := ag.Session.Save(); err != nil {
@@ -361,7 +362,7 @@ func (oa *OpenAI) process(ag *Agent) error {
 		}
 
 		// Make the streaming request
-		stream := oa.client.Chat.Completions.NewStreaming(oa.op.ctx, req)
+		stream := oa.client.Chat.Completions.NewStreaming(ag.Ctx, req)
 		// Bug: do NOT use defer here — deferreds accumulate until process() returns,
 		// so inside a loop each iteration would stack up an open stream. Close explicitly.
 		// defer stream.Close()
@@ -511,7 +512,7 @@ func (oa *OpenAI) processStream(stream *ssestream.Stream[openai.ChatCompletionCh
 					// Skip if not our expected function
 					// Because some model made up function name
 					if functionName != "" && !IsAvailableOpenTool(functionName) && !IsAvailableMCPTool(functionName, oa.op.mcpClient) {
-						util.Warnf("Skipping tool call with unknown function name: %s\n", functionName)
+						util.LogWarnf("Skipping tool call with unknown function name: %s\n", functionName)
 						continue
 					}
 

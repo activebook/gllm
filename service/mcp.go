@@ -71,6 +71,7 @@ type MCPSession struct {
 
 type MCPClient struct {
 	mu            sync.Mutex
+	serverMu      map[string]*sync.Mutex // Per-server locks to prevent duplicate connections
 	ctx           context.Context
 	cancel        context.CancelFunc
 	client        *mcp.Client
@@ -168,6 +169,7 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 		mc.ctx, mc.cancel = context.WithCancel(context.Background())
 		mc.toolToSession = make(map[string]*MCPSession)
 		mc.connected = make(map[string]bool)
+		mc.serverMu = make(map[string]*sync.Mutex)
 		// Create a new client, with no features.
 		mc.client = mcp.NewClient(&mcp.Implementation{Name: "mcp-client", Version: "v1.0.0"}, nil)
 	}
@@ -184,16 +186,31 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 			continue
 		}
 
+		// Retrieve or create a per-server mutex under the global lock.
+		// This prevents concurrent Init calls from spawning duplicate connections
+		// to the same server (e.g. background autoload + user /mcp load racing).
+		mc.mu.Lock()
+		if mc.serverMu[serverName] == nil {
+			mc.serverMu[serverName] = &sync.Mutex{}
+		}
+		srvMu := mc.serverMu[serverName]
+		mc.mu.Unlock()
+
+		// Acquire the per-server lock BEFORE checking isConnected.
+		// Any concurrent goroutine attempting the same server will block here
+		// and then see isConnected == true once the first goroutine finishes.
+		srvMu.Lock()
+
 		mc.mu.Lock()
 		isConnected := mc.connected[serverName]
 		mc.mu.Unlock()
 
 		if isConnected {
+			srvMu.Unlock()
 			continue // Already connected, skip
 		}
 
 		// Connect and add session
-		var err error
 		var session *MCPSession
 		if server.Type == "sse" || server.URL != "" || server.BaseURL != "" {
 			// Add SSE server
@@ -213,38 +230,60 @@ func (mc *MCPClient) Init(servers map[string]*data.MCPServer, option MCPLoadOpti
 		if err != nil {
 			// don't continue with other servers
 			err = fmt.Errorf("error loading mcp server %s: %w", serverName, err)
+			srvMu.Unlock()
 			break
 		}
 
-		tools, err := mc.GetTools(initCtx, session)
-		if err != nil {
-			err = fmt.Errorf("error loading mcp server %s: %w", serverName, err)
-			break
+		var tools *[]MCPTool
+		if option.LoadTools {
+			tools, err = mc.GetTools(initCtx, session)
+			if err != nil {
+				err = fmt.Errorf("error loading mcp server %s: %w", serverName, err)
+				srvMu.Unlock()
+				break
+			}
 		}
 		var resources *[]MCPResource
-		var prompts *[]MCPPrompt
 		if option.LoadResources {
 			resources, _ = mc.GetResources(initCtx, session)
 		}
+		var prompts *[]MCPPrompt
 		if option.LoadPrompts {
 			prompts, _ = mc.GetPrompts(initCtx, session)
 		}
 
 		mc.mu.Lock()
+
 		// Populate tool to session map for fast lookup
+		// Bugfix: remember we load servers in parallel (/mcp load and autoload in background),
+		// so we need to check for duplicates when multiple servers have the same tool name
+		// or, the same server is loaded multiple times
+		var filteredTools []MCPTool
 		if tools != nil {
 			for _, tool := range *tools {
+				// Prevent shadowing built-in system tools
+				if IsAvailableOpenTool(tool.Name) {
+					util.LogWarnf("MCP tool %q from server %q conflicts with built-in tool, ignored\n", tool.Name, serverName)
+					continue
+				}
+
+				// Prevent duplicates across different MCP servers
+				if _, exists := mc.toolToSession[tool.Name]; exists {
+					util.LogWarnf("Duplicate MCP tool ignored: %q (from server %q)\n", tool.Name, serverName)
+					continue
+				}
+
 				mc.toolToSession[tool.Name] = session
+				filteredTools = append(filteredTools, tool)
 			}
 		}
 
-		// Add server to servers
 		mc.servers = append(mc.servers, &MCPServer{
 			Name: serverName, Allowed: server.Allowed,
-			Tools: tools, Prompts: prompts, Resources: resources})
-
+			Tools: &filteredTools, Prompts: prompts, Resources: resources})
 		mc.connected[serverName] = true
 		mc.mu.Unlock()
+		srvMu.Unlock()
 	}
 	mc.mu.Lock()
 	mc.loaded = true

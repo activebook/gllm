@@ -69,7 +69,7 @@ func AfterLog() {
 	}
 }
 
-func Infof(format string, args ...interface{}) {
+func LogInfof(format string, args ...interface{}) {
 	if logger != nil {
 		BeforeLog()
 		logger.Infof(format, args...)
@@ -77,7 +77,7 @@ func Infof(format string, args ...interface{}) {
 	}
 }
 
-func Infoln(args ...interface{}) {
+func LogInfoln(args ...interface{}) {
 	if logger != nil {
 		BeforeLog()
 		logger.Infoln(args...)
@@ -85,7 +85,7 @@ func Infoln(args ...interface{}) {
 	}
 }
 
-func Successf(format string, args ...interface{}) {
+func LogSuccessf(format string, args ...interface{}) {
 	if logger != nil {
 		BeforeLog()
 		logger.Infof(format, args...)
@@ -93,7 +93,7 @@ func Successf(format string, args ...interface{}) {
 	}
 }
 
-func Successln(args ...interface{}) {
+func LogSuccessln(args ...interface{}) {
 	if logger != nil {
 		BeforeLog()
 		logger.Infoln(args...)
@@ -101,7 +101,7 @@ func Successln(args ...interface{}) {
 	}
 }
 
-func Debugf(format string, args ...interface{}) {
+func LogDebugf(format string, args ...interface{}) {
 	if logger != nil {
 		if logger.Level == log.DebugLevel {
 			BeforeLog()
@@ -113,7 +113,7 @@ func Debugf(format string, args ...interface{}) {
 	}
 }
 
-func Debugln(args ...interface{}) {
+func LogDebugln(args ...interface{}) {
 	if logger != nil {
 		if logger.Level == log.DebugLevel {
 			BeforeLog()
@@ -125,7 +125,7 @@ func Debugln(args ...interface{}) {
 	}
 }
 
-func Warnf(format string, args ...interface{}) {
+func LogWarnf(format string, args ...interface{}) {
 	if logger != nil {
 		BeforeLog()
 		logger.Warnf(format, args...)
@@ -133,7 +133,7 @@ func Warnf(format string, args ...interface{}) {
 	}
 }
 
-func Warnln(args ...interface{}) {
+func LogWarnln(args ...interface{}) {
 	if logger != nil {
 		BeforeLog()
 		logger.Warnln(args...)
@@ -141,7 +141,7 @@ func Warnln(args ...interface{}) {
 	}
 }
 
-func Errorf(format string, args ...interface{}) {
+func LogErrorf(format string, args ...interface{}) {
 	if logger != nil {
 		BeforeLog()
 		logger.Errorf(format, args...)
@@ -150,7 +150,7 @@ func Errorf(format string, args ...interface{}) {
 	}
 }
 
-func Errorln(args ...interface{}) {
+func LogErrorln(args ...interface{}) {
 	if logger != nil {
 		BeforeLog()
 		logger.Errorln(args...)

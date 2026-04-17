@@ -76,7 +76,7 @@ func (s *AnthropicSession) MarshalMessages(messages []anthropic.MessageParam, dr
 		// Marshal to compact JSON
 		line, err := json.Marshal(msgCopy)
 		if err != nil {
-			util.Warnf("failed to serialize message: %v\n", err)
+			util.LogWarnf("failed to serialize message: %v\n", err)
 			continue
 		}
 

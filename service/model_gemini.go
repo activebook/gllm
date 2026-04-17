@@ -52,12 +52,12 @@ type Gemini struct {
 	op     *OpenProcessor
 }
 
-func (ag *Agent) initGeminiAgent(ctx context.Context) (*Gemini, error) {
+func (ag *Agent) initGeminiAgent() (*Gemini, error) {
 	// Setup the Gemini client
 	// In multi-turn session, even though we create it each time
 	// it can still be cached for advanced gemini models such as 2.5 flash/pro
 	// so it's a server side job
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+	client, err := genai.NewClient(ag.Ctx, &genai.ClientConfig{
 		APIKey:  ag.Model.ApiKey,
 		Backend: genai.BackendGeminiAPI,
 		HTTPOptions: genai.HTTPOptions{
@@ -121,8 +121,10 @@ func (ag *Agent) SortGeminiMessagesByOrder() error {
 // systemPrompt is the system prompt to be used for the sync generation, it's majorly a role.
 // the last message is the user prompt to do the task.
 func (ag *Agent) GenerateGeminiSync(messages []*genai.Content, systemPrompt string) (string, error) {
-	ctx := context.Background()
-	ga, err := ag.initGeminiAgent(ctx)
+	if ag.Ctx == nil {
+		ag.Ctx = context.Background()
+	}
+	ga, err := ag.initGeminiAgent()
 	if err != nil {
 		return "", err
 	}
@@ -138,7 +140,7 @@ func (ag *Agent) GenerateGeminiSync(messages []*genai.Content, systemPrompt stri
 		config.SystemInstruction = &genai.Content{Parts: []*genai.Part{{Text: systemPrompt}}}
 	}
 
-	resp, err := ga.client.Models.GenerateContent(ctx, ag.Model.Model, messages, config)
+	resp, err := ga.client.Models.GenerateContent(ag.Ctx, ag.Model.Model, messages, config)
 	if err != nil {
 		return "", fmt.Errorf("sync chat completion error: %w", err)
 	}
@@ -160,8 +162,7 @@ func (ag *Agent) GenerateGeminiSync(messages []*genai.Content, systemPrompt stri
 func (ag *Agent) GenerateGeminiStream() error {
 	var err error
 	// Check the setup of Gemini client
-	ctx := context.Background()
-	ga, err := ag.initGeminiAgent(ctx)
+	ga, err := ag.initGeminiAgent()
 	if err != nil {
 		return err
 	}
@@ -169,22 +170,23 @@ func (ag *Agent) GenerateGeminiStream() error {
 	// Initialize sub-agent executor if SharedState is available
 	var executor *SubAgentExecutor
 	if ag.SharedState != nil {
-		executor = NewSubAgentExecutor(ag.SharedState, ag.Session.GetTopSessionName())
+		executor = NewSubAgentExecutor(ag.SharedState, ag.Session.GetTopSessionName(), ag.StdOutput, ag.FileOutput, ag.SSEOutput)
 		defer executor.Shutdown()
 	}
 
 	op := OpenProcessor{
-		ctx:        ctx,
-		notify:     ag.NotifyChan,
-		data:       ag.DataChan,
-		proceed:    ag.ProceedChan,
-		search:     ag.SearchEngine,
-		toolsUse:   &ag.ToolsUse,
-		queries:    make([]string, 0),
-		references: make([]map[string]interface{}, 0),
-		status:     &ag.Status,
-		mcpClient:  ag.MCPClient,
-		fileHooks:  NewFileHooks(),
+		notify:      ag.NotifyChan,
+		data:        ag.DataChan,
+		proceed:     ag.ProceedChan,
+		search:      ag.SearchEngine,
+		toolsUse:    &ag.ToolsUse,
+		interaction: ag.Interaction,
+		quiet:       ag.QuietMode,
+		queries:     make([]string, 0),
+		references:  make([]map[string]interface{}, 0),
+		status:      &ag.Status,
+		mcpClient:   ag.MCPClient,
+		fileHooks:   NewFileHooks(),
 		// Sub-agent orchestration
 		sharedState: ag.SharedState,
 		executor:    executor,
@@ -296,7 +298,7 @@ func (ga *Gemini) process(ag *Agent, config *genai.GenerateContentConfig) error 
 
 		// Context Management
 		// Directly truncate on the messages
-		util.Debugf("Context messages: [%d]\n", len(messages))
+		util.LogDebugf("Context messages: [%d]\n", len(messages))
 		// check context limit and prune if needed
 		pruned, truncated, err := ag.Context.PruneMessages(messages, ag.SystemPrompt, config.Tools)
 		if err != nil {
@@ -305,8 +307,8 @@ func (ga *Gemini) process(ag *Agent, config *genai.GenerateContentConfig) error 
 		messages = pruned.([]*genai.Content)
 
 		if truncated {
-			util.Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.\n", ag.Context.GetStrategy())
-			util.Debugf("Context messages after truncation: [%d]\n", len(messages))
+			util.LogWarnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.\n", ag.Context.GetStrategy())
+			util.LogDebugf("Context messages after truncation: [%d]\n", len(messages))
 			ag.Session.SetMessages(messages)
 			if err := ag.Session.Save(); err != nil {
 				return fmt.Errorf("failed to save truncated session: %w", err)
@@ -314,7 +316,7 @@ func (ga *Gemini) process(ag *Agent, config *genai.GenerateContentConfig) error 
 		}
 
 		// Stream the response
-		stream := ga.client.Models.GenerateContentStream(ga.op.ctx, ag.Model.Model, messages, config)
+		stream := ga.client.Models.GenerateContentStream(ag.Ctx, ag.Model.Model, messages, config)
 		// Wait for the main goroutine to tell sub-goroutine to proceed
 		ga.op.status.ChangeTo(ga.op.notify, StreamNotify{Status: StatusStarted}, ga.op.proceed)
 
@@ -439,7 +441,7 @@ func (ga *Gemini) processStream(stream iter.Seq2[*genai.GenerateContentResponse,
 						funcName := part.FunctionCall.Name
 						if funcName != "" && !IsAvailableOpenTool(funcName) && !IsAvailableMCPTool(funcName, ga.op.mcpClient) {
 							// Skip unknown tools so they don't pollute history and cause 400 errors (Missing function response)
-							util.Warnf("Skipping tool call with unknown function name: %s\n", funcName)
+							util.LogWarnf("Skipping tool call with unknown function name: %s\n", funcName)
 							continue
 						}
 					}

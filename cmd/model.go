@@ -7,11 +7,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/activebook/gllm/util"
+
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/io"
 	"github.com/activebook/gllm/service"
-	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
@@ -93,14 +94,14 @@ var modelListCmd = &cobra.Command{
 		}
 
 		if len(modelsMap) == 0 {
-			fmt.Println("No model defined yet. Use 'gllm model add'.")
+			util.Println(cmd, "No model defined yet. Use 'gllm model add'.")
 			return
 		}
 
 		verbose, _ := cmd.Flags().GetBool("verbose")
 
-		fmt.Println("Available models:")
-		fmt.Println()
+		util.Println(cmd, "Available models:")
+		util.Println(cmd)
 		// Sort keys for consistent output
 		names := make([]string, 0, len(modelsMap))
 		for name := range modelsMap {
@@ -125,26 +126,26 @@ var modelListCmd = &cobra.Command{
 			if isDefault {
 				pname = data.HighlightColor + name + data.ResetSeq
 			}
-			fmt.Printf("%s %s\n", indicator, pname)
+			util.Printf(cmd, "%s %s\n", indicator, pname)
 
 			if verbose {
 				if modelConfig := modelsMap[modelName]; modelConfig != nil {
-					fmt.Printf("\tProvider: %s\n", modelConfig.Provider)
-					fmt.Printf("\tEndpoint: %s\n", modelConfig.Endpoint)
-					fmt.Printf("\tModel: %s\n", modelConfig.Model)
-					fmt.Printf("\tTemp: %v\n", modelConfig.Temp)
-					fmt.Printf("\tTopP: %v\n", modelConfig.TopP)
+					util.Printf(cmd, "\tProvider: %s\n", modelConfig.Provider)
+					util.Printf(cmd, "\tEndpoint: %s\n", modelConfig.Endpoint)
+					util.Printf(cmd, "\tModel: %s\n", modelConfig.Model)
+					util.Printf(cmd, "\tTemp: %v\n", modelConfig.Temp)
+					util.Printf(cmd, "\tTopP: %v\n", modelConfig.TopP)
 					if modelConfig.Seed != nil {
-						fmt.Printf("\tSeed: %d\n", *modelConfig.Seed)
+						util.Printf(cmd, "\tSeed: %d\n", *modelConfig.Seed)
 					}
 				}
 			}
 		}
 		if defaultModelName != "" {
-			fmt.Printf("\n%s = Current model\n", ui.FormatEnabledIndicator(true))
+			util.Printf(cmd, "\n%s = Current model\n", ui.FormatEnabledIndicator(true))
 		} else {
-			fmt.Println("\nNo model selected. Use 'gllm model switch <name>' to select one.")
-			fmt.Println("The first available model will be used if needed.")
+			util.Println(cmd, "\nNo model selected. Use 'gllm model switch <name>' to select one.")
+			util.Println(cmd, "The first available model will be used if needed.")
 		}
 	},
 }
@@ -355,7 +356,7 @@ Example:
 			return fmt.Errorf("failed to save model: %w", err)
 		}
 
-		fmt.Printf("Model '%s' added successfully.\n", name)
+		util.Printf(cmd, "Model '%s' added successfully.\n", name)
 		return nil
 	},
 }
@@ -544,7 +545,7 @@ gllm model set gpt4 --endpoint "..." --key $OPENAI_KEY --model gpt-4o --temp 1.0
 			return fmt.Errorf("failed to save model: %w", err)
 		}
 
-		fmt.Printf("Model '%s' set successfully.\n", name)
+		util.Printf(cmd, "Model '%s' set successfully.\n", name)
 		return nil
 	},
 }
@@ -599,18 +600,18 @@ var modelInfoCmd = &cobra.Command{
 		modelConfig := modelsMap[modelName]
 
 		if modelConfig != nil {
-			fmt.Printf("Model '%s':\n---\n", name)
-			fmt.Printf("Provider: %s\n", modelConfig.Provider)
-			fmt.Printf("Endpoint: %s\n", modelConfig.Endpoint)
-			fmt.Printf("Model ID: %s\n", modelConfig.Model)
-			fmt.Printf("Temp: %v\n", modelConfig.Temp)
-			fmt.Printf("TopP: %v\n", modelConfig.TopP)
+			util.Printf(cmd, "Model '%s':\n---\n", name)
+			util.Printf(cmd, "Provider: %s\n", modelConfig.Provider)
+			util.Printf(cmd, "Endpoint: %s\n", modelConfig.Endpoint)
+			util.Printf(cmd, "Model ID: %s\n", modelConfig.Model)
+			util.Printf(cmd, "Temp: %v\n", modelConfig.Temp)
+			util.Printf(cmd, "TopP: %v\n", modelConfig.TopP)
 			if modelConfig.Seed != nil {
-				fmt.Printf("Seed: %d\n", *modelConfig.Seed)
+				util.Printf(cmd, "Seed: %d\n", *modelConfig.Seed)
 			}
-			fmt.Printf("Context Length: %d\n", modelConfig.ContextLength)
-			fmt.Printf("Max Output Tokens: %d\n", modelConfig.MaxOutputTokens)
-			fmt.Println("---")
+			util.Printf(cmd, "Context Length: %d\n", modelConfig.ContextLength)
+			util.Printf(cmd, "Max Output Tokens: %d\n", modelConfig.MaxOutputTokens)
+			util.Println(cmd, "---")
 			return nil
 		}
 
@@ -637,7 +638,7 @@ gllm model remove gpt4 --force`,
 			name = args[0]
 		} else {
 			if len(modelsMap) == 0 {
-				fmt.Println("No models to remove.")
+				util.Println(cmd, "No models to remove.")
 				return nil
 			}
 			activeAgent := store.GetActiveAgent()
@@ -671,7 +672,7 @@ gllm model remove gpt4 --force`,
 		} else {
 			cmd.SilenceUsage = true // Don't show usage for this error
 			if force, _ := cmd.Flags().GetBool("force"); force {
-				fmt.Printf("Model '%s' does not exist, nothing to remove.\n", name)
+				util.Printf(cmd, "Model '%s' does not exist, nothing to remove.\n", name)
 				return nil
 			}
 			return fmt.Errorf("model named '%s' not found", name)
@@ -685,7 +686,7 @@ gllm model remove gpt4 --force`,
 				Value(&confirm).
 				Run()
 			if err != nil || !confirm {
-				fmt.Println("Operation cancelled.")
+				util.Println(cmd, "Operation cancelled.")
 				return nil
 			}
 		}
@@ -695,7 +696,7 @@ gllm model remove gpt4 --force`,
 			return fmt.Errorf("failed to remove model: %w", err)
 		}
 
-		fmt.Printf("Model '%s' removed successfully.\n", name)
+		util.Printf(cmd, "Model '%s' removed successfully.\n", name)
 		return nil
 	},
 }
@@ -722,7 +723,7 @@ gllm model clear --force`,
 				Run()
 
 			if err != nil || !confirm {
-				fmt.Println("Operation cancelled.")
+				util.Println(cmd, "Operation cancelled.")
 				return nil
 			}
 		}
@@ -736,7 +737,7 @@ gllm model clear --force`,
 			}
 		}
 
-		fmt.Println("All models have been cleared.")
+		util.Println(cmd, "All models have been cleared.")
 		return nil
 	},
 }
@@ -801,8 +802,8 @@ to the specified one for all subsequent operations.`,
 			return fmt.Errorf("failed to set active agent: %w", err)
 		}
 
-		fmt.Printf("Switched to model '%s' successfully.\n", name)
-		fmt.Println("This model will be used for all subsequent operations.")
+		util.Printf(cmd, "Switched to model '%s' successfully.\n", name)
+		util.Println(cmd, "This model will be used for all subsequent operations.")
 		return nil
 	},
 }
@@ -828,7 +829,7 @@ var modelRenameCmd = &cobra.Command{
 		if oldName == "" {
 			modelsMap := store.GetModels()
 			if len(modelsMap) == 0 {
-				fmt.Println("No models found.")
+				util.Println(cmd, "No models found.")
 				return
 			}
 			var options []huh.Option[string]
@@ -852,14 +853,14 @@ var modelRenameCmd = &cobra.Command{
 				Value(&oldName).
 				Run()
 			if err != nil {
-				fmt.Println("Aborted.")
+				util.Println(cmd, "Aborted.")
 				return
 			}
 		}
 
 		// Check if old model exists
 		if store.GetModel(oldName) == nil {
-			fmt.Printf("Model '%s' not found.\n", oldName)
+			util.Printf(cmd, "Model '%s' not found.\n", oldName)
 			return
 		}
 
@@ -884,18 +885,18 @@ var modelRenameCmd = &cobra.Command{
 				}).
 				Run()
 			if err != nil {
-				fmt.Println("Aborted.")
+				util.Println(cmd, "Aborted.")
 				return
 			}
 		}
 
 		// Perform rename
 		if err := store.RenameModel(oldName, newName); err != nil {
-			util.Errorf("Failed to rename model: %v\n", err)
+			util.Errorf(cmd, "Failed to rename model: %v\n", err)
 			return
 		}
 
-		fmt.Printf("Model '%s' successfully renamed to '%s'.\n", oldName, newName)
+		util.Printf(cmd, "Model '%s' successfully renamed to '%s'.\n", oldName, newName)
 	},
 }
 

@@ -15,8 +15,8 @@ const (
 	StatusReasoningOver
 	StatusFunctionCalling
 	StatusFunctionCallingOver
-	StatusDiffConfirm
-	StatusDiffConfirmOver
+	StatusShowDiff
+	StatusShowDiffOver
 	StatusSwitchAgent
 	StatusUserCancel
 )
@@ -112,13 +112,13 @@ func (s *StatusStack) ChangeTo(
 		for s.IsTop(StatusFunctionCalling) || s.IsTop(StatusFunctionCallingOver) {
 			s.Pop() // Remove the function calling status
 		}
-	case StatusDiffConfirm:
+	case StatusShowDiff:
 		// If we are entering diff confirm, we push it onto the stack
-		if !s.IsTop(StatusDiffConfirm) {
-			s.Push(StatusDiffConfirm)
+		if !s.IsTop(StatusShowDiff) {
+			s.Push(StatusShowDiff)
 		}
-	case StatusDiffConfirmOver:
-		for s.IsTop(StatusDiffConfirm) || s.IsTop(StatusDiffConfirmOver) {
+	case StatusShowDiffOver:
+		for s.IsTop(StatusShowDiff) || s.IsTop(StatusShowDiffOver) {
 			s.Pop() // Remove the diff confirm status
 		}
 	case StatusWarn:

@@ -58,7 +58,7 @@ func (op *OpenProcessor) anthropicMCPToolCall(toolCall anthropic.ToolUseBlockPar
 }
 
 func (op *OpenProcessor) anthropicSwitchAgentToolCall(toolCall anthropic.ToolUseBlockParam, argsMap *map[string]interface{}) (anthropic.MessageParam, error) {
-	response, err := switchAgentToolCallImpl(argsMap, op.toolsUse)
+	response, err := switchAgentToolCallImpl(argsMap, op)
 
 	isError := err != nil && !IsSwitchAgentError(err)
 
@@ -85,11 +85,11 @@ func runAnthropicTool(toolID string, fn ToolFunc) (anthropic.MessageParam, error
 func (op *OpenProcessor) dispatchAnthropicToolCall(toolCall anthropic.ToolUseBlockParam, a *map[string]interface{}) (anthropic.MessageParam, error) {
 	switch toolCall.Name {
 	case ToolShell:
-		return runAnthropicTool(toolCall.ID, func() (string, error) { return shellToolCallImpl(a, op.toolsUse) })
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return shellToolCallImpl(a, op) })
 	case ToolWebFetch:
 		return runAnthropicTool(toolCall.ID, func() (string, error) { return webFetchToolCallImpl(a) })
 	case ToolWebSearch:
-		return runAnthropicTool(toolCall.ID, func() (string, error) { return webSearchToolCallImpl(a, &op.queries, &op.references, op.search) })
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return webSearchToolCallImpl(a, op) })
 	case ToolReadFile:
 		return runAnthropicTool(toolCall.ID, func() (string, error) { return readFileToolCallImpl(a) })
 	case ToolWriteFile:
@@ -97,17 +97,17 @@ func (op *OpenProcessor) dispatchAnthropicToolCall(toolCall anthropic.ToolUseBlo
 	case ToolEditFile:
 		return runAnthropicTool(toolCall.ID, func() (string, error) { return editFileToolCallImpl(a, op) })
 	case ToolCreateDirectory:
-		return runAnthropicTool(toolCall.ID, func() (string, error) { return createDirectoryToolCallImpl(a, op.toolsUse) })
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return createDirectoryToolCallImpl(a, op) })
 	case ToolListDirectory:
 		return runAnthropicTool(toolCall.ID, func() (string, error) { return listDirectoryToolCallImpl(a) })
 	case ToolDeleteFile:
-		return runAnthropicTool(toolCall.ID, func() (string, error) { return deleteFileToolCallImpl(a, op.toolsUse) })
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return deleteFileToolCallImpl(a, op) })
 	case ToolDeleteDirectory:
-		return runAnthropicTool(toolCall.ID, func() (string, error) { return deleteDirectoryToolCallImpl(a, op.toolsUse) })
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return deleteDirectoryToolCallImpl(a, op) })
 	case ToolMove:
-		return runAnthropicTool(toolCall.ID, func() (string, error) { return moveToolCallImpl(a, op.toolsUse) })
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return moveToolCallImpl(a, op) })
 	case ToolCopy:
-		return runAnthropicTool(toolCall.ID, func() (string, error) { return copyToolCallImpl(a, op.toolsUse) })
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return copyToolCallImpl(a, op) })
 	case ToolSearchFiles:
 		return runAnthropicTool(toolCall.ID, func() (string, error) { return searchFilesToolCallImpl(a) })
 	case ToolSearchTextInFile:
@@ -119,27 +119,27 @@ func (op *OpenProcessor) dispatchAnthropicToolCall(toolCall anthropic.ToolUseBlo
 	case ToolSaveMemory:
 		return runAnthropicTool(toolCall.ID, func() (string, error) { return saveMemoryToolCallImpl(a) })
 	case ToolBuildAgent:
-		return runAnthropicTool(toolCall.ID, func() (string, error) { return buildAgentToolCallImpl(a, op.toolsUse) })
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return buildAgentToolCallImpl(a, op) })
 	case ToolSwitchAgent:
 		return op.anthropicSwitchAgentToolCall(toolCall, a)
 	case ToolListAgent:
 		return runAnthropicTool(toolCall.ID, func() (string, error) { return listAgentToolCallImpl() })
 	case ToolSpawnSubAgents:
-		return runAnthropicTool(toolCall.ID, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op.toolsUse, op.executor) })
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op) })
 	case ToolGetState:
-		return runAnthropicTool(toolCall.ID, func() (string, error) { return getStateToolCallImpl(a, op.sharedState) })
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return getStateToolCallImpl(a, op) })
 	case ToolSetState:
-		return runAnthropicTool(toolCall.ID, func() (string, error) { return setStateToolCallImpl(a, op.agentName, op.sharedState) })
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return setStateToolCallImpl(a, op) })
 	case ToolListState:
-		return runAnthropicTool(toolCall.ID, func() (string, error) { return listStateToolCallImpl(op.sharedState) })
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return listStateToolCallImpl(op) })
 	case ToolActivateSkill:
-		return runAnthropicTool(toolCall.ID, func() (string, error) { return activateSkillToolCallImpl(a, op.toolsUse) })
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return activateSkillToolCallImpl(a, op) })
 	case ToolAskUser:
-		return runAnthropicTool(toolCall.ID, func() (string, error) { return askUserToolCallImpl(a) })
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return askUserToolCallImpl(a, op) })
 	case ToolExitPlanMode:
-		return runAnthropicTool(toolCall.ID, func() (string, error) { return exitPlanModeToolCallImpl(a, op.toolsUse) })
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return exitPlanModeToolCallImpl(a, op) })
 	case ToolEnterPlanMode:
-		return runAnthropicTool(toolCall.ID, func() (string, error) { return enterPlanModeToolCallImpl(a, op.toolsUse) })
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return enterPlanModeToolCallImpl(a, op) })
 	default:
 		if op.mcpClient != nil && op.mcpClient.FindTool(toolCall.Name) != nil {
 			return op.anthropicMCPToolCall(toolCall, a)

@@ -52,7 +52,9 @@ func (ag *Agent) getAnthropicFilePart(file *FileData) *anthropic.ContentBlockPar
 // systemPrompt — injected as the API-level system role.
 // the last message in messages — the instruction for the background task (rename, compress, …).
 func (ag *Agent) GenerateAnthropicSync(messages []anthropic.MessageParam, systemPrompt string) (string, error) {
-	ctx := context.Background()
+	if ag.Ctx == nil {
+		ag.Ctx = context.Background()
+	}
 	opts := []option.RequestOption{
 		option.WithAPIKey(ag.Model.ApiKey),
 		option.WithAuthToken(ag.Model.ApiKey),
@@ -90,7 +92,7 @@ func (ag *Agent) GenerateAnthropicSync(messages []anthropic.MessageParam, system
 
 	// Use streaming transport — Anthropic rejects the batch API for large contexts.
 	// We drain all SSE events synchronously and only collect text_delta payloads.
-	stream := client.Messages.NewStreaming(ctx, params)
+	stream := client.Messages.NewStreaming(ag.Ctx, params)
 	defer stream.Close()
 
 	var sb strings.Builder
@@ -117,8 +119,6 @@ func (ag *Agent) GenerateAnthropicSync(messages []anthropic.MessageParam, system
 // GenerateAnthropicStream generates a streaming response using Anthropic API
 func (ag *Agent) GenerateAnthropicStream() error {
 	// Initialize the Client
-	ctx := context.Background()
-
 	// Set both APIKey and AuthToken to ensure it works on X-Api-Key or Bearer
 	opts := []option.RequestOption{
 		option.WithAPIKey(ag.Model.ApiKey),
@@ -145,22 +145,23 @@ func (ag *Agent) GenerateAnthropicStream() error {
 	// Initialize sub-agent executor if SharedState is available
 	var executor *SubAgentExecutor
 	if ag.SharedState != nil {
-		executor = NewSubAgentExecutor(ag.SharedState, ag.Session.GetTopSessionName())
+		executor = NewSubAgentExecutor(ag.SharedState, ag.Session.GetTopSessionName(), ag.StdOutput, ag.FileOutput, ag.SSEOutput)
 		defer executor.Shutdown()
 	}
 
 	op := OpenProcessor{
-		ctx:        ctx,
-		notify:     ag.NotifyChan,
-		data:       ag.DataChan,
-		proceed:    ag.ProceedChan,
-		search:     ag.SearchEngine,
-		toolsUse:   &ag.ToolsUse,
-		queries:    make([]string, 0),
-		references: make([]map[string]interface{}, 0),
-		status:     &ag.Status,
-		mcpClient:  ag.MCPClient,
-		fileHooks:  NewFileHooks(),
+		notify:      ag.NotifyChan,
+		data:        ag.DataChan,
+		proceed:     ag.ProceedChan,
+		search:      ag.SearchEngine,
+		toolsUse:    &ag.ToolsUse,
+		interaction: ag.Interaction,
+		quiet:       ag.QuietMode,
+		queries:     make([]string, 0),
+		references:  make([]map[string]interface{}, 0),
+		status:      &ag.Status,
+		mcpClient:   ag.MCPClient,
+		fileHooks:   NewFileHooks(),
 		// Sub-agent orchestration
 		sharedState: ag.SharedState,
 		executor:    executor,
@@ -215,7 +216,7 @@ func (a *Anthropic) process(ag *Agent) error {
 		messages, _ := ag.Session.GetMessages().([]anthropic.MessageParam)
 
 		// check context limit and prune if needed
-		util.Debugf("Context messages: [%d]\n", len(messages))
+		util.LogDebugf("Context messages: [%d]\n", len(messages))
 		pruned, truncated, err := ag.Context.PruneMessages(messages, ag.SystemPrompt, a.tools)
 		if err != nil {
 			return fmt.Errorf("failed to prune context: %w", err)
@@ -223,8 +224,8 @@ func (a *Anthropic) process(ag *Agent) error {
 		messages = pruned.([]anthropic.MessageParam)
 
 		if truncated {
-			util.Warnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.\n", ag.Context.GetStrategy())
-			util.Debugf("Context messages after truncation: [%d]\n", len(messages))
+			util.LogWarnf("Context limit reached: oldest messages removed or summarized (%s). Consider using /compress or summarizing manually.\n", ag.Context.GetStrategy())
+			util.LogDebugf("Context messages after truncation: [%d]\n", len(messages))
 			// Update the session with truncated messages
 			ag.Session.SetMessages(messages)
 			if err := ag.Session.Save(); err != nil {
@@ -250,7 +251,7 @@ func (a *Anthropic) process(ag *Agent) error {
 			if params.Thinking.OfEnabled.BudgetTokens > params.MaxTokens {
 				params.Thinking.OfEnabled.BudgetTokens = params.MaxTokens * 1 / 2
 			}
-			util.Debugf("Anthropic MaxTokens: %d, Thinking BudgetTokens: %d\n", params.MaxTokens, params.Thinking.OfEnabled.BudgetTokens)
+			util.LogDebugf("Anthropic MaxTokens: %d, Thinking BudgetTokens: %d\n", params.MaxTokens, params.Thinking.OfEnabled.BudgetTokens)
 		}
 
 		// Temperature/TopP
@@ -261,7 +262,7 @@ func (a *Anthropic) process(ag *Agent) error {
 			params.TopP = param.NewOpt(float64(ag.Model.TopP))
 		}
 
-		stream := a.client.Messages.NewStreaming(a.op.ctx, params)
+		stream := a.client.Messages.NewStreaming(ag.Ctx, params)
 		a.op.status.ChangeTo(a.op.notify, StreamNotify{Status: StatusStarted}, a.op.proceed)
 
 		// Process stream
@@ -388,7 +389,7 @@ func (a *Anthropic) processStream(stream *ssestream.Stream[anthropic.MessageStre
 				functionID := block.ID
 				functionName := block.Name
 				if functionName != "" && !IsAvailableOpenTool(functionName) && !IsAvailableMCPTool(functionName, a.op.mcpClient) {
-					util.Warnf("Skipping tool call with unknown function name: %s\n", functionName)
+					util.LogWarnf("Skipping tool call with unknown function name: %s\n", functionName)
 					continue
 				}
 				// ContentBlockStartEventContentBlockUnion fields are embedded.

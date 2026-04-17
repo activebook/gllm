@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"sync"
 
 	"github.com/activebook/gllm/data"
@@ -96,6 +95,9 @@ func RunAgent(prompt string, guideline string, files []*service.FileData, sessio
 		// Stop indicator
 		ui.GetIndicator().Stop()
 
+		// Default interaction handler (using inner event bus)
+		interaction := service.DefaultInteractionHandler{}
+
 		// Prepare Agent Options
 		op := service.AgentOptions{
 			Prompt:        finalPrompt,
@@ -111,6 +113,7 @@ func RunAgent(prompt string, guideline string, files []*service.FileData, sessio
 			QuietMode:     false,
 			SessionName:   sessionName,
 			MCPConfig:     mcpConfig,
+			Interaction:   interaction,
 			// Sub-agent orchestration
 			SharedState: sharedState,
 			AgentName:   agent.Name,
@@ -123,10 +126,10 @@ func RunAgent(prompt string, guideline string, files []*service.FileData, sessio
 			// Switch agent signal
 			if service.IsSwitchAgentError(err) {
 				switchErr, _ := service.AsSwitchAgentError(err)
-				util.Infof("Already switched to agent [%s].\n", switchErr.TargetAgent)
+				util.LogInfof("Already switched to agent [%s].\n", switchErr.TargetAgent)
 				// Set instruction, shouldn't use the old prompt
 				prompt = switchErr.Instruction
-				util.Debugf("Switch agent instruction: %s\n", prompt)
+				util.LogDebugf("Switch agent instruction: %s\n", prompt)
 				// Clearup files
 				files = nil
 				if prompt == "" {
@@ -139,7 +142,7 @@ func RunAgent(prompt string, guideline string, files []*service.FileData, sessio
 			} else if service.IsUserCancelError(err) {
 				// User cancelled operation
 				userCancelErr, _ := service.AsUserCancelError(err)
-				util.Infof("%v\n", userCancelErr)
+				util.LogInfof("%v\n", userCancelErr)
 				break
 			} else {
 				// Other error, return
@@ -168,7 +171,7 @@ func buildFinalPrompt(input string, guideline string) string {
 	if atCtx, err := atRefProcessor.ParseAndCollect(input); err == nil && atCtx != "" {
 		contextBlobs = append(contextBlobs, atCtx)
 	} else if err != nil {
-		util.Warnf("Skip processing @ references in prompt: %v\n", err)
+		util.LogWarnf("Skip processing @ references in prompt: %v\n", err)
 	}
 
 	// 3. Optional: Add guideline as a special context blob if present
@@ -216,14 +219,13 @@ func ProcessAttachment(path string) *service.FileData {
 	// Handle stdin or regular file
 	data, err := readContentFromPath(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading file[%s]: %v\n", path, err)
+		util.LogErrorf("Error reading file[%s]: %v\n", path, err)
 		return nil
 	}
 
-	// Check if content is an image
 	isImage, format, err := service.CheckIfImageFromBytes(data)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error checking content type: %v\n", err)
+		util.LogErrorf("Error checking content type: %v\n", err)
 		return nil
 	}
 

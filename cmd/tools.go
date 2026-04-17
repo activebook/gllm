@@ -3,6 +3,9 @@ package cmd
 import (
 	"fmt"
 	"sort"
+	"strings"
+
+	"github.com/activebook/gllm/util"
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
@@ -43,9 +46,9 @@ Use 'gllm tools sw' to select which tools to enable for the current agent.`,
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(cmd.Long)
-		fmt.Println()
-		ListAllTools()
+		util.Println(cmd, cmd.Long)
+		util.Println(cmd)
+		ListAllTools(cmd)
 	},
 }
 
@@ -58,7 +61,7 @@ var toolsSwCmd = &cobra.Command{
 		store := data.NewConfigStore()
 		agent := store.GetActiveAgent()
 		if agent == nil {
-			fmt.Println("No active agent found")
+			util.Println(cmd, "No active agent found")
 			return
 		}
 
@@ -100,7 +103,7 @@ var toolsSwCmd = &cobra.Command{
 		).Run()
 
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
+			util.Printf(cmd, "Error: %v\n", err)
 			return
 		}
 
@@ -108,11 +111,11 @@ var toolsSwCmd = &cobra.Command{
 		agent.Tools = selectedTools
 		err = store.SetAgent(agent.Name, agent)
 		if err != nil {
-			fmt.Printf("Error saving tools config: %v\n", err)
+			util.Printf(cmd, "Error saving tools config: %v\n", err)
 			return
 		}
 
-		ListAllTools()
+		ListAllTools(cmd)
 	},
 }
 
@@ -192,15 +195,17 @@ func GetAllTools(agent *data.AgentConfig) string {
 	return toolsList
 }
 
-func ListAllTools() {
+func ListAllTools(cmd *cobra.Command) {
 	store := data.NewConfigStore()
 	agent := store.GetActiveAgent()
 	if agent == nil {
-		fmt.Println("No active agent found")
+		util.Println(cmd, "No active agent found")
 		return
 	}
 
-	toolsList := GetAllTools(agent)
-	fmt.Println(toolsList)
-	fmt.Println("* behind the tool name means it is a built-in capabilities tool which can be switched on/off in agent capabilities settings.")
+	var sb strings.Builder
+	sb.WriteString(GetAllTools(agent))
+	sb.WriteString("* behind the tool name means it is a built-in capabilities tool which can be switched on/off in agent capabilities settings.\n")
+
+	util.Print(cmd, sb.String())
 }

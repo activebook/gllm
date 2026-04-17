@@ -53,7 +53,7 @@ func (op *OpenProcessor) openAIMCPToolCall(toolCall openai.ChatCompletionMessage
 
 // Switch agent tool call is special, it need to deal with IsSwitchAgentError
 func (op *OpenProcessor) openAISwitchAgentToolCall(toolCall openai.ChatCompletionMessageToolCallUnion, argsMap *map[string]interface{}) (openai.ChatCompletionMessageParamUnion, error) {
-	response, err := switchAgentToolCallImpl(argsMap, op.toolsUse)
+	response, err := switchAgentToolCallImpl(argsMap, op)
 
 	if err != nil {
 		if IsSwitchAgentError(err) {
@@ -79,12 +79,12 @@ func runOpenAITool(tc openai.ChatCompletionMessageToolCallUnion, fn ToolFunc) (o
 func (op *OpenProcessor) dispatchOpenAIToolCall(toolCall openai.ChatCompletionMessageToolCallUnion, a *map[string]interface{}) (openai.ChatCompletionMessageParamUnion, error) {
 	switch toolCall.Function.Name {
 	case ToolShell:
-		return runOpenAITool(toolCall, func() (string, error) { return shellToolCallImpl(a, op.toolsUse) })
+		return runOpenAITool(toolCall, func() (string, error) { return shellToolCallImpl(a, op) })
 	case ToolWebFetch:
 		return runOpenAITool(toolCall, func() (string, error) { return webFetchToolCallImpl(a) })
 	case ToolWebSearch:
 		return runOpenAITool(toolCall, func() (string, error) {
-			return webSearchToolCallImpl(a, &op.queries, &op.references, op.search)
+			return webSearchToolCallImpl(a, op)
 		})
 	case ToolReadFile:
 		return runOpenAITool(toolCall, func() (string, error) { return readFileToolCallImpl(a) })
@@ -93,17 +93,17 @@ func (op *OpenProcessor) dispatchOpenAIToolCall(toolCall openai.ChatCompletionMe
 	case ToolEditFile:
 		return runOpenAITool(toolCall, func() (string, error) { return editFileToolCallImpl(a, op) })
 	case ToolCreateDirectory:
-		return runOpenAITool(toolCall, func() (string, error) { return createDirectoryToolCallImpl(a, op.toolsUse) })
+		return runOpenAITool(toolCall, func() (string, error) { return createDirectoryToolCallImpl(a, op) })
 	case ToolListDirectory:
 		return runOpenAITool(toolCall, func() (string, error) { return listDirectoryToolCallImpl(a) })
 	case ToolDeleteFile:
-		return runOpenAITool(toolCall, func() (string, error) { return deleteFileToolCallImpl(a, op.toolsUse) })
+		return runOpenAITool(toolCall, func() (string, error) { return deleteFileToolCallImpl(a, op) })
 	case ToolDeleteDirectory:
-		return runOpenAITool(toolCall, func() (string, error) { return deleteDirectoryToolCallImpl(a, op.toolsUse) })
+		return runOpenAITool(toolCall, func() (string, error) { return deleteDirectoryToolCallImpl(a, op) })
 	case ToolMove:
-		return runOpenAITool(toolCall, func() (string, error) { return moveToolCallImpl(a, op.toolsUse) })
+		return runOpenAITool(toolCall, func() (string, error) { return moveToolCallImpl(a, op) })
 	case ToolCopy:
-		return runOpenAITool(toolCall, func() (string, error) { return copyToolCallImpl(a, op.toolsUse) })
+		return runOpenAITool(toolCall, func() (string, error) { return copyToolCallImpl(a, op) })
 	case ToolSearchFiles:
 		return runOpenAITool(toolCall, func() (string, error) { return searchFilesToolCallImpl(a) })
 	case ToolSearchTextInFile:
@@ -117,23 +117,23 @@ func (op *OpenProcessor) dispatchOpenAIToolCall(toolCall openai.ChatCompletionMe
 	case ToolListAgent:
 		return runOpenAITool(toolCall, func() (string, error) { return listAgentToolCallImpl() })
 	case ToolSpawnSubAgents:
-		return runOpenAITool(toolCall, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op.toolsUse, op.executor) })
+		return runOpenAITool(toolCall, func() (string, error) { return spawnSubAgentsToolCallImpl(a, op) })
 	case ToolGetState:
-		return runOpenAITool(toolCall, func() (string, error) { return getStateToolCallImpl(a, op.sharedState) })
+		return runOpenAITool(toolCall, func() (string, error) { return getStateToolCallImpl(a, op) })
 	case ToolSetState:
-		return runOpenAITool(toolCall, func() (string, error) { return setStateToolCallImpl(a, op.agentName, op.sharedState) })
+		return runOpenAITool(toolCall, func() (string, error) { return setStateToolCallImpl(a, op) })
 	case ToolListState:
-		return runOpenAITool(toolCall, func() (string, error) { return listStateToolCallImpl(op.sharedState) })
+		return runOpenAITool(toolCall, func() (string, error) { return listStateToolCallImpl(op) })
 	case ToolActivateSkill:
-		return runOpenAITool(toolCall, func() (string, error) { return activateSkillToolCallImpl(a, op.toolsUse) })
+		return runOpenAITool(toolCall, func() (string, error) { return activateSkillToolCallImpl(a, op) })
 	case ToolAskUser:
-		return runOpenAITool(toolCall, func() (string, error) { return askUserToolCallImpl(a) })
+		return runOpenAITool(toolCall, func() (string, error) { return askUserToolCallImpl(a, op) })
 	case ToolExitPlanMode:
-		return runOpenAITool(toolCall, func() (string, error) { return exitPlanModeToolCallImpl(a, op.toolsUse) })
+		return runOpenAITool(toolCall, func() (string, error) { return exitPlanModeToolCallImpl(a, op) })
 	case ToolEnterPlanMode:
-		return runOpenAITool(toolCall, func() (string, error) { return enterPlanModeToolCallImpl(a, op.toolsUse) })
+		return runOpenAITool(toolCall, func() (string, error) { return enterPlanModeToolCallImpl(a, op) })
 	case ToolBuildAgent:
-		return runOpenAITool(toolCall, func() (string, error) { return buildAgentToolCallImpl(a, op.toolsUse) })
+		return runOpenAITool(toolCall, func() (string, error) { return buildAgentToolCallImpl(a, op) })
 	case ToolSwitchAgent:
 		return op.openAISwitchAgentToolCall(toolCall, a)
 	default:

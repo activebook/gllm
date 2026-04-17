@@ -3,6 +3,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/activebook/gllm/util"
+
 	"github.com/activebook/gllm/data"
 	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
@@ -17,40 +19,40 @@ var colorCmd = &cobra.Command{
 	Hidden: true, // hidden from help
 	Short:  "Test different colors of gllm output",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Current Theme: %s\n", data.CurrentThemeName)
-		fmt.Printf("Terminal Color Support: ")
+		util.Printf(cmd, "Current Theme: %s\n", data.CurrentThemeName)
+		util.Printf(cmd, "Terminal Color Support: ")
 		p := termenv.ColorProfile()
 		if p == termenv.TrueColor {
-			fmt.Println(data.SwitchOnColor + "TRUE COLOR (24-bit)" + data.ResetSeq)
+			util.Println(cmd, data.SwitchOnColor+"TRUE COLOR (24-bit)"+data.ResetSeq)
 		} else {
-			fmt.Println(data.StatusWarnColor + fmt.Sprintf("%v", p) + data.ResetSeq)
+			util.Println(cmd, data.StatusWarnColor+fmt.Sprintf("%v", p)+data.ResetSeq)
 		}
-		fmt.Println()
+		util.Println(cmd)
 
 		// Helper
 		printColor := func(name, colorSeq string) {
-			fmt.Printf("%s%s%s (Text)\n", colorSeq, name, data.ResetSeq)
+			util.Printf(cmd, "%s%s%s (Text)\n", colorSeq, name, data.ResetSeq)
 		}
 
-		fmt.Println("=== Semantic Colors ===")
+		util.Println(cmd, "=== Semantic Colors ===")
 
-		fmt.Println("\n-- Roles --")
+		util.Println(cmd, "\n-- Roles --")
 		printColor("RoleSystemColor", data.RoleSystemColor)
 		printColor("RoleUserColor", data.RoleUserColor)
 		printColor("RoleAssistantColor", data.RoleAssistantColor)
 
-		fmt.Println("\n-- Tools --")
+		util.Println(cmd, "\n-- Tools --")
 		printColor("ToolCallColor", data.ToolCallColor)
 		printColor("ToolResponseColor", data.ToolResponseColor)
 
-		fmt.Println("\n-- Status --")
+		util.Println(cmd, "\n-- Status --")
 		printColor("StatusErrorColor", data.StatusErrorColor)
 		printColor("StatusSuccessColor", data.StatusSuccessColor)
 		printColor("StatusWarnColor", data.StatusWarnColor)
 		printColor("StatusInfoColor", data.StatusInfoColor)
 		printColor("StatusDebugColor", data.StatusDebugColor)
 
-		fmt.Println("\n-- Reasoning --")
+		util.Println(cmd, "\n-- Reasoning --")
 		printColor("ReasoningTagColor", data.ReasoningTagColor)
 		printColor("ReasoningTextColor", data.ReasoningTextColor)
 
@@ -59,7 +61,7 @@ var colorCmd = &cobra.Command{
 		printColor("ReasoningMedColor", data.ReasoningMedColor)
 		printColor("ReasoningHighColor", data.ReasoningHighColor)
 
-		fmt.Println("\n-- UI & Workflow --")
+		util.Println(cmd, "\n-- UI & Workflow --")
 		printColor("SwitchOnColor", data.SwitchOnColor)
 		printColor("SwitchOffColor", data.SwitchOffColor)
 		printColor("TaskCompleteColor", data.TaskCompleteColor)
@@ -70,7 +72,7 @@ var colorCmd = &cobra.Command{
 		printColor("PromptColor", data.PromptColor)
 		printColor("MediaColor", data.MediaColor)
 
-		fmt.Println("\n-- Diff --")
+		util.Println(cmd, "\n-- Diff --")
 		printColor("DiffAddedColor", data.DiffAddedColor)
 		printColor("DiffRemovedColor", data.DiffRemovedColor)
 		printColor("DiffHeaderColor", data.DiffHeaderColor)
@@ -78,7 +80,7 @@ var colorCmd = &cobra.Command{
 		printColor("DiffAddedBgColor", data.DiffAddedBgColor)
 		printColor("DiffRemovedBgColor", data.DiffRemovedBgColor)
 
-		fmt.Println("\n-- UI & Colors --")
+		util.Println(cmd, "\n-- UI & Colors --")
 		printColor("BorderColor", data.BorderColor)
 		printColor("SectionColor", data.SectionColor)
 		printColor("KeyColor", data.KeyColor)
@@ -86,7 +88,7 @@ var colorCmd = &cobra.Command{
 		printColor("DetailColor", data.DetailColor)
 		printColor("ShellOutputColor", data.ShellOutputColor)
 
-		fmt.Println()
-		fmt.Println(data.ResetSeq)
+		util.Println(cmd)
+		util.Println(cmd, data.ResetSeq)
 	},
 }
