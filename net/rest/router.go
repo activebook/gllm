@@ -45,6 +45,7 @@ func Mount(mux *http.ServeMux) {
 
 	mux.Handle("/v1/tools", corsMiddleware(http.HandlerFunc(handleTools)))
 	mux.Handle("/v1/capabilities", corsMiddleware(http.HandlerFunc(handleCapabilities)))
+	mux.Handle("/v1/think", corsMiddleware(http.HandlerFunc(handleThink)))
 
 	mux.Handle("/v1/interact", corsMiddleware(http.HandlerFunc(handleInteract)))
 }
