@@ -37,7 +37,7 @@ func handleAgents(w http.ResponseWriter, r *http.Request) {
 	sendError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
 }
 
-func handleAgentsActive(w http.ResponseWriter, r *http.Request) {
+func handleAgentsSwitch(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		sendError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
 		return
