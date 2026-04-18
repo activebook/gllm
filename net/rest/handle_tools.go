@@ -17,11 +17,17 @@ type ToolResponse struct {
 }
 
 func handleTools(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	switch r.Method {
+	case http.MethodGet:
+		getTools(w, r)
+	case http.MethodPut:
+		updateTools(w, r)
+	default:
 		sendError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
-		return
 	}
+}
 
+func getTools(w http.ResponseWriter, r *http.Request) {
 	store := data.NewConfigStore()
 	activeAgent := store.GetActiveAgent()
 	if activeAgent == nil {
@@ -45,18 +51,12 @@ func handleTools(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, http.StatusOK, resp)
 }
 
-func handleToolsSwitch(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPut {
-		sendError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
-		return
-	}
-
+func updateTools(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		Name    string `json:"name"`
-		Enabled bool   `json:"enabled"`
+		Tools []string `json:"tools"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil || payload.Name == "" {
-		sendError(w, http.StatusBadRequest, "INVALID_PAYLOAD", "Tool name and enabled status required")
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		sendError(w, http.StatusBadRequest, "INVALID_PAYLOAD", "List of tools required")
 		return
 	}
 
@@ -67,31 +67,31 @@ func handleToolsSwitch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Logic to add/remove tool
-	changed := false
-	if payload.Enabled {
-		if !slices.Contains(activeAgent.Tools, payload.Name) {
-			activeAgent.Tools = append(activeAgent.Tools, payload.Name)
-			changed = true
-		}
-	} else {
-		if slices.Contains(activeAgent.Tools, payload.Name) {
-			activeAgent.Tools = slices.DeleteFunc(activeAgent.Tools, func(t string) bool {
-				return t == payload.Name
-			})
-			changed = true
-		}
+	// Validation: Only allow valid tool names
+	allValidTools := service.GetAllOpenTools()
+	validSet := make(map[string]bool)
+	for _, t := range allValidTools {
+		validSet[t] = true
 	}
 
-	if changed {
-		if err := store.SetAgent(activeAgent.Name, activeAgent); err != nil {
-			sendError(w, http.StatusInternalServerError, "SAVE_ERROR", err.Error())
+	var validatedTools []string
+	for _, t := range payload.Tools {
+		if validSet[t] {
+			validatedTools = append(validatedTools, t)
+		} else {
+			sendError(w, http.StatusBadRequest, "INVALID_TOOL", "Unknown tool: "+t)
 			return
 		}
 	}
 
+	activeAgent.Tools = validatedTools
+
+	if err := store.SetAgent(activeAgent.Name, activeAgent); err != nil {
+		sendError(w, http.StatusInternalServerError, "SAVE_ERROR", err.Error())
+		return
+	}
+
 	sendJSON(w, http.StatusOK, map[string]interface{}{
-		"name":    payload.Name,
-		"enabled": payload.Enabled,
+		"tools": activeAgent.Tools,
 	})
 }

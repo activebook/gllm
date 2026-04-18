@@ -18,11 +18,17 @@ type CapabilityResponse struct {
 }
 
 func handleCapabilities(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	switch r.Method {
+	case http.MethodGet:
+		getCapabilities(w, r)
+	case http.MethodPut:
+		updateCapabilities(w, r)
+	default:
 		sendError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
-		return
 	}
+}
 
+func getCapabilities(w http.ResponseWriter, r *http.Request) {
 	store := data.NewConfigStore()
 	activeAgent := store.GetActiveAgent()
 	if activeAgent == nil {
@@ -46,18 +52,12 @@ func handleCapabilities(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, http.StatusOK, resp)
 }
 
-func handleCapabilitiesSwitch(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPut {
-		sendError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
-		return
-	}
-
+func updateCapabilities(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		Name    string `json:"name"`
-		Enabled bool   `json:"enabled"`
+		Capabilities []string `json:"capabilities"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil || payload.Name == "" {
-		sendError(w, http.StatusBadRequest, "INVALID_PAYLOAD", "Capability name and enabled status required")
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		sendError(w, http.StatusBadRequest, "INVALID_PAYLOAD", "List of capabilities required")
 		return
 	}
 
@@ -68,31 +68,31 @@ func handleCapabilitiesSwitch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Logic to add/remove capability
-	changed := false
-	if payload.Enabled {
-		if !slices.Contains(activeAgent.Capabilities, payload.Name) {
-			activeAgent.Capabilities = append(activeAgent.Capabilities, payload.Name)
-			changed = true
-		}
-	} else {
-		if slices.Contains(activeAgent.Capabilities, payload.Name) {
-			activeAgent.Capabilities = slices.DeleteFunc(activeAgent.Capabilities, func(c string) bool {
-				return c == payload.Name
-			})
-			changed = true
-		}
+	// Validation: Only allow valid capability names
+	allValidCaps := service.GetAllEmbeddingCapabilities()
+	validSet := make(map[string]bool)
+	for _, c := range allValidCaps {
+		validSet[c] = true
 	}
 
-	if changed {
-		if err := store.SetAgent(activeAgent.Name, activeAgent); err != nil {
-			sendError(w, http.StatusInternalServerError, "SAVE_ERROR", err.Error())
+	var validatedCaps []string
+	for _, c := range payload.Capabilities {
+		if validSet[c] {
+			validatedCaps = append(validatedCaps, c)
+		} else {
+			sendError(w, http.StatusBadRequest, "INVALID_CAPABILITY", "Unknown capability: "+c)
 			return
 		}
 	}
 
+	activeAgent.Capabilities = validatedCaps
+
+	if err := store.SetAgent(activeAgent.Name, activeAgent); err != nil {
+		sendError(w, http.StatusInternalServerError, "SAVE_ERROR", err.Error())
+		return
+	}
+
 	sendJSON(w, http.StatusOK, map[string]interface{}{
-		"name":    payload.Name,
-		"enabled": payload.Enabled,
+		"capabilities": activeAgent.Capabilities,
 	})
 }

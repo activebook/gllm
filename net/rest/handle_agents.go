@@ -16,33 +16,34 @@ type AgentResponse struct {
 }
 
 func handleAgents(w http.ResponseWriter, r *http.Request) {
-	store := data.NewConfigStore()
-	if r.Method == http.MethodGet {
-		agentsMap := store.GetAllAgents()
-		activeAgentName := store.GetActiveAgentName()
-
-		resp := make([]AgentResponse, 0, len(agentsMap))
-		for name, agent := range agentsMap {
-			resp = append(resp, AgentResponse{
-				Name:        name,
-				Description: agent.Description,
-				Model:       agent.Model.Name,
-				Active:      name == activeAgentName,
-			})
-		}
-		sendJSON(w, http.StatusOK, resp)
-		return
+	switch r.Method {
+	case http.MethodGet:
+		getAgents(w, r)
+	case http.MethodPut:
+		updateActiveAgent(w, r)
+	default:
+		sendError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
 	}
-
-	sendError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
 }
 
-func handleAgentsSwitch(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPut {
-		sendError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
-		return
-	}
+func getAgents(w http.ResponseWriter, r *http.Request) {
+	store := data.NewConfigStore()
+	agentsMap := store.GetAllAgents()
+	activeAgentName := store.GetActiveAgentName()
 
+	resp := make([]AgentResponse, 0, len(agentsMap))
+	for name, agent := range agentsMap {
+		resp = append(resp, AgentResponse{
+			Name:        name,
+			Description: agent.Description,
+			Model:       agent.Model.Name,
+			Active:      name == activeAgentName,
+		})
+	}
+	sendJSON(w, http.StatusOK, resp)
+}
+
+func updateActiveAgent(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
 		Name string `json:"name"`
 	}
