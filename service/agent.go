@@ -64,9 +64,9 @@ type Agent struct {
 	MCPClient    *MCPClient         // MCP client for MCP tools
 
 	// Output triage
-	StdOutput  io.Output     // Standard I/O
-	FileOutput io.Output     // File I/O
-	SSEOutput  *io.SSEOutput // Network I/O for Server-Sent Events
+	StdOutput  io.Output // Standard I/O
+	FileOutput io.Output // File I/O
+	SSEOutput  io.Output // Network I/O for Server-Sent Events
 
 	// Sub-agent orchestration
 	SharedState *data.SharedState // Shared state for inter-agent communication
@@ -284,12 +284,12 @@ type AgentOptions struct {
 	ModelInfo     *data.Model
 	MaxRecursions int
 	ThinkingLevel string
-	EnabledTools  []string      // List of enabled embedding tools
-	Capabilities  []string      // List of enabled capabilities
-	YoloMode      bool          // Whether to automatically approve tools
-	QuietMode     bool          // If Quiet mode then don't print to console
-	OutputFile    string        // If OutputFile is set then write to file
-	SSEOutput     *io.SSEOutput // SSE networking adapter
+	EnabledTools  []string  // List of enabled embedding tools
+	Capabilities  []string  // List of enabled capabilities
+	YoloMode      bool      // Whether to automatically approve tools
+	QuietMode     bool      // If Quiet mode then don't print to console
+	OutputFile    string    // If OutputFile is set then write to file
+	SSEOutput     io.Output // SSE networking adapter
 	SessionName   string
 	MCPConfig     map[string]*data.MCPServer
 	Interaction   InteractionHandler // Handler for confirmations and prompts

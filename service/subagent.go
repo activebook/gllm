@@ -96,11 +96,11 @@ type SubAgentExecutor struct {
 	mcpStore     *data.MCPStore
 	stdOutput    io.Output
 	fileOutput   io.Output
-	sseOutput    *io.SSEOutput
+	sseOutput    io.Output
 }
 
 // NewSubAgentExecutor creates a new SubAgentExecutor
-func NewSubAgentExecutor(state *data.SharedState, mainSessionName string, stdOutput io.Output, fileOutput io.Output, sseOutput *io.SSEOutput) *SubAgentExecutor {
+func NewSubAgentExecutor(state *data.SharedState, mainSessionName string, stdOutput io.Output, fileOutput io.Output, sseOutput io.Output) *SubAgentExecutor {
 	return &SubAgentExecutor{
 		state:           state,
 		mainSessionName: mainSessionName,
@@ -330,7 +330,7 @@ func (e *SubAgentExecutor) setTaskStart(result *SubAgentResult, task *SubAgentTa
 	if SessionExists(sessionName, true) {
 		mode = "Resuming"
 	}
-	
+
 	if e.stdOutput != nil {
 		e.stdOutput.Writef("==> %s task: %s %s[%s -> %s]%s ...\n", mode, task.TaskKey, data.AgentRoleColor, task.CallerAgentName, task.AgentName, data.ResetSeq)
 	}
@@ -349,7 +349,7 @@ func (e *SubAgentExecutor) setTaskCompleted(result *SubAgentResult, taskKey stri
 	result.Duration = result.EndTime.Sub(result.StartTime)
 	result.Error = nil
 	result.Progress = fmt.Sprintf("Completed in %s", result.Duration.Round(time.Millisecond))
-	
+
 	if e.stdOutput != nil {
 		e.stdOutput.Writef("%s✓ > Task completed: %s%s\n", data.StatusSuccessColor, taskKey, data.ResetSeq)
 	}
@@ -368,7 +368,7 @@ func (e *SubAgentExecutor) setTaskError(result *SubAgentResult, taskKey string, 
 	result.Duration = result.EndTime.Sub(result.StartTime)
 	result.Error = err
 	result.Progress = fmt.Sprintf("Failed after %s: %v", result.Duration.Round(time.Millisecond), err)
-	
+
 	if e.stdOutput != nil {
 		e.stdOutput.Writef("%s✗ > Task failed: %s - %v%s\n", data.StatusErrorColor, taskKey, err, data.ResetSeq)
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/event"
 	"github.com/activebook/gllm/io"
+	"github.com/activebook/gllm/net/sse"
 	"github.com/activebook/gllm/util"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -42,8 +43,8 @@ StartReasoning notifies the user and logs to file that the agent has started thi
 It writes a status message to both Std and OutputFile if they are available.
 */
 func (ag *Agent) StartReasoning() {
-	if ag.SSEOutput != nil {
-		ag.SSEOutput.WriteStatusEvent("start_reasoning")
+	if sseOutput, ok := ag.SSEOutput.(*sse.SSEOutput); ok {
+		sseOutput.WriteStatusEvent("start_reasoning")
 	}
 
 	if ag.StdOutput != nil {
@@ -64,8 +65,8 @@ func (ag *Agent) StartReasoning() {
 }
 
 func (ag *Agent) CompleteReasoning() {
-	if ag.SSEOutput != nil {
-		ag.SSEOutput.WriteStatusEvent("end_reasoning")
+	if sseOutput, ok := ag.SSEOutput.(*sse.SSEOutput); ok {
+		sseOutput.WriteStatusEvent("end_reasoning")
 	}
 
 	if ag.StdOutput != nil {
@@ -106,8 +107,8 @@ func (ag *Agent) WriteReasoning(text string) {
 	// }
 
 	// Write reasoning stream event payload
-	if ag.SSEOutput != nil {
-		ag.SSEOutput.WriteReasoningPayload(text)
+	if sseOutput, ok := ag.SSEOutput.(*sse.SSEOutput); ok {
+		sseOutput.WriteReasoningPayload(text)
 	}
 }
 
@@ -249,13 +250,13 @@ func (ag *Agent) WriteFunctionCall(text string) {
 
 	// For sse, we only write the function name and the first argument
 	// We shouldn't expose the full arguments to the client
-	if ag.SSEOutput != nil {
+	if sseOutput, ok := ag.SSEOutput.(*sse.SSEOutput); ok {
 		if err == nil {
 			detail := extractFirstArg(toolData.Args)
-			ag.SSEOutput.WriteToolCallEvent(toolData.Function, detail)
+			sseOutput.WriteToolCallEvent(toolData.Function, detail)
 		} else {
 			// Fallback: raw text was not valid JSON, emit with empty function name
-			ag.SSEOutput.WriteToolCallEvent("", text)
+			sseOutput.WriteToolCallEvent("", text)
 		}
 	}
 }
@@ -270,8 +271,8 @@ func (ag *Agent) WriteFunctionCallOver() {
 }
 
 func (ag *Agent) WriteEnd() {
-	if ag.SSEOutput != nil {
-		ag.SSEOutput.WriteStatusEvent("agent_finished")
+	if sseOutput, ok := ag.SSEOutput.(*sse.SSEOutput); ok {
+		sseOutput.WriteStatusEvent("agent_finished")
 	}
 
 	// Ensure output ends with a newline to prevent shell from displaying %
