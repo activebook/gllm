@@ -10,10 +10,16 @@ import (
 
 // MCPServerResponse represents a basic MCP server entry.
 type MCPServerResponse struct {
+	Name        string            `json:"name"`
+	Type        string            `json:"type"`
+	Description string            `json:"description"`
+	Allowed     bool              `json:"allowed"`
+	Tools       []MCPToolResponse `json:"tools"`
+}
+
+type MCPToolResponse struct {
 	Name        string `json:"name"`
-	Type        string `json:"type"`
 	Description string `json:"description"`
-	Allowed     bool   `json:"allowed"`
 }
 
 func handleMCP(w http.ResponseWriter, r *http.Request) {
@@ -28,22 +34,48 @@ func handleMCP(w http.ResponseWriter, r *http.Request) {
 }
 
 func getMCPServers(w http.ResponseWriter, r *http.Request) {
+	// 1. Load static server configurations (including blocked ones)
 	store := data.NewMCPStore()
-	servers, err := store.Load()
+	staticServers, err := store.Load()
 	if err != nil {
 		sendError(w, http.StatusInternalServerError, "LOAD_ERROR", err.Error())
 		return
 	}
 
-	settingsStore := data.GetSettingsStore()
-	resp := make([]MCPServerResponse, 0, len(servers))
+	// 2. Get live servers from the shared client (contains loaded tools)
+	mc := service.GetMCPClient()
+	liveServers := mc.GetAllServers()
 
-	for name, server := range servers {
+	// Map live servers by name for fast lookup
+	liveMap := make(map[string]*service.MCPServer)
+	for _, ls := range liveServers {
+		liveMap[ls.Name] = ls
+	}
+
+	settingsStore := data.GetSettingsStore()
+	resp := make([]MCPServerResponse, 0, len(staticServers))
+
+	// 3. Join static config with live state
+	for name, server := range staticServers {
+		allowed := settingsStore.IsMCPServerAllowed(name)
+		var tools []MCPToolResponse
+
+		// If server is allowed and has live tools, populate them
+		if live, exists := liveMap[name]; exists && live.Tools != nil {
+			for _, t := range *live.Tools {
+				tools = append(tools, MCPToolResponse{
+					Name:        t.Name,
+					Description: t.Description,
+				})
+			}
+		}
+
 		resp = append(resp, MCPServerResponse{
 			Name:        name,
 			Type:        server.Type,
 			Description: server.Description,
-			Allowed:     settingsStore.IsMCPServerAllowed(name),
+			Allowed:     allowed,
+			Tools:       tools,
 		})
 	}
 
@@ -91,36 +123,4 @@ func updateAllowedMCPServers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendJSON(w, http.StatusOK, map[string]interface{}{"allowed": payload.Names})
-}
-
-func handleMCPDetails(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		sendError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
-		return
-	}
-
-	store := data.NewMCPStore()
-	mcpConfig, err := store.Load()
-	if err != nil {
-		sendError(w, http.StatusInternalServerError, "LOAD_ERROR", err.Error())
-		return
-	}
-
-	// Use a fresh client for discovery to avoid side effects on the global one
-	client := &service.MCPClient{}
-	defer client.Close()
-
-	// Initialize with LoadAll: true to fetch from all allowed servers
-	err = client.Init(mcpConfig, service.MCPLoadOption{
-		LoadAll:       true,
-		LoadTools:     true,
-		LoadResources: true,
-		LoadPrompts:   true,
-	})
-	if err != nil {
-		sendError(w, http.StatusInternalServerError, "INIT_ERROR", err.Error())
-		return
-	}
-
-	sendJSON(w, http.StatusOK, client.GetAllServers())
 }
