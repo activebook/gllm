@@ -194,9 +194,17 @@ var mcpListCmd = &cobra.Command{
 			}
 
 			util.Printf(cmd, "%s %-18s %-7s %s\n", enableIndicator, name, server.Type, statusSuffix)
+			if server.Description != "" {
+				for _, line := range strings.Split(server.Description, "\n") {
+					if strings.TrimSpace(line) != "" {
+						util.Printf(cmd, "%s%s%s\n", data.DetailColor, line, data.ResetSeq)
+					}
+				}
+			}
+			util.Println(cmd)
 		}
 
-		util.Printf(cmd, "\n%s = Allowed MCP server\n", ui.FormatEnabledIndicator(true))
+		util.Printf(cmd, "%s = Allowed MCP server\n", ui.FormatEnabledIndicator(true))
 	},
 }
 
