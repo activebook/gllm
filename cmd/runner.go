@@ -240,23 +240,3 @@ func ProcessAttachment(path string) *service.FileData {
 	return service.NewFileData(format, data, path)
 }
 
-// StartLoadMCPServer launches background MCP preloading (non-blocking).
-func StartLoadMCPServer(agent *data.AgentConfig) {
-	go func() {
-		if !service.IsMCPServersEnabled(agent.Capabilities) {
-			return
-		}
-
-		mcpStore := data.NewMCPStore()
-		mcpConfig, err := mcpStore.Load()
-		if err != nil {
-			return
-		}
-
-		mc := service.GetMCPClient()
-		mc.PreloadAsync(mcpConfig, service.MCPLoadOption{
-			LoadAll:   false,
-			LoadTools: true,
-		})
-	}()
-}

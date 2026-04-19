@@ -569,3 +569,24 @@ func (mc *MCPClient) GetPrompts(ctx context.Context, session *MCPSession) (*[]MC
 	}
 	return &mcpPrompts, nil
 }
+
+// StartMCPServer launches background MCP preloading (non-blocking).
+func StartMCPServer(agent *data.AgentConfig) {
+	go func() {
+		if !IsMCPServersEnabled(agent.Capabilities) {
+			return
+		}
+
+		mcpStore := data.NewMCPStore()
+		mcpConfig, err := mcpStore.Load()
+		if err != nil {
+			return
+		}
+
+		mc := GetMCPClient()
+		mc.PreloadAsync(mcpConfig, MCPLoadOption{
+			LoadAll:   false,
+			LoadTools: true,
+		})
+	}()
+}

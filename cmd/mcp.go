@@ -362,7 +362,7 @@ var mcpSwitchCmd = &cobra.Command{
 			mc.Close() // Must first close the old client
 			dataStore := data.NewConfigStore()
 			agent := dataStore.GetActiveAgent()
-			StartLoadMCPServer(agent)
+			service.StartMCPServer(agent)
 		}
 
 		// Run mcp list to show updated list
