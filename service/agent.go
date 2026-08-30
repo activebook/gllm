@@ -64,9 +64,9 @@ type Agent struct {
 	MCPClient    *MCPClient         // MCP client for MCP tools
 
 	// Output triage
-	StdOutput  io.Output     // Standard I/O
-	FileOutput io.Output     // File I/O
-	SSEOutput  *io.SSEOutput // Network I/O for Server-Sent Events
+	StdOutput  io.Output // Standard I/O
+	FileOutput io.Output // File I/O
+	SSEOutput  io.Output // Network I/O for Server-Sent Events
 
 	// Sub-agent orchestration
 	SharedState *data.SharedState // Shared state for inter-agent communication
@@ -74,8 +74,9 @@ type Agent struct {
 	ModelName   string            // Current model name of current agent (agent model key)
 
 	// Output mode
-	Verbose   bool // Whether verbose output mode is enabled
-	QuietMode bool // Whether quiet mode is enabled
+	Verbose         bool // Whether verbose output mode is enabled
+	QuietMode       bool // Whether quiet mode is enabled
+	AutoRenderUsage bool // Whether to automatically render token usage box on finish
 }
 
 func constructModelInfo(model *data.Model) *ModelInfo {
@@ -284,12 +285,12 @@ type AgentOptions struct {
 	ModelInfo     *data.Model
 	MaxRecursions int
 	ThinkingLevel string
-	EnabledTools  []string      // List of enabled embedding tools
-	Capabilities  []string      // List of enabled capabilities
-	YoloMode      bool          // Whether to automatically approve tools
-	QuietMode     bool          // If Quiet mode then don't print to console
-	OutputFile    string        // If OutputFile is set then write to file
-	SSEOutput     *io.SSEOutput // SSE networking adapter
+	EnabledTools  []string  // List of enabled embedding tools
+	Capabilities  []string  // List of enabled capabilities
+	YoloMode      bool      // Whether to automatically approve tools
+	QuietMode     bool      // If Quiet mode then don't print to console
+	OutputFile    string    // If OutputFile is set then write to file
+	SSEOutput     io.Output // SSE networking adapter
 	SessionName   string
 	MCPConfig     map[string]*data.MCPServer
 	Interaction   InteractionHandler // Handler for confirmations and prompts
@@ -377,11 +378,9 @@ func CallAgent(op *AgentOptions) error {
 		markdown = NewMarkdown()
 	}
 
-	// Need to append token usage
-	var tu *TokenUsage
-	if IsTokenUsageEnabled(op.Capabilities) {
-		tu = NewTokenUsage()
-	}
+	// Always track token usage; auto-render when capability is enabled
+	tu := NewTokenUsage()
+	autoRenderUsage := IsTokenUsageEnabled(op.Capabilities)
 
 	// Inject memory, skills, plan mode into system prompt
 	op.SysPrompt = ConstructSystemPrompt(op.SysPrompt, op.Capabilities)
@@ -390,33 +389,34 @@ func CallAgent(op *AgentOptions) error {
 	enabledTools := constructEnabledTools(op.EnabledTools, op.Capabilities)
 
 	ag := Agent{
-		Ctx:           op.Ctx,
-		Model:         mi,
-		SystemPrompt:  op.SysPrompt,
-		UserPrompt:    op.Prompt,
-		Files:         op.Files,
-		NotifyChan:    notifyCh,
-		DataChan:      dataCh,
-		ProceedChan:   proceedCh,
-		SearchEngine:  se,
-		ToolsUse:      toolsUse,
-		Interaction:   op.Interaction,
-		EnabledTools:  enabledTools,
-		UseCodeTool:   exeCode,
-		MCPClient:     mc,
-		ThinkingLevel: thinkingLevel,
-		MaxRecursions: op.MaxRecursions,
-		Markdown:      markdown,
-		TokenUsage:    tu,
-		StdOutput:     stdIO,
-		FileOutput:    fileIO,
-		SSEOutput:     op.SSEOutput,
-		Status:        StatusStack{},
-		SharedState:   op.SharedState,
-		AgentName:     op.AgentName,
-		ModelName:     op.ModelName,
-		Verbose:       verboseMode,
-		QuietMode:     op.QuietMode,
+		Ctx:             op.Ctx,
+		Model:           mi,
+		SystemPrompt:    op.SysPrompt,
+		UserPrompt:      op.Prompt,
+		Files:           op.Files,
+		NotifyChan:      notifyCh,
+		DataChan:        dataCh,
+		ProceedChan:     proceedCh,
+		SearchEngine:    se,
+		ToolsUse:        toolsUse,
+		Interaction:     op.Interaction,
+		EnabledTools:    enabledTools,
+		UseCodeTool:     exeCode,
+		MCPClient:       mc,
+		ThinkingLevel:   thinkingLevel,
+		MaxRecursions:   op.MaxRecursions,
+		Markdown:        markdown,
+		TokenUsage:      tu,
+		StdOutput:       stdIO,
+		FileOutput:      fileIO,
+		SSEOutput:       op.SSEOutput,
+		Status:          StatusStack{},
+		SharedState:     op.SharedState,
+		AgentName:       op.AgentName,
+		ModelName:       op.ModelName,
+		Verbose:         verboseMode,
+		QuietMode:       op.QuietMode,
+		AutoRenderUsage: autoRenderUsage,
 	}
 
 	// If no context is provided, use background context

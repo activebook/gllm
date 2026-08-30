@@ -27,7 +27,7 @@ func TestFindBestModelMatch(t *testing.T) {
 
 		// Phase 2: Date stamp stripping
 		{"date strip YYYY-MM-DD", "gpt-4o-2024-08-06", "gpt-4o"},
-		{"date strip MM-YYYY", "command-r-08-2024", ""},   // not in index, ensure no crash
+		{"date strip MM-YYYY", "command-r-08-2024", ""}, // not in index, ensure no crash
 		{"date strip short -0528", "gpt-4o-0528", "gpt-4o"},
 
 		// Phase 3: Version-suffix stripping (new dedicated phase)
@@ -41,7 +41,7 @@ func TestFindBestModelMatch(t *testing.T) {
 		{"reverse-prefix: gemini-3-flash -> gemini-3-flash-preview", "gemini-3-flash", "gemini-3-flash-preview"},
 
 		// Safety guards
-		{"guard: short input not matched by reverse-prefix", "free", "free"},   // exact match takes priority
+		{"guard: short input not matched by reverse-prefix", "free", "free"},    // exact match takes priority
 		{"guard: 'auto' not reverse-matched to a longer entry", "auto", "auto"}, // exact match, length < 10 guards reverse
 		{"guard: no match for unknown model", "unknown-model-xyz", ""},
 	}

@@ -85,7 +85,6 @@ func (p *AtRefProcessor) CollectContext(references []AtReference) (string, error
 	return ctx.String(), nil
 }
 
-
 // resolveReference resolves a single @ reference to its content
 func (p *AtRefProcessor) resolveReference(ref AtReference) (string, error) {
 	// Resolve the path (handle relative paths)

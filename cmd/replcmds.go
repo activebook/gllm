@@ -47,6 +47,7 @@ var (
 		"/detach":   "Detach file(s) or URL(s), or 'all'",
 		"/copy":     "Copy the last result or code snippet to clipboard",
 		"/about":    "Show current session settings",
+		"/status":   "Show system status and latest token usage",
 		"/theme":    "Manage and switch themes",
 		"/verbose":  "Toggle verbose mode",
 		"/workflow": "Manage workflow commands",
@@ -285,6 +286,9 @@ func (ri *ReplInfo) handleCommand(cmd *cobra.Command, input string) {
 
 	case "/about":
 		ri.showInfo(cmd)
+
+	case "/status":
+		runCommand(statusCmd, parts[1:])
 
 	case "/theme":
 		runCommand(themeCmd, parts[1:])

@@ -154,7 +154,6 @@ func (c *geminiContext) truncate(messages []*genai.Content, totalOverhead int) (
 	return messages, truncated
 }
 
-
 func (c *geminiContext) isToolMessage(msg *genai.Content) bool {
 	if msg == nil {
 		return false

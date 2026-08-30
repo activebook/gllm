@@ -315,7 +315,7 @@ func TestConvertMessages_Multimodal_AnthropicToOpenChat(t *testing.T) {
 
 	contentField := openChatMessages[0]["content"]
 	var contentArr []interface{}
-	
+
 	if arr, ok := contentField.([]interface{}); ok {
 		contentArr = arr
 	} else if obj, ok := contentField.(map[string]interface{}); ok {
@@ -325,7 +325,7 @@ func TestConvertMessages_Multimodal_AnthropicToOpenChat(t *testing.T) {
 	if len(contentArr) != 2 {
 		t.Fatalf("Expected content array of length 2 in OpenChat message, got %v", contentArr)
 	}
-	
+
 	// First block is text
 	block1 := contentArr[0].(map[string]interface{})
 	if block1["text"] != "Analyze frame" {

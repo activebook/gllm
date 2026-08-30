@@ -1,4 +1,4 @@
-package io
+package sse
 
 import (
 	"encoding/json"

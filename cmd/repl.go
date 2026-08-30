@@ -186,7 +186,7 @@ func (ri *ReplInfo) getChatInputHooks(agent *data.AgentConfig) ui.ChatInputHooks
 	return ui.ChatInputHooks{
 		// Start load MCP server when chat input is ready
 		EventChatInputReady: func() {
-			StartLoadMCPServer(agent)
+			service.StartMCPServer(agent)
 		},
 		IsPlanModeActive: func() bool {
 			return data.IsPlanModeInSessionEnabled() && data.GetPlanModeInSession()
