@@ -41,9 +41,9 @@ const (
 	CapabilityPlanModeTitleHighlight     = "[Plan Mode]()"
 	CapabilityAutoRenameTitleHighlight   = "[Auto Rename]()"
 
-	CapabilityMCPBody          = "enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."
-	CapabilitySkillsBody       = "are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.\nAfter integrating skills, **agent** will use skills automatically."
-	CapabilityMemoryBody       = "allows agents to remember important facts about you across sessions.\nFacts are used to personalize responses."
+	CapabilityMCPBody       = "enables communication with locally running MCP servers that provide additional tools and resources to extend capabilities.\nYou need to set up MCP servers specifically to use this feature."
+	CapabilitySkillsBody    = "are a lightweight, open format for extending AI agent capabilities with specialized knowledge and workflows.\nAfter integrating skills, **agent** will use skills automatically."
+	CapabilityMemoryBody    = "allows agents to remember important facts about you across sessions.\nFacts are used to personalize responses."
 	CapabilitySubAgentsBody = "enable multi-agent workflows where specialized agents collaborate to complete complex tasks.\n" +
 		"Use when a task benefits from parallel execution, requires a domain expert persona, " +
 		"or needs to be handed off to a more suitable agent."
@@ -57,8 +57,8 @@ const (
 	CapabilityMCPDescription          = CapabilityMCPTitle + " " + CapabilityMCPBody
 	CapabilitySkillsDescription       = CapabilitySkillsTitle + " " + CapabilitySkillsBody
 	CapabilityMemoryDescription       = CapabilityMemoryTitle + " " + CapabilityMemoryBody
-	CapabilitySubAgentsDescription = CapabilitySubAgentsTitle + " " + CapabilitySubAgentsBody
-	CapabilityWebSearchDescription = CapabilityWebSearchTitle + " " + CapabilityWebSearchBody
+	CapabilitySubAgentsDescription    = CapabilitySubAgentsTitle + " " + CapabilitySubAgentsBody
+	CapabilityWebSearchDescription    = CapabilityWebSearchTitle + " " + CapabilityWebSearchBody
 	CapabilityTokenUsageDescription   = CapabilityTokenUsageTitle + " " + CapabilityTokenUsageBody
 	CapabilityMarkdownDescription     = CapabilityMarkdownTitle + " " + CapabilityMarkdownBody
 	CapabilityAutoCompressDescription = CapabilityAutoCompressTitle + " " + CapabilityAutoCompressBody
@@ -69,8 +69,8 @@ const (
 	CapabilityMCPDescriptionHighlight          = CapabilityMCPTitleHighlight + CapabilityMCPBody
 	CapabilitySkillsDescriptionHighlight       = CapabilitySkillsTitleHighlight + CapabilitySkillsBody
 	CapabilityMemoryDescriptionHighlight       = CapabilityMemoryTitleHighlight + CapabilityMemoryBody
-	CapabilitySubAgentsDescriptionHighlight = CapabilitySubAgentsTitleHighlight + CapabilitySubAgentsBody
-	CapabilityWebSearchDescriptionHighlight = CapabilityWebSearchTitleHighlight + CapabilityWebSearchBody
+	CapabilitySubAgentsDescriptionHighlight    = CapabilitySubAgentsTitleHighlight + CapabilitySubAgentsBody
+	CapabilityWebSearchDescriptionHighlight    = CapabilityWebSearchTitleHighlight + CapabilityWebSearchBody
 	CapabilityTokenUsageDescriptionHighlight   = CapabilityTokenUsageTitleHighlight + CapabilityTokenUsageBody
 	CapabilityMarkdownDescriptionHighlight     = CapabilityMarkdownTitleHighlight + CapabilityMarkdownBody
 	CapabilityAutoCompressDescriptionHighlight = CapabilityAutoCompressTitleHighlight + CapabilityAutoCompressBody

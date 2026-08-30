@@ -239,4 +239,3 @@ func ProcessAttachment(path string) *service.FileData {
 	}
 	return service.NewFileData(format, data, path)
 }
-

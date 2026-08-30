@@ -178,6 +178,7 @@ var webCommandRegistry = []struct {
 	{"/memory", memoryCmd, cmdModeInfo, false},
 	{"/think", thinkCmd, cmdModeInfo, false},
 	{"/verbose", verboseCmd, cmdModeInfo, false},
+	{"/status", statusCmd, cmdModeInfo, false},
 	{"/version", versionCmd, cmdModeInfo, false},
 
 	// Session-ops: mutate current session, args must be explicit (no picker)

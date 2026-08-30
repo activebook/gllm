@@ -107,8 +107,6 @@ func WriteAgentFile(agent *AgentConfig) error {
 	return os.WriteFile(filename, []byte(content), 0644)
 }
 
-
-
 // ExportAgent exports an agent's .md file to the specified destination path.
 // It validates the agent exists and is well-formed before exporting.
 func ExportAgent(name, destPath string) error {

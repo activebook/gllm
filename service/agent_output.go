@@ -122,9 +122,9 @@ func (ag *Agent) WriteMarkdown() {
 }
 
 func (ag *Agent) WriteUsage() {
-	// Render the token usage
 	if ag.TokenUsage != nil {
-		if ag.StdOutput != nil {
+		SetLatestTokenUsage(ag.TokenUsage, ag.Model.Model, ag.Model.ContextLength, ag.Model.MaxOutputTokens)
+		if ag.AutoRenderUsage && ag.StdOutput != nil {
 			ag.TokenUsage.Render(ag.StdOutput)
 		}
 	}

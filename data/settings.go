@@ -43,14 +43,14 @@ type PluginSettings struct {
 
 // Settings represents the structure of settings.json.
 type Settings struct {
-	MCP     MCPSettings    `json:"mcp"`
-	Skills  SkillsSettings `json:"skills"`
-	Search  SearchSettings `json:"search"`
+	MCP     MCPSettings     `json:"mcp"`
+	Skills  SkillsSettings  `json:"skills"`
+	Search  SearchSettings  `json:"search"`
 	Verbose VerboseSettings `json:"verbose"`
-	Plugin  PluginSettings `json:"plugin"`
-	Theme   string         `json:"theme"`
-	Editor  string         `json:"editor"`
-	Update  UpdateSettings `json:"update"`
+	Plugin  PluginSettings  `json:"plugin"`
+	Theme   string          `json:"theme"`
+	Editor  string          `json:"editor"`
+	Update  UpdateSettings  `json:"update"`
 }
 
 // SettingsStore provides access to settings.json.

@@ -254,4 +254,3 @@ func GetDynamicHuhNoteForSelect(title string, sel *huh.Select[string], descFunc 
 
 	return note
 }
-

@@ -7,7 +7,7 @@ import (
 
 	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/io"
-	"github.com/superstarryeyes/bit/ansifonts"
+	"github.com/paulilaaso/bit/ansifonts"
 )
 
 const (

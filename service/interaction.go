@@ -5,8 +5,8 @@ import (
 	"github.com/activebook/gllm/internal/event"
 )
 
-// InteractionHandler abstracts the interactive side effects (such as asking for confirmation 
-// or prompting the user) away from the core Agent execution loop. 
+// InteractionHandler abstracts the interactive side effects (such as asking for confirmation
+// or prompting the user) away from the core Agent execution loop.
 // This decoupling allows the Agent to run seamlessly in headless environments (like SSE servers)
 // without blocking on the global event bus.
 type InteractionHandler interface {
