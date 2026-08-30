@@ -179,6 +179,7 @@ var webCommandRegistry = []struct {
 	{"/think", thinkCmd, cmdModeInfo, false},
 	{"/verbose", verboseCmd, cmdModeInfo, false},
 	{"/status", statusCmd, cmdModeInfo, false},
+	{"/goal", goalCmd, cmdModeInfo, false},
 	{"/version", versionCmd, cmdModeInfo, false},
 
 	// Session-ops: mutate current session, args must be explicit (no picker)
@@ -220,6 +221,17 @@ func handleWebCommand(prompt string, sessionName string, sseOut *sse.SSEOutput) 
 			} else {
 				runCommand(entry.cmd, parts[1:], w)
 			}
+
+			// If establishing a new goal objective in chat, proceed to agent execution
+			if command == "/goal" && len(parts) > 1 {
+				sub := strings.ToLower(parts[1])
+				if sub != "clear" && sub != "reset" && sub != "done" && sub != "complete" && sub != "milestone" && !strings.HasPrefix(sub, "-") {
+					objective := strings.Join(parts[1:], " ")
+					newPrompt := fmt.Sprintf("Goal established: %s. Review the active goal, define necessary milestones using `update_goal`, and begin executing the steps to achieve it.", objective)
+					return false, newPrompt, ""
+				}
+			}
+
 			return true, prompt, ""
 		}
 	}

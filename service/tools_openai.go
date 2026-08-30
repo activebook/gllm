@@ -132,6 +132,8 @@ func (op *OpenProcessor) dispatchOpenAIToolCall(toolCall openai.ChatCompletionMe
 		return runOpenAITool(toolCall, func() (string, error) { return exitPlanModeToolCallImpl(a, op) })
 	case ToolEnterPlanMode:
 		return runOpenAITool(toolCall, func() (string, error) { return enterPlanModeToolCallImpl(a, op) })
+	case ToolUpdateGoal:
+		return runOpenAITool(toolCall, func() (string, error) { return updateGoalToolCallImpl(a, op) })
 	case ToolBuildAgent:
 		return runOpenAITool(toolCall, func() (string, error) { return buildAgentToolCallImpl(a, op) })
 	case ToolSwitchAgent:

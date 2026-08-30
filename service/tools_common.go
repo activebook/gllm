@@ -49,6 +49,7 @@ const (
 	ToolListState         = "list_state"
 	ToolExitPlanMode      = "exit_plan_mode"
 	ToolEnterPlanMode     = "enter_plan_mode"
+	ToolUpdateGoal        = "update_goal"
 )
 
 // OpenTool is a generic tool definition that is not tied to any specific model.
@@ -127,6 +128,11 @@ var (
 		ToolEnterPlanMode,
 	}
 
+	goalTools = []string{
+		// Goal management
+		ToolUpdateGoal,
+	}
+
 	readOnlyTools = map[string]bool{
 		ToolReadFile:          true,
 		ToolReadMultipleFiles: true,
@@ -138,6 +144,7 @@ var (
 		ToolAskUser:           true,
 		ToolExitPlanMode:      true,
 		ToolEnterPlanMode:     true,
+		ToolUpdateGoal:        true,
 		ToolActivateSkill:     true,
 		ToolListMemory:        true,
 		ToolListAgent:         true,
@@ -171,6 +178,10 @@ func GetPlanModeTools() []string {
 	return planModeTools
 }
 
+func GetGoalTools() []string {
+	return goalTools
+}
+
 func GetAllFeatureInjectedTools() []string {
 	tools := []string{}
 	tools = append(tools, GetSearchTools()...)
@@ -178,6 +189,7 @@ func GetAllFeatureInjectedTools() []string {
 	tools = append(tools, GetMemoryTools()...)
 	tools = append(tools, GetSubagentTools()...)
 	tools = append(tools, GetPlanModeTools()...)
+	tools = append(tools, GetGoalTools()...)
 	return tools
 }
 
@@ -189,14 +201,15 @@ func GetAllOpenTools() []string {
 
 // IsAvailableTool checks if a tool is available for the current agent.
 // It checks if the tool is available in the
-// embedding tools, search tools, skill tools, memory tools, subagent tools, agent delegation tools, or MCP tools.
+// embedding tools, search tools, skill tools, memory tools, subagent tools, agent delegation tools, plan tools, goal tools, or MCP tools.
 func IsAvailableOpenTool(toolName string) bool {
 	return AvailableEmbeddingTool(toolName) ||
 		AvailableSearchTool(toolName) ||
 		AvailableSkillTool(toolName) ||
 		AvailableMemoryTool(toolName) ||
 		AvailableSubagentTool(toolName) ||
-		AvailablePlanTool(toolName)
+		AvailablePlanTool(toolName) ||
+		AvailableGoalTool(toolName)
 }
 
 // AvailableEmbeddingTool checks if a tool is available in the embedding tools.
@@ -252,6 +265,16 @@ func AvailableSubagentTool(toolName string) bool {
 // AvailablePlanTool checks if a tool is available in the plan tools.
 func AvailablePlanTool(toolName string) bool {
 	for _, tool := range planModeTools {
+		if tool == toolName {
+			return true
+		}
+	}
+	return false
+}
+
+// AvailableGoalTool checks if a tool is available in the goal tools.
+func AvailableGoalTool(toolName string) bool {
+	for _, tool := range goalTools {
 		if tool == toolName {
 			return true
 		}
@@ -352,6 +375,26 @@ func AppendPlanTools(tools []string) []string {
 // RemovePlanTools removes plan tools from the given tools slice.
 func RemovePlanTools(tools []string) []string {
 	for _, tool := range planModeTools {
+		tools = slices.DeleteFunc(tools, func(t string) bool {
+			return t == tool
+		})
+	}
+	return tools
+}
+
+// AppendGoalTools appends goal tools to the given tools slice if they are not already present.
+func AppendGoalTools(tools []string) []string {
+	for _, tool := range goalTools {
+		if !slices.Contains(tools, tool) {
+			tools = append(tools, tool)
+		}
+	}
+	return tools
+}
+
+// RemoveGoalTools removes goal tools from the given tools slice.
+func RemoveGoalTools(tools []string) []string {
+	for _, tool := range goalTools {
 		tools = slices.DeleteFunc(tools, func(t string) bool {
 			return t == tool
 		})
@@ -697,6 +740,10 @@ func getOpenTools() []*OpenTool {
 	// exit_plan_mode tool
 	exitPlanModeTool := getExitPlanModeTool()
 	tools = append(tools, exitPlanModeTool)
+
+	// update_goal tool
+	updateGoalTool := getUpdateGoalTool()
+	tools = append(tools, updateGoalTool)
 
 	return tools
 }
@@ -1698,6 +1745,46 @@ Use this tool when your planning phase is complete, and you require the reinstat
 		Function: &exitPlanModeFunc,
 	}
 	return &exitPlanModeTool
+}
+
+func getUpdateGoalTool() *OpenTool {
+	updateGoalFunc := OpenFunctionDefinition{
+		Name: ToolUpdateGoal,
+		Description: `Updates the active session goal progress, milestones, and verification status.
+Use this tool to track sub-task completion as you execute, append newly discovered milestones, or mark the overarching goal as completed when all acceptance criteria are validated.`,
+		Parameters: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"milestone_id": map[string]interface{}{
+					"type":        "integer",
+					"description": "The ID number of the milestone to update (e.g. 1, 2, 3).",
+				},
+				"milestone_status": map[string]interface{}{
+					"type":        "string",
+					"description": "The new status for the milestone: 'pending', 'in_progress', or 'completed'.",
+					"enum":        []string{"pending", "in_progress", "completed"},
+				},
+				"add_milestone": map[string]interface{}{
+					"type":        "string",
+					"description": "A new milestone description to append to the active goal roadmap.",
+				},
+				"goal_status": map[string]interface{}{
+					"type":        "string",
+					"description": "The new status for the overarching goal: 'completed' or 'abandoned'.",
+					"enum":        []string{"completed", "abandoned"},
+				},
+				"verification_notes": map[string]interface{}{
+					"type":        "string",
+					"description": "Detailed explanation of how the sub-task or goal was verified (e.g. test results, build success, file assertions).",
+				},
+			},
+		},
+	}
+	updateGoalTool := OpenTool{
+		Type:     ToolTypeFunction,
+		Function: &updateGoalFunc,
+	}
+	return &updateGoalTool
 }
 
 // OpenProcessor is the main processor for OpenAI-like models

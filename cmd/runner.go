@@ -56,6 +56,9 @@ func RunAgent(prompt string, guideline string, files []*service.FileData, sessio
 		defer sharedState.Clear() // Clean up on session end
 	}
 
+	// Set active session name for goal tracking
+	data.SetActiveSessionName(sessionName)
+
 	for {
 		// Get YOLO mode
 		yolo := data.GetYoloModeInSession()

@@ -704,3 +704,79 @@ func exitPlanModeToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor
 
 	return "Successfully exited Plan Mode. Current session is now in normal execution mode.", nil
 }
+
+// updateGoalToolCallImpl handles the update_goal tool call.
+func updateGoalToolCallImpl(argsMap *map[string]interface{}, op *OpenProcessor) (string, error) {
+	if err := CheckToolPermission(ToolUpdateGoal, argsMap); err != nil {
+		return "", err
+	}
+
+	goal, ok := data.GetActiveGoal()
+	if !ok || goal.Status != data.GoalStatusActive {
+		addMilestone, _ := (*argsMap)["add_milestone"].(string)
+		if addMilestone == "" {
+			return "No active session goal exists to update. Set one using /goal <objective>.", nil
+		}
+	}
+
+	var updates []string
+
+	// 1. Add new milestone if provided
+	if newDesc, ok := (*argsMap)["add_milestone"].(string); ok && strings.TrimSpace(newDesc) != "" {
+		id := data.AddGoalMilestone(strings.TrimSpace(newDesc))
+		updates = append(updates, fmt.Sprintf("Added milestone #%d: '%s'", id, newDesc))
+	}
+
+	// 2. Update existing milestone status if provided
+	if mIDRaw, ok := (*argsMap)["milestone_id"]; ok {
+		var mID int
+		switch v := mIDRaw.(type) {
+		case int:
+			mID = v
+		case int64:
+			mID = int(v)
+		case float64:
+			mID = int(v)
+		}
+
+		if mStatusStr, ok := (*argsMap)["milestone_status"].(string); ok && mID > 0 {
+			var mStatus data.MilestoneStatus
+			switch strings.ToLower(strings.TrimSpace(mStatusStr)) {
+			case "completed", "done", "true":
+				mStatus = data.MilestoneCompleted
+			case "in_progress", "inprogress", "active":
+				mStatus = data.MilestoneInProgress
+			default:
+				mStatus = data.MilestonePending
+			}
+
+			if data.UpdateGoalMilestone(mID, mStatus) {
+				updates = append(updates, fmt.Sprintf("Updated milestone #%d status to '%s'", mID, mStatus))
+			} else {
+				updates = append(updates, fmt.Sprintf("Milestone #%d not found", mID))
+			}
+		}
+	}
+
+	// 3. Update overall goal status
+	if goalStatusStr, ok := (*argsMap)["goal_status"].(string); ok {
+		notes, _ := (*argsMap)["verification_notes"].(string)
+		switch strings.ToLower(strings.TrimSpace(goalStatusStr)) {
+		case "completed", "done":
+			data.CompleteActiveGoal(notes)
+			updates = append(updates, "Goal marked as COMPLETED ✅")
+		case "abandoned":
+			if activeGoal, ok := data.GetActiveGoal(); ok {
+				activeGoal.Status = data.GoalStatusAbandoned
+				activeGoal.VerificationNotes = notes
+			}
+			updates = append(updates, "Goal marked as ABANDONED")
+		}
+	}
+
+	if len(updates) == 0 {
+		return "No goal updates were specified.", nil
+	}
+
+	return fmt.Sprintf("Goal progress updated successfully:\n- %s", strings.Join(updates, "\n- ")), nil
+}

@@ -166,6 +166,8 @@ func (op *OpenProcessor) dispatchGeminiToolCall(call *genai.FunctionCall, a *map
 		return runGeminiTool(call, func() (string, error) { return exitPlanModeToolCallImpl(a, op) })
 	case ToolEnterPlanMode:
 		return runGeminiTool(call, func() (string, error) { return enterPlanModeToolCallImpl(a, op) })
+	case ToolUpdateGoal:
+		return runGeminiTool(call, func() (string, error) { return updateGoalToolCallImpl(a, op) })
 	case ToolBuildAgent:
 		return runGeminiTool(call, func() (string, error) { return buildAgentToolCallImpl(a, op) })
 	case ToolSwitchAgent:
