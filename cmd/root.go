@@ -39,7 +39,7 @@ Configure your API keys and preferred models, then start chatting or executing c
 				// Complete the root command - list all available commands
 				return []string{
 					"agent", "completion", "config", "session",
-					"diff", "editor", "features", "help", "init",
+					"diff", "editor", "features", "goal", "help", "init",
 					"mcp", "memory", "model", "search", "skills",
 					"status", "theme", "think", "tools", "version",
 				}, cobra.ShellCompDirectiveNoFileComp

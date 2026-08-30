@@ -277,15 +277,22 @@ func RenderStatusCard(snapshot *TokenUsageSnapshot, agent *data.AgentConfig, ses
 	valueColor := lipgloss.Color(data.DetailHex)
 	totalColor := lipgloss.Color(data.SectionHex)
 
+	termWidth := io.GetTerminalWidth()
+	cardWidth := min(78, max(50, termWidth-4))
+
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(borderColor).
+		Width(cardWidth).
 		Padding(0, 1).
 		Margin(0, 0)
+
+	innerWidth := cardWidth - boxStyle.GetHorizontalFrameSize()
 
 	titleStyle := lipgloss.NewStyle().
 		Foreground(titleColor).
 		Bold(true).
+		Width(innerWidth).
 		Align(lipgloss.Center)
 
 	secHeaderStyle := lipgloss.NewStyle().
@@ -294,11 +301,12 @@ func RenderStatusCard(snapshot *TokenUsageSnapshot, agent *data.AgentConfig, ses
 
 	metaLabelW := 10
 	metaLabelStyle := lipgloss.NewStyle().Foreground(labelColor).Width(metaLabelW)
-	valStyle := lipgloss.NewStyle().Foreground(valueColor)
+	valW := max(20, innerWidth-metaLabelW)
+	valStyle := lipgloss.NewStyle().Foreground(valueColor).Width(valW)
 
 	var lines []string
 	lines = append(lines, titleStyle.Render("System Status & Token Usage"))
-	divider := lipgloss.NewStyle().Foreground(borderColor).Render(strings.Repeat("─", 44))
+	divider := lipgloss.NewStyle().Foreground(borderColor).Render(strings.Repeat("─", innerWidth))
 	lines = append(lines, divider)
 
 	// Agent & Model Section
@@ -340,6 +348,18 @@ func RenderStatusCard(snapshot *TokenUsageSnapshot, agent *data.AgentConfig, ses
 
 	if sessionName != "" {
 		lines = append(lines, lipgloss.JoinHorizontal(lipgloss.Left, metaLabelStyle.Render("Session:"), valStyle.Render(sessionName)))
+	}
+
+	// Active Goal Section
+	if goal, ok := data.GetActiveGoal(); ok && goal.Status == data.GoalStatusActive {
+		completed, total, pct := data.CalculateGoalProgress(goal)
+		var goalSummary string
+		if total > 0 {
+			goalSummary = fmt.Sprintf("%s (%d/%d · %.0f%%)", goal.Objective, completed, total, pct)
+		} else {
+			goalSummary = goal.Objective
+		}
+		lines = append(lines, lipgloss.JoinHorizontal(lipgloss.Left, metaLabelStyle.Render("Goal:"), valStyle.Foreground(lipgloss.Color(data.PlanModeHex)).Bold(true).Render(goalSummary)))
 	}
 
 	// Token Usage & Context Utilization

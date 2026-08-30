@@ -182,6 +182,13 @@ func ConstructSystemPrompt(prompt string, capabilities []string) string {
 		}
 	}
 
+	// Inject active session goal if set
+	if goal, ok := data.GetActiveGoal(); ok && goal.Status == data.GoalStatusActive {
+		if goalPrompt := ConstructGoalPrompt(goal); goalPrompt != "" {
+			sysPrompt += "\n\n" + goalPrompt
+		}
+	}
+
 	// Inject global and project instruction files (GLLM.md)
 	if instructionContent := data.GetInstructionContent(); instructionContent != "" {
 		sysPrompt += "\n\n" + instructionContent
@@ -229,6 +236,11 @@ func constructEnabledTools(tools []string, capabilities []string) []string {
 		enabledTools = AppendPlanTools(enabledTools)
 	} else {
 		enabledTools = RemovePlanTools(enabledTools)
+	}
+
+	// Goal tool injection: available whenever a goal is active or agents are operating
+	if data.IsGoalActive() {
+		enabledTools = AppendGoalTools(enabledTools)
 	}
 	return enabledTools
 }

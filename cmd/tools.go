@@ -179,6 +179,12 @@ func GetAllTools(agent *data.AgentConfig) string {
 		}
 	}
 
+	// Add goal tools if goal is active
+	goalTools := service.GetGoalTools()
+	for _, t := range goalTools {
+		enabledSet[t] = data.IsGoalActive()
+	}
+
 	var toolsList string
 	// Append char ' behind the tool name of those non-embedding tools
 	// to tell user those tools are not switchable

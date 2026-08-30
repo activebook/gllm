@@ -140,6 +140,8 @@ func (op *OpenProcessor) dispatchAnthropicToolCall(toolCall anthropic.ToolUseBlo
 		return runAnthropicTool(toolCall.ID, func() (string, error) { return exitPlanModeToolCallImpl(a, op) })
 	case ToolEnterPlanMode:
 		return runAnthropicTool(toolCall.ID, func() (string, error) { return enterPlanModeToolCallImpl(a, op) })
+	case ToolUpdateGoal:
+		return runAnthropicTool(toolCall.ID, func() (string, error) { return updateGoalToolCallImpl(a, op) })
 	default:
 		if op.mcpClient != nil && op.mcpClient.FindTool(toolCall.Name) != nil {
 			return op.anthropicMCPToolCall(toolCall, a)

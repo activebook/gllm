@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/activebook/gllm/data"
 	"github.com/activebook/gllm/internal/ui"
 	"github.com/activebook/gllm/io"
 	"github.com/activebook/gllm/service"
@@ -281,6 +282,7 @@ gllm session clear --force`,
 			}
 		}
 
+		data.ClearActiveGoal()
 		util.Println(cmd, "All sessions have been cleared.")
 		return nil
 	},
@@ -550,8 +552,10 @@ var sessionClearCurrentCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		tgtSession := GetContextSession(cmd)
 		if tgtSession == "" {
-			util.Errorf(cmd, "No active session to clear.\n")
-			return nil
+			tgtSession = sessionName
+		}
+		if tgtSession == "" {
+			tgtSession = "default"
 		}
 
 		agent, err := EnsureActiveAgent()
@@ -569,6 +573,7 @@ var sessionClearCurrentCmd = &cobra.Command{
 			util.Errorf(cmd, "Error clearing context: %v\n", err)
 			return nil
 		}
+		data.ClearActiveGoal()
 		util.Successln(cmd, "Context cleared successfully.")
 		return nil
 	},

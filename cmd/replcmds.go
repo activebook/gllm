@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -48,6 +49,7 @@ var (
 		"/copy":     "Copy the last result or code snippet to clipboard",
 		"/about":    "Show current session settings",
 		"/status":   "Show system status and latest token usage",
+		"/goal":     "Set, view, or manage invariant session goals and milestones",
 		"/theme":    "Manage and switch themes",
 		"/verbose":  "Toggle verbose mode",
 		"/workflow": "Manage workflow commands",
@@ -217,6 +219,7 @@ func (ri *ReplInfo) handleCommand(cmd *cobra.Command, input string) {
 	case "/clear":
 		runCommand(sessionClearCurrentCmd, parts[1:])
 		ri.Files = []*service.FileData{}
+		data.ClearActiveGoal()
 
 	case "/model":
 		runCommand(modelCmd, parts[1:])
@@ -289,6 +292,9 @@ func (ri *ReplInfo) handleCommand(cmd *cobra.Command, input string) {
 
 	case "/status":
 		runCommand(statusCmd, parts[1:])
+
+	case "/goal":
+		ri.handleGoalCommand(cmd, parts[1:])
 
 	case "/theme":
 		runCommand(themeCmd, parts[1:])
@@ -760,5 +766,77 @@ func switchSessionMode() {
 		data.SetPlanModeInSession(false)
 		data.SetYoloModeInSession(false)
 		ui.SendEvent(ui.SessionModeMsg{Mode: ui.SessionModeNormal})
+	}
+}
+
+func (ri *ReplInfo) handleGoalCommand(cmd *cobra.Command, args []string) {
+	if len(args) == 0 {
+		goal, _ := data.GetActiveGoal()
+		card := service.RenderGoalCard(goal)
+		util.Println(cmd, card)
+		return
+	}
+
+	subCmd := strings.ToLower(args[0])
+
+	switch subCmd {
+	case "clear", "reset":
+		data.ClearActiveGoal()
+		util.Println(cmd, "Active session goal cleared.")
+
+	case "done", "complete":
+		notes := strings.Join(args[1:], " ")
+		if data.CompleteActiveGoal(notes) {
+			util.Println(cmd, "Active session goal marked as COMPLETED ✅")
+		} else {
+			util.Println(cmd, "No active session goal to complete.")
+		}
+
+	case "milestone":
+		if len(args) < 2 {
+			util.Println(cmd, "Usage: /goal milestone add <description> OR /goal milestone <id> done")
+			return
+		}
+
+		if strings.ToLower(args[1]) == "add" && len(args) > 2 {
+			desc := strings.Join(args[2:], " ")
+			id := data.AddGoalMilestone(desc)
+			util.Printf(cmd, "Added milestone #%d: '%s'\n", id, desc)
+			return
+		}
+
+		// Milestone ID status update
+		mID, err := strconv.Atoi(args[1])
+		if err == nil && len(args) > 2 {
+			action := strings.ToLower(args[2])
+			var status data.MilestoneStatus
+			switch action {
+			case "done", "completed", "complete":
+				status = data.MilestoneCompleted
+			case "in_progress", "active":
+				status = data.MilestoneInProgress
+			default:
+				status = data.MilestonePending
+			}
+
+			if data.UpdateGoalMilestone(mID, status) {
+				util.Printf(cmd, "Milestone #%d updated to '%s'.\n", mID, status)
+			} else {
+				util.Printf(cmd, "Milestone #%d not found.\n", mID)
+			}
+			return
+		}
+
+		util.Println(cmd, "Usage: /goal milestone add <description> OR /goal milestone <id> done")
+
+	default:
+		// User provided a new goal objective
+		objective := strings.Join(args, " ")
+		goal := data.SetActiveGoal(objective, "", nil)
+		card := service.RenderGoalCard(goal)
+		util.Println(cmd, card)
+
+		// Trigger agent prompt execution to start pursuing the goal immediately
+		ri.EditorInput = fmt.Sprintf("Goal established: %s. Review the active goal, define necessary milestones using `update_goal`, and begin executing the steps to achieve it.", objective)
 	}
 }
